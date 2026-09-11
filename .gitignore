@@ -1,0 +1,28 @@
+*.iml
+.gradle/
+local.properties
+.idea/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Kotlin and Gradle generated files
+.kotlin/
+*.class
+
+# Android build and packaging artifacts
+*.apk
+*.aab
+*.apks
+output-metadata.json
+
+# Signing keys and local certificates
+*.jks
+*.keystore
+
+# IDE, OS and profiling files
+.fleet/
+.DS_Store
+Thumbs.db
+*.hprof
