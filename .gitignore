@@ -1,28 +1,40 @@
-*.iml
+# Gradle
 .gradle/
-local.properties
-.idea/
 build/
-captures/
-.externalNativeBuild/
-.cxx/
+!gradle/wrapper/gradle-wrapper.jar
 
-# Kotlin and Gradle generated files
-.kotlin/
+# Android build output
+**/build/
+
+# Local SDK and machine-specific configuration
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Kotlin / Java generated files
 *.class
+out/
 
-# Android build and packaging artifacts
+# Native build output
+.cxx/
+.externalNativeBuild/
+
+# Packaged artifacts
 *.apk
 *.aab
 *.apks
-output-metadata.json
 
-# Signing keys and local certificates
+# Signing files and private credentials
 *.jks
 *.keystore
+keystore.properties
 
-# IDE, OS and profiling files
-.fleet/
+# OS and editor files
 .DS_Store
 Thumbs.db
-*.hprof
+*.swp
+*.swo

@@ -216,7 +216,8 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
 
     fun updateFilter(f: LibraryFilter) { filter = f }
 
-    fun updateQuery(q: String) { query = q }
+    /** Con el buscador cerrado se ignora: el campo sigue compuesto (ancho 0) y podría recibir teclas tardías. */
+    fun updateQuery(q: String) { if (searchOpen) query = q }
 
     fun toggleSearch() {
         if (searchOpen) query = ""

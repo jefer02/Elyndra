@@ -17,6 +17,14 @@ cada ROM se entrega al emulador que el usuario eligió para su carpeta.
 
 Requiere JDK 17+ y el SDK de Android (compileSdk 35, minSdk 26).
 
+Para probar en el emulador usa una imagen de sistema estándar (por ejemplo
+"Google Play · x86_64", Android 15). La imagen experimental "16 KB Page Size"
+de x86_64 es inestable en Windows (WHPX): cierra al azar cualquier proceso
+(sistema, Servicios de Google Play, la propia app) a los pocos segundos. No
+hace falta para comprobar la compatibilidad con 16 KB: la única librería
+nativa del APK (`libandroidx.graphics.path.so`, de Compose) ya está alineada a
+16 KB.
+
 ## `local.properties`
 
 No se versiona. Además de `sdk.dir=...`, admite:

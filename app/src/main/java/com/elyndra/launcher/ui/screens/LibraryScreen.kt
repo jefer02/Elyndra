@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -409,6 +411,9 @@ private fun FilterTab(label: String, active: Boolean, onClick: () -> Unit) {
 @Composable
 private fun SearchField(vm: ElyndraViewModel, m: Metrics) {
     val open = vm.searchOpen
+    // Al cerrarse, el campo suelta el foco para que el teclado no siga escribiendo en un buscador invisible.
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(open) { if (!open) focusManager.clearFocus() }
     val fieldWidth by animateDpAsState(
         targetValue = if (open) (if (m.landscape) 190.dp else 96.dp) else 0.dp,
         animationSpec = tween(300, easing = Swift),
@@ -431,6 +436,7 @@ private fun SearchField(vm: ElyndraViewModel, m: Metrics) {
             BasicTextField(
                 value = vm.query,
                 onValueChange = vm::updateQuery,
+                enabled = open,
                 singleLine = true,
                 textStyle = inputStyle(12f, Color.White),
                 cursorBrush = SolidColor(Color.White),
