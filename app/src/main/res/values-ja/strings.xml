@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- アクセント -->
+    <string name="accent_mandarina">マンダリン</string>
+    <string name="accent_fuego">ファイア</string>
+    <string name="accent_menta">ミント</string>
+    <string name="accent_cobalto">コバルト</string>
+    <string name="accent_lila">ライラック</string>
+    <string name="accent_coral">コーラル</string>
+    <string name="accent_turquesa">ターコイズ</string>
+    <string name="accent_oro">ゴールド</string>
+    <string name="accent_chicle">バブルガム</string>
+    <string name="accent_grafito">グラファイト</string>
+
+    <!-- ライブラリ -->
+    <string name="filter_all">すべて</string>
+    <string name="filter_android">Android</string>
+    <string name="filter_consoles">ゲーム機</string>
+    <string name="search_hint">検索</string>
+    <string name="chip_emulator_folder">エミュレーターフォルダー</string>
+    <string name="chip_android_app">Androidアプリ</string>
+    <string name="played_time">%1$s プレイ</string>
+    <string name="never_played">未プレイ</string>
+    <string name="app_not_installed_badge">未インストール</string>
+    <string name="empty_library_title">ライブラリは空です</string>
+    <string name="empty_library_hint">Androidゲームまたは ROM フォルダーを追加</string>
+    <string name="hint_gestures">タップで選択 · ダブルタップで起動 · 長押しでオプション</string>
+    <string name="no_results">検索に一致する項目はありません</string>
+    <string name="add_short">追加</string>
+    <string name="add_long">ゲームや ROM を追加</string>
+    <string name="open">開く</string>
+    <string name="launch_android">Androidアプリを起動中</string>
+    <string name="launch_via">%1$s で起動中</string>
+    <plurals name="items_count">
+        <item quantity="other">%d 件</item>
+    </plurals>
+    <plurals name="roms_with_emulator">
+        <item quantity="other">%1$d ROM · %2$s</item>
+    </plurals>
+
+    <!-- フォルダー -->
+    <string name="rom_chip">ROM · %1$s</string>
+    <string name="roms_header">ROM</string>
+    <string name="library_back">ライブラリ</string>
+    <string name="open_in">%1$s で開く</string>
+    <string name="folder_empty">このフォルダーに ROM がありません。再スキャンするか、システムの設定を確認してください。</string>
+    <plurals name="roms_summary">
+        <item quantity="other">%1$d ROM · %2$s</item>
+    </plurals>
+
+    <!-- メニューとダイアログ -->
+    <string name="details">詳細</string>
+    <string name="refresh_metadata">メタデータを更新</string>
+    <string name="remove_from_library">ライブラリから削除</string>
+    <string name="remove_folder">フォルダーを削除</string>
+    <string name="rescan_folder">フォルダーを再スキャン</string>
+    <string name="change_emulator">エミュレーターを変更</string>
+    <string name="choose_emulator">エミュレーターを選択</string>
+    <string name="emulator_for_game">このゲームのエミュレーター</string>
+    <string name="use_folder_emulator">フォルダーのエミュレーターを使う</string>
+    <string name="other_app">ほかのアプリ…</string>
+    <string name="other_app_hint">Elyndra は標準の「表示」リクエストでこのアプリに ROM を渡します。</string>
+    <string name="not_installed">未インストール</string>
+    <string name="confirm_remove_title">ライブラリから削除しますか？</string>
+    <string name="confirm_remove_app_msg">%1$s をライブラリから外します。アプリはインストールされたままです。</string>
+    <plurals name="confirm_remove_folder_msg">
+        <item quantity="other">フォルダーと %d 本の ROM を Elyndra から外します。ファイル自体は削除されません。</item>
+    </plurals>
+    <string name="remove">削除</string>
+    <string name="close">閉じる</string>
+    <string name="ok">OK</string>
+    <string name="install">インストール</string>
+    <string name="choose_other">ほかを選ぶ</string>
+    <string name="cancel">キャンセル</string>
+    <string name="retry">再試行</string>
+    <string name="dialog_emulator_missing_title">%1$s がインストールされていません</string>
+    <string name="dialog_emulator_missing_msg">インストールするか、このフォルダーに別のエミュレーターを選んでください。</string>
+    <string name="dialog_needs_path_title">ローカルファイルが必要です</string>
+    <string name="dialog_needs_path_msg">%1$s はファイルパスでしか開けませんが、このフォルダーは本体ストレージにも SD カードにもありません。別のエミュレーターを選ぶか、ROM をローカルストレージに移動してください。</string>
+    <string name="dialog_vita_title">タイトル ID がありません</string>
+    <string name="dialog_vita_msg">Vita3K には .psvita ファイル内に記載されたゲームのタイトル ID（例: PCSE00000）が必要です。</string>
+    <string name="dialog_launch_failed_title">ゲームを開けませんでした</string>
+    <string name="dialog_launch_failed_msg">%1$s がゲームを開けませんでした: %2$s</string>
+    <string name="dialog_app_missing_title">アプリがインストールされていません</string>
+    <string name="dialog_app_missing_msg">%1$s はこの端末にインストールされていません。ライブラリから削除しますか？</string>
+    <string name="dialog_permission_lost_title">フォルダーへのアクセスが失われました</string>
+    <string name="dialog_permission_lost_msg">Android により %1$s を読み取れなくなりました。フォルダーを削除してから、もう一度追加してください。</string>
+    <string name="dialog_no_emulator_title">エミュレーターがありません</string>
+    <string name="dialog_no_emulator_msg">このフォルダーで使うエミュレーターを選んでください。</string>
+
+    <!-- 追加 -->
+    <string name="add_title">ライブラリに追加</string>
+    <string name="tab_android">Androidゲーム</string>
+    <string name="tab_roms">ROM フォルダー</string>
+    <string name="apps_title">インストール済みアプリ</string>
+    <string name="show_all_apps">すべてのアプリ</string>
+    <string name="show_games_only">ゲームのみ</string>
+    <string name="app_already_added">ライブラリに追加済み</string>
+    <string name="select_games">追加するゲームを選択</string>
+    <string name="no_games_detected">インストール済みのゲームが見つかりません。「すべてのアプリ」をタップすると任意のアプリを選べます。</string>
+    <plurals name="apps_summary">
+        <item quantity="other">%1$d 本のゲームを検出 · %2$d 本選択中</item>
+    </plurals>
+    <plurals name="add_n_games">
+        <item quantity="other">%d 本のゲームを追加</item>
+    </plurals>
+    <string name="step_folder">1 · フォルダー</string>
+    <string name="step_system">2 · システム</string>
+    <string name="step_emulator">3 · このフォルダーのエミュレーター</string>
+    <string name="browse">参照</string>
+    <string name="no_folder">ROM が入っているフォルダーを選んでください</string>
+    <string name="no_folder_cta">先にフォルダーを選んでください</string>
+    <string name="choose_system_first">システムを選んでください</string>
+    <string name="emulator_explainer">このフォルダーの ROM はすべて %1$s で開きます。Elyndra 自体がゲームを実行することはありません。</string>
+    <string name="emulator_not_installed">%1$s は未インストールです</string>
+    <string name="emulator_legend">薄く表示されているエミュレーターは、この端末にインストールされていません。</string>
+    <string name="reading_folder">フォルダーを読み込み中</string>
+    <string name="analysis_done">スキャン完了</string>
+    <string name="scan_none">%1$s の ROM が見つかりません。対応する拡張子: %2$s</string>
+    <string name="scan_failed">フォルダーを読み込めませんでした: %1$s</string>
+    <string name="analyze_folder">フォルダーをスキャン</string>
+    <string name="scanning_cta">スキャン中…</string>
+    <string name="scan_again">もう一度スキャン</string>
+    <string name="add_folder_to_library">フォルダーをライブラリに追加</string>
+    <string name="add_all_detected">すべて追加</string>
+    <string name="adding_systems">%1$s を追加中（%2$d/%3$d）…</string>
+    <string name="folder_already_added">このフォルダーはすでにライブラリにあります</string>
+    <plurals name="scan_progress">
+        <item quantity="other">%1$d ROM · %2$d ファイル</item>
+    </plurals>
+    <plurals name="scan_found">
+        <item quantity="other">%1$d 本の ROM を検出 · %2$s</item>
+    </plurals>
+    <plurals name="detected_systems">
+        <item quantity="other">サブフォルダーで %d 個のシステムを検出</item>
+    </plurals>
+
+    <!-- 通知メッセージ -->
+    <string name="toast_folder_permission_failed">Android がそのフォルダーへのアクセスを許可しませんでした</string>
+    <string name="toast_folder_unreachable">%1$s に今はアクセスできません（SD カードが外された？）</string>
+    <string name="toast_rescan">新規 %1$d · 削除 %2$d</string>
+    <string name="toast_metadata_started">バックグラウンドでメタデータをダウンロード中</string>
+    <string name="toast_images_cleared">画像を削除しました</string>
+    <string name="library_empty_toast">ライブラリが空です。先にゲームや ROM を追加してください。</string>
+    <plurals name="toast_added_apps">
+        <item quantity="other">%d 本のゲームを追加しました</item>
+    </plurals>
+    <plurals name="toast_folder_added">
+        <item quantity="other">%1$d 本の ROM を追加 · %2$s</item>
+    </plurals>
+    <plurals name="toast_bulk_added">
+        <item quantity="other">%2$d 個のシステムから %1$d 本の ROM を追加しました</item>
+    </plurals>
+
+    <!-- 設定 -->
+    <string name="settings_title">設定</string>
+    <string name="section_accent">アクセントカラー</string>
+    <string name="accent_label">アクセント: %1$s</string>
+    <string name="section_glass">リキッドグラス</string>
+    <string name="preview">プレビュー</string>
+    <string name="blur">ぼかし</string>
+    <string name="transparency">透明度</string>
+    <string name="hero_intensity">ヒーローの濃さ</string>
+    <string name="section_language">言語</string>
+    <string name="section_library">ライブラリ</string>
+    <string name="rescan_all">すべてのフォルダーを再スキャン</string>
+    <string name="rescan">再スキャン</string>
+    <string name="clear_images">ダウンロードした画像</string>
+    <string name="clear_images_msg">ダウンロードしたカバー、背景、ロゴをすべて削除しますか？次にメタデータを適用するときに再ダウンロードされます。</string>
+    <string name="images_size">%1$s 使用中</string>
+    <plurals name="folders_count">
+        <item quantity="other">ROM フォルダー %d 個</item>
+    </plurals>
+    <string name="section_metadata_apis">メタデータ API</string>
+    <string name="status_connected">接続済み</string>
+    <string name="status_not_configured">未設定</string>
+    <string name="status_unverified">未確認</string>
+    <string name="status_checking">確認中…</string>
+    <string name="status_error">エラー</string>
+    <string name="test_connection">接続テスト</string>
+    <string name="connect">接続</string>
+    <string name="get_credentials">認証情報を取得</string>
+    <string name="show">表示</string>
+    <string name="hide">隠す</string>
+    <string name="field_username">ユーザー名</string>
+    <string name="field_password">パスワード</string>
+    <string name="field_client_id">Client ID</string>
+    <string name="field_client_secret">Client Secret</string>
+    <string name="field_api_key">API キー</string>
+    <string name="field_web_api_key">Web API キー</string>
+    <string name="field_dev_id">開発者 ID（devid）</string>
+    <string name="field_dev_password">開発者パスワード</string>
+    <string name="ss_desc">ROM のハッシュで識別して、カバー、ロゴ、スクリーンショット、あらすじを取得します。</string>
+    <string name="ss_help">screenscraper.fr の無料アカウントがあると、1日のリクエスト上限と速度が上がります。アカウントなしでは匿名で、少ない上限で取得します。</string>
+    <string name="ss_dev_toggle">開発者の認証情報</string>
+    <string name="ss_dev_builtin">このビルドには Elyndra の開発者認証情報が含まれています。独自のものを使う場合のみ入力してください。</string>
+    <string name="ss_dev_missing">このビルドには ScreenScraper の開発者認証情報が含まれていません。ScreenScraper はフォーラムでアプリごとに発行しています。ここに入力してください。</string>
+    <string name="ss_status_detail">%1$s · 本日 %2$d/%3$d リクエスト</string>
+    <string name="ss_status_anonymous">開発者認証情報 OK · 匿名アクセス（アカウントを追加すると上限が増えます）</string>
+    <string name="igdb_desc">発売日、ジャンル、開発会社、概要を取得します。</string>
+    <string name="igdb_help">dev.twitch.tv/console/apps でアプリケーションを登録し（OAuth リダイレクト URL: http://localhost、カテゴリ: Application Integration）、Client ID をコピーして新しい Client Secret を生成してください。Twitch アカウントには二段階認証が必要です。</string>
+    <string name="igdb_status_detail">トークンの有効期限: %1$s</string>
+    <string name="sgdb_desc">高解像度のグリッド、ヒーロー画像、ロゴ。Android タイトルに最適です。</string>
+    <string name="sgdb_help">steamgriddb.com に Steam アカウントでログインし、Preferences → API でキーを生成してください。</string>
+    <string name="sgdb_status_ok">有効なキー</string>
+    <string name="ra_desc">対応ゲームごとの実績セットと、あなたの進捗。</string>
+    <string name="ra_help">ユーザー名と、retroachievements.org → Settings → Keys にある Web API Key を入力してください。</string>
+    <string name="ra_status_detail">%1$s · %2$d ポイント</string>
+    <string name="err_credentials">認証情報が正しくありません</string>
+    <string name="err_missing_dev">開発者の認証情報がありません</string>
+    <string name="err_quota">1日の上限に達しました。明日もう一度お試しください。</string>
+    <string name="err_blocked">サービスがこのアプリを拒否しました（古いかブロック済み）</string>
+    <string name="err_rate">リクエストが多すぎます。少し待ってからお試しください。</string>
+    <string name="err_network">サービスに接続できません。接続を確認してください。</string>
+    <string name="err_server">サービスエラー（%1$d）</string>
+    <string name="err_bad_response">サービスから想定外の応答がありました</string>
+    <string name="err_unavailable">サービスは一時的に利用できません</string>
+    <string name="auto_meta_title">メタデータを自動で適用</string>
+    <string name="auto_meta_desc">ゲームを追加するとすぐに、カバー、ロゴ、背景、実績をダウンロードします。</string>
+    <string name="apply_all">ライブラリ全体にメタデータを適用</string>
+    <string name="applying">メタデータをダウンロード中… %1$d/%2$d</string>
+    <string name="applied_detail">一致 %1$d · 見つからず %2$d</string>
+    <string name="metadata_cancelled">キャンセルしました</string>
+    <string name="redo_all">すべて再取得</string>
+    <string name="configure_a_service">カバーやゲーム情報をダウンロードするには、設定でメタデータサービスを1つ以上設定してください。</string>
+    <string name="service_failure_line">%1$s: %2$s</string>
+    <plurals name="applied">
+        <item quantity="other">%d 件にメタデータを適用しました</item>
+    </plurals>
+
+    <!-- 詳細 -->
+    <string name="details_emulator_line">%1$s で開きます</string>
+    <string name="details_no_metadata">まだメタデータがありません。設定でサービスを設定してから更新してください。</string>
+    <string name="details_release">発売日</string>
+    <string name="details_developer">開発</string>
+    <string name="details_publisher">販売</string>
+    <string name="details_genre">ジャンル</string>
+    <string name="details_players">プレイ人数</string>
+    <string name="details_rating">評価</string>
+    <string name="details_sources">情報元</string>
+    <string name="details_last_played">最終プレイ</string>
+    <string name="details_file">ファイル</string>
+    <string name="details_size">サイズ</string>
+    <string name="details_package">パッケージ</string>
+    <string name="achievements_title">実績</string>
+    <string name="achievements_summary">%1$d/%2$d 解除 · %3$d/%4$d ポイント</string>
+    <string name="achievements_loading">実績を読み込み中…</string>
+    <string name="achievements_failed">実績を読み込めませんでした</string>
+    <string name="achievements_load">実績を表示</string>
+    <string name="open_in_ra">RetroAchievements</string>
+    <string name="matched_by_title">タイトルで識別（ROM ハッシュなし）</string>
+
+    <!-- 通知 -->
+    <string name="notif_channel_metadata">メタデータのダウンロード</string>
+    <string name="notif_metadata_title">メタデータをダウンロード中</string>
+    <string name="notif_metadata_progress">%1$d/%2$d · %3$s</string>
+    <string name="notif_metadata_preparing">準備中…</string>
+
+    <!-- Lucy -->
+    <string name="lucy_subtitle">ライブラリアシスタント</string>
+    <string name="lucy_online">オンライン · Claude</string>
+    <string name="lucy_demo">デモモード · API キーを追加</string>
+    <string name="lucy_placeholder">プレイ時間について Lucy に質問…</string>
+    <string name="lucy_greeting">こんにちは、Lucy です。ライブラリやプレイ時間、次に遊ぶゲームについて聞いてください。</string>
+    <string name="lucy_stat_week">今週</string>
+    <string name="lucy_stat_top">最も遊んだ</string>
+    <string name="lucy_stat_sessions">セッション</string>
+    <string name="lucy_vs_previous">先週比 %1$s</string>
+    <string name="lucy_average">平均 %1$s</string>
+    <string name="lucy_no_data">まだデータがありません</string>
+    <string name="lucy_suggest_week">今週の内訳を教えて</string>
+    <string name="lucy_suggest_fact">豆知識</string>
+    <string name="lucy_suggest_next">次は何を遊ぶ？</string>
+</resources>

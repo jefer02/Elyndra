@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Idioma por defecto (inglés): lo que ve cualquier dispositivo en un idioma no traducido.
+     Traducciones: values-es, values-pt, values-fr, values-de, values-ja. -->
+<resources>
+    <string name="app_name" translatable="false">Elyndra</string>
+
+    <!-- Acentos -->
+    <string name="accent_mandarina">Mandarin</string>
+    <string name="accent_fuego">Fire</string>
+    <string name="accent_menta">Mint</string>
+    <string name="accent_cobalto">Cobalt</string>
+    <string name="accent_lila">Lilac</string>
+    <string name="accent_coral">Coral</string>
+    <string name="accent_turquesa">Turquoise</string>
+    <string name="accent_oro">Gold</string>
+    <string name="accent_chicle">Bubblegum</string>
+    <string name="accent_grafito">Graphite</string>
+
+    <!-- Biblioteca -->
+    <string name="filter_all">All</string>
+    <string name="filter_android">Android</string>
+    <string name="filter_consoles">Consoles</string>
+    <string name="search_hint">Search</string>
+    <string name="chip_emulator_folder">Emulator folder</string>
+    <string name="chip_android_app">Android app</string>
+    <string name="played_time">%1$s played</string>
+    <string name="never_played">Not played yet</string>
+    <string name="app_not_installed_badge">Not installed</string>
+    <string name="empty_library_title">Empty library</string>
+    <string name="empty_library_hint">Add Android games or a ROM folder</string>
+    <string name="hint_gestures">Tap to select · Double tap to open · Hold for options</string>
+    <string name="no_results">Nothing matches your search</string>
+    <string name="add_short">Add</string>
+    <string name="add_long">Add games or ROMs</string>
+    <string name="open">Open</string>
+    <string name="launch_android">Opening Android app</string>
+    <string name="launch_via">Opening in %1$s</string>
+    <plurals name="items_count">
+        <item quantity="one">%d item</item>
+        <item quantity="other">%d items</item>
+    </plurals>
+    <plurals name="roms_with_emulator">
+        <item quantity="one">%1$d ROM · %2$s</item>
+        <item quantity="other">%1$d ROMs · %2$s</item>
+    </plurals>
+
+    <!-- Carpeta -->
+    <string name="rom_chip">ROM · %1$s</string>
+    <string name="roms_header">ROMs</string>
+    <string name="library_back">Library</string>
+    <string name="open_in">Open in %1$s</string>
+    <string name="folder_empty">No ROMs in this folder. Rescan it or check that the system is right.</string>
+    <plurals name="roms_summary">
+        <item quantity="one">%1$d ROM · %2$s</item>
+        <item quantity="other">%1$d ROMs · %2$s</item>
+    </plurals>
+
+    <!-- Menús y diálogos -->
+    <string name="details">Details</string>
+    <string name="refresh_metadata">Refresh metadata</string>
+    <string name="remove_from_library">Remove from library</string>
+    <string name="remove_folder">Remove folder</string>
+    <string name="rescan_folder">Rescan folder</string>
+    <string name="change_emulator">Change emulator</string>
+    <string name="choose_emulator">Choose emulator</string>
+    <string name="emulator_for_game">Emulator for this game</string>
+    <string name="use_folder_emulator">Use the folder\'s emulator</string>
+    <string name="other_app">Other app…</string>
+    <string name="other_app_hint">Elyndra will hand ROMs to this app with a standard “view” request.</string>
+    <string name="not_installed">Not installed</string>
+    <string name="confirm_remove_title">Remove from library?</string>
+    <string name="confirm_remove_app_msg">%1$s will leave your library. The app stays installed.</string>
+    <plurals name="confirm_remove_folder_msg">
+        <item quantity="one">The folder and its %d ROM leave Elyndra. Your files aren\'t deleted.</item>
+        <item quantity="other">The folder and its %d ROMs leave Elyndra. Your files aren\'t deleted.</item>
+    </plurals>
+    <string name="remove">Remove</string>
+    <string name="close">Close</string>
+    <string name="ok">OK</string>
+    <string name="install">Install</string>
+    <string name="choose_other">Choose another</string>
+    <string name="cancel">Cancel</string>
+    <string name="retry">Retry</string>
+    <string name="dialog_emulator_missing_title">%1$s isn\'t installed</string>
+    <string name="dialog_emulator_missing_msg">Install it, or pick another emulator for this folder.</string>
+    <string name="dialog_needs_path_title">Needs a local file</string>
+    <string name="dialog_needs_path_msg">%1$s only opens files by path, and this folder isn\'t on the device storage or SD card. Choose another emulator or move the ROMs to local storage.</string>
+    <string name="dialog_vita_title">Missing title ID</string>
+    <string name="dialog_vita_msg">Vita3K needs the game\'s title ID (for example PCSE00000) written inside the .psvita file.</string>
+    <string name="dialog_launch_failed_title">Couldn\'t open the game</string>
+    <string name="dialog_launch_failed_msg">%1$s couldn\'t open the game: %2$s</string>
+    <string name="dialog_app_missing_title">App not installed</string>
+    <string name="dialog_app_missing_msg">%1$s is no longer installed on this device. Remove it from your library?</string>
+    <string name="dialog_permission_lost_title">Folder access lost</string>
+    <string name="dialog_permission_lost_msg">Android no longer lets Elyndra read %1$s. Remove the folder and add it again.</string>
+    <string name="dialog_no_emulator_title">No emulator</string>
+    <string name="dialog_no_emulator_msg">Choose which emulator this folder uses.</string>
+
+    <!-- Añadir -->
+    <string name="add_title">Add to library</string>
+    <string name="tab_android">Android games</string>
+    <string name="tab_roms">ROM folder</string>
+    <string name="apps_title">Installed apps</string>
+    <string name="show_all_apps">Show all apps</string>
+    <string name="show_games_only">Games only</string>
+    <string name="app_already_added">Already in your library</string>
+    <string name="select_games">Select games to add</string>
+    <string name="no_games_detected">No installed games detected. Tap “Show all apps” to pick any app.</string>
+    <plurals name="apps_summary">
+        <item quantity="one">%1$d game detected · %2$d selected</item>
+        <item quantity="other">%1$d games detected · %2$d selected</item>
+    </plurals>
+    <plurals name="add_n_games">
+        <item quantity="one">Add %d game</item>
+        <item quantity="other">Add %d games</item>
+    </plurals>
+    <string name="step_folder">1 · Folder</string>
+    <string name="step_system">2 · System</string>
+    <string name="step_emulator">3 · Emulator for this folder</string>
+    <string name="browse">Browse</string>
+    <string name="no_folder">Choose the folder that holds your ROMs</string>
+    <string name="no_folder_cta">Choose a folder first</string>
+    <string name="choose_system_first">Choose a system</string>
+    <string name="emulator_explainer">Every ROM in this folder will open in %1$s. Elyndra never runs the game itself.</string>
+    <string name="emulator_not_installed">%1$s isn\'t installed</string>
+    <string name="emulator_legend">Faded emulators aren\'t installed on this device.</string>
+    <string name="reading_folder">Reading folder</string>
+    <string name="analysis_done">Scan complete</string>
+    <string name="scan_none">No %1$s ROMs found. Expected extensions: %2$s</string>
+    <string name="scan_failed">Couldn\'t read the folder: %1$s</string>
+    <string name="analyze_folder">Scan folder</string>
+    <string name="scanning_cta">Scanning…</string>
+    <string name="scan_again">Scan again</string>
+    <string name="add_folder_to_library">Add folder to library</string>
+    <string name="add_all_detected">Add all</string>
+    <string name="adding_systems">Adding %1$s (%2$d/%3$d)…</string>
+    <string name="folder_already_added">This folder is already in your library</string>
+    <plurals name="scan_progress">
+        <item quantity="one">%1$d ROM · %2$d files</item>
+        <item quantity="other">%1$d ROMs · %2$d files</item>
+    </plurals>
+    <plurals name="scan_found">
+        <item quantity="one">%1$d ROM found · %2$s</item>
+        <item quantity="other">%1$d ROMs found · %2$s</item>
+    </plurals>
+    <plurals name="detected_systems">
+        <item quantity="one">%d system detected in subfolders</item>
+        <item quantity="other">%d systems detected in subfolders</item>
+    </plurals>
+
+    <!-- Avisos -->
+    <string name="toast_folder_permission_failed">Android didn\'t grant access to that folder</string>
+    <string name="toast_folder_unreachable">%1$s isn\'t reachable right now (SD card removed?)</string>
+    <string name="toast_rescan">%1$d new · %2$d removed</string>
+    <string name="toast_metadata_started">Downloading metadata in the background</string>
+    <string name="toast_images_cleared">Images deleted</string>
+    <string name="library_empty_toast">Your library is empty. Add games or ROMs first.</string>
+    <plurals name="toast_added_apps">
+        <item quantity="one">%d game added</item>
+        <item quantity="other">%d games added</item>
+    </plurals>
+    <plurals name="toast_folder_added">
+        <item quantity="one">%1$d ROM added · %2$s</item>
+        <item quantity="other">%1$d ROMs added · %2$s</item>
+    </plurals>
+    <plurals name="toast_bulk_added">
+        <item quantity="one">%1$d ROM added from %2$d systems</item>
+        <item quantity="other">%1$d ROMs added from %2$d systems</item>
+    </plurals>
+
+    <!-- Ajustes -->
+    <string name="settings_title">Settings</string>
+    <string name="section_accent">Accent color</string>
+    <string name="accent_label">Accent: %1$s</string>
+    <string name="section_glass">Liquid glass</string>
+    <string name="preview">Preview</string>
+    <string name="blur">Blur</string>
+    <string name="transparency">Transparency</string>
+    <string name="hero_intensity">Hero intensity</string>
+    <string name="section_language">Language</string>
+    <string name="section_library">Library</string>
+    <string name="rescan_all">Rescan all folders</string>
+    <string name="rescan">Rescan</string>
+    <string name="clear_images">Downloaded images</string>
+    <string name="clear_images_msg">Delete every downloaded cover, background and logo? They\'ll be downloaded again the next time you apply metadata.</string>
+    <string name="images_size">%1$s in use</string>
+    <plurals name="folders_count">
+        <item quantity="one">%d ROM folder</item>
+        <item quantity="other">%d ROM folders</item>
+    </plurals>
+    <string name="section_metadata_apis">Metadata APIs</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_not_configured">Not set up</string>
+    <string name="status_unverified">Not verified</string>
+    <string name="status_checking">Checking…</string>
+    <string name="status_error">Error</string>
+    <string name="test_connection">Test connection</string>
+    <string name="connect">Connect</string>
+    <string name="get_credentials">Get credentials</string>
+    <string name="show">Show</string>
+    <string name="hide">Hide</string>
+    <string name="field_username">Username</string>
+    <string name="field_password">Password</string>
+    <string name="field_client_id">Client ID</string>
+    <string name="field_client_secret">Client secret</string>
+    <string name="field_api_key">API key</string>
+    <string name="field_web_api_key">Web API key</string>
+    <string name="field_dev_id">Developer ID (devid)</string>
+    <string name="field_dev_password">Developer password</string>
+    <string name="ss_desc">Box art, logos, screenshots and synopses, identified by ROM hash.</string>
+    <string name="ss_help">A free screenscraper.fr account raises your daily quota and speed. Without an account the app scrapes anonymously with a lower quota.</string>
+    <string name="ss_dev_toggle">Developer credentials</string>
+    <string name="ss_dev_builtin">This build already includes Elyndra\'s developer credentials. Fill these in only to use your own.</string>
+    <string name="ss_dev_missing">This build has no ScreenScraper developer credentials. ScreenScraper grants them per app on its forum; enter them here.</string>
+    <string name="ss_status_detail">%1$s · %2$d/%3$d requests today</string>
+    <string name="ss_status_anonymous">Developer credentials OK · anonymous access (add your account for a higher quota)</string>
+    <string name="igdb_desc">Release dates, genres, studios and summaries.</string>
+    <string name="igdb_help">At dev.twitch.tv/console/apps, register an application (OAuth redirect URL: http://localhost, category: Application Integration). Copy its Client ID and generate a new Client Secret. Twitch requires two-factor authentication on the account.</string>
+    <string name="igdb_status_detail">Token valid until %1$s</string>
+    <string name="sgdb_desc">High-resolution grids, heroes and logos, ideal for Android titles.</string>
+    <string name="sgdb_help">Sign in at steamgriddb.com with your Steam account, then open Preferences → API and generate a key.</string>
+    <string name="sgdb_status_ok">Valid key</string>
+    <string name="ra_desc">Achievement sets and your progress for each supported game.</string>
+    <string name="ra_help">Enter your username and the Web API Key from retroachievements.org → Settings → Keys.</string>
+    <string name="ra_status_detail">%1$s · %2$d points</string>
+    <string name="err_credentials">Wrong credentials</string>
+    <string name="err_missing_dev">Missing developer credentials</string>
+    <string name="err_quota">Daily quota used up. Try again tomorrow.</string>
+    <string name="err_blocked">The service rejected this app (outdated or blocked)</string>
+    <string name="err_rate">Too many requests. Wait a moment and try again.</string>
+    <string name="err_network">Can\'t reach the service. Check your connection.</string>
+    <string name="err_server">Service error (%1$d)</string>
+    <string name="err_bad_response">Unexpected response from the service</string>
+    <string name="err_unavailable">Service temporarily unavailable</string>
+    <string name="auto_meta_title">Apply metadata automatically</string>
+    <string name="auto_meta_desc">Box art, logos, backgrounds and achievements download as soon as a game is added.</string>
+    <string name="apply_all">Apply metadata to the whole library</string>
+    <string name="applying">Downloading metadata… %1$d/%2$d</string>
+    <string name="applied_detail">%1$d matched · %2$d not found</string>
+    <string name="metadata_cancelled">Cancelled</string>
+    <string name="redo_all">Refresh everything</string>
+    <string name="configure_a_service">Set up at least one metadata service in Settings to download box art and game info.</string>
+    <string name="service_failure_line">%1$s: %2$s</string>
+    <plurals name="applied">
+        <item quantity="one">Metadata applied to %d item</item>
+        <item quantity="other">Metadata applied to %d items</item>
+    </plurals>
+
+    <!-- Ficha de detalles -->
+    <string name="details_emulator_line">Opens in %1$s</string>
+    <string name="details_no_metadata">No metadata yet. Set up a service in Settings and refresh.</string>
+    <string name="details_release">Released</string>
+    <string name="details_developer">Developer</string>
+    <string name="details_publisher">Publisher</string>
+    <string name="details_genre">Genre</string>
+    <string name="details_players">Players</string>
+    <string name="details_rating">Rating</string>
+    <string name="details_sources">Sources</string>
+    <string name="details_last_played">Last played</string>
+    <string name="details_file">File</string>
+    <string name="details_size">Size</string>
+    <string name="details_package">Package</string>
+    <string name="achievements_title">Achievements</string>
+    <string name="achievements_summary">%1$d/%2$d unlocked · %3$d/%4$d points</string>
+    <string name="achievements_loading">Loading achievements…</string>
+    <string name="achievements_failed">Couldn\'t load the achievements</string>
+    <string name="achievements_load">Show achievements</string>
+    <string name="open_in_ra">RetroAchievements</string>
+    <string name="matched_by_title">Matched by title (no ROM hash available)</string>
+
+    <!-- Notificación -->
+    <string name="notif_channel_metadata">Metadata downloads</string>
+    <string name="notif_metadata_title">Downloading metadata</string>
+    <string name="notif_metadata_progress">%1$d/%2$d · %3$s</string>
+    <string name="notif_metadata_preparing">Preparing…</string>
+
+    <!-- Lucy -->
+    <string name="lucy_subtitle">Library assistant</string>
+    <string name="lucy_online">Online · Claude</string>
+    <string name="lucy_demo">Demo mode · add the API key</string>
+    <string name="lucy_placeholder">Ask Lucy about your hours…</string>
+    <string name="lucy_greeting">Hi, I\'m Lucy. Ask me about your library, your hours or what to play next.</string>
+    <string name="lucy_stat_week">This week</string>
+    <string name="lucy_stat_top">Most played</string>
+    <string name="lucy_stat_sessions">Sessions</string>
+    <string name="lucy_vs_previous">%1$s vs last week</string>
+    <string name="lucy_average">avg %1$s</string>
+    <string name="lucy_no_data">no data yet</string>
+    <string name="lucy_suggest_week">Break down my week</string>
+    <string name="lucy_suggest_fact">Fun fact</string>
+    <string name="lucy_suggest_next">What should I play?</string>
+</resources>
