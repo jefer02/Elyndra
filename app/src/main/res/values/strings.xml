@@ -59,6 +59,16 @@
     <string name="details">Details</string>
     <string name="refresh_metadata">Refresh metadata</string>
     <string name="remove_from_library">Remove from library</string>
+    <string name="customize_cover">Customize cover</string>
+    <string name="customize_background">Customize background</string>
+    <string name="customize_icon">Customize icon</string>
+    <string name="art_source_not_configured">Set up this service in Settings first</string>
+    <string name="art_source_roms_only">Only for ROMs of supported systems</string>
+    <string name="art_searching">Searching images…</string>
+    <string name="art_none_found">No images found for this game.</string>
+    <string name="art_search_failed">Couldn\'t reach the service. Try again later.</string>
+    <string name="art_applied">Image updated</string>
+    <string name="art_apply_failed">Couldn\'t download that image</string>
     <string name="remove_folder">Remove folder</string>
     <string name="rescan_folder">Rescan folder</string>
     <string name="change_emulator">Change emulator</string>

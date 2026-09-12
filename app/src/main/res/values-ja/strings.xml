@@ -52,6 +52,16 @@
     <string name="details">詳細</string>
     <string name="refresh_metadata">メタデータを更新</string>
     <string name="remove_from_library">ライブラリから削除</string>
+    <string name="customize_cover">カバーをカスタマイズ</string>
+    <string name="customize_background">背景をカスタマイズ</string>
+    <string name="customize_icon">アイコンをカスタマイズ</string>
+    <string name="art_source_not_configured">先に設定でこのサービスを設定してください</string>
+    <string name="art_source_roms_only">対応システムのROMのみ</string>
+    <string name="art_searching">画像を検索中…</string>
+    <string name="art_none_found">このゲームの画像が見つかりませんでした。</string>
+    <string name="art_search_failed">サービスに接続できませんでした。後でもう一度お試しください。</string>
+    <string name="art_applied">画像を更新しました</string>
+    <string name="art_apply_failed">画像をダウンロードできませんでした</string>
     <string name="remove_folder">フォルダーを削除</string>
     <string name="rescan_folder">フォルダーを再スキャン</string>
     <string name="change_emulator">エミュレーターを変更</string>

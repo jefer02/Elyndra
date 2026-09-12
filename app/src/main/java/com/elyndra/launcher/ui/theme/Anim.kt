@@ -254,13 +254,24 @@ fun auroraOffset(periodMs: Int, reverse: Boolean): Triple<Float, Float, Float> {
     return Triple(0.06f * k, -0.04f * k, 1f + 0.14f * k)
 }
 
-/** Elevación en dp de la card seleccionada (`transform: translateY(-6px)`). */
+/** Elevación en dp de la card seleccionada (`transform: translateY(-8px)`). */
 @Composable
 fun selectionLift(selected: Boolean): Dp {
     val t = androidx.compose.animation.core.animateDpAsState(
-        targetValue = if (selected) (-6).dp else 0.dp,
+        targetValue = if (selected) (-8).dp else 0.dp,
         animationSpec = tween(300, easing = Swift),
         label = "lift",
+    )
+    return t.value
+}
+
+/** Ampliación de la card seleccionada (`transform: scale(1.08)`). */
+@Composable
+fun selectionScale(selected: Boolean): Float {
+    val t = androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (selected) 1.08f else 1f,
+        animationSpec = tween(300, easing = Swift),
+        label = "scale",
     )
     return t.value
 }

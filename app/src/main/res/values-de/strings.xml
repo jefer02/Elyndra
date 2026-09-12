@@ -55,6 +55,16 @@
     <string name="details">Details</string>
     <string name="refresh_metadata">Metadaten aktualisieren</string>
     <string name="remove_from_library">Aus der Bibliothek entfernen</string>
+    <string name="customize_cover">Cover anpassen</string>
+    <string name="customize_background">Hintergrund anpassen</string>
+    <string name="customize_icon">Symbol anpassen</string>
+    <string name="art_source_not_configured">Richte diesen Dienst zuerst in den Einstellungen ein</string>
+    <string name="art_source_roms_only">Nur für ROMs unterstützter Systeme</string>
+    <string name="art_searching">Bilder werden gesucht…</string>
+    <string name="art_none_found">Keine Bilder für dieses Spiel gefunden.</string>
+    <string name="art_search_failed">Dienst nicht erreichbar. Versuche es später erneut.</string>
+    <string name="art_applied">Bild aktualisiert</string>
+    <string name="art_apply_failed">Bild konnte nicht geladen werden</string>
     <string name="remove_folder">Ordner entfernen</string>
     <string name="rescan_folder">Ordner neu scannen</string>
     <string name="change_emulator">Emulator wechseln</string>

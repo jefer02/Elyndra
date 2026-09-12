@@ -58,6 +58,16 @@
     <string name="details">Detalhes</string>
     <string name="refresh_metadata">Atualizar metadados</string>
     <string name="remove_from_library">Remover da biblioteca</string>
+    <string name="customize_cover">Personalizar capa</string>
+    <string name="customize_background">Personalizar plano de fundo</string>
+    <string name="customize_icon">Personalizar ícone</string>
+    <string name="art_source_not_configured">Configure este serviço em Ajustes primeiro</string>
+    <string name="art_source_roms_only">Apenas para ROMs de sistemas compatíveis</string>
+    <string name="art_searching">Buscando imagens…</string>
+    <string name="art_none_found">Nenhuma imagem encontrada para este jogo.</string>
+    <string name="art_search_failed">Não foi possível contatar o serviço. Tente mais tarde.</string>
+    <string name="art_applied">Imagem atualizada</string>
+    <string name="art_apply_failed">Não foi possível baixar essa imagem</string>
     <string name="remove_folder">Remover pasta</string>
     <string name="rescan_folder">Escanear pasta de novo</string>
     <string name="change_emulator">Trocar emulador</string>
