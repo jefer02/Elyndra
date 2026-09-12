@@ -115,6 +115,10 @@ data class GameMeta(
     val hero: String? = null,
     val logo: String? = null,
     val screenshot: String? = null,
+    /** Icono elegido a mano (sustituye al icono de la app o acompaña a la ROM sin carátula). */
+    val icon: String? = null,
+    /** Imágenes elegidas a mano ("cover", "hero", "icon"): "Actualizar metadatos" no las pisa. */
+    val pinned: List<String> = emptyList(),
     val ssGameId: String? = null,
     val igdbId: Long? = null,
     val sgdbId: Long? = null,
