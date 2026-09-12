@@ -409,8 +409,10 @@ class MetadataEngine(
 
     /** Guarda lo encontrado. Devuelve true si algún servicio reconoció el juego. */
     private suspend fun save(key: String, d: Draft, force: Boolean): Boolean {
-        val cover = d.coverUrl?.let { media.download(it, key, "cover") }
-        val hero = d.heroUrl?.let { media.download(it, key, "hero") }
+        // Lo elegido a mano en "Personalizar…" no se vuelve a descargar (la descarga borraría el archivo).
+        val pinned = (repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta)?.pinned.orEmpty()
+        val cover = d.coverUrl?.takeIf { "cover" !in pinned }?.let { media.download(it, key, "cover") }
+        val hero = d.heroUrl?.takeIf { "hero" !in pinned }?.let { media.download(it, key, "hero") }
         val logo = d.logoUrl?.let { media.download(it, key, "logo") }
         val shot = d.screenshotUrl?.let { media.download(it, key, "shot") }
         val matched = d.sources.isNotEmpty()
@@ -431,6 +433,8 @@ class MetadataEngine(
                 hero = hero ?: old.hero,
                 logo = logo ?: old.logo,
                 screenshot = shot ?: old.screenshot,
+                icon = old.icon,
+                pinned = old.pinned,
                 ssGameId = d.ssId ?: old.ssGameId,
                 igdbId = d.igdbId ?: old.igdbId,
                 sgdbId = d.sgdbId ?: old.sgdbId,
