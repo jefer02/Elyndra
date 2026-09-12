@@ -22,6 +22,24 @@ enum class LibraryFilter(@StringRes val label: Int) {
 
 enum class AddTab { Android, Roms }
 
+/**
+ * Criterio de orden del carrusel. Se guarda en SettingsStore por su [id].
+ *
+ * "Nombre" ya es el orden A→Z, así que no hay una entrada aparte para
+ * "A-Z": sería la misma lista dos veces en el menú.
+ */
+enum class SortMode(val id: String, @StringRes val label: Int) {
+    Name("name", R.string.sort_name),
+    PlayTime("playtime", R.string.sort_playtime),
+    Platform("platform", R.string.sort_platform),
+    DateAdded("added", R.string.sort_added),
+    ;
+
+    companion object {
+        fun byId(id: String): SortMode = entries.firstOrNull { it.id == id } ?: Name
+    }
+}
+
 /** Un elemento del carrusel unificado: una carpeta de emulador o una app Android. */
 sealed interface LibraryItem {
     val key: String
@@ -34,8 +52,14 @@ sealed interface LibraryItem {
         val emulatorName: String?,
         val emulatorInstalled: Boolean,
         val minutes: Int,
-        /** Imagen para el hero: la del último juego jugado de la carpeta, si tiene. */
+        /** Fondo: el elegido a mano para la carpeta o, si no, el del último juego jugado. */
         val heroPath: String?,
+        /** Carátula, logo e icono elegidos a mano (null = card de consola de siempre). */
+        val coverPath: String? = null,
+        val logoPath: String? = null,
+        val iconPath: String? = null,
+        /** Paquete del emulador instalado: su icono es el automático de la carpeta. */
+        val emulatorPackage: String? = null,
     ) : LibraryItem {
         override val key: String get() = folder.key
         override val name: String get() = system.name
@@ -76,7 +100,17 @@ data class ArtPickerState(
 fun ArtKind.label(): Int = when (this) {
     ArtKind.Cover -> R.string.customize_cover
     ArtKind.Background -> R.string.customize_background
+    ArtKind.Logo -> R.string.customize_logo
     ArtKind.Icon -> R.string.customize_icon
+}
+
+/** "Quitar carátula / fondo / logo / icono" del menú de pulsación larga. */
+@StringRes
+fun ArtKind.removeLabel(): Int = when (this) {
+    ArtKind.Cover -> R.string.remove_cover
+    ArtKind.Background -> R.string.remove_background
+    ArtKind.Logo -> R.string.remove_logo
+    ArtKind.Icon -> R.string.remove_icon
 }
 
 data class DialogButton(val label: UiText, val action: () -> Unit)

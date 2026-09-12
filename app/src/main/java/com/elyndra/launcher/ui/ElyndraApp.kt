@@ -3,12 +3,15 @@ package com.elyndra.launcher.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +31,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -41,6 +45,7 @@ import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GameIcon
 import com.elyndra.launcher.ui.components.LocalScreenSize
 import com.elyndra.launcher.ui.components.ToastView
+import com.elyndra.launcher.ui.components.VideoBackdrop
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.screens.AddScreen
 import com.elyndra.launcher.ui.screens.ArtPickerSheet
@@ -76,7 +81,22 @@ fun ElyndraApp(vm: ElyndraViewModel) {
         BackHandler(enabled = vm.canGoBack) { vm.back() }
 
         Box(Modifier.fillMaxSize().background(P.paper)) {
-            BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
+            // Fondo animado de la app (solo de Elyndra, no del sistema), debajo de todo.
+            val s = vm.settings
+            if (s.videoBgEnabled) {
+                s.videoBgUri?.let { uri ->
+                    VideoBackdrop(uri, s.videoBgOpacity / 100f, Modifier.fillMaxSize())
+                }
+            }
+
+            // Las barras van ocultas (pantalla completa), así que sus insets son 0;
+            // se mantiene el del recorte de pantalla para que en un móvil con muesca
+            // el contenido no quede debajo.
+            BoxWithConstraints(
+                Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)),
+            ) {
                 // Las métricas reparten este alto entre hero y cards (móvil y tableta).
                 CompositionLocalProvider(LocalScreenSize provides DpSize(maxWidth, maxHeight)) {
                     when (vm.screen) {
@@ -121,7 +141,7 @@ private fun LaunchOverlay(launch: Launch, landscape: Boolean) {
         Modifier
             .fillMaxSize()
             .animFadeIn(280, key = launch.title)
-            .background(P.ink.copy(alpha = 0.72f))
+            .background(P.shade.copy(alpha = 0.72f))
             .windowInsetsPadding(WindowInsets.systemBars),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -139,9 +159,7 @@ private fun LaunchOverlay(launch: Launch, landscape: Boolean) {
         ) {
             ArtImage(launch.coverPath, launch.pairIndex, Modifier.fillMaxSize())
             if (launch.coverPath == null && (launch.packageName != null || launch.iconPath != null)) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    GameIcon(launch.iconPath, launch.packageName, Modifier.size(if (landscape) 46.dp else 62.dp))
-                }
+                GameIcon(launch.iconPath, launch.packageName, Modifier.fillMaxSize(), ContentScale.Crop)
             }
             Box(
                 Modifier

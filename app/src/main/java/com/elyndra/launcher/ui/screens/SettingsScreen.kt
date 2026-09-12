@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.text.format.Formatter
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -51,6 +52,7 @@ import com.elyndra.launcher.data.P
 import com.elyndra.launcher.data.TINTS
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.Screen
+import com.elyndra.launcher.ui.SortMode
 import com.elyndra.launcher.ui.components.AccentSlider
 import com.elyndra.launcher.ui.components.AccentSwitch
 import com.elyndra.launcher.ui.components.ArcSpinner
@@ -113,8 +115,69 @@ private fun AppearanceColumn(vm: ElyndraViewModel) {
     val skin = LocalSkin.current
     val s = vm.settings
     val activity = LocalContext.current.findActivity()
+    // SAF: se queda el permiso del vídeo para que siga ahí tras reiniciar.
+    val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        s.onVideoPicked(uri)
+    }
 
     Column(Modifier.fillMaxWidth()) {
+        SectionLabel(stringResource(R.string.section_theme))
+        GlassPanel {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    ElyText(stringResource(R.string.dark_mode), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
+                    Spacer(Modifier.height(4.dp))
+                    ElyText(stringResource(R.string.dark_mode_desc), size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
+                }
+                Spacer(Modifier.width(12.dp))
+                AccentSwitch(s.darkMode, s::toggleDark)
+            }
+        }
+
+        SectionLabel(stringResource(R.string.section_video_bg))
+        GlassPanel {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    ElyText(stringResource(R.string.video_bg_title), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
+                    Spacer(Modifier.height(4.dp))
+                    ElyText(stringResource(R.string.video_bg_desc), size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
+                }
+                Spacer(Modifier.width(12.dp))
+                AccentSwitch(s.videoBgEnabled, s::toggleVideoBg)
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ElyText(
+                    s.videoBgUri?.let { Uri.parse(it).lastPathSegment ?: it } ?: stringResource(R.string.video_bg_none),
+                    size = 9.5f,
+                    color = P.ink2,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(8.dp))
+                // `onClick` va posicional: en GhostButton el último parámetro es el
+                // modifier, así que una lambda al final no sería el clic.
+                GhostButton(
+                    stringResource(if (s.videoBgUri == null) R.string.video_bg_choose else R.string.video_bg_change),
+                    { videoPicker.launch(arrayOf("video/*")) },
+                )
+                if (s.videoBgUri != null) {
+                    Spacer(Modifier.width(6.dp))
+                    GhostButton(stringResource(R.string.remove), s::clearVideoBg)
+                }
+            }
+            if (s.videoBgUri != null) {
+                SliderRow(
+                    stringResource(R.string.video_bg_opacity),
+                    "${s.videoBgOpacity} %",
+                    s.videoBgOpacity,
+                    10..100,
+                    s::updateVideoBgOpacity,
+                )
+            }
+        }
+
         SectionLabel(stringResource(R.string.section_accent))
         GlassPanel {
             SwatchGrid(
@@ -202,6 +265,13 @@ private fun AppearanceColumn(vm: ElyndraViewModel) {
                         activity?.let { AppLocale.set(it, tag) }
                     }
                 })
+            }
+        }
+
+        SectionLabel(stringResource(R.string.sort_by))
+        WrapRow(gap = 7.dp) {
+            SortMode.entries.forEach { mode ->
+                Pill(stringResource(mode.label), s.sortMode == mode, { s.setSort(mode) })
             }
         }
 

@@ -71,13 +71,13 @@ fun Pill(
         .then(if (height != null) Modifier.height(height) else Modifier)
     if (active) {
         m = m
-            .shadow(8.dp, shape, clip = false, ambientColor = P.ink.copy(alpha = 0.22f), spotColor = P.ink.copy(alpha = 0.22f))
+            .shadow(8.dp, shape, clip = false, ambientColor = P.shade.copy(alpha = 0.22f), spotColor = P.shade.copy(alpha = 0.22f))
             .clip(shape)
             .drawBehind { drawRect(accentGradient(skin, 145f, size)) }
     } else {
         m = m
             .clip(shape)
-            .background(Color.White.copy(alpha = 0.6f))
+            .background(P.chip)
             .border(1.dp, P.ink.copy(alpha = 0.14f), shape)
     }
     Box(
@@ -126,7 +126,7 @@ fun CtaButton(
             .alpha(if (enabled) 1f else 0.42f)
             .then(
                 if (enabled) {
-                    Modifier.shadow(14.dp, shape, clip = false, ambientColor = P.ink.copy(alpha = 0.24f), spotColor = P.ink.copy(alpha = 0.24f))
+                    Modifier.shadow(14.dp, shape, clip = false, ambientColor = P.shade.copy(alpha = 0.24f), spotColor = P.shade.copy(alpha = 0.24f))
                 } else Modifier,
             )
             .clip(shape)
@@ -152,7 +152,7 @@ fun AccentButton(
     Box(
         modifier
             .height(42.dp)
-            .shadow(12.dp, shape, clip = false, ambientColor = P.ink.copy(alpha = 0.24f), spotColor = P.ink.copy(alpha = 0.24f))
+            .shadow(12.dp, shape, clip = false, ambientColor = P.shade.copy(alpha = 0.24f), spotColor = P.shade.copy(alpha = 0.24f))
             .clip(shape)
             .drawBehind { drawRect(accentGradient(skin, 145f, size)) }
             .clickable(onClick = onClick)
@@ -189,7 +189,7 @@ fun GhostButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifie
     Box(
         modifier
             .clip(shape)
-            .background(Color.White.copy(alpha = 0.65f))
+            .background(P.chip)
             .border(1.dp, P.ink.copy(alpha = 0.14f), shape)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -238,7 +238,7 @@ fun AccentSwitch(checked: Boolean, onToggle: () -> Unit, modifier: Modifier = Mo
             Modifier
                 .offset(x = knobX.dp)
                 .size(22.dp)
-                .shadow(2.dp, CircleShape, clip = false, ambientColor = P.ink.copy(alpha = 0.3f), spotColor = P.ink.copy(alpha = 0.3f))
+                .shadow(2.dp, CircleShape, clip = false, ambientColor = P.shade.copy(alpha = 0.3f), spotColor = P.shade.copy(alpha = 0.3f))
                 .clip(CircleShape)
                 .background(Color.White),
         )
@@ -311,7 +311,7 @@ fun AccentSlider(
             Modifier
                 .offset(x = with(density) { (fraction * travel).toDp() })
                 .size(16.dp)
-                .shadow(3.dp, CircleShape, clip = false, ambientColor = P.ink.copy(alpha = 0.35f), spotColor = P.ink.copy(alpha = 0.35f))
+                .shadow(3.dp, CircleShape, clip = false, ambientColor = P.shade.copy(alpha = 0.35f), spotColor = P.shade.copy(alpha = 0.35f))
                 .clip(CircleShape)
                 .background(skin.a2)
                 .border(BorderStroke(2.dp, Color.White), CircleShape),
@@ -335,8 +335,8 @@ fun Swatch(
                 if (selected) 6.dp else 3.dp,
                 shape,
                 clip = false,
-                ambientColor = P.ink.copy(alpha = if (selected) 0.24f else 0.10f),
-                spotColor = P.ink.copy(alpha = if (selected) 0.24f else 0.10f),
+                ambientColor = P.shade.copy(alpha = if (selected) 0.24f else 0.10f),
+                spotColor = P.shade.copy(alpha = if (selected) 0.24f else 0.10f),
             )
             .clip(shape)
             .background(brush)

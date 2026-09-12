@@ -411,9 +411,11 @@ class MetadataEngine(
     private suspend fun save(key: String, d: Draft, force: Boolean): Boolean {
         // Lo elegido a mano en "Personalizar…" no se vuelve a descargar (la descarga borraría el archivo).
         val pinned = (repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta)?.pinned.orEmpty()
-        val cover = d.coverUrl?.takeIf { "cover" !in pinned }?.let { media.download(it, key, "cover") }
+        // Un juego Android no usa carátula (se representa con su icono): no se baja.
+        val isApp = key.startsWith("a:")
+        val cover = d.coverUrl?.takeIf { !isApp && "cover" !in pinned }?.let { media.download(it, key, "cover") }
         val hero = d.heroUrl?.takeIf { "hero" !in pinned }?.let { media.download(it, key, "hero") }
-        val logo = d.logoUrl?.let { media.download(it, key, "logo") }
+        val logo = d.logoUrl?.takeIf { "logo" !in pinned }?.let { media.download(it, key, "logo") }
         val shot = d.screenshotUrl?.let { media.download(it, key, "shot") }
         val matched = d.sources.isNotEmpty()
         repo.updateMeta(key) { old ->

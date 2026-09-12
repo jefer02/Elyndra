@@ -62,6 +62,31 @@
     <string name="customize_cover">Customize cover</string>
     <string name="customize_background">Customize background</string>
     <string name="customize_icon">Customize icon</string>
+    <string name="customize_logo">Set logo</string>
+    <string name="remove_cover">Remove cover</string>
+    <string name="remove_background">Remove background</string>
+    <string name="remove_logo">Remove logo</string>
+    <string name="remove_icon">Remove icon</string>
+    <string name="art_cleared">Image removed</string>
+
+    <!-- Orden de la biblioteca -->
+    <string name="sort_by">Sort by</string>
+    <string name="sort_name">Name (A–Z)</string>
+    <string name="sort_playtime">Play time</string>
+    <string name="sort_platform">Platform</string>
+    <string name="sort_added">Date added</string>
+
+    <!-- Tema y fondo animado -->
+    <string name="section_theme">Theme</string>
+    <string name="dark_mode">Dark mode</string>
+    <string name="dark_mode_desc">Use a dark interface, whatever the system theme is.</string>
+    <string name="section_video_bg">Animated background</string>
+    <string name="video_bg_title">Video background</string>
+    <string name="video_bg_desc">Play a video behind the interface. It only affects Elyndra, not your system wallpaper.</string>
+    <string name="video_bg_choose">Choose video</string>
+    <string name="video_bg_change">Change</string>
+    <string name="video_bg_none">No video chosen</string>
+    <string name="video_bg_opacity">Opacity</string>
     <string name="art_source_not_configured">Set up this service in Settings first</string>
     <string name="art_source_roms_only">Only for ROMs of supported systems</string>
     <string name="art_searching">Searching images…</string>

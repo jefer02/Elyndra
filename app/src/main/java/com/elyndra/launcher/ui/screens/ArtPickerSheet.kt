@@ -60,6 +60,8 @@ fun ArtPickerSheet(vm: ElyndraViewModel, state: ArtPickerState) {
     val (minCell, ratio) = when (state.kind) {
         ArtKind.Cover -> 96.dp to 2f / 3f
         ArtKind.Background -> 180.dp to 16f / 9f
+        // Los logos son apaisados y con transparencia: celda ancha y baja.
+        ArtKind.Logo -> 150.dp to 16f / 7f
         ArtKind.Icon -> 80.dp to 1f
     }
 
@@ -104,7 +106,8 @@ fun ArtPickerSheet(vm: ElyndraViewModel, state: ArtPickerState) {
                         CandidateCell(
                             candidate = c,
                             ratio = ratio,
-                            fit = state.kind == ArtKind.Icon,
+                            // Logo e icono llevan transparencia: se muestran enteros.
+                            fit = state.kind == ArtKind.Logo || state.kind == ArtKind.Icon,
                             applying = state.applying == c.url,
                             dimmed = state.applying != null && state.applying != c.url,
                         ) { vm.applyArt(c) }
@@ -164,7 +167,7 @@ private fun CandidateCell(
                 modifier = Modifier.fillMaxSize().padding(if (fit) 8.dp else 0.dp),
             )
             if (applying) {
-                Box(Modifier.fillMaxSize().background(P.ink.copy(alpha = 0.35f)), contentAlignment = Alignment.Center) { Spinner() }
+                Box(Modifier.fillMaxSize().background(P.shade.copy(alpha = 0.35f)), contentAlignment = Alignment.Center) { Spinner() }
             }
         }
         Spacer(Modifier.height(4.dp))

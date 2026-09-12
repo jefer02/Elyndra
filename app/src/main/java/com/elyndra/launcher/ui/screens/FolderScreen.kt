@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -271,30 +273,30 @@ fun FolderScreen(vm: ElyndraViewModel) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(start = m.pad, end = m.pad, bottom = if (m.landscape) 10.dp else 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
+                .padding(start = m.pad, end = m.pad, bottom = if (m.landscape) 6.dp else 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(
                 Modifier
-                    .height(42.dp)
-                    .glass(RoundedCornerShape(15.dp))
+                    .height(34.dp)
+                    .glass(RoundedCornerShape(12.dp))
                     .clickable { vm.go(Screen.Library) }
-                    .padding(horizontal = 14.dp),
+                    .padding(horizontal = 11.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 BackChevron(size = 13.dp)
                 Spacer(Modifier.width(5.dp))
-                ElyText(stringResource(R.string.library_back), size = 12f, weight = FontWeight.SemiBold, color = P.ink, maxLines = 1)
+                ElyText(stringResource(R.string.library_back), size = 11.5f, weight = FontWeight.SemiBold, color = P.ink, maxLines = 1)
             }
 
             Row(
                 Modifier
                     .weight(1f)
-                    .height(42.dp)
+                    .height(34.dp)
                     .alpha(if (rom != null) 1f else 0.45f)
-                    .shadow(12.dp, RoundedCornerShape(15.dp), clip = false, ambientColor = P.ink.copy(alpha = 0.24f), spotColor = P.ink.copy(alpha = 0.24f))
-                    .clip(RoundedCornerShape(15.dp))
+                    .shadow(10.dp, RoundedCornerShape(12.dp), clip = false, ambientColor = P.shade.copy(alpha = 0.24f), spotColor = P.shade.copy(alpha = 0.24f))
+                    .clip(RoundedCornerShape(12.dp))
                     .drawBehind { drawRect(accentGradient(skin, 145f, size)) }
                     .clickable(enabled = rom != null) { rom?.let { vm.openRom(it) } },
                 horizontalArrangement = Arrangement.Center,
@@ -368,21 +370,29 @@ private fun RomTile(
                     if (selected) 16.dp else 8.dp,
                     shape,
                     clip = false,
-                    ambientColor = P.ink.copy(alpha = if (selected) 0.32f else 0.2f),
-                    spotColor = P.ink.copy(alpha = if (selected) 0.32f else 0.2f),
+                    ambientColor = P.shade.copy(alpha = if (selected) 0.32f else 0.2f),
+                    spotColor = P.shade.copy(alpha = if (selected) 0.32f else 0.2f),
                 )
                 .clip(shape)
                 .border(
-                    if (selected) 4.dp else 1.dp,
-                    if (selected) skin.a1 else Color.White.copy(alpha = 0.6f),
+                    if (selected) 6.dp else 1.dp,
+                    if (selected) skin.a1 else P.hairline,
                     shape,
                 ),
         ) {
-            ArtImage(cover, pairIndex, Modifier.fillMaxSize())
+            ArtImage(cover, pairIndex, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
 
             if (cover == null) {
                 rom.meta.icon?.let { icon ->
-                    GameIcon(icon, null, Modifier.align(Alignment.Center).padding(bottom = height * 0.2f).size(width * 0.56f))
+                    GameIcon(
+                        icon,
+                        null,
+                        Modifier
+                            .align(Alignment.Center)
+                            .padding(bottom = height * 0.2f, start = width * 0.1f, end = width * 0.1f)
+                            .fillMaxWidth()
+                            .aspectRatio(1f),
+                    )
                 }
                 Box(Modifier.fillMaxSize().drawBehind { drawRect(romScrimBrush(size)) })
                 ElyText(
@@ -404,10 +414,12 @@ private fun RomTile(
                     .align(Alignment.TopEnd)
                     .padding(5.dp)
                     .clip(RoundedCornerShape(5.dp))
+                    // Va encima de la carátula, no de una superficie del tema: se queda
+                    // clara con tinta oscura en ambos modos, que es lo que se lee.
                     .background(Color.White.copy(alpha = 0.82f))
                     .padding(horizontal = 5.dp, vertical = 3.dp),
             ) {
-                ElyText(rom.extension.ifEmpty { "DIR" }, size = 7f, weight = FontWeight.SemiBold, color = P.ink, letterSpacing = tracking(0.1f))
+                ElyText(rom.extension.ifEmpty { "DIR" }, size = 7f, weight = FontWeight.SemiBold, color = P.shade, letterSpacing = tracking(0.1f))
             }
 
             if (selected) {

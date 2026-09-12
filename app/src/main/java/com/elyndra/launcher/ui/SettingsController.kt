@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui
 
+import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -8,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.elyndra.launcher.R
 import com.elyndra.launcher.data.ACCENTS
 import com.elyndra.launcher.data.AppLocale
+import com.elyndra.launcher.data.P
 import com.elyndra.launcher.data.SecretKeys
 import com.elyndra.launcher.data.TINTS
 import com.elyndra.launcher.metadata.ApiException
@@ -39,6 +41,65 @@ class SettingsController(private val vm: ElyndraViewModel) {
     var scrimPct by mutableStateOf(store.scrimPct); private set
     var autoMeta by mutableStateOf(store.autoMeta); private set
     var lang by mutableStateOf(AppLocale.current(vm.app)); private set
+
+    /* ── tema claro / oscuro ──────────────────────────────────── */
+
+    var darkMode by mutableStateOf(store.darkMode); private set
+
+    init {
+        // `P` guarda el tema en un estado de Compose: fijarlo aquí basta para
+        // que toda la interfaz se repinte, sin tocar ningún sitio de llamada.
+        P.isDark = store.darkMode
+    }
+
+    fun toggleDark() {
+        darkMode = !darkMode
+        store.darkMode = darkMode
+        P.isDark = darkMode
+    }
+
+    /* ── fondo de vídeo de la interfaz ────────────────────────── */
+
+    var videoBgEnabled by mutableStateOf(store.videoBgEnabled); private set
+    var videoBgUri by mutableStateOf(store.videoBgUri); private set
+    var videoBgOpacity by mutableStateOf(store.videoBgOpacity); private set
+
+    fun toggleVideoBg() {
+        videoBgEnabled = !videoBgEnabled
+        store.videoBgEnabled = videoBgEnabled
+    }
+
+    // `updateX`, no `setX`: `setVideoBgOpacity` chocaría con el setter que Kotlin
+    // ya genera para la propiedad (misma firma JVM). Igual que `updateBlur`.
+    fun updateVideoBgOpacity(v: Int) {
+        videoBgOpacity = v
+        store.videoBgOpacity = v
+    }
+
+    /** Vídeo elegido con SAF: hay que quedarse el permiso o se pierde al reiniciar. */
+    fun onVideoPicked(uri: Uri?) {
+        if (uri == null) return
+        runCatching { vm.app.files.takePermission(uri) }
+        videoBgUri = uri.toString()
+        store.videoBgUri = videoBgUri
+        if (!videoBgEnabled) toggleVideoBg()
+    }
+
+    fun clearVideoBg() {
+        videoBgUri?.let { old -> runCatching { vm.app.files.releasePermission(old) } }
+        videoBgUri = null
+        store.videoBgUri = null
+        if (videoBgEnabled) toggleVideoBg()
+    }
+
+    /* ── orden de la biblioteca ───────────────────────────────── */
+
+    var sortMode by mutableStateOf(SortMode.byId(store.sortMode)); private set
+
+    fun setSort(mode: SortMode) {
+        sortMode = mode
+        store.sortMode = mode.id
+    }
 
     val skin: ElyndraSkin
         get() = ElyndraSkin(

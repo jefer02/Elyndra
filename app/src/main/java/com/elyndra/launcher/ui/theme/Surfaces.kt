@@ -53,18 +53,31 @@ private fun hazeFor(blur: Int): Float = (blur / 40f) * 0.20f
 fun Modifier.glass(
     shape: Shape = RoundedCornerShape(16.dp),
     shadow: Dp = 10.dp,
-    borderColor: Color = Color.White.copy(alpha = 0.72f),
+    borderColor: Color = P.hairline,
     /** Capas flotantes (diálogos, hojas, ficha): base opaca para que no se transparente lo de detrás. */
     solid: Boolean = false,
 ): Modifier {
     val skin = LocalSkin.current
     val haze = hazeFor(skin.blur)
+    val dark = P.isDark
     return this
-        .shadow(shadow, shape, clip = false, ambientColor = P.ink.copy(alpha = 0.10f), spotColor = P.ink.copy(alpha = 0.10f))
+        .shadow(shadow, shape, clip = false, ambientColor = P.shade.copy(alpha = 0.10f), spotColor = P.shade.copy(alpha = 0.10f))
         .clip(shape)
-        .then(if (solid) Modifier.background(P.paper) else Modifier)
-        .background(skin.tint.color.copy(alpha = skin.alpha))
-        .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = haze + 0.06f), Color.White.copy(alpha = haze * 0.35f))))
+        .then(if (solid) Modifier.background(P.surface) else Modifier)
+        // En oscuro el cristal NO puede blanquearse. Los tintes del diseño son
+        // colores claros (el de serie es blanco puro) y, aplicados al 55 %,
+        // dejaban un panel claro con texto casi blanco encima: ilegible. Aquí
+        // se apoya primero una base oscura y el tinte queda solo como matiz.
+        .then(if (dark && !solid) Modifier.background(P.surface.copy(alpha = 0.86f)) else Modifier)
+        .background(skin.tint.color.copy(alpha = if (dark) skin.alpha * 0.16f else skin.alpha))
+        .background(
+            Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = if (dark) haze * 0.25f + 0.02f else haze + 0.06f),
+                    Color.White.copy(alpha = if (dark) 0f else haze * 0.35f),
+                ),
+            ),
+        )
         .insetHighlight()
         .border(1.dp, borderColor, shape)
 }
@@ -78,7 +91,7 @@ fun Modifier.darkGlass(
     val a = max(0.25f, skin.alpha * 0.6f)
     return this
         .clip(shape)
-        .background(P.ink.copy(alpha = a))
+        .background(P.shade.copy(alpha = a))
         .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = hazeFor(skin.blur) * 0.5f), Color.Transparent)))
         .border(1.dp, Color.White.copy(alpha = 0.28f), shape)
 }
@@ -87,7 +100,8 @@ fun Modifier.darkGlass(
 private fun Modifier.insetHighlight(): Modifier = drawBehind {
     val y = 0.5.dp.toPx()
     drawLine(
-        color = Color.White.copy(alpha = 0.7f),
+        // En oscuro el realce se apaga: una línea blanca al 70 % delataría el borde.
+        color = Color.White.copy(alpha = if (P.isDark) 0.10f else 0.7f),
         start = Offset(0f, y),
         end = Offset(size.width, y),
         strokeWidth = 1.dp.toPx(),

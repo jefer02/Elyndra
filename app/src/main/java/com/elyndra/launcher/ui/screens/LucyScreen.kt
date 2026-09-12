@@ -252,7 +252,7 @@ fun LucyScreen(vm: ElyndraViewModel) {
                 Box(
                     Modifier
                         .size(46.dp)
-                        .shadow(12.dp, RoundedCornerShape(16.dp), clip = false, ambientColor = P.ink.copy(alpha = 0.24f), spotColor = P.ink.copy(alpha = 0.24f))
+                        .shadow(12.dp, RoundedCornerShape(16.dp), clip = false, ambientColor = P.shade.copy(alpha = 0.24f), spotColor = P.shade.copy(alpha = 0.24f))
                         .clip(RoundedCornerShape(16.dp))
                         .drawBehind { drawRect(accentGradient(skin, 145f, size)) }
                         .clickable { lucy.send(lang) },
@@ -303,7 +303,7 @@ private fun LucyAvatar() {
         Box(
             Modifier
                 .size(40.dp)
-                .shadow(8.dp, RoundedCornerShape(15.dp), clip = false, ambientColor = P.ink.copy(alpha = 0.3f), spotColor = P.ink.copy(alpha = 0.3f))
+                .shadow(8.dp, RoundedCornerShape(15.dp), clip = false, ambientColor = P.shade.copy(alpha = 0.3f), spotColor = P.shade.copy(alpha = 0.3f))
                 .clip(RoundedCornerShape(15.dp))
                 .drawBehind { drawRect(accentGradient(skin, 145f, size)) },
             contentAlignment = Alignment.Center,

@@ -104,7 +104,8 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
         val folders = lib.folders.mapNotNull { f ->
             val system = Systems.byId(f.systemId) ?: return@mapNotNull null
             val list = roms[f.id].orEmpty()
-            val hero = list.filter { it.meta.hero != null || it.meta.screenshot != null }
+            // El fondo elegido a mano para la carpeta manda sobre el heredado.
+            val hero = f.hero ?: list.filter { it.meta.hero != null || it.meta.screenshot != null }
                 .maxByOrNull { it.stats.lastPlayed }
                 ?.let { it.meta.hero ?: it.meta.screenshot }
             LibraryItem.Folder(
@@ -115,6 +116,10 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                 emulatorInstalled = isEmulatorInstalled(f.emulatorId),
                 minutes = list.sumOf { it.stats.minutes },
                 heroPath = hero,
+                coverPath = f.cover,
+                logoPath = f.logo,
+                iconPath = f.icon,
+                emulatorPackage = emulatorPackage(f.emulatorId),
             )
         }
         return Derived(lib, inst, folders, roms).also { derivedCache = it }
@@ -127,7 +132,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
         var list: List<LibraryItem> = d.folders + library.apps.map {
             LibraryItem.App(it, installedPackages.isEmpty() || it.packageName in installedPackages)
         }
-        list = list.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+        list = sorted(list)
         if (filter == LibraryFilter.Android) list = list.filterIsInstance<LibraryItem.App>()
         if (filter == LibraryFilter.Consoles) list = list.filterIsInstance<LibraryItem.Folder>()
         if (q.isNotEmpty()) {
@@ -137,6 +142,54 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
             }
         }
         return list
+    }
+
+    /** Orden elegido en Ajustes. A igualdad, siempre alfabético, para que la lista no baile. */
+    private fun sorted(list: List<LibraryItem>): List<LibraryItem> {
+        val byName = compareBy(String.CASE_INSENSITIVE_ORDER, LibraryItem::name)
+        return when (settings.sortMode) {
+            SortMode.Name -> list.sortedWith(byName)
+            SortMode.PlayTime -> list.sortedWith(
+                compareByDescending<LibraryItem> { minutesOf(it) }.then(byName),
+            )
+            SortMode.Platform -> list.sortedWith(
+                // Dos parámetros de tipo: el del elemento y el de la clave que se compara.
+                compareBy<LibraryItem, String>(String.CASE_INSENSITIVE_ORDER) { platformOf(it) }.then(byName),
+            )
+            SortMode.DateAdded -> list.sortedWith(
+                compareByDescending<LibraryItem> { addedAtOf(it) }.then(byName),
+            )
+        }
+    }
+
+    private fun minutesOf(item: LibraryItem): Int = when (item) {
+        is LibraryItem.Folder -> item.minutes
+        is LibraryItem.App -> item.app.stats.minutes
+    }
+
+    private fun addedAtOf(item: LibraryItem): Long = when (item) {
+        is LibraryItem.Folder -> item.folder.addedAt
+        is LibraryItem.App -> item.app.addedAt
+    }
+
+    private fun platformOf(item: LibraryItem): String = when (item) {
+        is LibraryItem.Folder -> item.system.name
+        is LibraryItem.App -> "Android"
+    }
+
+    /** Hoja de "Ordenar por" del carrusel. */
+    fun sortOptions() {
+        showSheet(
+            ActionSheetSpec(
+                UiText.res(R.string.sort_by),
+                null,
+                SortMode.entries.map { mode ->
+                    SheetAction(UiText.res(mode.label), selected = settings.sortMode == mode) {
+                        settings.setSort(mode)
+                    }
+                },
+            ),
+        )
     }
 
     fun selected(): LibraryItem? {
@@ -171,6 +224,16 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
             return labelCache.getOrPut(pkg) { app.apps.label(pkg) ?: pkg }
         }
         return Emulators.byId(id)?.name ?: id
+    }
+
+    /** Paquete instalado del emulador, para sacar su icono de launcher. */
+    fun emulatorPackage(id: String?): String? {
+        if (id == null) return null
+        if (id.startsWith(Emulators.CUSTOM_PREFIX)) {
+            return id.removePrefix(Emulators.CUSTOM_PREFIX).takeIf { it in installedPackages }
+        }
+        val profile = Emulators.byId(id) ?: return null
+        return profile.packages.firstOrNull { it in installedPackages }
     }
 
     fun isEmulatorInstalled(id: String?): Boolean {
@@ -250,7 +313,8 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
 
     private fun launchApp(item: LibraryItem.App) {
         val entry = item.app
-        showLaunch(Launch(entry.displayTitle, UiText.res(R.string.launch_android), pairIndexFor(entry.packageName), entry.meta.cover, entry.packageName, entry.meta.icon))
+        // Un juego Android se representa siempre con su icono, no con carátula.
+        showLaunch(Launch(entry.displayTitle, UiText.res(R.string.launch_android), pairIndexFor(entry.packageName), null, entry.packageName, entry.meta.icon))
         launchJob?.cancel()
         launchJob = viewModelScope.launch {
             delay(LAUNCH_DELAY_MS)
@@ -472,6 +536,8 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                 SheetAction(UiText.res(R.string.refresh_metadata)) {
                     refreshMetadata(library.roms.filter { it.folderId == item.folder.id }.map { it.key })
                 },
+                // Una carpeta de emulador también admite carátula, fondo y logo propios.
+            ) + customizeActions(item.key, item.system.name) + listOf(
                 SheetAction(UiText.res(R.string.remove_folder), destructive = true) { removeFolder(item.folder) },
             )
             is LibraryItem.App -> listOf(
@@ -508,8 +574,44 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
 
     /* ── personalizar carátula / fondo / icono ────────────────── */
 
-    private fun customizeActions(key: String, title: String): List<SheetAction> =
-        ArtKind.entries.map { kind -> SheetAction(UiText.res(kind.label())) { chooseArtSource(key, title, kind) } }
+    /**
+     * Por cada clase de imagen: "poner…" y, solo si ya hay una puesta,
+     * "quitar…". Así el menú no ofrece borrar lo que no existe.
+     */
+    private fun customizeActions(key: String, title: String): List<SheetAction> {
+        val settable = artKindsFor(key)
+        return ArtKind.entries.flatMap { kind ->
+            buildList {
+                if (kind in settable) {
+                    add(SheetAction(UiText.res(kind.label())) { chooseArtSource(key, title, kind) })
+                }
+                // "Quitar" se ofrece siempre que haya imagen, aunque ya no se pueda
+                // volver a poner: una carátula guardada antes de este cambio se
+                // quedaría si no sin manera de borrarse.
+                if (art.has(key, kind)) {
+                    add(SheetAction(UiText.res(kind.removeLabel()), destructive = true) { clearArt(key, kind) })
+                }
+            }
+        }
+    }
+
+    /**
+     * Qué imágenes admite cada cosa.
+     *
+     * La carátula solo tiene sentido en una ROM: es la portada de *ese* juego.
+     * Un juego Android y una carpeta de emulador se representan con logo o
+     * icono, que es lo que se ve en su card.
+     */
+    private fun artKindsFor(key: String): List<ArtKind> =
+        if (key.startsWith("r:")) listOf(ArtKind.Cover, ArtKind.Background, ArtKind.Logo)
+        else listOf(ArtKind.Background, ArtKind.Logo, ArtKind.Icon)
+
+    fun clearArt(key: String, kind: ArtKind) {
+        viewModelScope.launch {
+            art.clear(key, kind)
+            showToast(UiText.res(R.string.art_cleared))
+        }
+    }
 
     /** Hoja con los cuatro servicios; los que no están configurados (o no cubren el juego) salen atenuados. */
     private fun chooseArtSource(key: String, title: String, kind: ArtKind) {

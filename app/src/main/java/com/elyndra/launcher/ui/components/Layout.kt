@@ -86,7 +86,7 @@ fun metrics(): Metrics {
 
     // El hero manda —con logo ocupa menos que una carátula, así que se le da
     // más sitio— y la card se queda con el resto exacto.
-    var hero = free * (if (l) 0.56f else 0.60f)
+    var hero = free * (if (l) 0.60f else 0.64f)
     var tile = free - hero
 
     val maxTileByWidth = w * (if (l) 0.30f else 0.46f) / COVER_RATIO

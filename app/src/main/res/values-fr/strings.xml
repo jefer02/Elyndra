@@ -61,6 +61,29 @@
     <string name="customize_cover">Personnaliser la jaquette</string>
     <string name="customize_background">Personnaliser le fond</string>
     <string name="customize_icon">Personnaliser l’icône</string>
+    <string name="customize_logo">Définir le logo</string>
+    <string name="remove_cover">Retirer la jaquette</string>
+    <string name="remove_background">Retirer l’arrière-plan</string>
+    <string name="remove_logo">Retirer le logo</string>
+    <string name="remove_icon">Retirer l’icône</string>
+    <string name="art_cleared">Image retirée</string>
+
+    <string name="sort_by">Trier par</string>
+    <string name="sort_name">Nom (A–Z)</string>
+    <string name="sort_playtime">Temps de jeu</string>
+    <string name="sort_platform">Plateforme</string>
+    <string name="sort_added">Date d’ajout</string>
+
+    <string name="section_theme">Thème</string>
+    <string name="dark_mode">Mode sombre</string>
+    <string name="dark_mode_desc">Utilise une interface sombre, quel que soit le thème du système.</string>
+    <string name="section_video_bg">Arrière-plan animé</string>
+    <string name="video_bg_title">Vidéo d’arrière-plan</string>
+    <string name="video_bg_desc">Lit une vidéo derrière l’interface. Cela ne concerne qu’Elyndra, pas le fond d’écran du système.</string>
+    <string name="video_bg_choose">Choisir une vidéo</string>
+    <string name="video_bg_change">Changer</string>
+    <string name="video_bg_none">Aucune vidéo choisie</string>
+    <string name="video_bg_opacity">Opacité</string>
     <string name="art_source_not_configured">Configurez d’abord ce service dans les réglages</string>
     <string name="art_source_roms_only">Uniquement pour les ROM des systèmes pris en charge</string>
     <string name="art_searching">Recherche d’images…</string>

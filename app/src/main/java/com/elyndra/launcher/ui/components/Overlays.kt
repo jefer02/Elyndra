@@ -71,7 +71,7 @@ fun ScrimLayer(
         Modifier
             .fillMaxSize()
             .animFadeIn(200, key = key)
-            .background(P.ink.copy(alpha = alpha))
+            .background(P.shade.copy(alpha = alpha))
             .consumeClicks { onDismiss?.invoke() }
             .windowInsetsPadding(WindowInsets.systemBars),
         contentAlignment = alignment,

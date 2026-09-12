@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -174,8 +176,14 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                             )
                         }
                     }
-                    val logo = (sel as? LibraryItem.App)?.app?.meta?.logo
-                    if (logo != null) {
+                    val logo = when (sel) {
+                        is LibraryItem.App -> sel.app.meta.logo
+                        is LibraryItem.Folder -> sel.logoPath
+                        null -> null
+                    }
+                    // El `sel != null` es para el compilador: el `when` de arriba no le
+                    // basta para deducir que si hay logo entonces hay elemento.
+                    if (sel != null && logo != null) {
                         LogoImage(
                             logo,
                             Modifier
@@ -237,6 +245,24 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                     letterSpacing = tracking(0.18f),
                     uppercase = true,
                 )
+                Spacer(Modifier.width(8.dp))
+                // "Ordenar por": el criterio en curso hace de etiqueta del botón.
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(9.dp))
+                        .clickable { vm.sortOptions() }
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    ElyText(
+                        stringResource(vm.settings.sortMode.label),
+                        size = 9f,
+                        weight = FontWeight.SemiBold,
+                        color = skin.a2,
+                        letterSpacing = tracking(0.1f),
+                        maxLines = 1,
+                        uppercase = true,
+                    )
+                }
             }
 
             if (items.isEmpty() && !libraryEmpty && vm.loaded) {
@@ -279,46 +305,33 @@ fun LibraryScreen(vm: ElyndraViewModel) {
         }
 
         // ── DOCK ──
+        // Compacto a propósito: "Añadir" y Lucy quedan como iconos y solo
+        // "Abrir" conserva rótulo, para que el dock reste lo mínimo posible
+        // al alto de las carátulas (ver `chrome` en Metrics).
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(start = m.pad, end = m.pad, bottom = if (m.landscape) 10.dp else 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
+                .padding(start = m.pad, end = m.pad, bottom = if (m.landscape) 6.dp else 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
+            Box(
                 Modifier
-                    .then(if (m.landscape) Modifier else Modifier.weight(1f))
-                    .height(42.dp)
-                    .glass(RoundedCornerShape(15.dp))
-                    .clickable { vm.go(Screen.Add) }
-                    .padding(horizontal = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
+                    .size(DOCK_H)
+                    .glass(RoundedCornerShape(12.dp))
+                    .clickable { vm.go(Screen.Add) },
+                contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    Modifier.size(20.dp).clip(RoundedCornerShape(7.dp)).background(Color.White),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    ElyText("+", size = 14f, weight = FontWeight.SemiBold, color = skin.a2, lineHeightRatio = 1f)
-                }
-                Spacer(Modifier.width(8.dp))
-                ElyText(
-                    stringResource(if (m.landscape) R.string.add_long else R.string.add_short),
-                    size = 12f,
-                    weight = FontWeight.SemiBold,
-                    color = P.ink,
-                    maxLines = 1,
-                )
+                ElyText("+", size = 17f, weight = FontWeight.SemiBold, color = skin.a2, lineHeightRatio = 1f)
             }
 
             Row(
                 Modifier
                     .weight(1f)
-                    .height(42.dp)
+                    .height(DOCK_H)
                     .alpha(if (sel != null) 1f else 0.45f)
-                    .shadow(12.dp, RoundedCornerShape(15.dp), clip = false, ambientColor = P.ink.copy(alpha = 0.24f), spotColor = P.ink.copy(alpha = 0.24f))
-                    .clip(RoundedCornerShape(15.dp))
+                    .shadow(10.dp, RoundedCornerShape(12.dp), clip = false, ambientColor = P.shade.copy(alpha = 0.24f), spotColor = P.shade.copy(alpha = 0.24f))
+                    .clip(RoundedCornerShape(12.dp))
                     .drawBehind { drawRect(accentGradient(skin, 145f, size)) }
                     .clickable(enabled = sel != null) { sel?.let { vm.open(it) } },
                 horizontalArrangement = Arrangement.Center,
@@ -326,7 +339,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
             ) {
                 PlayGlyph()
                 Spacer(Modifier.width(7.dp))
-                ElyText(stringResource(R.string.open), size = 12.5f, weight = FontWeight.SemiBold, color = Color.White)
+                ElyText(stringResource(R.string.open), size = 12f, weight = FontWeight.SemiBold, color = Color.White, maxLines = 1)
             }
 
             LucyFab(onClick = { vm.go(Screen.Lucy) })
@@ -461,13 +474,16 @@ private fun SearchField(vm: ElyndraViewModel, m: Metrics) {
     }
 }
 
+/** Alto del dock compacto; `chrome` en Metrics cuenta con este número. */
+private val DOCK_H = 34.dp
+
 /** Botón flotante de Lucy, con el aro que late. */
 @Composable
 private fun LucyFab(onClick: () -> Unit) {
     val skin = LocalSkin.current
     val ring = ringProgress()
     Box(
-        Modifier.size(42.dp).glass(RoundedCornerShape(16.dp)).clickable(onClick = onClick),
+        Modifier.size(DOCK_H).glass(RoundedCornerShape(12.dp)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -479,9 +495,9 @@ private fun LucyFab(onClick: () -> Unit) {
                     scaleY = k
                     alpha = 0.5f * (1f - ring)
                 }
-                .border(1.5.dp, skin.a1, RoundedCornerShape(16.dp)),
+                .border(1.5.dp, skin.a1, RoundedCornerShape(12.dp)),
         )
-        ElyText("L", size = 16f, weight = FontWeight.Bold, color = skin.a2)
+        ElyText("L", size = 13f, weight = FontWeight.Bold, color = skin.a2)
     }
 }
 
@@ -564,27 +580,46 @@ private fun LibraryTile(
                     if (selected) 16.dp else 8.dp,
                     shape,
                     clip = false,
-                    ambientColor = P.ink.copy(alpha = if (selected) 0.32f else 0.2f),
-                    spotColor = P.ink.copy(alpha = if (selected) 0.32f else 0.2f),
+                    ambientColor = P.shade.copy(alpha = if (selected) 0.32f else 0.2f),
+                    spotColor = P.shade.copy(alpha = if (selected) 0.32f else 0.2f),
                 )
                 .clip(shape)
                 .border(
-                    if (selected) 4.dp else 1.dp,
-                    if (selected) skin.a1 else Color.White.copy(alpha = 0.6f),
+                    // Marco más grueso: la selección tiene que leerse de lejos.
+                    if (selected) 6.dp else 1.dp,
+                    if (selected) skin.a1 else P.hairline,
                     shape,
                 ),
         ) {
-            val cover = (item as? LibraryItem.App)?.app?.meta?.cover
-            ArtImage(cover, pairIndex, Modifier.fillMaxSize())
+            // Ni un juego Android ni una carpeta de emulador usan carátula: se
+            // representan con su icono — el elegido en "Personalizar icono" o, si
+            // no hay ninguno, el de la app instalada / del emulador de la carpeta.
+            // La carátula queda solo para las ROMs.
+            val icon = when (item) {
+                is LibraryItem.App -> item.app.meta.icon
+                is LibraryItem.Folder -> item.iconPath
+            }
+            // Icono automático cuando no se ha elegido ninguno.
+            val autoIconPackage = when (item) {
+                is LibraryItem.App -> item.app.packageName
+                is LibraryItem.Folder -> item.emulatorPackage
+            }
+            // Detrás, el arte procedural del diseño: el icono nunca flota sobre nada.
+            ArtImage(null, pairIndex, Modifier.fillMaxSize())
             // brillo diagonal
             Box(Modifier.fillMaxSize().drawBehind { drawRect(tileGlossBrush(size)) })
 
-            when (item) {
-                is LibraryItem.Folder -> Column(
+            // El icono llena la card: `Crop` centrado, así que se escala sin
+            // deformarse y solo se recorta lo que sobra de los lados.
+            if (icon != null || autoIconPackage != null) {
+                GameIcon(icon, autoIconPackage, Modifier.fillMaxSize(), ContentScale.Crop)
+            } else if (item is LibraryItem.Folder) {
+                // Carpeta sin icono y sin emulador instalado: rótulo de consola.
+                Column(
                     Modifier
                         .fillMaxSize()
                         .drawBehind { drawRect(consoleFaceBrush(size)) }
-                        .padding(horizontal = 12.dp),
+                        .padding(horizontal = 8.dp),
                     verticalArrangement = Arrangement.Center,
                 ) {
                     ElyText(
@@ -598,8 +633,9 @@ private fun LibraryTile(
                     Spacer(Modifier.height(2.dp))
                     ElyText(
                         item.system.short,
-                        // Misma proporción con la card que en el diseño (16 sp en 66 dp / 18 sp en 96 dp).
-                        size = (metrics.tileH.value * if (metrics.landscape) 0.24f else 0.19f).coerceAtMost(36f),
+                        // La card de carpeta ya no es apaisada, sino una carátula 2:3:
+                        // el rótulo se mide contra su ancho, no contra su alto.
+                        size = (metrics.tileH.value * if (metrics.landscape) 0.15f else 0.13f).coerceAtMost(26f),
                         weight = FontWeight.Bold,
                         color = Color.White,
                         letterSpacing = tracking(-0.01f),
@@ -618,12 +654,6 @@ private fun LibraryTile(
                         overflow = TextOverflow.Ellipsis,
                         uppercase = true,
                     )
-                }
-
-                is LibraryItem.App -> if (cover == null) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        GameIcon(item.app.meta.icon, item.app.packageName, Modifier.size(metrics.tileH * 0.52f))
-                    }
                 }
             }
 

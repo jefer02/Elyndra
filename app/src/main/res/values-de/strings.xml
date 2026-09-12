@@ -58,6 +58,29 @@
     <string name="customize_cover">Cover anpassen</string>
     <string name="customize_background">Hintergrund anpassen</string>
     <string name="customize_icon">Symbol anpassen</string>
+    <string name="customize_logo">Logo festlegen</string>
+    <string name="remove_cover">Cover entfernen</string>
+    <string name="remove_background">Hintergrund entfernen</string>
+    <string name="remove_logo">Logo entfernen</string>
+    <string name="remove_icon">Symbol entfernen</string>
+    <string name="art_cleared">Bild entfernt</string>
+
+    <string name="sort_by">Sortieren nach</string>
+    <string name="sort_name">Name (A–Z)</string>
+    <string name="sort_playtime">Spielzeit</string>
+    <string name="sort_platform">Plattform</string>
+    <string name="sort_added">Hinzugefügt am</string>
+
+    <string name="section_theme">Design</string>
+    <string name="dark_mode">Dunkles Design</string>
+    <string name="dark_mode_desc">Nutzt eine dunkle Oberfläche, unabhängig vom Systemdesign.</string>
+    <string name="section_video_bg">Animierter Hintergrund</string>
+    <string name="video_bg_title">Video-Hintergrund</string>
+    <string name="video_bg_desc">Spielt ein Video hinter der Oberfläche ab. Betrifft nur Elyndra, nicht den System-Hintergrund.</string>
+    <string name="video_bg_choose">Video wählen</string>
+    <string name="video_bg_change">Ändern</string>
+    <string name="video_bg_none">Kein Video gewählt</string>
+    <string name="video_bg_opacity">Deckkraft</string>
     <string name="art_source_not_configured">Richte diesen Dienst zuerst in den Einstellungen ein</string>
     <string name="art_source_roms_only">Nur für ROMs unterstützter Systeme</string>
     <string name="art_searching">Bilder werden gesucht…</string>

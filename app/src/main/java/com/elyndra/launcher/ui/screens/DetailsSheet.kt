@@ -2,6 +2,7 @@ package com.elyndra.launcher.ui.screens
 
 import android.text.format.Formatter
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -98,11 +99,12 @@ fun DetailsSheet(vm: ElyndraViewModel, key: String) {
             // ── Cabecera ──
             Row(Modifier.fillMaxWidth().padding(16.dp)) {
                 Box(Modifier.size(78.dp, 104.dp).clip(RoundedCornerShape(12.dp))) {
-                    ArtImage(meta.cover, pair, Modifier.fillMaxSize())
-                    if (meta.cover == null && (app != null || meta.icon != null)) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            GameIcon(meta.icon, app?.packageName, Modifier.size(44.dp))
-                        }
+                    // Un juego Android se representa con su icono; la carátula solo
+                    // se usa en las ROMs.
+                    val headerCover = if (app != null) null else meta.cover
+                    ArtImage(headerCover, pair, Modifier.fillMaxSize())
+                    if (headerCover == null && (app != null || meta.icon != null)) {
+                        GameIcon(meta.icon, app?.packageName, Modifier.fillMaxSize(), ContentScale.Crop)
                     }
                 }
                 Spacer(Modifier.width(12.dp))
