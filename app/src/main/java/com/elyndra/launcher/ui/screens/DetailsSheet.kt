@@ -46,7 +46,7 @@ import com.elyndra.launcher.ui.AchievementsState
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.LibraryItem
 import com.elyndra.launcher.ui.components.AccentButton
-import com.elyndra.launcher.ui.components.AppIconImage
+import com.elyndra.launcher.ui.components.GameIcon
 import com.elyndra.launcher.ui.components.ArcSpinner
 import com.elyndra.launcher.ui.components.ArtImage
 import com.elyndra.launcher.ui.components.ElyText
@@ -99,9 +99,9 @@ fun DetailsSheet(vm: ElyndraViewModel, key: String) {
             Row(Modifier.fillMaxWidth().padding(16.dp)) {
                 Box(Modifier.size(78.dp, 104.dp).clip(RoundedCornerShape(12.dp))) {
                     ArtImage(meta.cover, pair, Modifier.fillMaxSize())
-                    if (meta.cover == null && app != null) {
+                    if (meta.cover == null && (app != null || meta.icon != null)) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            AppIconImage(app.packageName, Modifier.size(44.dp))
+                            GameIcon(meta.icon, app?.packageName, Modifier.size(44.dp))
                         }
                     }
                 }
