@@ -85,16 +85,19 @@ object IgdbParser {
     /** Escapa comillas y barras para la sintaxis Apicalypse. */
     fun escape(s: String): String = s.replace("\\", "\\\\").replace("\"", "\\\"")
 
+    private const val FIELDS =
+        "fields name,summary,first_release_date,genres.name,involved_companies.developer," +
+            "involved_companies.publisher,involved_companies.company.name,cover.image_id," +
+            "artworks.image_id,screenshots.image_id,total_rating,rating,game_modes.name;\n"
+
     fun searchQuery(name: String, platforms: List<Int>?, limit: Int = 10): String = buildString {
         append("search \"").append(escape(name)).append("\";\n")
-        append(
-            "fields name,summary,first_release_date,genres.name,involved_companies.developer," +
-                "involved_companies.publisher,involved_companies.company.name,cover.image_id," +
-                "artworks.image_id,screenshots.image_id,total_rating,rating,game_modes.name;\n",
-        )
+        append(FIELDS)
         if (!platforms.isNullOrEmpty()) append("where platforms = (").append(platforms.joinToString(",")).append(");\n")
         append("limit ").append(limit).append(";")
     }
+
+    fun idQuery(id: Long): String = FIELDS + "where id = $id;\nlimit 1;"
 }
 
 class IgdbClient(
@@ -160,6 +163,8 @@ class IgdbClient(
 
     suspend fun search(name: String, platforms: List<Int>?): List<IgdbGame> =
         IgdbParser.games(post("games", IgdbParser.searchQuery(name, platforms)))
+
+    suspend fun byId(id: Long): IgdbGame? = IgdbParser.games(post("games", IgdbParser.idQuery(id))).firstOrNull()
 
     private fun messageOf(body: String): String = runCatching {
         Http.parse(body).asObject()?.str("message")
