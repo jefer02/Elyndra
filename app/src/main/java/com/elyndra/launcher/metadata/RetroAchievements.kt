@@ -53,6 +53,9 @@ data class RaGameProgress(
     val developer: String?,
     val publisher: String?,
     val genre: String?,
+    val imageIcon: String? = null,
+    val imageTitle: String? = null,
+    val imageIngame: String? = null,
 ) {
     val total: Int get() = achievements.size
     val points: Int get() = achievements.sumOf { it.points }
@@ -101,6 +104,9 @@ object RaParser {
             developer = o.str("Developer"),
             publisher = o.str("Publisher"),
             genre = o.str("Genre"),
+            imageIcon = o.str("ImageIcon"),
+            imageTitle = o.str("ImageTitle"),
+            imageIngame = o.str("ImageIngame"),
         )
     }
 
