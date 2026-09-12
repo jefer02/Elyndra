@@ -55,9 +55,9 @@ import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.LibraryFilter
 import com.elyndra.launcher.ui.LibraryItem
 import com.elyndra.launcher.ui.Screen
-import com.elyndra.launcher.ui.components.AppIconImage
 import com.elyndra.launcher.ui.components.ArtImage
 import com.elyndra.launcher.ui.components.ElyText
+import com.elyndra.launcher.ui.components.GameIcon
 import com.elyndra.launcher.ui.components.Hero
 import com.elyndra.launcher.ui.components.LogoImage
 import com.elyndra.launcher.ui.components.Metrics
@@ -83,6 +83,7 @@ import com.elyndra.launcher.ui.theme.glass
 import com.elyndra.launcher.ui.theme.pulseHintAlpha
 import com.elyndra.launcher.ui.theme.ringProgress
 import com.elyndra.launcher.ui.theme.selectionLift
+import com.elyndra.launcher.ui.theme.selectionScale
 import com.elyndra.launcher.ui.theme.sheenBrush
 import com.elyndra.launcher.ui.theme.sheenProgress
 import com.elyndra.launcher.ui.theme.tileGlossBrush
@@ -180,7 +181,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                             Modifier
                                 .animTitleIn(key = sel.key)
                                 .fillMaxWidth(0.72f)
-                                .height(if (m.landscape) 42.dp else 64.dp),
+                                .height(m.logoH),
                         )
                     } else {
                         ElyText(
@@ -190,7 +191,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                                 else -> ""
                             },
                             modifier = Modifier.animTitleIn(key = sel?.key ?: "none"),
-                            size = if (m.landscape) 34f else 40f,
+                            size = m.titleSize,
                             weight = FontWeight.ExtraBold,
                             color = Color.White,
                             letterSpacing = tracking(-0.03f),
@@ -248,7 +249,8 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                     contentPadding = PaddingValues(
                         start = m.pad,
                         end = m.pad,
-                        top = if (m.landscape) 6.dp else 8.dp,
+                        // Hueco extra arriba para la card seleccionada, que sube y se amplía.
+                        top = if (m.landscape) 12.dp else 14.dp,
                         bottom = if (m.landscape) 6.dp else 10.dp,
                     ),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -529,6 +531,7 @@ private fun LibraryTile(
     val skin = LocalSkin.current
     val width: Dp = if (item is LibraryItem.Folder) metrics.consoleW else metrics.appW
     val lift = selectionLift(selected)
+    val scale = selectionScale(selected)
     val shape = RoundedCornerShape(16.dp)
     val curtain = curtainAlpha(index * 40, key = item.key)
     val sheen = sheenProgress()
@@ -553,6 +556,10 @@ private fun LibraryTile(
             Modifier
                 .fillMaxWidth()
                 .height(metrics.tileH)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
                 .shadow(
                     if (selected) 16.dp else 8.dp,
                     shape,
@@ -562,7 +569,7 @@ private fun LibraryTile(
                 )
                 .clip(shape)
                 .border(
-                    if (selected) 2.5.dp else 1.dp,
+                    if (selected) 4.dp else 1.dp,
                     if (selected) skin.a1 else Color.White.copy(alpha = 0.6f),
                     shape,
                 ),
@@ -591,7 +598,8 @@ private fun LibraryTile(
                     Spacer(Modifier.height(2.dp))
                     ElyText(
                         item.system.short,
-                        size = if (metrics.landscape) 16f else 18f,
+                        // Misma proporción con la card que en el diseño (16 sp en 66 dp / 18 sp en 96 dp).
+                        size = (metrics.tileH.value * if (metrics.landscape) 0.24f else 0.19f).coerceAtMost(36f),
                         weight = FontWeight.Bold,
                         color = Color.White,
                         letterSpacing = tracking(-0.01f),
@@ -614,7 +622,7 @@ private fun LibraryTile(
 
                 is LibraryItem.App -> if (cover == null) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        AppIconImage(item.app.packageName, Modifier.size(metrics.tileH * 0.52f))
+                        GameIcon(item.app.meta.icon, item.app.packageName, Modifier.size(metrics.tileH * 0.52f))
                     }
                 }
             }

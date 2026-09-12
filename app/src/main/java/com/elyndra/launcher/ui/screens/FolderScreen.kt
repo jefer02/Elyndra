@@ -48,6 +48,7 @@ import com.elyndra.launcher.ui.Screen
 import com.elyndra.launcher.ui.components.ArtImage
 import com.elyndra.launcher.ui.components.BackChevron
 import com.elyndra.launcher.ui.components.ElyText
+import com.elyndra.launcher.ui.components.GameIcon
 import com.elyndra.launcher.ui.components.GhostButton
 import com.elyndra.launcher.ui.components.Hero
 import com.elyndra.launcher.ui.components.LogoImage
@@ -66,6 +67,7 @@ import com.elyndra.launcher.ui.theme.glass
 import com.elyndra.launcher.ui.theme.pulseHintAlpha
 import com.elyndra.launcher.ui.theme.romScrimBrush
 import com.elyndra.launcher.ui.theme.selectionLift
+import com.elyndra.launcher.ui.theme.selectionScale
 import com.elyndra.launcher.ui.theme.sheenBrush
 import com.elyndra.launcher.ui.theme.sheenProgress
 
@@ -169,13 +171,13 @@ fun FolderScreen(vm: ElyndraViewModel) {
                             Modifier
                                 .animTitleIn(key = rom.key)
                                 .fillMaxWidth(0.72f)
-                                .height(if (m.landscape) 42.dp else 64.dp),
+                                .height(m.logoH),
                         )
                     } else {
                         ElyText(
                             rom?.displayTitle ?: item.system.name,
                             modifier = Modifier.animTitleIn(key = rom?.key ?: item.key),
-                            size = if (m.landscape) 34f else 40f,
+                            size = m.titleSize,
                             weight = FontWeight.ExtraBold,
                             color = Color.White,
                             letterSpacing = tracking(-0.03f),
@@ -237,7 +239,8 @@ fun FolderScreen(vm: ElyndraViewModel) {
                     contentPadding = PaddingValues(
                         start = m.pad,
                         end = m.pad,
-                        top = if (m.landscape) 6.dp else 8.dp,
+                        // Hueco extra arriba para la card seleccionada, que sube y se amplía.
+                        top = if (m.landscape) 12.dp else 14.dp,
                         bottom = if (m.landscape) 6.dp else 10.dp,
                     ),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -334,6 +337,7 @@ private fun RomTile(
     val skin = LocalSkin.current
     val shape = RoundedCornerShape(12.dp)
     val lift = selectionLift(selected)
+    val scale = selectionScale(selected)
     val curtain = curtainAlpha(minOf(index, 12) * 40, key = rom.id)
     val sheen = sheenProgress()
     val cover = rom.meta.cover
@@ -356,6 +360,10 @@ private fun RomTile(
             Modifier
                 .fillMaxWidth()
                 .height(height)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
                 .shadow(
                     if (selected) 16.dp else 8.dp,
                     shape,
@@ -365,7 +373,7 @@ private fun RomTile(
                 )
                 .clip(shape)
                 .border(
-                    if (selected) 2.5.dp else 1.dp,
+                    if (selected) 4.dp else 1.dp,
                     if (selected) skin.a1 else Color.White.copy(alpha = 0.6f),
                     shape,
                 ),
@@ -373,6 +381,9 @@ private fun RomTile(
             ArtImage(cover, pairIndex, Modifier.fillMaxSize())
 
             if (cover == null) {
+                rom.meta.icon?.let { icon ->
+                    GameIcon(icon, null, Modifier.align(Alignment.Center).padding(bottom = height * 0.2f).size(width * 0.56f))
+                }
                 Box(Modifier.fillMaxSize().drawBehind { drawRect(romScrimBrush(size)) })
                 ElyText(
                     rom.displayTitle,
