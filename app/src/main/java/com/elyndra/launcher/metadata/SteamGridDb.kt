@@ -23,6 +23,8 @@ data class SgdbImage(
     val height: Int,
     val style: String?,
     val score: Int,
+    /** Miniatura para el selector de imágenes. */
+    val thumb: String = url,
 )
 
 object SgdbParser {
@@ -38,13 +40,15 @@ object SgdbParser {
 
     fun images(root: JsonElement): List<SgdbImage> = data(root).mapNotNull { e ->
         val o = e.asObject() ?: return@mapNotNull null
+        val url = o.str("url") ?: return@mapNotNull null
         SgdbImage(
             id = o["id"].asLong() ?: return@mapNotNull null,
-            url = o.str("url") ?: return@mapNotNull null,
+            url = url,
             width = o["width"].asInt() ?: 0,
             height = o["height"].asInt() ?: 0,
             style = o.str("style"),
             score = o["score"].asInt() ?: 0,
+            thumb = o.str("thumb") ?: url,
         )
     }
 
@@ -104,6 +108,9 @@ class SteamGridDbClient(private val apiKey: () -> String) {
 
     /** Logos con transparencia. */
     suspend fun logos(gameId: Long): List<SgdbImage> = images(url("logos", "game", gameId.toString(), params = filters))
+
+    /** Iconos cuadrados. */
+    suspend fun icons(gameId: Long): List<SgdbImage> = images(url("icons", "game", gameId.toString(), params = filters))
 
     private suspend fun images(u: HttpUrl): List<SgdbImage> = try {
         SgdbParser.images(get(u)).sortedByDescending { it.score }
