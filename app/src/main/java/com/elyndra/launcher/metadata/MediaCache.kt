@@ -58,6 +58,11 @@ class MediaCache(private val filesDir: File) {
         dirFor(key).deleteRecursively()
     }
 
+    /** Borra solo una clase de imagen ("cover", "hero", "logo") de [key]. */
+    fun delete(key: String, kind: String) {
+        dirFor(key).listFiles { f -> f.name.startsWith("${kind}_") }?.forEach { it.delete() }
+    }
+
     fun clearAll() {
         root.deleteRecursively()
     }
