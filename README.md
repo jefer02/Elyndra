@@ -1,7 +1,6 @@
 # Elyndra — app Android nativa
 
-Implementación nativa (Kotlin + Jetpack Compose) del diseño de Claude Design
-`Elyndra.dc.html`. Sin WebView, sin HTML, sin JS: todo son composables.
+Implementación nativa (Kotlin + Jetpack Compose) 
 
 Elyndra unifica en una sola biblioteca los juegos Android instalados y las
 carpetas de ROMs de emulador. Solo indexa y lanza títulos; nunca emula nada:
