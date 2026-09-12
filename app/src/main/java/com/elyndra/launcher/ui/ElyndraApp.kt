@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,16 +31,19 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.components.ActionSheetView
-import com.elyndra.launcher.ui.components.AppIconImage
 import com.elyndra.launcher.ui.components.ArtImage
 import com.elyndra.launcher.ui.components.ElyDialogView
 import com.elyndra.launcher.ui.components.ElyText
+import com.elyndra.launcher.ui.components.GameIcon
+import com.elyndra.launcher.ui.components.LocalScreenSize
 import com.elyndra.launcher.ui.components.ToastView
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.screens.AddScreen
+import com.elyndra.launcher.ui.screens.ArtPickerSheet
 import com.elyndra.launcher.ui.screens.DetailsSheet
 import com.elyndra.launcher.ui.screens.FolderScreen
 import com.elyndra.launcher.ui.screens.LibraryScreen
@@ -71,17 +76,21 @@ fun ElyndraApp(vm: ElyndraViewModel) {
         BackHandler(enabled = vm.canGoBack) { vm.back() }
 
         Box(Modifier.fillMaxSize().background(P.paper)) {
-            Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
-                when (vm.screen) {
-                    Screen.Library -> LibraryScreen(vm)
-                    Screen.Folder -> FolderScreen(vm)
-                    Screen.Add -> AddScreen(vm)
-                    Screen.Settings -> SettingsScreen(vm)
-                    Screen.Lucy -> LucyScreen(vm)
+            BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
+                // Las métricas reparten este alto entre hero y cards (móvil y tableta).
+                CompositionLocalProvider(LocalScreenSize provides DpSize(maxWidth, maxHeight)) {
+                    when (vm.screen) {
+                        Screen.Library -> LibraryScreen(vm)
+                        Screen.Folder -> FolderScreen(vm)
+                        Screen.Add -> AddScreen(vm)
+                        Screen.Settings -> SettingsScreen(vm)
+                        Screen.Lucy -> LucyScreen(vm)
+                    }
                 }
             }
 
             vm.detailsKey?.let { DetailsSheet(vm, it) }
+            vm.artPicker?.let { ArtPickerSheet(vm, it) }
             vm.sheet?.let { ActionSheetView(it, onDismiss = vm::dismissSheet) }
             vm.dialog?.let { ElyDialogView(it, onDismiss = vm::dismissDialog) }
             vm.launching?.let { LaunchOverlay(it, landscape) }
@@ -129,9 +138,9 @@ private fun LaunchOverlay(launch: Launch, landscape: Boolean) {
                 .border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(16.dp)),
         ) {
             ArtImage(launch.coverPath, launch.pairIndex, Modifier.fillMaxSize())
-            if (launch.coverPath == null && launch.packageName != null) {
+            if (launch.coverPath == null && (launch.packageName != null || launch.iconPath != null)) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    AppIconImage(launch.packageName, Modifier.size(if (landscape) 46.dp else 62.dp))
+                    GameIcon(launch.iconPath, launch.packageName, Modifier.size(if (landscape) 46.dp else 62.dp))
                 }
             }
             Box(
