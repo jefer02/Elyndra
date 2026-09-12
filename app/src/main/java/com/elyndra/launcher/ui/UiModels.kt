@@ -7,7 +7,10 @@ import com.elyndra.launcher.data.AppEntry
 import com.elyndra.launcher.data.GameSystem
 import com.elyndra.launcher.data.RomFolder
 import com.elyndra.launcher.library.RomScanner
+import com.elyndra.launcher.metadata.ArtCandidate
+import com.elyndra.launcher.metadata.ArtKind
 import com.elyndra.launcher.metadata.RaGameProgress
+import com.elyndra.launcher.metadata.Service
 
 enum class Screen { Library, Folder, Add, Settings, Lucy }
 
@@ -53,7 +56,28 @@ data class Launch(
     val pairIndex: Int,
     val coverPath: String?,
     val packageName: String? = null,
+    val iconPath: String? = null,
 )
+
+/** Selector de "Personalizar carátula / fondo / icono" con las imágenes de un servicio. */
+data class ArtPickerState(
+    val key: String,
+    val title: String,
+    val kind: ArtKind,
+    val service: Service,
+    val loading: Boolean = true,
+    val candidates: List<ArtCandidate> = emptyList(),
+    val failed: Boolean = false,
+    /** URL que se está descargando tras elegirla. */
+    val applying: String? = null,
+)
+
+@StringRes
+fun ArtKind.label(): Int = when (this) {
+    ArtKind.Cover -> R.string.customize_cover
+    ArtKind.Background -> R.string.customize_background
+    ArtKind.Icon -> R.string.customize_icon
+}
 
 data class DialogButton(val label: UiText, val action: () -> Unit)
 
