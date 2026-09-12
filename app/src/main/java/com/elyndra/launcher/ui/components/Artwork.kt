@@ -66,6 +66,15 @@ fun LogoImage(path: String, modifier: Modifier = Modifier, alignment: Alignment 
     )
 }
 
+/** Icono del juego: el elegido en "Personalizar icono" si lo hay; si no, el de la app instalada. */
+@Composable
+fun GameIcon(iconPath: String?, packageName: String?, modifier: Modifier = Modifier) {
+    when {
+        iconPath != null -> LogoImage(iconPath, modifier, alignment = Alignment.Center)
+        packageName != null -> AppIconImage(packageName, modifier)
+    }
+}
+
 private val iconCache = LruCache<String, ImageBitmap>(96)
 
 /** Icono real de una app instalada (PackageManager), cacheado en memoria. */

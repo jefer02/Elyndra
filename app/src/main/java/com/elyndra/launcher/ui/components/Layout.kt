@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
@@ -17,6 +18,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.elyndra.launcher.data.P
@@ -30,11 +32,13 @@ import java.io.File
 /* ─────────────────────────────────────────────────────────────
    Métricas del diseño.
 
-   En Elyndra.dc.html todo depende de la bandera `L` (horizontal):
-     pad    = L ? 22 : 18
-     heroH  = L ? 132 : 330
-     tileH  = L ? 66 : 96
-     appW   = tileH ; conW = tileH*1.5 ; romW = tileH*0.75
+   Parten de la bandera `L` (horizontal) de Elyndra.dc.html, pero el
+   hero y las cards se reparten el alto real de la ventana, así que
+   escalan igual en móvil y en tableta:
+     libre  = alto − (filtros + márgenes + nombre + dock)
+     L:  tileH = 40 % de libre ; heroH = el resto
+     P:  tileH = 34 % de libre (máx. 46 % del ancho) ; heroH = 46 % de libre
+     appW = tileH ; conW = tileH*1.5 ; romW = romTileH*0.625 (L) / 0.56 (P)
    ───────────────────────────────────────────────────────────── */
 
 data class Metrics(
@@ -46,21 +50,46 @@ data class Metrics(
     val consoleW: Dp,
     val romW: Dp,
     val romTileH: Dp,
+    /** Tamaño (sp) del título del juego seleccionado en el hero. */
+    val titleSize: Float,
+    /** Alto del logo que sustituye a ese título. */
+    val logoH: Dp,
 )
+
+/** Espacio útil de la ventana (sin barras del sistema); lo provee ElyndraApp. */
+val LocalScreenSize = staticCompositionLocalOf { DpSize(412.dp, 892.dp) }
 
 @Composable
 fun metrics(): Metrics {
     val l = LocalLandscape.current
-    val tileH = if (l) 66.dp else 96.dp
+    val screen = LocalScreenSize.current
+    val w = screen.width.value
+    val h = screen.height.value
+    // Alto que no es ni hero ni card: filtros, márgenes del carrusel, nombre bajo la card y dock.
+    val chrome = if (l) 142f else 160f
+    val free = (h - chrome).coerceAtLeast(176f)
+    val tile: Float
+    val hero: Float
+    if (l) {
+        tile = (free * 0.40f).coerceIn(66f, 220f)
+        hero = (free - tile).coerceAtLeast(110f)
+    } else {
+        tile = minOf(free * 0.34f, w * 0.46f).coerceIn(96f, 300f)
+        hero = (free * 0.46f).coerceAtMost(free - tile).coerceAtLeast(200f)
+    }
+    val titleSize = if (l) (hero * 0.30f).coerceIn(44f, 72f) else (hero * 0.16f).coerceIn(48f, 80f)
+    val tileH = tile.dp
     return Metrics(
         landscape = l,
         pad = if (l) 22.dp else 18.dp,
-        heroH = if (l) 132.dp else 330.dp,
+        heroH = hero.dp,
         tileH = tileH,
         appW = tileH,
         consoleW = tileH * 1.5f,
-        romW = tileH * 0.75f,
-        romTileH = tileH * (if (l) 1.2f else 1.34f),
+        romW = tileH * (if (l) 0.625f else 0.56f),
+        romTileH = tileH,
+        titleSize = titleSize,
+        logoH = (titleSize * if (l) 1.25f else 1.6f).dp,
     )
 }
 
