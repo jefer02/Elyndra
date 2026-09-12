@@ -254,6 +254,13 @@ class ScreenScraperClient(private val credentials: () -> SsCredentials) {
         null
     }
 
+    /** Juego ya identificado, por su id de ScreenScraper (jeuInfos.php?gameid=). */
+    suspend fun gameById(gameId: String): SsGame? = try {
+        ScreenScraperParser.gameInfo(call("jeuInfos.php", mapOf("gameid" to gameId)))?.takeUnless { it.notGame }
+    } catch (e: ApiException.NotFound) {
+        null
+    }
+
     /** Búsqueda por nombre (jeuRecherche.php), resultados ordenados por probabilidad. */
     suspend fun search(systemId: Int?, name: String): List<SsGame> = try {
         val root = call("jeuRecherche.php", mapOf("systemeid" to systemId?.toString(), "recherche" to name))
