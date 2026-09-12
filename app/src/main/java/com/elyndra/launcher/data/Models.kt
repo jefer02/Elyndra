@@ -42,6 +42,7 @@ data class RomFolder(
     val cover: String? = null,
     val hero: String? = null,
     val logo: String? = null,
+    val icon: String? = null,
 ) {
     val key: String get() = "f:$id"
 }

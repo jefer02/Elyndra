@@ -150,12 +150,13 @@ class LibraryRepository(private val file: File, private val scope: CoroutineScop
         lib.copy(folders = lib.folders.map { if (it.id == folderId) transform(it) else it })
     }
 
-    /** Fija (o borra, con [path] = null) una imagen de carpeta. [kind] es "cover", "hero" o "logo". */
+    /** Fija (o borra, con [path] = null) una imagen de carpeta: "cover", "hero", "logo" o "icon". */
     fun setFolderArt(folderId: String, kind: String, path: String?) = updateFolder(folderId) { f ->
         when (kind) {
             "cover" -> f.copy(cover = path)
             "hero" -> f.copy(hero = path)
             "logo" -> f.copy(logo = path)
+            "icon" -> f.copy(icon = path)
             else -> f
         }
     }
