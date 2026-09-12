@@ -87,6 +87,10 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.coil.compose)
 
+    // Fondo animado de la interfaz (Ajustes → "Vídeo de fondo").
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
+
     debugImplementation(libs.androidx.ui.tooling)
 
     testImplementation(libs.junit)

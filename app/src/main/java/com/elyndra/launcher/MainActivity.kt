@@ -1,6 +1,7 @@
 package com.elyndra.launcher
 
 import android.content.Context
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -26,6 +27,12 @@ class MainActivity : ComponentActivity() {
         // pantalla, como en el diseño. Los insets se aplican en ElyndraApp.
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        // El modo oscuro es una opción de la app, no del sistema, así que no
+        // puede venir de un `values-night`: se pinta aquí el fondo de ventana
+        // para que el primer fotograma (antes de Compose) no dé un destello claro.
+        val dark = (application as ElyndraApplication).settings.darkMode
+        window.setBackgroundDrawable(ColorDrawable(if (dark) 0xFF13161A.toInt() else 0xFFF6F8F9.toInt()))
 
         // Al volver de un juego se cierra la sesión medida; al salir, se retira el velo de lanzamiento.
         lifecycle.addObserver(

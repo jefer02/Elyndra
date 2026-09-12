@@ -1,24 +1,76 @@
 package com.elyndra.launcher.data
 
 import androidx.annotation.StringRes
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import com.elyndra.launcher.R
 
 /* ─────────────────────────────────────────────────────────────
    Paleta del diseño (Elyndra.dc.html): marca, acentos, tintes del
    cristal y pares de degradado de las carátulas procedurales.
+
+   Modo claro / oscuro
+   ───────────────────
+   `P` guarda el tema en un estado de Compose: cambiar [P.isDark]
+   recompone toda la interfaz sin tocar ninguno de los ~145 sitios
+   que ya leen `P.ink`, `P.paper`… Eso mantiene el estilo intacto,
+   que es justo lo que se pide: solo cambian los valores.
+
+   Ojo con los dos papeles de la "tinta":
+
+     · [ink] / [ink2] son color de TEXTO — se invierten con el tema.
+     · [shade] es tinta FÍSICA (sombras, velos, el fondo del hero y
+       el cristal oscuro) — nunca se invierte: una sombra sigue
+       siendo oscura en modo oscuro.
+
+   Antes ambos usos compartían `ink`; separarlos evita que en modo
+   oscuro las sombras y los velos se vuelvan neblina blanca.
    ───────────────────────────────────────────────────────────── */
 
 /** Paleta base de marca (`P` en el diseño). */
 object P {
+
+    /** Tema activo. Lo fija SettingsController al arrancar y al conmutar. */
+    var isDark by mutableStateOf(false)
+
+    /* ── Marca: constantes, no dependen del tema ─────────────── */
     val light = Color(0xFFF59659)
     val strong = Color(0xFFEE7E28)
     val dark = Color(0xFFE26D19)
-    val paper = Color(0xFFF6F8F9)
-    val ink = Color(0xFF333333)
-    val ink2 = Color(0xFF555555)
     val green = Color(0xFF9BD494)
-    val red = Color(0xFFD33F5B)
+
+    /** Tinta física: sombras, velos, fondo del hero y cristal oscuro. Siempre oscura. */
+    val shade = Color(0xFF333333)
+
+    /* ── Dependientes del tema ───────────────────────────────── */
+
+    /** Fondo general de la app. */
+    val paper: Color get() = if (isDark) Color(0xFF13161A) else Color(0xFFF6F8F9)
+
+    /** Base opaca de diálogos y hojas (un punto por encima del fondo). */
+    val surface: Color get() = if (isDark) Color(0xFF1D2227) else Color(0xFFF6F8F9)
+
+    /** Texto principal. Casi blanco en oscuro: varios rótulos se pintan además con alpha. */
+    val ink: Color get() = if (isDark) Color(0xFFF4F7F9) else Color(0xFF333333)
+
+    /** Texto secundario. */
+    val ink2: Color get() = if (isDark) Color(0xFFC2CBD2) else Color(0xFF555555)
+
+    val red: Color get() = if (isDark) Color(0xFFFF8497) else Color(0xFFD33F5B)
+
+    /**
+     * Relleno de las piezas pequeñas (píldoras, botones fantasma, etiquetas).
+     * En claro es un velo blanco; en oscuro tiene que ser un velo **claro sobre
+     * oscuro**, o el texto [ink] —casi blanco— se pierde encima.
+     */
+    val chip: Color
+        get() = if (isDark) Color.White.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.65f)
+
+    /** Filo de las láminas de cristal y de las cards. */
+    val hairline: Color
+        get() = if (isDark) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.72f)
 }
 
 /** Color de acento: 10 opciones (las 3 de marca + 7 más). El nombre se traduce. */

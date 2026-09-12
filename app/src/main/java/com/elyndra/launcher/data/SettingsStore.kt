@@ -57,4 +57,31 @@ class SettingsStore(context: Context) {
     var pendingSessionStart: Long
         get() = prefs.getLong("session.start", 0L)
         set(v) = prefs.edit { putLong("session.start", v) }
+
+    /* ── tema y fondo ─────────────────────────────────────────── */
+
+    /** Modo oscuro de la interfaz (independiente del tema del sistema). */
+    var darkMode: Boolean
+        get() = prefs.getBoolean("darkMode", false)
+        set(v) = prefs.edit { putBoolean("darkMode", v) }
+
+    /** URI (SAF, con permiso persistente) del vídeo de fondo de la interfaz. */
+    var videoBgUri: String?
+        get() = prefs.getString("videoBg.uri", null)
+        set(v) = prefs.edit { if (v == null) remove("videoBg.uri") else putString("videoBg.uri", v) }
+
+    /** El vídeo de fondo se pinta solo si además está activado. */
+    var videoBgEnabled: Boolean
+        get() = prefs.getBoolean("videoBg.enabled", false)
+        set(v) = prefs.edit { putBoolean("videoBg.enabled", v) }
+
+    /** Opacidad (%) con la que se mezcla el vídeo sobre el fondo. */
+    var videoBgOpacity: Int
+        get() = prefs.getInt("videoBg.opacity", 45)
+        set(v) = prefs.edit { putInt("videoBg.opacity", v) }
+
+    /** Criterio de orden de la biblioteca (id de [com.elyndra.launcher.ui.SortMode]). */
+    var sortMode: String
+        get() = prefs.getString("sortMode", "name") ?: "name"
+        set(v) = prefs.edit { putString("sortMode", v) }
 }

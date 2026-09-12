@@ -35,6 +35,13 @@ data class RomFolder(
     val emulatorId: String? = null,
     val addedAt: Long = 0,
     val lastScan: Long = 0,
+    /**
+     * Imágenes elegidas a mano para la carpeta. Si están, mandan sobre las
+     * heredadas del último juego jugado (ver `Derived.folders` en el ViewModel).
+     */
+    val cover: String? = null,
+    val hero: String? = null,
+    val logo: String? = null,
 ) {
     val key: String get() = "f:$id"
 }

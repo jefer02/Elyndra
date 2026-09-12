@@ -146,6 +146,20 @@ class LibraryRepository(private val file: File, private val scope: CoroutineScop
 
     fun setRomEmulator(romId: String, emulatorId: String?) = updateRom(romId) { it.copy(emulatorId = emulatorId) }
 
+    fun updateFolder(folderId: String, transform: (RomFolder) -> RomFolder) = update { lib ->
+        lib.copy(folders = lib.folders.map { if (it.id == folderId) transform(it) else it })
+    }
+
+    /** Fija (o borra, con [path] = null) una imagen de carpeta. [kind] es "cover", "hero" o "logo". */
+    fun setFolderArt(folderId: String, kind: String, path: String?) = updateFolder(folderId) { f ->
+        when (kind) {
+            "cover" -> f.copy(cover = path)
+            "hero" -> f.copy(hero = path)
+            "logo" -> f.copy(logo = path)
+            else -> f
+        }
+    }
+
     fun updateRom(romId: String, transform: (RomEntry) -> RomEntry) = update { lib ->
         lib.copy(roms = lib.roms.map { if (it.id == romId) transform(it) else it })
     }
@@ -204,6 +218,9 @@ class LibraryRepository(private val file: File, private val scope: CoroutineScop
         if (key.startsWith("a:")) current.apps.firstOrNull { it.packageName == key.removePrefix("a:") } else null
 
     fun folder(folderId: String): RomFolder? = current.folders.firstOrNull { it.id == folderId }
+
+    fun folderByKey(key: String): RomFolder? =
+        if (key.startsWith("f:")) folder(key.removePrefix("f:")) else null
 
     private fun newRom(folder: RomFolder, f: RomScanner.Found) = RomEntry(
         id = romId(folder.id, f.docId),
