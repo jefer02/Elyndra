@@ -19,6 +19,12 @@ import com.elyndra.launcher.data.RomFolder
 import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.data.pairIndexFor
 import com.elyndra.launcher.launch.GameLauncher
+import com.elyndra.launcher.metadata.ArtCandidate
+import com.elyndra.launcher.metadata.ArtKind
+import com.elyndra.launcher.metadata.ArtSources
+import com.elyndra.launcher.metadata.Service
+import com.elyndra.launcher.ui.screens.serviceName
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -59,6 +65,10 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
     var detailsKey by mutableStateOf<String?>(null); private set
     var achievements by mutableStateOf<AchievementsState>(AchievementsState.Idle); private set
     var toast by mutableStateOf<UiText?>(null); private set
+    var artPicker by mutableStateOf<ArtPickerState?>(null); private set
+
+    private val art = ArtSources(engine, repo, app.media)
+    private var artJob: Job? = null
 
     val add = AddController(this)
     val settings = SettingsController(this)
@@ -198,12 +208,13 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
     }
 
     val canGoBack: Boolean
-        get() = dialog != null || sheet != null || detailsKey != null || screen != Screen.Library || searchOpen
+        get() = dialog != null || sheet != null || artPicker != null || detailsKey != null || screen != Screen.Library || searchOpen
 
     fun back() {
         when {
             dialog != null -> dialog = null
             sheet != null -> sheet = null
+            artPicker != null -> closeArtPicker()
             detailsKey != null -> closeDetails()
             screen != Screen.Library -> go(Screen.Library)
             searchOpen -> toggleSearch()
@@ -239,7 +250,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
 
     private fun launchApp(item: LibraryItem.App) {
         val entry = item.app
-        showLaunch(Launch(entry.displayTitle, UiText.res(R.string.launch_android), pairIndexFor(entry.packageName), entry.meta.cover, entry.packageName))
+        showLaunch(Launch(entry.displayTitle, UiText.res(R.string.launch_android), pairIndexFor(entry.packageName), entry.meta.cover, entry.packageName, entry.meta.icon))
         launchJob?.cancel()
         launchJob = viewModelScope.launch {
             delay(LAUNCH_DELAY_MS)
@@ -289,7 +300,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
             emulatorMissing(emuId, emuName, folder, rom)
             return
         }
-        showLaunch(Launch(rom.displayTitle, UiText.res(R.string.launch_via, emuName.uppercase()), romPairIndex(rom), rom.meta.cover))
+        showLaunch(Launch(rom.displayTitle, UiText.res(R.string.launch_via, emuName.uppercase()), romPairIndex(rom), rom.meta.cover, iconPath = rom.meta.icon))
         launchJob?.cancel()
         launchJob = viewModelScope.launch {
             val vitaTitle = if (folder.systemId == "psvita") {
@@ -467,6 +478,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                 SheetAction(UiText.res(R.string.open)) { open(item) },
                 SheetAction(UiText.res(R.string.details)) { showDetails(item.key) },
                 SheetAction(UiText.res(R.string.refresh_metadata)) { refreshMetadata(listOf(item.key)) },
+            ) + customizeActions(item.key, item.app.displayTitle) + listOf(
                 SheetAction(UiText.res(R.string.remove_from_library), destructive = true) {
                     removeApp(item.app.packageName, item.app.displayTitle)
                 },
@@ -489,9 +501,66 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                     SheetAction(UiText.res(R.string.details)) { showDetails(rom.key) },
                     SheetAction(UiText.res(R.string.emulator_for_game), rom.emulatorId?.let { UiText.Raw(emulatorName(it)) }) { pickRomEmulator(rom) },
                     SheetAction(UiText.res(R.string.refresh_metadata)) { refreshMetadata(listOf(rom.key)) },
-                ),
+                ) + customizeActions(rom.key, rom.displayTitle),
             ),
         )
+    }
+
+    /* ── personalizar carátula / fondo / icono ────────────────── */
+
+    private fun customizeActions(key: String, title: String): List<SheetAction> =
+        ArtKind.entries.map { kind -> SheetAction(UiText.res(kind.label())) { chooseArtSource(key, title, kind) } }
+
+    /** Hoja con los cuatro servicios; los que no están configurados (o no cubren el juego) salen atenuados. */
+    private fun chooseArtSource(key: String, title: String, kind: ArtKind) {
+        val actions = ART_SERVICES.map { service ->
+            val supported = art.supports(key, service)
+            val configured = app.credentials.isConfigured(service)
+            val problem = when {
+                !supported -> UiText.res(R.string.art_source_roms_only)
+                !configured -> UiText.res(R.string.art_source_not_configured)
+                else -> null
+            }
+            SheetAction(UiText.Raw(serviceName(service)), detail = problem, dimmed = problem != null) {
+                if (problem != null) showToast(problem) else searchArt(key, title, kind, service)
+            }
+        }
+        showSheet(ActionSheetSpec(UiText.res(kind.label()), UiText.Raw(title), actions))
+    }
+
+    private fun searchArt(key: String, title: String, kind: ArtKind, service: Service) {
+        val state = ArtPickerState(key, title, kind, service)
+        artPicker = state
+        artJob?.cancel()
+        artJob = viewModelScope.launch {
+            val found = try {
+                art.candidates(key, kind, service)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            }
+            if (artPicker === state) {
+                artPicker = state.copy(loading = false, candidates = found.orEmpty(), failed = found == null)
+            }
+        }
+    }
+
+    fun applyArt(candidate: ArtCandidate) {
+        val state = artPicker ?: return
+        if (state.applying != null) return
+        artPicker = state.copy(applying = candidate.url)
+        artJob?.cancel()
+        artJob = viewModelScope.launch {
+            val ok = art.apply(state.key, state.kind, candidate.url)
+            artPicker = null
+            showToast(UiText.res(if (ok) R.string.art_applied else R.string.art_apply_failed))
+        }
+    }
+
+    fun closeArtPicker() {
+        artJob?.cancel()
+        artPicker = null
     }
 
     fun pickFolderEmulator(folder: RomFolder) {
@@ -600,5 +669,6 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
         private const val LAUNCH_DELAY_MS = 650L
         private const val MAX_SESSION_MINUTES = 12 * 60
         private const val AUTO_RESCAN_MS = 6L * 60 * 60 * 1000
+        private val ART_SERVICES = listOf(Service.ScreenScraper, Service.Igdb, Service.SteamGridDb, Service.RetroAchievements)
     }
 }
