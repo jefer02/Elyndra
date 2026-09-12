@@ -35,10 +35,21 @@ import java.io.File
    Parten de la bandera `L` (horizontal) de Elyndra.dc.html, pero el
    hero y las cards se reparten el alto real de la ventana, así que
    escalan igual en móvil y en tableta:
-     libre  = alto − (filtros + márgenes + nombre + dock)
-     L:  tileH = 40 % de libre ; heroH = el resto
-     P:  tileH = 34 % de libre (máx. 46 % del ancho) ; heroH = 46 % de libre
-     appW = tileH ; conW = tileH*1.5 ; romW = romTileH*0.625 (L) / 0.56 (P)
+     libre = alto − (filtros + márgenes + nombre + dock compacto)
+
+   El reparto es exacto: **hero + card == libre**, siempre. El hero se
+   lleva su porcentaje y la card se queda con el resto; si algún tope
+   la mueve, el hero absorbe la diferencia. Así no hay forma de que la
+   suma se pase del alto de la pantalla, que era justo lo que recortaba
+   el carrusel en vertical (antes hero y card se calculaban por separado
+   y un mínimo posterior podía deshacer el tope).
+
+   Topes de la card:
+     · ancho: su carátula 2:3 no puede comerse la fila.
+     · mínimo: por debajo no se distingue la carátula.
+
+   Todas las cards miden igual —carpetas de emulador, juegos Android y
+   ROMs— con proporción de carátula 2:3.
    ───────────────────────────────────────────────────────────── */
 
 data class Metrics(
@@ -56,6 +67,9 @@ data class Metrics(
     val logoH: Dp,
 )
 
+/** Proporción de las carátulas (2:3, el estándar de box art). */
+const val COVER_RATIO = 2f / 3f
+
 /** Espacio útil de la ventana (sin barras del sistema); lo provee ElyndraApp. */
 val LocalScreenSize = staticCompositionLocalOf { DpSize(412.dp, 892.dp) }
 
@@ -65,28 +79,42 @@ fun metrics(): Metrics {
     val screen = LocalScreenSize.current
     val w = screen.width.value
     val h = screen.height.value
-    // Alto que no es ni hero ni card: filtros, márgenes del carrusel, nombre bajo la card y dock.
-    val chrome = if (l) 142f else 160f
-    val free = (h - chrome).coerceAtLeast(176f)
-    val tile: Float
-    val hero: Float
-    if (l) {
-        tile = (free * 0.40f).coerceIn(66f, 220f)
-        hero = (free - tile).coerceAtLeast(110f)
-    } else {
-        tile = minOf(free * 0.34f, w * 0.46f).coerceIn(96f, 300f)
-        hero = (free * 0.46f).coerceAtMost(free - tile).coerceAtLeast(200f)
+    // Alto que no es ni hero ni card: filtros, márgenes del carrusel, nombre bajo
+    // la card y el dock compacto (ver LibraryScreen: 34dp + aire).
+    val chrome = if (l) 118f else 132f
+    val free = (h - chrome).coerceAtLeast(150f)
+
+    // El hero manda —con logo ocupa menos que una carátula, así que se le da
+    // más sitio— y la card se queda con el resto exacto.
+    var hero = free * (if (l) 0.56f else 0.60f)
+    var tile = free - hero
+
+    val maxTileByWidth = w * (if (l) 0.30f else 0.46f) / COVER_RATIO
+    if (tile > maxTileByWidth) {
+        tile = maxTileByWidth
+        hero = free - tile
     }
-    val titleSize = if (l) (hero * 0.30f).coerceIn(44f, 72f) else (hero * 0.16f).coerceIn(48f, 80f)
+    val minTile = if (l) 72f else 104f
+    if (tile < minTile) {
+        // En una pantalla muy baja la card se queda como mucho con la mitad:
+        // repartir a medias es preferible a que el hero la deje sin sitio.
+        tile = minTile.coerceAtMost(free * 0.5f)
+        hero = free - tile
+    }
+
+    val titleSize = if (l) (hero * 0.34f).coerceIn(50f, 96f) else (hero * 0.20f).coerceIn(56f, 112f)
     val tileH = tile.dp
+    // Carátula vertical: el ancho sale del alto, no al revés, así nunca se recorta.
+    val cardW = tileH * COVER_RATIO
     return Metrics(
         landscape = l,
         pad = if (l) 22.dp else 18.dp,
         heroH = hero.dp,
         tileH = tileH,
-        appW = tileH,
-        consoleW = tileH * 1.5f,
-        romW = tileH * (if (l) 0.625f else 0.56f),
+        appW = cardW,
+        // Las carpetas de emulador miden lo mismo que los juegos Android.
+        consoleW = cardW,
+        romW = cardW,
         romTileH = tileH,
         titleSize = titleSize,
         logoH = (titleSize * if (l) 1.25f else 1.6f).dp,
@@ -116,7 +144,7 @@ fun Hero(
             .fillMaxWidth()
             .height(height)
             .clipToBounds()
-            .background(P.ink),
+            .background(P.shade),
     ) {
         // `heroArt`: la misma carátula procedural, al 115 % y saturada.
         Box(
