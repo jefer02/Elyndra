@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
@@ -99,252 +100,262 @@ fun LibraryScreen(vm: ElyndraViewModel) {
     val sel = vm.selected()
     val libraryEmpty = vm.loaded && vm.library.folders.isEmpty() && vm.library.apps.isEmpty()
 
-    Column(Modifier.fillMaxSize().animFadeIn(key = Screen.Library)) {
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().animFadeIn(key = Screen.Library)) {
 
-        Hero(
-            pairIndex = sel?.let { vm.pairIndexOf(it) } ?: 0,
-            heroKey = sel?.key ?: "none",
-            height = m.iconHeroH,
-            imagePath = when (sel) {
-                is LibraryItem.App -> sel.app.meta.hero ?: sel.app.meta.screenshot
-                is LibraryItem.Folder -> sel.heroPath
-                null -> null
-            },
-            topBar = {
-                Row(
-                    Modifier
-                        .align(Alignment.TopStart)
-                        .fillMaxWidth()
-                        .padding(start = m.pad, end = m.pad, top = if (m.landscape) 8.dp else 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
+            Hero(
+                pairIndex = sel?.let { vm.pairIndexOf(it) } ?: 0,
+                heroKey = sel?.key ?: "none",
+                height = m.iconHeroH,
+                imagePath = when (sel) {
+                    is LibraryItem.App -> sel.app.meta.hero ?: sel.app.meta.screenshot
+                    is LibraryItem.Folder -> sel.heroPath
+                    null -> null
+                },
+                topBar = {
+                    Row(
                         Modifier
-                            .offset(y = bobOffset().dp)
-                            .size(9.dp)
-                            .shadow(6.dp, RoundedCornerShape(3.dp), clip = false, ambientColor = skin.a1, spotColor = skin.a1)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(skin.a1),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    ElyText(
-                        "ELYNDRA",
-                        size = if (m.landscape) 17f else 19f,
-                        weight = FontWeight.ExtraBold,
-                        color = Color.White,
-                        letterSpacing = tracking(0.16f),
-                        shadow = WordmarkShadow,
-                        maxLines = 1,
-                    )
-                    Spacer(Modifier.weight(1f))
-                    SearchField(vm, m)
-                    Spacer(Modifier.width(8.dp))
-                    Box(
+                            .align(Alignment.TopStart)
+                            .fillMaxWidth()
+                            .padding(start = m.pad, end = m.pad, top = if (m.landscape) 8.dp else 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            Modifier
+                                .offset(y = bobOffset().dp)
+                                .size(9.dp)
+                                .shadow(6.dp, RoundedCornerShape(3.dp), clip = false, ambientColor = skin.a1, spotColor = skin.a1)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(skin.a1),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        ElyText(
+                            "ELYNDRA",
+                            size = if (m.landscape) 17f else 19f,
+                            weight = FontWeight.ExtraBold,
+                            color = Color.White,
+                            letterSpacing = tracking(0.16f),
+                            shadow = WordmarkShadow,
+                            maxLines = 1,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        SearchField(vm, m)
+                        Spacer(Modifier.width(8.dp))
+                        Box(
+                            Modifier
+                                .size(34.dp)
+                                .darkGlass(RoundedCornerShape(12.dp))
+                                .clickable { vm.go(Screen.Settings) },
+                            contentAlignment = Alignment.Center,
+                        ) { SettingsGlyph() }
+                    }
+                },
+                info = {
+                    Column(
                         Modifier
-                            .size(34.dp)
-                            .darkGlass(RoundedCornerShape(12.dp))
-                            .clickable { vm.go(Screen.Settings) },
-                        contentAlignment = Alignment.Center,
-                    ) { SettingsGlyph() }
-                }
-            },
-            info = {
-                Column(
-                    Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .padding(start = m.pad, end = m.pad, bottom = if (m.landscape) 8.dp else 18.dp),
-                ) {
-                    if (sel != null) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(bottom = if (m.landscape) 3.dp else 6.dp),
-                        ) {
-                            HeroChip(
-                                stringResource(
-                                    if (sel is LibraryItem.Folder) R.string.chip_emulator_folder else R.string.chip_android_app,
-                                ),
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .padding(start = m.pad, end = m.pad, bottom = if (m.landscape) 8.dp else 18.dp),
+                    ) {
+                        if (sel != null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(bottom = if (m.landscape) 3.dp else 6.dp),
+                            ) {
+                                HeroChip(
+                                    stringResource(
+                                        if (sel is LibraryItem.Folder) R.string.chip_emulator_folder else R.string.chip_android_app,
+                                    ),
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                ElyText(
+                                    heroSubline(sel),
+                                    size = 9.5f,
+                                    weight = FontWeight.Medium,
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    letterSpacing = tracking(0.1f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        val logo = when (sel) {
+                            is LibraryItem.App -> sel.app.meta.logo
+                            is LibraryItem.Folder -> sel.logoPath
+                            null -> null
+                        }
+                        // El `sel != null` es para el compilador: el `when` de arriba no le
+                        // basta para deducir que si hay logo entonces hay elemento.
+                        if (sel != null && logo != null) {
+                            LogoImage(
+                                logo,
+                                Modifier
+                                    .animTitleIn(key = sel.key)
+                                    .fillMaxWidth(0.72f)
+                                    .height(m.logoH),
                             )
-                            Spacer(Modifier.width(8.dp))
+                        } else {
                             ElyText(
-                                heroSubline(sel),
-                                size = 9.5f,
-                                weight = FontWeight.Medium,
-                                color = Color.White.copy(alpha = 0.85f),
-                                letterSpacing = tracking(0.1f),
+                                when {
+                                    sel != null -> sel.name
+                                    vm.loaded -> stringResource(R.string.empty_library_title)
+                                    else -> ""
+                                },
+                                modifier = Modifier.animTitleIn(key = sel?.key ?: "none"),
+                                size = m.titleSize,
+                                weight = FontWeight.ExtraBold,
+                                color = Color.White,
+                                letterSpacing = tracking(-0.03f),
+                                lineHeightRatio = 0.92f,
+                                shadow = HeroTitleShadow,
+                                uppercase = true,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                    }
-                    val logo = when (sel) {
-                        is LibraryItem.App -> sel.app.meta.logo
-                        is LibraryItem.Folder -> sel.logoPath
-                        null -> null
-                    }
-                    // El `sel != null` es para el compilador: el `when` de arriba no le
-                    // basta para deducir que si hay logo entonces hay elemento.
-                    if (sel != null && logo != null) {
-                        LogoImage(
-                            logo,
-                            Modifier
-                                .animTitleIn(key = sel.key)
-                                .fillMaxWidth(0.72f)
-                                .height(m.logoH),
-                        )
-                    } else {
                         ElyText(
-                            when {
-                                sel != null -> sel.name
-                                vm.loaded -> stringResource(R.string.empty_library_title)
-                                else -> ""
-                            },
-                            modifier = Modifier.animTitleIn(key = sel?.key ?: "none"),
-                            size = m.titleSize,
-                            weight = FontWeight.ExtraBold,
-                            color = Color.White,
-                            letterSpacing = tracking(-0.03f),
-                            lineHeightRatio = 0.92f,
-                            shadow = HeroTitleShadow,
-                            uppercase = true,
+                            stringResource(if (sel == null) R.string.empty_library_hint else R.string.hint_gestures),
+                            modifier = Modifier
+                                .padding(top = if (m.landscape) 4.dp else 7.dp)
+                                .alpha(pulseHintAlpha()),
+                            size = 9f,
+                            weight = FontWeight.Medium,
+                            color = Color.White.copy(alpha = 0.8f),
+                            letterSpacing = tracking(0.14f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            uppercase = true,
                         )
                     }
+                },
+            )
+
+            // ── CARRUSEL ──
+            Column(Modifier.weight(1f).padding(top = 10.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = m.pad, end = m.pad, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    LibraryFilter.entries.forEach { f ->
+                        FilterTab(stringResource(f.label), vm.filter == f) { vm.updateFilter(f) }
+                    }
+                    Spacer(Modifier.weight(1f))
                     ElyText(
-                        stringResource(if (sel == null) R.string.empty_library_hint else R.string.hint_gestures),
-                        modifier = Modifier
-                            .padding(top = if (m.landscape) 4.dp else 7.dp)
-                            .alpha(pulseHintAlpha()),
+                        pluralStringResource(R.plurals.items_count, items.size, items.size),
                         size = 9f,
                         weight = FontWeight.Medium,
-                        color = Color.White.copy(alpha = 0.8f),
-                        letterSpacing = tracking(0.14f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        color = P.ink2.copy(alpha = 0.8f),
+                        letterSpacing = tracking(0.18f),
                         uppercase = true,
                     )
-                }
-            },
-        )
-
-        // ── CARRUSEL ──
-        Column(Modifier.weight(1f).padding(top = 10.dp)) {
-            Row(
-                Modifier.fillMaxWidth().padding(start = m.pad, end = m.pad, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                LibraryFilter.entries.forEach { f ->
-                    FilterTab(stringResource(f.label), vm.filter == f) { vm.updateFilter(f) }
-                }
-                Spacer(Modifier.weight(1f))
-                ElyText(
-                    pluralStringResource(R.plurals.items_count, items.size, items.size),
-                    size = 9f,
-                    weight = FontWeight.Medium,
-                    color = P.ink2.copy(alpha = 0.8f),
-                    letterSpacing = tracking(0.18f),
-                    uppercase = true,
-                )
-                Spacer(Modifier.width(8.dp))
-                // "Ordenar por": el criterio en curso hace de etiqueta del botón.
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(9.dp))
-                        .clickable { vm.sortOptions() }
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                ) {
-                    ElyText(
-                        stringResource(vm.settings.sortMode.label),
-                        size = 9f,
-                        weight = FontWeight.SemiBold,
-                        color = skin.a2,
-                        letterSpacing = tracking(0.1f),
-                        maxLines = 1,
-                        uppercase = true,
-                    )
-                }
-            }
-
-            if (items.isEmpty() && !libraryEmpty && vm.loaded) {
-                Box(Modifier.fillMaxWidth().weight(1f).padding(horizontal = m.pad), contentAlignment = Alignment.Center) {
-                    ElyText(stringResource(R.string.no_results), size = 11f, color = P.ink2, align = TextAlign.Center)
-                }
-            } else {
-                LazyRow(
-                    Modifier.fillMaxWidth().weight(1f),
-                    contentPadding = PaddingValues(
-                        start = m.pad,
-                        end = m.pad,
-                        // Hueco extra arriba para la card seleccionada, que sube y se amplía.
-                        top = if (m.landscape) 12.dp else 14.dp,
-                        bottom = if (m.landscape) 6.dp else 10.dp,
-                    ),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    if (libraryEmpty) {
-                        item(key = "add") { AddTile(m) { vm.go(Screen.Add) } }
-                    }
-                    itemsIndexed(items, key = { _, it -> it.key }) { i, item ->
-                        LibraryTile(
-                            item = item,
-                            index = i,
-                            selected = item.key == sel?.key,
-                            metrics = m,
-                            pairIndex = vm.pairIndexOf(item),
-                            onTap = { vm.select(item.key) },
-                            onOpen = { vm.open(item) },
-                            onLongPress = {
-                                vm.select(item.key)
-                                vm.itemOptions(item)
-                            },
+                    Spacer(Modifier.width(8.dp))
+                    // "Ordenar por": el criterio en curso hace de etiqueta del botón.
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(9.dp))
+                            .clickable { vm.sortOptions() }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    ) {
+                        ElyText(
+                            stringResource(vm.settings.sortMode.label),
+                            size = 9f,
+                            weight = FontWeight.SemiBold,
+                            color = skin.a2,
+                            letterSpacing = tracking(0.1f),
+                            maxLines = 1,
+                            uppercase = true,
                         )
                     }
                 }
-            }
-        }
 
-        // ── DOCK ──
-        // Compacto a propósito: "Añadir" y Lucy quedan como iconos y solo
-        // "Abrir" conserva rótulo, para que el dock reste lo mínimo posible
-        // al alto de las carátulas (ver `chrome` en Metrics).
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(start = m.pad, end = m.pad, bottom = if (m.landscape) 6.dp else 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                Modifier
-                    .size(DOCK_H)
-                    .glass(RoundedCornerShape(12.dp))
-                    .clickable { vm.go(Screen.Add) },
-                contentAlignment = Alignment.Center,
-            ) {
-                ElyText("+", size = 17f, weight = FontWeight.SemiBold, color = skin.a2, lineHeightRatio = 1f)
+                if (items.isEmpty() && !libraryEmpty && vm.loaded) {
+                    Box(Modifier.fillMaxWidth().weight(1f).padding(horizontal = m.pad), contentAlignment = Alignment.Center) {
+                        ElyText(stringResource(R.string.no_results), size = 11f, color = P.ink2, align = TextAlign.Center)
+                    }
+                } else {
+                    LazyRow(
+                        Modifier.fillMaxWidth().weight(1f),
+                        contentPadding = PaddingValues(
+                            start = m.pad,
+                            end = m.pad,
+                            // Hueco extra arriba para la card seleccionada, que sube y se amplía.
+                            top = if (m.landscape) 12.dp else 14.dp,
+                            bottom = if (m.landscape) 6.dp else 10.dp,
+                        ),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        if (libraryEmpty) {
+                            item(key = "add") { AddTile(m) { vm.go(Screen.Add) } }
+                        }
+                        itemsIndexed(items, key = { _, it -> it.key }) { i, item ->
+                            LibraryTile(
+                                item = item,
+                                index = i,
+                                selected = item.key == sel?.key,
+                                metrics = m,
+                                pairIndex = vm.pairIndexOf(item),
+                                onTap = { vm.select(item.key) },
+                                onOpen = { vm.open(item) },
+                                onLongPress = {
+                                    vm.select(item.key)
+                                    vm.itemOptions(item)
+                                },
+                            )
+                        }
+                    }
+                }
             }
 
+            // ── DOCK ──
+            // Compacto a propósito: "Añadir" y Lucy quedan como iconos y solo
+            // "Abrir" conserva rótulo, para que el dock reste lo mínimo posible
+            // al alto de las carátulas (ver `chrome` en Metrics).
             Row(
                 Modifier
-                    .weight(1f)
-                    .height(DOCK_H)
-                    .alpha(if (sel != null) 1f else 0.45f)
-                    .shadow(10.dp, RoundedCornerShape(12.dp), clip = false, ambientColor = P.shade.copy(alpha = 0.24f), spotColor = P.shade.copy(alpha = 0.24f))
-                    .clip(RoundedCornerShape(12.dp))
-                    .drawBehind { drawRect(accentGradient(skin, 145f, size)) }
-                    .clickable(enabled = sel != null) { sel?.let { vm.open(it) } },
-                horizontalArrangement = Arrangement.Center,
+                    .fillMaxWidth()
+                    .padding(start = m.pad, end = m.pad, bottom = if (m.landscape) 6.dp else 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                PlayGlyph()
-                Spacer(Modifier.width(7.dp))
-                ElyText(stringResource(R.string.open), size = 12f, weight = FontWeight.SemiBold, color = Color.White, maxLines = 1)
-            }
+                Box(
+                    Modifier
+                        .size(DOCK_H)
+                        .glass(RoundedCornerShape(12.dp))
+                        .clickable { vm.go(Screen.Add) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    ElyText("+", size = 17f, weight = FontWeight.SemiBold, color = skin.a2, lineHeightRatio = 1f)
+                }
 
-            LucyFab(onClick = { vm.go(Screen.Lucy) })
+                Row(
+                    Modifier
+                        .weight(1f)
+                        .height(DOCK_H)
+                        .alpha(if (sel != null) 1f else 0.45f)
+                        .shadow(10.dp, RoundedCornerShape(12.dp), clip = false, ambientColor = P.shade.copy(alpha = 0.24f), spotColor = P.shade.copy(alpha = 0.24f))
+                        .clip(RoundedCornerShape(12.dp))
+                        .drawBehind { drawRect(accentGradient(skin, 145f, size)) }
+                        .clickable(enabled = sel != null) { sel?.let { vm.open(it) } },
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    PlayGlyph()
+                    Spacer(Modifier.width(7.dp))
+                    ElyText(stringResource(R.string.open), size = 12f, weight = FontWeight.SemiBold, color = Color.White, maxLines = 1)
+                }
+            }
         }
+
+        // Lucy, flotando justo encima del dock.
+        LucyFab(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .padding(
+                    end = m.pad,
+                    bottom = (if (m.landscape) 6.dp else 10.dp) + DOCK_H + 12.dp,
+                ),
+        ) { vm.go(Screen.Lucy) }
     }
 }
 
@@ -478,13 +489,26 @@ private fun SearchField(vm: ElyndraViewModel, m: Metrics) {
 /** Alto del dock compacto; `chrome` en Metrics cuenta con este número. */
 private val DOCK_H = 34.dp
 
-/** Botón flotante de Lucy, con el aro que late. */
+/** Lado del botón de Lucy: flota sobre el dock, así que no se ata a su alto. */
+private val LUCY_FAB = 58.dp
+
+/**
+ * Botón de Lucy, con el aro que late.
+ *
+ * Flota sobre el carrusel, en la esquina de abajo a la derecha: dentro del dock
+ * quedaba del tamaño de un icono más y pasaba desapercibido.
+ */
 @Composable
-private fun LucyFab(onClick: () -> Unit) {
+private fun LucyFab(modifier: Modifier = Modifier, onClick: () -> Unit) {
     val skin = LocalSkin.current
     val ring = ringProgress()
+    val shape = CircleShape
     Box(
-        Modifier.size(DOCK_H).glass(RoundedCornerShape(12.dp)).clickable(onClick = onClick),
+        modifier
+            .size(LUCY_FAB)
+            .shadow(14.dp, shape, clip = false, ambientColor = P.shade.copy(alpha = 0.3f), spotColor = P.shade.copy(alpha = 0.3f))
+            .glass(shape)
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -496,14 +520,14 @@ private fun LucyFab(onClick: () -> Unit) {
                     scaleY = k
                     alpha = 0.5f * (1f - ring)
                 }
-                .border(1.5.dp, skin.a1, RoundedCornerShape(12.dp)),
+                .border(1.5.dp, skin.a1, shape),
         )
-        // El logo de Lucy, dentro del botón de cristal del dock.
+        // El logo, llenando el botón: es lo que tiene que verse.
         Image(
             painterResource(R.drawable.lucy),
             contentDescription = null,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.size(DOCK_H * 0.62f).clip(RoundedCornerShape(8.dp)),
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.size(LUCY_FAB * 0.86f).clip(shape),
         )
     }
 }
