@@ -318,8 +318,7 @@
     <string name="notif_metadata_preparing">Preparando…</string>
 
     <!-- Lucy -->
-    <string name="lucy_subtitle">Assistente da biblioteca</string>
-    <string name="lucy_online">On-line · Gemini</string>
+    <string name="lucy_online">On-line</string>
     <string name="lucy_error">Lucy não conseguiu ligar-se ao serviço de IA. A mostrar uma resposta offline.</string>
     <string name="lucy_demo">Modo demo · adicione a chave de API</string>
     <string name="lucy_placeholder">Pergunte à Lucy sobre suas horas…</string>

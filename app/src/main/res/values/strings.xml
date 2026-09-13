@@ -310,8 +310,7 @@
     <string name="notif_metadata_preparing">Preparing…</string>
 
     <!-- Lucy -->
-    <string name="lucy_subtitle">Library assistant</string>
-    <string name="lucy_online">Online · Gemini</string>
+    <string name="lucy_online">Online</string>
     <string name="lucy_error">Lucy couldn’t reach the AI service. Showing an offline answer.</string>
     <string name="lucy_demo">Demo mode · add the API key</string>
     <string name="lucy_placeholder">Ask Lucy about your hours…</string>

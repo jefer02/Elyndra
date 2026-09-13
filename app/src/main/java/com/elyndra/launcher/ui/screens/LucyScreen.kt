@@ -132,20 +132,7 @@ fun LucyScreen(vm: ElyndraViewModel) {
                 LucyAvatar()
                 Spacer(Modifier.width(11.dp))
                 Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        ElyText("Lucy", size = 19f, weight = FontWeight.Bold, color = P.ink, letterSpacing = tracking(-0.01f))
-                        Spacer(Modifier.width(8.dp))
-                        ElyText(
-                            stringResource(R.string.lucy_subtitle),
-                            size = 7.5f,
-                            weight = FontWeight.SemiBold,
-                            color = P.ink2.copy(alpha = 0.8f),
-                            letterSpacing = tracking(0.2f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            uppercase = true,
-                        )
-                    }
+                    ElyText("Lucy", size = 19f, weight = FontWeight.Bold, color = P.ink, letterSpacing = tracking(-0.01f))
                     Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         val pulse = livePulseScale()
