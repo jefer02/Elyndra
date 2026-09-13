@@ -103,7 +103,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
         Hero(
             pairIndex = sel?.let { vm.pairIndexOf(it) } ?: 0,
             heroKey = sel?.key ?: "none",
-            height = m.heroH,
+            height = m.iconHeroH,
             imagePath = when (sel) {
                 is LibraryItem.App -> sel.app.meta.hero ?: sel.app.meta.screenshot
                 is LibraryItem.Folder -> sel.heroPath
@@ -506,13 +506,13 @@ private fun LucyFab(onClick: () -> Unit) {
 private fun AddTile(metrics: Metrics, onClick: () -> Unit) {
     val skin = LocalSkin.current
     Column(
-        Modifier.width(metrics.consoleW).animPopIn(key = "add").clickable(onClick = onClick),
+        Modifier.width(metrics.iconTile).animPopIn(key = "add").clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(metrics.tileH)
+                .height(metrics.iconTile)
                 .glass(RoundedCornerShape(16.dp), borderColor = skin.a1.copy(alpha = 0.6f)),
             contentAlignment = Alignment.Center,
         ) {
@@ -545,7 +545,9 @@ private fun LibraryTile(
     onLongPress: () -> Unit,
 ) {
     val skin = LocalSkin.current
-    val width: Dp = if (item is LibraryItem.Folder) metrics.consoleW else metrics.appW
+    // Juegos Android y carpetas de emulador se representan con icono, no con
+    // carátula: su contenedor es cuadrado.
+    val width: Dp = metrics.iconTile
     val lift = selectionLift(selected)
     val scale = selectionScale(selected)
     val shape = RoundedCornerShape(16.dp)
@@ -571,7 +573,7 @@ private fun LibraryTile(
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(metrics.tileH)
+                .height(metrics.iconTile)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
@@ -609,10 +611,10 @@ private fun LibraryTile(
             // brillo diagonal
             Box(Modifier.fillMaxSize().drawBehind { drawRect(tileGlossBrush(size)) })
 
-            // El icono llena la card: `Crop` centrado, así que se escala sin
-            // deformarse y solo se recorta lo que sobra de los lados.
+            // Contenedor e icono son cuadrados: el icono lo llena entero,
+            // centrado, sin dejar huecos y sin deformarse.
             if (icon != null || autoIconPackage != null) {
-                GameIcon(icon, autoIconPackage, Modifier.fillMaxSize(), ContentScale.Crop)
+                GameIcon(icon, autoIconPackage, Modifier.fillMaxSize(), ContentScale.Fit)
             } else if (item is LibraryItem.Folder) {
                 // Carpeta sin icono y sin emulador instalado: rótulo de consola.
                 Column(
@@ -635,7 +637,7 @@ private fun LibraryTile(
                         item.system.short,
                         // La card de carpeta ya no es apaisada, sino una carátula 2:3:
                         // el rótulo se mide contra su ancho, no contra su alto.
-                        size = (metrics.tileH.value * if (metrics.landscape) 0.15f else 0.13f).coerceAtMost(26f),
+                        size = (metrics.iconTile.value * if (metrics.landscape) 0.2f else 0.18f).coerceAtMost(26f),
                         weight = FontWeight.Bold,
                         color = Color.White,
                         letterSpacing = tracking(-0.01f),

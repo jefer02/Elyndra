@@ -30,11 +30,7 @@ import com.elyndra.launcher.ui.theme.heroScrimBrush
 import java.io.File
 
 /* ─────────────────────────────────────────────────────────────
-   Métricas del diseño.
-
-   Parten de la bandera `L` (horizontal) de Elyndra.dc.html, pero el
-   hero y las cards se reparten el alto real de la ventana, así que
-   escalan igual en móvil y en tableta:
+     Escalan igual en móvil y en tableta:
      libre = alto − (filtros + márgenes + nombre + dock compacto)
 
    El reparto es exacto: **hero + card == libre**, siempre. El hero se
@@ -61,6 +57,10 @@ data class Metrics(
     val consoleW: Dp,
     val romW: Dp,
     val romTileH: Dp,
+    /** Lado de la card cuadrada de icono (juegos Android y carpetas de emulador). */
+    val iconTile: Dp,
+    /** Alto del hero en la biblioteca, donde la card es la cuadrada de icono. */
+    val iconHeroH: Dp,
     /** Tamaño (sp) del título del juego seleccionado en el hero. */
     val titleSize: Float,
     /** Alto del logo que sustituye a ese título. */
@@ -102,6 +102,14 @@ fun metrics(): Metrics {
         hero = free - tile
     }
 
+    // La biblioteca no usa carátulas: sus cards son cuadradas (formato de
+    // icono). El lado lo manda el ancho —una card cuadrada tan alta como una
+    // carátula se comería la fila— y el alto que sobra se lo queda el hero.
+    // El factor final la baja un poco más en vertical que en horizontal: en
+    // vertical la fila tiene menos aire y la card cuadrada se comía la pantalla.
+    val iconSide = minOf(tile, w * (if (l) 0.30f else 0.46f)) * (if (l) 0.92f else 0.84f)
+    val iconHero = free - iconSide
+
     val titleSize = if (l) (hero * 0.34f).coerceIn(50f, 96f) else (hero * 0.20f).coerceIn(56f, 112f)
     val tileH = tile.dp
     // Carátula vertical: el ancho sale del alto, no al revés, así nunca se recorta.
@@ -116,6 +124,8 @@ fun metrics(): Metrics {
         consoleW = cardW,
         romW = cardW,
         romTileH = tileH,
+        iconTile = iconSide.dp,
+        iconHeroH = iconHero.dp,
         titleSize = titleSize,
         logoH = (titleSize * if (l) 1.25f else 1.6f).dp,
     )
