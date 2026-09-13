@@ -22,11 +22,13 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.elyndra.launcher.data.P
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import com.elyndra.launcher.ui.theme.LocalLandscape
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.animHeroIn
-import com.elyndra.launcher.ui.theme.drawArt
 import com.elyndra.launcher.ui.theme.heroScrimBrush
+import com.elyndra.launcher.ui.theme.liquidGlass
 import java.io.File
 
 /* ─────────────────────────────────────────────────────────────
@@ -107,7 +109,7 @@ fun metrics(): Metrics {
     // carátula se comería la fila— y el alto que sobra se lo queda el hero.
     // El factor final la baja un poco más en vertical que en horizontal: en
     // vertical la fila tiene menos aire y la card cuadrada se comía la pantalla.
-    val iconSide = minOf(tile, w * (if (l) 0.30f else 0.46f)) * (if (l) 0.92f else 0.84f)
+    val iconSide = minOf(tile, w * (if (l) 0.30f else 0.46f)) * (if (l) 0.92f else 0.78f)
     val iconHero = free - iconSide
 
     val titleSize = if (l) (hero * 0.34f).coerceIn(50f, 96f) else (hero * 0.20f).coerceIn(56f, 112f)
@@ -153,20 +155,14 @@ fun Hero(
         modifier
             .fillMaxWidth()
             .height(height)
-            .clipToBounds()
-            .background(P.shade),
+            .clipToBounds(),
     ) {
-        // `heroArt`: la misma carátula procedural, al 115 % y saturada.
+        // Sin fondo de serie: solo el fondo del juego, si lo hay. Lo demás lo
+        // pone el cristal, que deja ver la aurora de la pantalla.
         Box(
             Modifier
                 .fillMaxSize()
-                .animHeroIn(key = heroKey)
-                .drawBehind {
-                    // `transform: scale(1.15)` sobre la carátula, desde el centro.
-                    withTransform({ scale(1.15f, 1.15f, Offset(size.width / 2f, size.height / 2f)) }) {
-                        drawArt(pairIndex)
-                    }
-                },
+                .animHeroIn(key = heroKey),
         ) {
             if (imagePath != null) {
                 val file = remember(imagePath) { File(context.filesDir, imagePath) }
@@ -183,6 +179,8 @@ fun Hero(
                 )
             }
         }
+        // Cristal líquido sobre el fondo, y encima el velo que hace legible el texto.
+        Box(Modifier.fillMaxSize().liquidGlass(RectangleShape, Color.Transparent))
         // `heroScrim`
         Box(Modifier.fillMaxSize().drawBehind { drawRect(heroScrimBrush(skin.scrim, size)) })
         topBar()

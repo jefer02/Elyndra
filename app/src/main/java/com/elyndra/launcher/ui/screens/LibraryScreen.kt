@@ -57,7 +57,6 @@ import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.LibraryFilter
 import com.elyndra.launcher.ui.LibraryItem
 import com.elyndra.launcher.ui.Screen
-import com.elyndra.launcher.ui.components.ArtImage
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GameIcon
 import com.elyndra.launcher.ui.components.Hero
@@ -82,13 +81,13 @@ import com.elyndra.launcher.ui.theme.consoleFaceBrush
 import com.elyndra.launcher.ui.theme.curtainAlpha
 import com.elyndra.launcher.ui.theme.darkGlass
 import com.elyndra.launcher.ui.theme.glass
+import com.elyndra.launcher.ui.theme.liquidGlass
 import com.elyndra.launcher.ui.theme.pulseHintAlpha
 import com.elyndra.launcher.ui.theme.ringProgress
 import com.elyndra.launcher.ui.theme.selectionLift
 import com.elyndra.launcher.ui.theme.selectionScale
 import com.elyndra.launcher.ui.theme.sheenBrush
 import com.elyndra.launcher.ui.theme.sheenProgress
-import com.elyndra.launcher.ui.theme.tileGlossBrush
 
 @Composable
 fun LibraryScreen(vm: ElyndraViewModel) {
@@ -585,13 +584,11 @@ private fun LibraryTile(
                     ambientColor = P.shade.copy(alpha = if (selected) 0.32f else 0.2f),
                     spotColor = P.shade.copy(alpha = if (selected) 0.32f else 0.2f),
                 )
-                .clip(shape)
-                .border(
-                    // Marco más grueso: la selección tiene que leerse de lejos.
-                    if (selected) 6.dp else 1.dp,
-                    if (selected) skin.a1 else P.hairline,
-                    shape,
-                ),
+                // Sin fondo de serie: cristal semitransparente, que deja ver la
+                // aurora de la pantalla por detrás del icono.
+                .liquidGlass(shape, if (selected) skin.a1 else P.hairline)
+                // Marco más grueso: la selección tiene que leerse de lejos.
+                .then(if (selected) Modifier.border(6.dp, skin.a1, shape) else Modifier),
         ) {
             // Ni un juego Android ni una carpeta de emulador usan carátula: se
             // representan con su icono — el elegido en "Personalizar icono" o, si
@@ -606,11 +603,6 @@ private fun LibraryTile(
                 is LibraryItem.App -> item.app.packageName
                 is LibraryItem.Folder -> item.emulatorPackage
             }
-            // Detrás, el arte procedural del diseño: el icono nunca flota sobre nada.
-            ArtImage(null, pairIndex, Modifier.fillMaxSize())
-            // brillo diagonal
-            Box(Modifier.fillMaxSize().drawBehind { drawRect(tileGlossBrush(size)) })
-
             // Contenedor e icono son cuadrados: el icono lo llena entero,
             // centrado, sin dejar huecos y sin deformarse.
             if (icon != null || autoIconPackage != null) {

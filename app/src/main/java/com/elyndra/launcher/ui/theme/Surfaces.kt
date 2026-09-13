@@ -96,6 +96,35 @@ fun Modifier.darkGlass(
         .border(1.dp, Color.White.copy(alpha = 0.28f), shape)
 }
 
+/**
+ * `liquidGlass()` — cristal semitransparente sin base opaca.
+ *
+ * Igual que [glass] pero sin el relleno que tapa lo de detrás: se usa donde el
+ * fondo de la pantalla (la aurora, el fondo del hero) tiene que verse a través.
+ */
+@Composable
+fun Modifier.liquidGlass(
+    shape: Shape = RoundedCornerShape(16.dp),
+    borderColor: Color = P.hairline,
+): Modifier {
+    val skin = LocalSkin.current
+    val haze = hazeFor(skin.blur)
+    val dark = P.isDark
+    return this
+        .clip(shape)
+        .background(skin.tint.color.copy(alpha = if (dark) skin.alpha * 0.22f else skin.alpha * 0.5f))
+        .background(
+            Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = if (dark) haze * 0.30f + 0.03f else haze + 0.08f),
+                    Color.White.copy(alpha = if (dark) 0f else haze * 0.30f),
+                ),
+            ),
+        )
+        .insetHighlight()
+        .border(1.dp, borderColor, shape)
+}
+
 /** `inset 0 1px 0 rgba(255,255,255,.7)` — la línea de luz del borde superior. */
 private fun Modifier.insetHighlight(): Modifier = drawBehind {
     val y = 0.5.dp.toPx()
