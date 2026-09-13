@@ -110,14 +110,6 @@ val ArtStripeColor = Color.White.copy(alpha = 0.14f)
    Velos y realces reutilizados
    ───────────────────────────────────────────────────────────── */
 
-/** `linear-gradient(160deg, rgba(255,255,255,.34), rgba(255,255,255,0) 48%)` — brillo de las cards. */
-fun tileGlossBrush(size: Size): Brush = cssLinearGradient(
-    160f,
-    listOf(Color.White.copy(alpha = 0.34f), Color.White.copy(alpha = 0f)),
-    size,
-    stops = listOf(0f, 0.48f),
-)
-
 /** Velo del hero: tres paradas cuya opacidad depende del ajuste "intensidad del hero". */
 fun heroScrimBrush(scrim: Float, size: Size): Brush = cssLinearGradient(
     180f,

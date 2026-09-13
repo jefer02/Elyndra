@@ -54,9 +54,6 @@ data class Metrics(
     val landscape: Boolean,
     val pad: Dp,
     val heroH: Dp,
-    val tileH: Dp,
-    val appW: Dp,
-    val consoleW: Dp,
     val romW: Dp,
     val romTileH: Dp,
     /** Lado de la card cuadrada de icono (juegos Android y carpetas de emulador). */
@@ -133,10 +130,6 @@ fun metrics(): Metrics {
         landscape = l,
         pad = if (l) 22.dp else 18.dp,
         heroH = hero.dp,
-        tileH = tileH,
-        appW = cardW,
-        // Las carpetas de emulador miden lo mismo que los juegos Android.
-        consoleW = cardW,
         romW = cardW,
         romTileH = tileH,
         iconTile = iconSide.dp,

@@ -3,6 +3,7 @@ package com.elyndra.launcher.ui.screens
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -44,6 +45,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -496,7 +498,13 @@ private fun LucyFab(onClick: () -> Unit) {
                 }
                 .border(1.5.dp, skin.a1, RoundedCornerShape(12.dp)),
         )
-        ElyText("L", size = 13f, weight = FontWeight.Bold, color = skin.a2)
+        // El logo de Lucy, dentro del botón de cristal del dock.
+        Image(
+            painterResource(R.drawable.lucy),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.size(DOCK_H * 0.62f).clip(RoundedCornerShape(8.dp)),
+        )
     }
 }
 

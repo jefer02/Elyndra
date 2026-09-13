@@ -305,7 +305,8 @@
 
     <!-- Lucy -->
     <string name="lucy_subtitle">Bibliotheksassistentin</string>
-    <string name="lucy_online">Online · Claude</string>
+    <string name="lucy_online">Online · Gemini</string>
+    <string name="lucy_error">Lucy konnte den KI-Dienst nicht erreichen. Es wird eine Offline-Antwort gezeigt.</string>
     <string name="lucy_demo">Demomodus · API-Schlüssel hinzufügen</string>
     <string name="lucy_placeholder">Frag Lucy nach deinen Spielstunden…</string>
     <string name="lucy_greeting">Hallo, ich bin Lucy. Frag mich nach deiner Bibliothek, deinen Spielstunden oder was du als Nächstes spielen sollst.</string>

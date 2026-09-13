@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,6 +37,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -299,7 +302,7 @@ private fun LucyAvatar() {
                 }
                 .border(1.5.dp, skin.a1, RoundedCornerShape(16.dp)),
         )
-        // `luciaAvatar`
+        // `luciaAvatar`: el logo de Lucy, sobre el degradado por si trae alfa.
         Box(
             Modifier
                 .size(40.dp)
@@ -308,7 +311,12 @@ private fun LucyAvatar() {
                 .drawBehind { drawRect(accentGradient(skin, 145f, size)) },
             contentAlignment = Alignment.Center,
         ) {
-            ElyText("L", size = 17f, weight = FontWeight.Bold, color = Color.White)
+            Image(
+                painterResource(R.drawable.lucy),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }

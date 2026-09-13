@@ -319,7 +319,8 @@
 
     <!-- Lucy -->
     <string name="lucy_subtitle">Assistante de bibliothèque</string>
-    <string name="lucy_online">En ligne · Claude</string>
+    <string name="lucy_online">En ligne · Gemini</string>
+    <string name="lucy_error">Lucy n’a pas pu joindre le service d’IA. Réponse hors ligne affichée.</string>
     <string name="lucy_demo">Mode démo · ajoutez la clé API</string>
     <string name="lucy_placeholder">Demandez à Lucy vos heures de jeu…</string>
     <string name="lucy_greeting">Bonjour, je suis Lucy. Posez-moi des questions sur votre bibliothèque, vos heures de jeu ou votre prochain jeu.</string>

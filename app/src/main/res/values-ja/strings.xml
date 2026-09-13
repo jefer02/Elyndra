@@ -291,7 +291,8 @@
 
     <!-- Lucy -->
     <string name="lucy_subtitle">ライブラリアシスタント</string>
-    <string name="lucy_online">オンライン · Claude</string>
+    <string name="lucy_online">オンライン · Gemini</string>
+    <string name="lucy_error">Lucy は AI サービスに接続できませんでした。オフラインの回答を表示しています。</string>
     <string name="lucy_demo">デモモード · API キーを追加</string>
     <string name="lucy_placeholder">プレイ時間について Lucy に質問…</string>
     <string name="lucy_greeting">こんにちは、Lucy です。ライブラリやプレイ時間、次に遊ぶゲームについて聞いてください。</string>
