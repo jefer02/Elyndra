@@ -10,6 +10,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.elyndra.launcher.ElyndraApplication
 import com.elyndra.launcher.R
+import com.elyndra.launcher.data.AppEntry
 import com.elyndra.launcher.data.Emulators
 import com.elyndra.launcher.data.Library
 import com.elyndra.launcher.data.LibraryRepository
@@ -19,6 +20,7 @@ import com.elyndra.launcher.data.RomFolder
 import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.data.pairIndexFor
 import com.elyndra.launcher.launch.GameLauncher
+import com.elyndra.launcher.library.InstalledApp
 import com.elyndra.launcher.metadata.ArtCandidate
 import com.elyndra.launcher.metadata.ArtKind
 import com.elyndra.launcher.metadata.ArtSources
@@ -631,6 +633,68 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
         }
+    }
+
+    /**
+     * Pone automáticamente una imagen a un elemento, con el primer candidato
+     * que dé algún servicio configurado. Es lo que usan tanto el arte
+     * automático de las carpetas como las acciones de Lucy.
+     */
+    suspend fun applyArtAuto(key: String, kind: ArtKind): Boolean {
+        if (!app.credentials.anyConfigured()) return false
+        for (service in ART_SERVICES) {
+            if (!app.credentials.isConfigured(service) || !art.supports(key, service)) continue
+            val url = runCatching { art.candidates(key, kind, service) }
+                .getOrNull()?.firstOrNull()?.url ?: continue
+            if (runCatching { art.apply(key, kind, url) }.getOrDefault(false)) return true
+        }
+        return false
+    }
+
+    /** ¿Hay ya una imagen de esta clase puesta? */
+    fun hasArt(key: String, kind: ArtKind): Boolean = art.has(key, kind)
+
+    /* ── acciones que puede ejecutar Lucy ─────────────────── */
+
+    /** Lanza cualquier elemento de la biblioteca por su clave. */
+    fun openByKey(key: String): Boolean {
+        val rom = repo.romByKey(key)
+        if (rom != null) {
+            go(Screen.Library)
+            openRom(rom)
+            return true
+        }
+        val entry = repo.appByKey(key) ?: return false
+        go(Screen.Library)
+        select(key)
+        open(LibraryItem.App(entry, installed = true))
+        return true
+    }
+
+    /** Quita de la biblioteca una app Android o una carpeta de emulador. */
+    fun removeFromLibrary(key: String): Boolean {
+        repo.appByKey(key)?.let {
+            repo.removeApp(it.packageName)
+            return true
+        }
+        repo.folderByKey(key)?.let {
+            repo.removeFolder(it.id)
+            return true
+        }
+        return false
+    }
+
+    /** Apps instaladas en el teléfono, para que Lucy pueda añadir una. */
+    suspend fun installedApps(): List<InstalledApp> = withContext(Dispatchers.IO) { app.apps.launchable() }
+
+    /** Añade a la biblioteca una app instalada; devuelve su clave. */
+    fun addInstalledApp(pkg: String, label: String): String? {
+        if (repo.appByKey("a:$pkg") != null) return null
+        val keys = repo.addApps(listOf(AppEntry(packageName = pkg, label = label, addedAt = System.currentTimeMillis())))
+        val key = keys.firstOrNull() ?: return null
+        select(key)
+        if (app.settings.autoMeta && app.credentials.anyConfigured()) engine.start(keys, force = false)
+        return key
     }
 
     fun clearArt(key: String, kind: ArtKind) {

@@ -6,8 +6,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewModelScope
 import com.elyndra.launcher.R
+import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.lucy.LucyClient
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * Lucy: la conversación contra Google AI Studio (Gemini), con el hilo entero y
@@ -21,6 +24,9 @@ class LucyController(private val vm: ElyndraViewModel) {
     val messages = mutableStateListOf<ChatMessage>()
 
     val online: Boolean get() = LucyClient.hasApiKey
+
+    /** Lo que Lucy puede hacer sobre la biblioteca y la interfaz. */
+    private val actions = LucyActions(vm)
 
     fun ensureGreeting(text: String) {
         if (messages.isEmpty()) messages.add(ChatMessage(fromLucy = true, text = text))
@@ -37,7 +43,7 @@ class LucyController(private val vm: ElyndraViewModel) {
         draft = ""
         typing = true
         vm.viewModelScope.launch {
-            val reply = LucyClient.ask(text, uiLanguage, playtime(), history)
+            val reply = LucyClient.ask(text, uiLanguage, libraryJson(), history, actions::run)
             typing = false
             messages.add(ChatMessage(fromLucy = true, text = reply.text))
             // Con clave puesta, una respuesta que no viene de la API es un fallo
@@ -51,11 +57,42 @@ class LucyController(private val vm: ElyndraViewModel) {
         send(uiLanguage)
     }
 
-    private fun playtime(): Map<String, Int> {
+    /**
+     * La biblioteca que ve Lucy: cada juego con su plataforma, su emulador y su
+     * tiempo jugado, y las carpetas con cuántas ROMs tienen. Es lo que le
+     * permite recomendar solo lo que el usuario tiene y nombrarlo bien.
+     */
+    private fun libraryJson(): String {
         val lib = vm.library
-        return (lib.roms.map { it.displayTitle to it.stats.minutes } + lib.apps.map { it.displayTitle to it.stats.minutes })
-            .filter { it.second > 0 }
-            .toMap()
+        val games = JSONArray()
+        lib.apps.forEach { a ->
+            games.put(
+                JSONObject()
+                    .put("title", a.displayTitle)
+                    .put("platform", "Android")
+                    .put("minutes", a.stats.minutes)
+                    .put("lastPlayed", a.stats.lastPlayed),
+            )
+        }
+        lib.roms.forEach { r ->
+            val system = Systems.byId(r.systemId)?.name ?: r.systemId
+            games.put(
+                JSONObject()
+                    .put("title", r.displayTitle)
+                    .put("platform", system)
+                    .put("minutes", r.stats.minutes)
+                    .put("lastPlayed", r.stats.lastPlayed),
+            )
+        }
+        val folders = JSONArray()
+        lib.folders.forEach { f ->
+            folders.put(
+                JSONObject()
+                    .put("system", Systems.byId(f.systemId)?.name ?: f.systemId)
+                    .put("roms", lib.roms.count { it.folderId == f.id }),
+            )
+        }
+        return JSONObject().put("games", games).put("folders", folders).toString()
     }
 
     data class Stats(
