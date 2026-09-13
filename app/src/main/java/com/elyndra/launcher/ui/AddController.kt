@@ -193,6 +193,7 @@ class AddController(private val vm: ElyndraViewModel) {
         vm.select(rf.key)
         if (app.settings.autoMeta && keys.isNotEmpty() && app.credentials.anyConfigured()) {
             vm.engine.start(keys, force = false)
+            vm.autoFolderArt(listOf(rf.key))
         }
     }
 
@@ -231,6 +232,7 @@ class AddController(private val vm: ElyndraViewModel) {
             vm.go(Screen.Library)
             if (app.settings.autoMeta && keys.isNotEmpty() && app.credentials.anyConfigured()) {
                 vm.engine.start(keys, force = false)
+                vm.autoFolderArt()
             }
         }
     }

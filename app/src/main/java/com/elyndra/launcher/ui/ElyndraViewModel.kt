@@ -606,6 +606,33 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
         if (key.startsWith("r:")) listOf(ArtKind.Cover, ArtKind.Background, ArtKind.Logo)
         else listOf(ArtKind.Background, ArtKind.Logo, ArtKind.Icon)
 
+    /**
+     * Icono, logo y fondo automáticos de las carpetas de emulador.
+     *
+     * Una carpeta no tiene metadatos que scrapear —el motor no la toca—, así
+     * que aquí se le pide a cada servicio configurado arte para el nombre de su
+     * sistema y se guarda el primer candidato. Lo que ya tiene imagen no se
+     * toca, así que no pisa lo elegido a mano ni repite descargas.
+     */
+    fun autoFolderArt(keys: List<String>? = null) {
+        if (!app.credentials.anyConfigured()) return
+        val targets = (keys ?: library.folders.map { it.key }).filter { it.startsWith("f:") }
+        if (targets.isEmpty()) return
+        viewModelScope.launch {
+            for (key in targets) {
+                for (kind in listOf(ArtKind.Icon, ArtKind.Logo, ArtKind.Background)) {
+                    if (art.has(key, kind)) continue
+                    for (service in ART_SERVICES) {
+                        if (!app.credentials.isConfigured(service) || !art.supports(key, service)) continue
+                        val url = runCatching { art.candidates(key, kind, service) }
+                            .getOrNull()?.firstOrNull()?.url ?: continue
+                        if (runCatching { art.apply(key, kind, url) }.getOrDefault(false)) break
+                    }
+                }
+            }
+        }
+    }
+
     fun clearArt(key: String, kind: ArtKind) {
         viewModelScope.launch {
             art.clear(key, kind)
@@ -717,6 +744,8 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
             return
         }
         engine.start(keys, force = true)
+        // Las carpetas no pasan por el motor: su arte se resuelve aparte.
+        autoFolderArt(keys.filter { it.startsWith("f:") })
         showToast(UiText.res(R.string.toast_metadata_started))
     }
 

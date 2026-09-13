@@ -69,6 +69,9 @@ data class Metrics(
     val logoH: Dp,
 )
 
+/** Lado máximo de la card de icono: por encima se ve desproporcionada en tablet. */
+private const val ICON_TILE_MAX = 168f
+
 /** Proporción de las carátulas (2:3, el estándar de box art). */
 const val COVER_RATIO = 2f / 3f
 
@@ -107,9 +110,19 @@ fun metrics(): Metrics {
     // La biblioteca no usa carátulas: sus cards son cuadradas (formato de
     // icono). El lado lo manda el ancho —una card cuadrada tan alta como una
     // carátula se comería la fila— y el alto que sobra se lo queda el hero.
-    // El factor final la baja un poco más en vertical que en horizontal: en
-    // vertical la fila tiene menos aire y la card cuadrada se comía la pantalla.
-    val iconSide = minOf(tile, w * (if (l) 0.30f else 0.46f)) * (if (l) 0.92f else 0.78f)
+    // Tres topes y un factor:
+    //   · el alto libre de la fila,
+    //   · una fracción del ancho y otra del alto de la pantalla,
+    //   · y un tope absoluto, que es lo que arregla las tablets: sin él la card
+    //     crece con la pantalla y en horizontal quedaba una fila de cromos
+    //     enormes; un icono no necesita más de ~170dp en ninguna pantalla.
+    // El factor final la baja algo en horizontal y un poco más en vertical.
+    val iconSide = minOf(
+        tile,
+        w * (if (l) 0.30f else 0.46f),
+        h * (if (l) 0.26f else 0.22f),
+        ICON_TILE_MAX,
+    ) * (if (l) 0.88f else 0.72f)
     val iconHero = free - iconSide
 
     val titleSize = if (l) (hero * 0.34f).coerceIn(50f, 96f) else (hero * 0.20f).coerceIn(56f, 112f)
