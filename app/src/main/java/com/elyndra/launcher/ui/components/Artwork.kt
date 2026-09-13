@@ -1,5 +1,8 @@
 package com.elyndra.launcher.ui.components
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.drawable.AdaptiveIconDrawable
 import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
@@ -99,17 +102,57 @@ fun AppIconImage(
     val bitmap by produceState(initialValue = iconCache.get(packageName), packageName) {
         if (value == null) {
             value = withContext(Dispatchers.IO) {
-                runCatching {
-                    // Se respeta la proporción del drawable: rasterizarlo a un
-                    // cuadrado deformaría los iconos que no lo son.
-                    val d = context.packageManager.getApplicationIcon(packageName)
-                    val w = d.intrinsicWidth.takeIf { it > 0 } ?: 384
-                    val h = d.intrinsicHeight.takeIf { it > 0 } ?: 384
-                    val k = 384f / maxOf(w, h)
-                    d.toBitmap((w * k).toInt().coerceAtLeast(1), (h * k).toInt().coerceAtLeast(1)).asImageBitmap()
-                }.getOrNull()
+                runCatching { loadAppIcon(context, packageName) }.getOrNull()
             }?.also { iconCache.put(packageName, it) }
         }
     }
     bitmap?.let { Image(it, contentDescription = null, modifier = modifier, contentScale = contentScale) }
+}
+
+private const val ICON_PX = 384
+
+/**
+ * Icono de una app listo para llenar una card.
+ *
+ * Se rasteriza respetando su proporción (cuadrarlo deformaría los que no lo
+ * son) y se le quita el margen que no se ve: un icono adaptativo reserva un
+ * tercio de zona de seguridad y muchos PNG traen borde transparente, y sin
+ * recortarlo el dibujo queda pequeño en medio de la card.
+ */
+private fun loadAppIcon(context: Context, packageName: String): ImageBitmap {
+    val d = context.packageManager.getApplicationIcon(packageName)
+    val w = d.intrinsicWidth.takeIf { it > 0 } ?: ICON_PX
+    val h = d.intrinsicHeight.takeIf { it > 0 } ?: ICON_PX
+    val k = ICON_PX.toFloat() / maxOf(w, h)
+    var bmp = d.toBitmap((w * k).toInt().coerceAtLeast(1), (h * k).toInt().coerceAtLeast(1))
+    if (d is AdaptiveIconDrawable) {
+        // El launcher solo enseña el 66 % central del lienzo de 108dp.
+        val inset = minOf(bmp.width, bmp.height) / 6
+        if (inset > 0) {
+            bmp = Bitmap.createBitmap(bmp, inset, inset, bmp.width - inset * 2, bmp.height - inset * 2)
+        }
+    }
+    return trimTransparent(bmp).asImageBitmap()
+}
+
+/** Recorta el borde completamente transparente del bitmap. */
+private fun trimTransparent(src: Bitmap): Bitmap {
+    if (!src.hasAlpha()) return src
+    val w = src.width
+    val h = src.height
+    if (w < 2 || h < 2) return src
+    val px = IntArray(w * h)
+    src.getPixels(px, 0, w, 0, 0, w, h)
+    fun rowEmpty(y: Int) = (0 until w).all { px[y * w + it] ushr 24 == 0 }
+    fun colEmpty(x: Int) = (0 until h).all { px[it * w + x] ushr 24 == 0 }
+    var top = 0
+    var bottom = h - 1
+    var left = 0
+    var right = w - 1
+    while (top < bottom && rowEmpty(top)) top++
+    while (bottom > top && rowEmpty(bottom)) bottom--
+    while (left < right && colEmpty(left)) left++
+    while (right > left && colEmpty(right)) right--
+    if (top == 0 && left == 0 && bottom == h - 1 && right == w - 1) return src
+    return Bitmap.createBitmap(src, left, top, right - left + 1, bottom - top + 1)
 }

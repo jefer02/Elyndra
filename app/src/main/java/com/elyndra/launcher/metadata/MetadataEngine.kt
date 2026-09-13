@@ -178,6 +178,7 @@ class MetadataEngine(
         var coverUrl: String? = null
         var heroUrl: String? = null
         var logoUrl: String? = null
+        var iconUrl: String? = null
         var screenshotUrl: String? = null
         var ssId: String? = null
         var igdbId: Long? = null
@@ -186,7 +187,7 @@ class MetadataEngine(
         val sources = LinkedHashSet<String>()
 
         val needsText get() = description == null || name == null
-        val needsArt get() = coverUrl == null || heroUrl == null || logoUrl == null
+        val needsArt get() = coverUrl == null || heroUrl == null || logoUrl == null || iconUrl == null
     }
 
     private fun usable(service: Service, failures: Map<Service, FailureKind>) =
@@ -284,6 +285,7 @@ class MetadataEngine(
                     game.media(listOf("box-2D", "box-3D"), regions)?.let { draft.coverUrl = ScreenScraperClient.sizedMediaUrl(it, 640, jpg = true) }
                     game.media(listOf("fanart", "ss", "sstitle"), regions)?.let { draft.heroUrl = ScreenScraperClient.sizedMediaUrl(it, 1280, jpg = true) }
                     game.media(listOf("wheel-hd", "wheel", "wheel-carbon"), regions)?.let { draft.logoUrl = ScreenScraperClient.sizedMediaUrl(it, 640, jpg = false) }
+                    game.media(listOf("wheel-hd", "wheel", "box-2D"), regions)?.let { draft.iconUrl = ScreenScraperClient.sizedMediaUrl(it, 512, jpg = false) }
                     game.media(listOf("ss", "sstitle"), regions)?.let { draft.screenshotUrl = ScreenScraperClient.sizedMediaUrl(it, 960, jpg = true) }
                 }
             } catch (e: CancellationException) {
@@ -314,6 +316,7 @@ class MetadataEngine(
                     draft.sources += Service.RetroAchievements.id
                     draft.ra = raInfo(p, if (byHash != null) "hash" else "title")
                     if (draft.coverUrl == null) p.boxArt?.let { draft.coverUrl = RetroAchievementsClient.mediaUrl(it) }
+                    if (draft.iconUrl == null) p.imageIcon?.let { draft.iconUrl = RetroAchievementsClient.mediaUrl(it) }
                     if (draft.name == null) draft.name = p.title.takeIf { it.isNotBlank() }
                     if (draft.developer == null) draft.developer = p.developer
                     if (draft.publisher == null) draft.publisher = p.publisher
@@ -369,6 +372,7 @@ class MetadataEngine(
                     ?: best.screenshotIds.firstOrNull()?.let { IgdbClient.imageUrl(it, "screenshot_huge") })
                     ?.let { draft.heroUrl = it }
             }
+            if (draft.iconUrl == null) best.coverId?.let { draft.iconUrl = IgdbClient.imageUrl(it, "cover_big") }
             if (draft.screenshotUrl == null) best.screenshotIds.firstOrNull()?.let { draft.screenshotUrl = IgdbClient.imageUrl(it, "screenshot_big") }
         } catch (e: CancellationException) {
             throw e
@@ -388,6 +392,7 @@ class MetadataEngine(
             if (draft.coverUrl == null) steamGridDb.grids(game.id, gridDimensions).firstOrNull()?.let { draft.coverUrl = it.url }
             if (draft.heroUrl == null) steamGridDb.heroes(game.id).firstOrNull()?.let { draft.heroUrl = it.url }
             if (draft.logoUrl == null) steamGridDb.logos(game.id).firstOrNull()?.let { draft.logoUrl = it.url }
+            if (draft.iconUrl == null) steamGridDb.icons(game.id).firstOrNull()?.let { draft.iconUrl = it.url }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -414,6 +419,8 @@ class MetadataEngine(
         // Un juego Android no usa carátula (se representa con su icono): no se baja.
         val isApp = key.startsWith("a:")
         val cover = d.coverUrl?.takeIf { !isApp && "cover" !in pinned }?.let { media.download(it, key, "cover") }
+        // El icono es la imagen de un juego Android: se baja solo para ellos.
+        val icon = d.iconUrl?.takeIf { isApp && "icon" !in pinned }?.let { media.download(it, key, "icon") }
         val hero = d.heroUrl?.takeIf { "hero" !in pinned }?.let { media.download(it, key, "hero") }
         val logo = d.logoUrl?.takeIf { "logo" !in pinned }?.let { media.download(it, key, "logo") }
         val shot = d.screenshotUrl?.let { media.download(it, key, "shot") }
@@ -435,7 +442,7 @@ class MetadataEngine(
                 hero = hero ?: old.hero,
                 logo = logo ?: old.logo,
                 screenshot = shot ?: old.screenshot,
-                icon = old.icon,
+                icon = icon ?: old.icon,
                 pinned = old.pinned,
                 ssGameId = d.ssId ?: old.ssGameId,
                 igdbId = d.igdbId ?: old.igdbId,
