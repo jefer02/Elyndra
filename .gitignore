@@ -1,13 +1,7 @@
 # Gradle
 .gradle/
-build/
-!gradle/wrapper/gradle-wrapper.jar
-
-# Android build output
+.kotlin/
 **/build/
-
-# Local SDK and machine-specific configuration
-local.properties
 
 # Android Studio / IntelliJ
 .idea/
@@ -15,13 +9,17 @@ local.properties
 *.ipr
 *.iws
 
+# Android local configuration and generated output
+local.properties
+captures/
+.cxx/
+.externalNativeBuild/
+
 # Kotlin / Java generated files
 *.class
 out/
-
-# Native build output
-.cxx/
-.externalNativeBuild/
+*.hprof
+*.log
 
 # Packaged artifacts
 *.apk

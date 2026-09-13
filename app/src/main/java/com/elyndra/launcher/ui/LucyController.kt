@@ -5,14 +5,14 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewModelScope
+import com.elyndra.launcher.R
 import com.elyndra.launcher.lucy.LucyClient
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Lucy. La conversación sigue igual que en el prototipo (se trabajará más
- * adelante); lo que cambia es que las tarjetas y el contexto que recibe salen
- * del tiempo de juego real de la biblioteca.
+ * Lucy: la conversación contra Google AI Studio (Gemini), con el hilo entero y
+ * el tiempo de juego real de la biblioteca como contexto. Sin clave configurada
+ * responde en modo demo con los textos del prototipo.
  */
 class LucyController(private val vm: ElyndraViewModel) {
 
@@ -31,14 +31,18 @@ class LucyController(private val vm: ElyndraViewModel) {
     fun send(uiLanguage: String) {
         val text = draft.trim()
         if (text.isEmpty() || typing) return
+        // El hilo que ve el modelo es el de antes de este mensaje.
+        val history = messages.map { LucyClient.Turn(it.fromLucy, it.text) }
         messages.add(ChatMessage(fromLucy = false, text = text))
         draft = ""
         typing = true
         vm.viewModelScope.launch {
-            delay(900)
-            val reply = LucyClient.ask(text, uiLanguage, playtime())
+            val reply = LucyClient.ask(text, uiLanguage, playtime(), history)
             typing = false
-            messages.add(ChatMessage(fromLucy = true, text = reply))
+            messages.add(ChatMessage(fromLucy = true, text = reply.text))
+            // Con clave puesta, una respuesta que no viene de la API es un fallo
+            // de red o de cuota: se dice, en vez de colar el texto de demo a secas.
+            if (!reply.ok && online) vm.showToast(UiText.res(R.string.lucy_error))
         }
     }
 

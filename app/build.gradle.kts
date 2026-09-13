@@ -38,6 +38,7 @@ android {
         versionCode = 2
         versionName = "1.1"
         buildConfigField("String", "LUCY_API_KEY", quoted(localProp("lucy.apiKey")))
+        buildConfigField("String", "LUCY_MODEL", quoted(localProp("lucy.model")))
         buildConfigField("String", "SS_DEV_ID", quoted(localProp("screenscraper.devId")))
         buildConfigField("String", "SS_DEV_PASSWORD", quoted(localProp("screenscraper.devPassword")))
         buildConfigField("String", "SS_SOFTNAME", quoted(localProp("screenscraper.softname").ifEmpty { "Elyndra" }))

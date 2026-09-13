@@ -14,9 +14,10 @@ import java.util.concurrent.TimeUnit
 /* ─────────────────────────────────────────────────────────────
    Lucy — la asistente que vive dentro de Elyndra.
 
-   La clave llega por BuildConfig desde local.properties; nunca se
-   escribe en el código. Sin clave, Lucy responde con los textos
-   locales del prototipo (modo demo).
+   El proveedor es Google AI Studio (API de Gemini). La clave llega
+   por BuildConfig desde local.properties (`lucy.apiKey`); nunca se
+   escribe en el código ni se sube al repositorio. Sin clave, Lucy
+   responde con los textos locales del prototipo (modo demo).
 
    Aviso que ya venía en el diseño y sigue valiendo: llamar a la API
    directamente desde el cliente expone la clave a cualquiera que
@@ -26,14 +27,23 @@ import java.util.concurrent.TimeUnit
 
 object LucyClient {
 
-    private const val ENDPOINT = "https://api.anthropic.com/v1/messages"
-    private const val MODEL = "claude-sonnet-4-5"
+    private const val ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models"
+    private const val DEFAULT_MODEL = "gemini-3.6-flash"
+
+    /** Un turno de la conversación. [fromLucy] marca las respuestas del modelo. */
+    data class Turn(val fromLucy: Boolean, val text: String)
+
+    /**
+     * Respuesta de Lucy. [ok] en false significa que no se habló con la API:
+     * la interfaz enseña el texto igual, pero puede avisar de que falló.
+     */
+    data class Reply(val text: String, val ok: Boolean)
 
     private val SYSTEM_PROMPT = """
         Eres Lucy, la asistente de IA que vive dentro de Elyndra, una app móvil que unifica en una sola biblioteca los juegos Android instalados del usuario y su colección de ROMs de emulador (Nintendo Switch, PS2, PS3, Xbox 360, PSP, GameCube y otros). Elyndra solo indexa y lanza títulos; nunca emula nada por sí misma.
 
         QUIÉN ERES
-        - Cercana, rápida, con algo de humor. Suenas como una amiga que además se ha leído todos los libros de curiosidades de videojuegos.
+        - Cercana, rápida, con algo de humor. Suenas como una amiga bastente amable y cariñosa que además se ha leído todos los libros de curiosidades de videojuegos.
         - Nunca rellenas. De dos a cuatro frases cortas salvo que el usuario pida profundidad.
         - Hablas en el idioma en el que te escriben (el idioma de la interfaz llega en el contexto).
 
@@ -80,23 +90,35 @@ object LucyClient {
         ),
     )
 
-    private val apiKey: String get() = BuildConfig.LUCY_API_KEY
+    private val apiKey: String get() = BuildConfig.LUCY_API_KEY.trim()
+
+    private val model: String get() = BuildConfig.LUCY_MODEL.trim().ifEmpty { DEFAULT_MODEL }
 
     val hasApiKey: Boolean get() = apiKey.isNotBlank()
 
     private val http by lazy {
         OkHttpClient.Builder()
-            .callTimeout(30, TimeUnit.SECONDS)
+            .callTimeout(45, TimeUnit.SECONDS)
             .build()
     }
 
-    /** [library]: título → minutos jugados, sacado de la biblioteca real. */
-    suspend fun ask(text: String, uiLanguage: String, library: Map<String, Int>): String {
-        if (!hasApiKey) return fallbackFor(text)
+    /**
+     * Pregunta a Lucy.
+     *
+     * @param history turnos anteriores, en orden; el modelo mantiene el hilo.
+     * @param library título → minutos jugados, sacado de la biblioteca real.
+     */
+    suspend fun ask(
+        text: String,
+        uiLanguage: String,
+        library: Map<String, Int>,
+        history: List<Turn> = emptyList(),
+    ): Reply {
+        if (!hasApiKey) return Reply(fallbackFor(text), ok = false)
         return try {
-            withContext(Dispatchers.IO) { call(text, uiLanguage, library) }
+            withContext(Dispatchers.IO) { call(text, uiLanguage, library, history) }
         } catch (e: Exception) {
-            fallbackFor(text)
+            Reply(fallbackFor(text), ok = false)
         }
     }
 
@@ -105,43 +127,83 @@ object LucyClient {
         return (FALLBACKS.firstOrNull { f -> f.keys.any { q.contains(it) } } ?: FALLBACKS[1]).text
     }
 
-    private fun call(text: String, uiLanguage: String, library: Map<String, Int>): String {
+    private fun call(
+        text: String,
+        uiLanguage: String,
+        library: Map<String, Int>,
+        history: List<Turn>,
+    ): Reply {
         val libraryContext = JSONObject().apply {
             library.forEach { (title, minutes) -> put(title, minutes) }
         }
 
-        val payload = JSONObject().apply {
-            put("model", MODEL)
-            put("max_tokens", 400)
-            put("system", SYSTEM_PROMPT)
-            put(
-                "messages",
-                JSONArray().put(
-                    JSONObject().apply {
-                        put("role", "user")
-                        put(
-                            "content",
+        val contents = JSONArray()
+        // El hilo anterior, tal cual; Gemini llama "model" a sus propios turnos.
+        history.forEach { turn ->
+            contents.put(
+                JSONObject().apply {
+                    put("role", if (turn.fromLucy) "model" else "user")
+                    put("parts", JSONArray().put(JSONObject().put("text", turn.text)))
+                },
+            )
+        }
+        contents.put(
+            JSONObject().apply {
+                put("role", "user")
+                put(
+                    "parts",
+                    JSONArray().put(
+                        JSONObject().put(
+                            "text",
                             "LIBRARY_CONTEXT (JSON): $libraryContext\nUI_LANGUAGE: $uiLanguage\n\n$text",
-                        )
-                    },
-                ),
+                        ),
+                    ),
+                )
+            },
+        )
+
+        val payload = JSONObject().apply {
+            put(
+                "system_instruction",
+                JSONObject().put("parts", JSONArray().put(JSONObject().put("text", SYSTEM_PROMPT))),
+            )
+            put("contents", contents)
+            put(
+                "generationConfig",
+                JSONObject().apply {
+                    put("maxOutputTokens", 800)
+                    put("temperature", 0.8)
+                },
             )
         }
 
         val request = Request.Builder()
-            .url(ENDPOINT)
+            .url("$ENDPOINT/$model:generateContent")
             .header("content-type", "application/json")
-            .header("x-api-key", apiKey)
-            .header("anthropic-version", "2023-06-01")
+            .header("x-goog-api-key", apiKey)
             .post(payload.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
         http.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
-            if (!response.isSuccessful) return fallbackFor(text)
-            val content = JSONObject(body).optJSONArray("content") ?: return "…"
-            val first = content.optJSONObject(0) ?: return "…"
-            return first.optString("text", "…")
+            if (!response.isSuccessful) return Reply(fallbackFor(text), ok = false)
+            val answer = firstText(body)
+            return if (answer.isNullOrBlank()) Reply(fallbackFor(text), ok = false) else Reply(answer, ok = true)
         }
+    }
+
+    /** El texto de la respuesta: las `parts` del primer candidato, unidas. */
+    private fun firstText(body: String): String? {
+        val candidate = JSONObject(body).optJSONArray("candidates")?.optJSONObject(0) ?: return null
+        val parts = candidate.optJSONObject("content")?.optJSONArray("parts") ?: return null
+        return (0 until parts.length())
+            .mapNotNull { i ->
+                // Los `parts` de razonamiento no son respuesta: no se enseñan.
+                parts.optJSONObject(i)?.takeIf { !it.optBoolean("thought") }
+                    ?.optString("text")?.takeIf { t -> t.isNotBlank() }
+            }
+            .joinToString("\n")
+            .trim()
+            .takeIf { it.isNotEmpty() }
     }
 }
