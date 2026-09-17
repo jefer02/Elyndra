@@ -82,6 +82,19 @@ private fun DrawScope.drawSheetGlyph(icon: SheetIcon, color: Color) {
             close()
         }
 
+        // Etiqueta con su agujero: el id con el que el runtime conoce al juego.
+        SheetIcon.GameId -> {
+            shape(stroke) {
+                moveTo(w * 0.52f, h * 0.12f)
+                lineTo(w * 0.88f, h * 0.48f)
+                lineTo(w * 0.50f, h * 0.86f)
+                lineTo(w * 0.14f, h * 0.50f)
+                lineTo(w * 0.14f, h * 0.12f)
+                close()
+            }
+            drawCircle(color, radius = t * 0.9f, center = Offset(w * 0.30f, h * 0.30f))
+        }
+
         // Ficha: una "i" dentro de un círculo.
         SheetIcon.Details -> {
             drawCircle(color, radius = w * 0.38f, center = Offset(w * 0.5f, h * 0.5f), style = stroke)
