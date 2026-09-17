@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
+import com.elyndra.launcher.data.BannerHub
 import com.elyndra.launcher.data.GameSystem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
@@ -153,8 +154,10 @@ class RomScanner(private val resolver: ContentResolver) {
      * Una subcarpeta sin ningún ejecutable dentro se deja fuera: es la carpeta
      * de guardados, la de mods o una descompresión a medias.
      *
-     * También se recogen los ejecutables sueltos que haya en la propia raíz,
-     * para el portable que no está metido en su carpeta.
+     * También se recogen los archivos sueltos de la propia raíz: el portable
+     * que no está metido en su carpeta, y los archivos-id ([PcGames.isIdFile])
+     * de quien tiene su biblioteca de BannerHub anotada así, un archivo por
+     * juego con el id dentro.
      */
     private suspend fun scanFolderGames(
         treeUri: Uri,
@@ -166,9 +169,15 @@ class RomScanner(private val resolver: ContentResolver) {
         val kids = runCatching { children(treeUri, rootDocId) }.getOrDefault(emptyList())
         var scanned = kids.size
 
-        // Portables sueltos en la raíz.
-        kids.filter { !it.isDir && !it.name.startsWith(".") && it.extension in system.extensions }
-            .forEach { results += Found(it.docId, it.name, it.name, it.size, it.modified, isDir = false) }
+        // Sueltos en la raíz: portables (.exe) y archivos-id (.iso, .txt…).
+        for (f in kids.filter { !it.isDir && !it.name.startsWith(".") }) {
+            val known = f.extension in system.extensions
+            if (!known && !PcGames.isIdFile(f.name, f.size)) continue
+            // Un .iso o un .txt solo cuenta si dentro hay un id: si no, es un
+            // disco de verdad o un léeme, y no un juego.
+            if (!known && idOf(treeUri, f.docId) == null) continue
+            results += Found(f.docId, f.name, f.name, f.size, f.modified, isDir = false)
+        }
 
         val dirs = kids.filter { it.isDir && !it.name.startsWith(".") && it.name.lowercase() !in SKIP_DIRS }
         for (dir in dirs) {
@@ -178,7 +187,16 @@ class RomScanner(private val resolver: ContentResolver) {
 
             val executables = ArrayList<PcGames.Executable>()
             scanned += collectExecutables(treeUri, dir.docId, "", 0, executables)
-            if (!PcGames.looksLikeGame(executables)) continue
+            if (!PcGames.looksLikeGame(executables)) {
+                // Sin ejecutable la carpeta aún puede llevar juegos dentro: los
+                // archivos-id de quien tiene así su biblioteca de BannerHub.
+                // Cada archivo es un juego, con su nombre y su id — dar de alta
+                // la carpeta entera dejaría fuera todos menos el primero.
+                idFilesIn(treeUri, dir.docId).forEach { id ->
+                    results += Found(id.docId, id.name, "${dir.name}/${id.name}", id.size, id.modified, isDir = false)
+                }
+                continue
+            }
 
             val main = PcGames.pickExecutable(dir.name, executables)
             results += Found(
@@ -195,6 +213,17 @@ class RomScanner(private val resolver: ContentResolver) {
         }
         return results.sortedBy { it.relPath.lowercase() }
     }
+
+    /** Archivos-id de una carpeta que no tiene ningún ejecutable dentro. */
+    private fun idFilesIn(treeUri: Uri, docId: String): List<Child> =
+        runCatching { children(treeUri, docId) }.getOrDefault(emptyList())
+            .filter { !it.isDir && !it.name.startsWith(".") && PcGames.isIdFile(it.name, it.size) }
+            .sortedBy { it.name.lowercase() }
+            .filter { !PcGames.idFileNeedsContent(it.name) || idOf(treeUri, it.docId) != null }
+
+    /** El id que lleva dentro un archivo-id, o null si lo que hay no lo es. */
+    private fun idOf(treeUri: Uri, docId: String): String? =
+        BannerHub.parseId(readSmallText(treeUri, docId, PcGames.MAX_LAUNCHER_BYTES))
 
     /**
      * Ejecutables de la carpeta de un juego, bajando hasta [PcGames.MAX_DEPTH].
