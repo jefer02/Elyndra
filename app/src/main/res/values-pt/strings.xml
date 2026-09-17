@@ -77,13 +77,15 @@
     <string name="section_theme">Tema</string>
     <string name="dark_mode">Modo escuro</string>
     <string name="dark_mode_desc">Usa uma interface escura, seja qual for o tema do sistema.</string>
-    <string name="section_video_bg">Fundo animado</string>
-    <string name="video_bg_title">Vídeo de fundo</string>
-    <string name="video_bg_desc">Reproduz um vídeo atrás da interface. Afeta apenas o Elyndra, não o papel de parede do sistema.</string>
-    <string name="video_bg_choose">Escolher vídeo</string>
-    <string name="video_bg_change">Alterar</string>
-    <string name="video_bg_none">Nenhum vídeo escolhido</string>
-    <string name="video_bg_opacity">Opacidade</string>
+    <string name="section_background">Fundo</string>
+    <string name="background_title">Personalizar fundo</string>
+    <string name="background_desc">Mostra um vídeo ou uma imagem atrás da interface. Afeta apenas o Elyndra, não o papel de parede do sistema.</string>
+    <string name="background_choose">Escolher ficheiro</string>
+    <string name="background_change">Alterar</string>
+    <string name="background_none">Nenhum fundo escolhido</string>
+    <string name="background_opacity">Opacidade</string>
+    <string name="background_kind_video">Vídeo</string>
+    <string name="background_kind_image">Imagem</string>
     <string name="art_source_not_configured">Configure este serviço em Ajustes primeiro</string>
     <string name="art_source_roms_only">Apenas para ROMs de sistemas compatíveis</string>
     <string name="art_searching">Buscando imagens…</string>
@@ -332,4 +334,19 @@
     <string name="lucy_suggest_week">Detalhe minha semana</string>
     <string name="lucy_suggest_fact">Curiosidade</string>
     <string name="lucy_suggest_next">O que eu jogo agora?</string>
+
+    <!-- Menu de toque longo e imagens personalizadas -->
+    <string name="sheet_group_play">Jogar</string>
+    <string name="sheet_group_artwork">Imagens</string>
+    <string name="sheet_group_manage">Gerir</string>
+    <string name="art_kind_cover">Capa</string>
+    <string name="art_kind_background">Fundo</string>
+    <string name="art_kind_logo">Logótipo</string>
+    <string name="art_kind_icon">Ícone</string>
+    <string name="art_group_yours">Os teus ficheiros</string>
+    <string name="art_group_services">Procurar num serviço</string>
+    <string name="art_from_gallery">Escolher da galeria</string>
+    <string name="art_from_gallery_hint">Usa uma foto ou imagem deste dispositivo</string>
+    <string name="art_local_failed">Não foi possível ler essa imagem</string>
+    <string name="art_set">Definida</string>
 </resources>

@@ -76,17 +76,19 @@
     <string name="sort_platform">Platform</string>
     <string name="sort_added">Date added</string>
 
-    <!-- Tema y fondo animado -->
+    <!-- Tema y fondo de la interfaz -->
     <string name="section_theme">Theme</string>
     <string name="dark_mode">Dark mode</string>
     <string name="dark_mode_desc">Use a dark interface, whatever the system theme is.</string>
-    <string name="section_video_bg">Animated background</string>
-    <string name="video_bg_title">Video background</string>
-    <string name="video_bg_desc">Play a video behind the interface. It only affects Elyndra, not your system wallpaper.</string>
-    <string name="video_bg_choose">Choose video</string>
-    <string name="video_bg_change">Change</string>
-    <string name="video_bg_none">No video chosen</string>
-    <string name="video_bg_opacity">Opacity</string>
+    <string name="section_background">Background</string>
+    <string name="background_title">Customize background</string>
+    <string name="background_desc">Show a video or an image behind the interface. It only affects Elyndra, not your system wallpaper.</string>
+    <string name="background_choose">Choose file</string>
+    <string name="background_change">Change</string>
+    <string name="background_none">No background chosen</string>
+    <string name="background_opacity">Opacity</string>
+    <string name="background_kind_video">Video</string>
+    <string name="background_kind_image">Image</string>
     <string name="art_source_not_configured">Set up this service in Settings first</string>
     <string name="art_source_roms_only">Only for ROMs of supported systems</string>
     <string name="art_searching">Searching images…</string>
@@ -324,4 +326,19 @@
     <string name="lucy_suggest_week">Break down my week</string>
     <string name="lucy_suggest_fact">Fun fact</string>
     <string name="lucy_suggest_next">What should I play?</string>
+
+    <!-- Menú de pulsación larga y personalización de imágenes -->
+    <string name="sheet_group_play">Play</string>
+    <string name="sheet_group_artwork">Artwork</string>
+    <string name="sheet_group_manage">Manage</string>
+    <string name="art_kind_cover">Cover</string>
+    <string name="art_kind_background">Background</string>
+    <string name="art_kind_logo">Logo</string>
+    <string name="art_kind_icon">Icon</string>
+    <string name="art_group_yours">Your files</string>
+    <string name="art_group_services">Search a service</string>
+    <string name="art_from_gallery">Choose from gallery</string>
+    <string name="art_from_gallery_hint">Use a photo or image from this device</string>
+    <string name="art_local_failed">Couldn\'t read that image</string>
+    <string name="art_set">Set</string>
 </resources>

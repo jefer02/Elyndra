@@ -77,13 +77,15 @@
     <string name="section_theme">Tema</string>
     <string name="dark_mode">Modo oscuro</string>
     <string name="dark_mode_desc">Usa una interfaz oscura, sea cual sea el tema del sistema.</string>
-    <string name="section_video_bg">Fondo animado</string>
-    <string name="video_bg_title">Vídeo de fondo</string>
-    <string name="video_bg_desc">Reproduce un vídeo detrás de la interfaz. Solo afecta a Elyndra, no al fondo de pantalla del sistema.</string>
-    <string name="video_bg_choose">Elegir vídeo</string>
-    <string name="video_bg_change">Cambiar</string>
-    <string name="video_bg_none">Sin vídeo elegido</string>
-    <string name="video_bg_opacity">Opacidad</string>
+    <string name="section_background">Fondo</string>
+    <string name="background_title">Personalizar fondo</string>
+    <string name="background_desc">Pon un vídeo o una imagen detrás de la interfaz. Solo afecta a Elyndra, no al fondo de pantalla del sistema.</string>
+    <string name="background_choose">Elegir archivo</string>
+    <string name="background_change">Cambiar</string>
+    <string name="background_none">Sin fondo elegido</string>
+    <string name="background_opacity">Opacidad</string>
+    <string name="background_kind_video">Vídeo</string>
+    <string name="background_kind_image">Imagen</string>
     <string name="art_source_not_configured">Configura antes este servicio en Ajustes</string>
     <string name="art_source_roms_only">Solo para ROMs de sistemas compatibles</string>
     <string name="art_searching">Buscando imágenes…</string>
@@ -332,4 +334,19 @@
     <string name="lucy_suggest_week">Desglosa mi semana</string>
     <string name="lucy_suggest_fact">Dato curioso</string>
     <string name="lucy_suggest_next">¿Qué juego toca?</string>
+
+    <!-- Menú de pulsación larga y personalización de imágenes -->
+    <string name="sheet_group_play">Jugar</string>
+    <string name="sheet_group_artwork">Imágenes</string>
+    <string name="sheet_group_manage">Gestionar</string>
+    <string name="art_kind_cover">Carátula</string>
+    <string name="art_kind_background">Fondo</string>
+    <string name="art_kind_logo">Logo</string>
+    <string name="art_kind_icon">Icono</string>
+    <string name="art_group_yours">Tus archivos</string>
+    <string name="art_group_services">Buscar en un servicio</string>
+    <string name="art_from_gallery">Elegir de la galería</string>
+    <string name="art_from_gallery_hint">Usa una foto o imagen de este dispositivo</string>
+    <string name="art_local_failed">No se pudo leer esa imagen</string>
+    <string name="art_set">Puesta</string>
 </resources>
