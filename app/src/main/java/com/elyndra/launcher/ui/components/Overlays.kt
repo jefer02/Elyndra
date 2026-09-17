@@ -3,6 +3,8 @@ package com.elyndra.launcher.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,22 +28,31 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.ActionSheetSpec
+import com.elyndra.launcher.ui.DialogInput
 import com.elyndra.launcher.ui.DialogSpec
 import com.elyndra.launcher.ui.SheetAction
 import com.elyndra.launcher.ui.UiText
@@ -100,6 +111,13 @@ fun ElyDialogView(spec: DialogSpec, onDismiss: () -> Unit) {
             ElyText(spec.title.resolve(), size = 15f, weight = FontWeight.SemiBold, color = P.ink)
             Spacer(Modifier.height(8.dp))
             ElyText(spec.message.resolve(), size = 12f, color = P.ink2, lineHeightRatio = 1.5f)
+            // Lo escrito vive aquí, no en el spec: el diálogo se repinta con
+            // cada tecla y el botón de aceptar lee este mismo estado al pulsar.
+            val typed = remember(spec) { mutableStateOf(spec.input?.initial.orEmpty()) }
+            spec.input?.let { input ->
+                Spacer(Modifier.height(14.dp))
+                DialogField(input, typed.value) { typed.value = it }
+            }
             Spacer(Modifier.height(16.dp))
             Row(
                 Modifier.fillMaxWidth(),
@@ -109,9 +127,62 @@ fun ElyDialogView(spec: DialogSpec, onDismiss: () -> Unit) {
                 spec.extra?.let { b -> GhostButton(b.label.resolve(), { onDismiss(); b.action() }) }
                 Spacer(Modifier.weight(1f))
                 spec.dismiss?.let { b -> GhostButton(b.label.resolve(), { onDismiss(); b.action() }) }
-                AccentButton(spec.confirm.label.resolve(), { onDismiss(); spec.confirm.action() }, fontSize = 12f)
+                val input = spec.input
+                AccentButton(
+                    spec.confirm.label.resolve(),
+                    {
+                        // El valor se lee al pulsar, no al componer: si no, se
+                        // guardaría lo que hubiese antes de escribir.
+                        val written = typed.value
+                        onDismiss()
+                        if (input != null) input.onConfirm(written) else spec.confirm.action()
+                    },
+                    fontSize = 12f,
+                )
             }
         }
+    }
+}
+
+/**
+ * Campo de un diálogo que pide un dato suelto (ver [DialogInput]).
+ *
+ * Pide el foco y abre el teclado al aparecer: el diálogo sale sobre un velo a
+ * pantalla completa y, sin eso, se puede teclear creyendo que se está
+ * escribiendo en el campo cuando no lo tiene nadie.
+ */
+@Composable
+private fun DialogField(input: DialogInput, value: String, onChange: (String) -> Unit) {
+    val skin = LocalSkin.current
+    val focus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(input) {
+        runCatching { focus.requestFocus() }
+        keyboard?.show()
+    }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color.White.copy(alpha = 0.7f))
+            .border(1.dp, P.ink.copy(alpha = 0.14f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        if (value.isEmpty()) {
+            input.placeholder?.let { ElyText(it.resolve(), size = 12f, color = P.ink2.copy(alpha = 0.6f)) }
+        }
+        BasicTextField(
+            value = value,
+            onValueChange = onChange,
+            singleLine = true,
+            textStyle = inputStyle(12f),
+            cursorBrush = SolidColor(skin.a2),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = if (input.numeric) KeyboardType.Number else KeyboardType.Text,
+                imeAction = ImeAction.Done,
+            ),
+            modifier = Modifier.fillMaxWidth().focusRequester(focus),
+        )
     }
 }
 
