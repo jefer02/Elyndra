@@ -116,10 +116,13 @@ class RomScanner(private val resolver: ContentResolver) {
             for (d in dirs) {
                 val lower = d.name.lowercase()
                 if (lower in SKIP_DIRS) continue
-                if (system.dirGames && isDirectoryGame(treeUri, d)) {
+                if (system.dirGames && isDirectoryGame(treeUri, d, system)) {
                     results += Found(d.docId, d.name, rel + d.name, 0L, d.modified, isDir = true)
                     continue
                 }
+                // `code` / `content` / `meta` solo cuelgan de un juego de Wii U ya
+                // dado de alta: bajar ahí solo sacaría sus .rpx y .tmd sueltos.
+                if (system.id == WiiU.SYSTEM_ID && WiiU.isInnerDir(d.name)) continue
                 if (depth < MAX_DEPTH) queue += Triple(d.docId, "$rel${d.name}/", depth + 1)
             }
             onProgress(Progress(scanned, results.size, rel.ifEmpty { "/" }))
@@ -127,7 +130,15 @@ class RomScanner(private val resolver: ContentResolver) {
         results.sortedBy { it.relPath.lowercase() }
     }
 
-    private fun isDirectoryGame(treeUri: Uri, dir: Child): Boolean {
+    /**
+     * Carpetas que son un juego entero: PS3 en formato JB (con `PS3_GAME` dentro)
+     * y Wii U desempaquetado (con `code`, `content` y `meta`).
+     */
+    private fun isDirectoryGame(treeUri: Uri, dir: Child, system: GameSystem): Boolean {
+        if (system.id == WiiU.SYSTEM_ID) {
+            val subs = runCatching { children(treeUri, dir.docId) }.getOrDefault(emptyList())
+            return WiiU.isGameDir(subs.filter { it.isDir }.map { it.name })
+        }
         if (dir.name.lowercase().endsWith(".ps3")) return true
         return runCatching { children(treeUri, dir.docId).any { it.isDir && it.name.equals("PS3_GAME", ignoreCase = true) } }
             .getOrDefault(false)

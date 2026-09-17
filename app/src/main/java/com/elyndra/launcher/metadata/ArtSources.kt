@@ -90,6 +90,21 @@ class ArtSources(
     /** Descarga la imagen elegida y la fija para que "Actualizar metadatos" no la sustituya. */
     suspend fun apply(key: String, kind: ArtKind, url: String): Boolean {
         val path = media.download(url, key, kind.media) ?: return false
+        return store(key, kind, path)
+    }
+
+    /**
+     * Lo mismo con una imagen del propio dispositivo: la que el usuario elige
+     * en su galería. No hay servicio de por medio, así que basta con guardar
+     * los bytes ya leídos y fijarla igual que una descargada — "Actualizar
+     * metadatos" no la pisará.
+     */
+    suspend fun applyLocal(key: String, kind: ArtKind, image: LocalImage): Boolean {
+        val path = withContext(Dispatchers.IO) { media.save(image.bytes, key, kind.media, image.extension) } ?: return false
+        return store(key, kind, path)
+    }
+
+    private suspend fun store(key: String, kind: ArtKind, path: String): Boolean {
         val folderId = folderIdOf(key)
         if (folderId != null) {
             repo.setFolderArt(folderId, kind.media, path)
