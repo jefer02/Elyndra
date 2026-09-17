@@ -12,7 +12,12 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Visibilidad de paquetes (Android 11+): Elyndra tiene que ver los juegos
-         instalados y los emuladores a los que entrega cada ROM. -->
+         instalados y los emuladores a los que entrega cada ROM. No es un permiso
+         que se pida al usuario, se declara aquí: sin esto el PackageManager
+         contesta "no instalado" a todo.
+
+         Los tres <intent> cubren cualquier app que se pueda abrir (móvil o TV) y
+         las que declaran VIEW, que es como recibe la ROM la mayoría de emuladores. -->
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -26,6 +31,32 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:mimeType="*/*" />
         </intent>
+
+        <!-- Runtimes de Windows (juegos de PC). Van uno a uno porque no se les
+             llega por ningún intent genérico: el juego se lanza con una acción
+             propia de cada paquete ("banner.hub.LAUNCH_GAME") o con su actividad
+             explícita, y varios se publican como build "de reemplazo" bajo el
+             paquete de otra app. La lista es la de Emulators.kt. -->
+        <package android:name="com.winlator" />
+        <package android:name="com.winlator.cmod" />
+        <package android:name="com.winlator.vanilla" />
+        <package android:name="com.cmodded.winlator" />
+        <package android:name="com.winlator.banner" />
+        <package android:name="com.winnative.cmod" />
+        <package android:name="banner.hub" />
+        <package android:name="gamehub.lite" />
+        <package android:name="emuready.gamehub.lite" />
+        <package android:name="app.gamenative" />
+        <package android:name="com.mobox.launcher" />
+        <package android:name="com.micewine.emu" />
+        <package android:name="com.xiaoji.egggame" />
+        <package android:name="com.antutu.ABenchMark" />
+        <package android:name="com.antutu.benchmark.full" />
+        <package android:name="com.ludashi.aibench" />
+        <package android:name="com.ludashi.benchmark" />
+        <package android:name="com.miHoYo.GenshinImpact" />
+        <package android:name="com.tencent.ig" />
+        <package android:name="com.tencent.tmgp.cf" />
     </queries>
 
     <!-- allowBackup desactivado: los permisos de carpeta (SAF) y la clave del
