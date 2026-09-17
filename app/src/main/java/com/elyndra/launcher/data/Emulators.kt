@@ -25,6 +25,30 @@ sealed interface ExtraValue {
     data object RetroArchConfig : ExtraValue
     /** String[] {"-r", <TITLE ID leído del archivo .psvita>} para Vita3K. */
     data object VitaTitleArgs : ExtraValue
+
+    /* ── Juegos de PC: lo que entienden los runtimes de Windows ──
+       Ninguno acepta la ruta de un .exe. Lo que aceptan es el archivo
+       lanzador que ellos mismos exportan (ver PcGames.Launcher). */
+
+    /** Ruta del `.desktop` que exportó Winlator: dentro van contenedor y ejecutable. */
+    data object WinShortcut : ExtraValue
+
+    /**
+     * Id del juego dentro del runtime.
+     *
+     * GameHub y sus forks leen el id de dos claves distintas según la build
+     * (`steamAppId` para lo que viene de Steam, `localGameId` para el resto).
+     * Desde fuera no se sabe cuál mira la build instalada, así que el mismo id
+     * se manda en las dos: [alsoKey] es la segunda. La que no le corresponda,
+     * el runtime la ignora.
+     */
+    data class LauncherId(val alsoKey: String? = null) : ExtraValue
+
+    /** El mismo id, como entero: GameNative pide `app_id` así. */
+    data object LauncherIdInt : ExtraValue
+
+    /** Tienda de la que sale el juego (STEAM, GOG, EPIC…), por la extensión del lanzador. */
+    data object LauncherStore : ExtraValue
 }
 
 data class ExtraSpec(val key: String, val value: ExtraValue)
@@ -47,10 +71,9 @@ data class EmulatorProfile(
     /**
      * El runtime no admite que le pasen el juego: solo se puede abrir.
      *
-     * Es el caso de los runtimes de Windows (Winlator y sus derivados), que
-     * no exponen ningún intent para arrancar un ejecutable: el juego se elige
-     * dentro, en su propio contenedor. Elyndra abre la app y se aparta, en vez
-     * de mandar un intent con una ruta que el runtime va a ignorar.
+     * Queda para los runtimes de Windows que no exponen ningún intent de
+     * lanzamiento (Mobox). Elyndra abre la app y se aparta, en vez de mandar
+     * un intent con una ruta que el runtime va a ignorar.
      */
     val launchOnly: Boolean = false,
 ) {
@@ -62,6 +85,15 @@ object Emulators {
 
     const val VIEW = "android.intent.action.VIEW"
     const val MAIN = "android.intent.action.MAIN"
+
+    /**
+     * Marca en una acción que hay que sustituirla por el paquete que se lanza.
+     *
+     * GameHub y sus forks declaran la acción con su propio paquete delante
+     * ("gamehub.lite.LAUNCH_GAME", "banner.hub.LAUNCH_GAME"…), y cada build
+     * se instala con un paquete distinto, así que la acción se arma al vuelo.
+     */
+    const val PACKAGE_TOKEN = "%PKG%"
     private const val TECH_DISCOVERED = "android.nfc.action.TECH_DISCOVERED"
     private const val DEFAULT = "android.intent.category.DEFAULT"
     private const val LEANBACK = "android.intent.category.LEANBACK_LAUNCHER"
@@ -90,17 +122,53 @@ object Emulators {
     )
 
     /**
-     * Runtime de Windows sobre Android (Winlator, GameHub y sus derivados).
+     * Winlator y sus forks: `XServerDisplayActivity` con la ruta del `.desktop`.
+     *
+     * El acceso directo lo exporta el propio runtime ("Export for frontends") y
+     * dentro lleva el contenedor y el ejecutable; sin él no hay nada que lanzar.
      *
      * Se listan varios paquetes por perfil porque cada fork se instala con el
-     * suyo y algunos ofrecen build "de reemplazo" con el paquete del original;
-     * gana el primero que este instalado.
+     * suyo y varios publican builds "de reemplazo" con el paquete de otra app.
+     * Esos paquetes de reemplazo se repiten entre forks, así que lo que
+     * distingue a uno de otro es el nombre de la actividad — por eso va
+     * completo en cada componente (ver GameLauncher.installedComponent).
      */
-    private fun windows(id: String, name: String, vararg packages: String) = EmulatorProfile(
+    private fun winlator(id: String, name: String, activity: String, vararg packages: String) = EmulatorProfile(
         id = id,
         name = name,
-        components = packages.toList(),
-        launchOnly = true,
+        components = packages.map { "$it/$activity" },
+        action = MAIN,
+        extras = listOf(ExtraSpec("shortcut_path", ExtraValue.WinShortcut)),
+        clearTask = true,
+        clearTop = true,
+    )
+
+    /**
+     * GameHub Lite y sus forks (BannerHub): `<paquete>.LAUNCH_GAME` con el id
+     * del juego dentro de la biblioteca del runtime.
+     *
+     * Sin ese id el intent abre la portada del runtime y ahí se queda, así que
+     * el id es el lanzamiento entero. Sale del archivo que exporta el propio
+     * runtime ("Frontend Export" → ES-DE), de un archivo suelto junto al juego
+     * o de lo que el usuario haya escrito a mano (ver [BannerHub]).
+     *
+     * Va en las dos claves a la vez —`steamAppId` y `localGameId`— porque cada
+     * build lee la suya y desde fuera no hay forma de saber cuál: la que no
+     * corresponda, el runtime la ignora.
+     *
+     * Cada build publica una actividad distinta; se listan todas y gana la que
+     * esté instalada de verdad (ver `GameLauncher.installedComponent`).
+     */
+    private fun gameHub(id: String, name: String, vararg packages: String) = EmulatorProfile(
+        id = id,
+        name = name,
+        components = packages.flatMap { pkg -> BannerHub.ACTIVITIES.map { "$pkg/$it" } },
+        action = PACKAGE_TOKEN + BannerHub.ACTION_SUFFIX,
+        category = DEFAULT,
+        extras = listOf(
+            ExtraSpec(BannerHub.EXTRA_AUTOSTART, ExtraValue.Flag(true)),
+            ExtraSpec(BannerHub.EXTRA_STEAM_ID, ExtraValue.LauncherId(alsoKey = BannerHub.EXTRA_LOCAL_ID)),
+        ),
     )
 
     /** Familia yuzu (Eden, Citron, Sudachi…): acción TECH_DISCOVERED + URI en data. */
@@ -319,20 +387,38 @@ object Emulators {
 
         // ── PC (Windows sobre Android) ──
         //
-        // Ninguno de estos acepta hoy un intent con la ruta del juego: se
-        // abren y el juego se elige dentro. De ahi `launchOnly` — ver
-        // EmulatorProfile.launchOnly. Si alguno lo llega a admitir, basta con
-        // quitarle la bandera y darle `data`/`extras` como a cualquier otro.
-        //
-        // Los nombres de actividad no se fijan a proposito: estos proyectos son
-        // forks que renombran clases entre versiones, y GameLauncher ya cae en
-        // el intent de lanzamiento del paquete cuando la actividad no existe.
-        windows("winlator", "Winlator", "com.winlator"),
-        windows("winlator_cmod", "Winlator Cmod", "com.winlator.cmod"),
-        windows("bannerlator", "Bannerlator", "com.winlator.banner"),
-        windows("gamehub", "GameHub", "gamehub.lite"),
-        windows("bannerhub", "BannerHub", "banner.hub", "gamehub.lite"),
-        windows("mobox", "Mobox", "com.mobox.launcher", "com.micewine.emu"),
+        // Un juego de PC no se entrega como una ROM: no vive suelto en el
+        // disco, vive dentro del runtime, en un contenedor con su Wine y sus
+        // ajustes. Ninguno de estos acepta la ruta de un .exe. Lo que aceptan
+        // es el archivo que ellos mismos exportan para los frontends, y de ahi
+        // salen las dos familias de abajo (ver PcGames.Launcher).
+        winlator("winlator_cmod", "Winlator Cmod", "com.winlator.cmod.XServerDisplayActivity",
+            "com.winlator.cmod", "com.winlator.vanilla", "com.ludashi.benchmark", "com.miHoYo.GenshinImpact"),
+        winlator("winlator", "Winlator", "com.winlator.XServerDisplayActivity", "com.winlator"),
+        winlator("winlator_proot", "Winlator Cmod PRoot", "com.winlator.XServerDisplayActivity", "com.cmodded.winlator"),
+        winlator("bannerlator", "Bannerlator", "com.winlator.star.XServerDisplayActivity",
+            "com.winlator.banner", "com.ludashi.benchmark", "com.tencent.ig"),
+        winlator("winnative", "WinNative", "com.winlator.cmod.runtime.display.XServerDisplayActivity",
+            "com.winnative.cmod", "com.antutu.ABenchMark", "com.ludashi.benchmark", "com.tencent.ig"),
+        gameHub(
+            "bannerhub", "BannerHub",
+            // Los propios primero y los de reemplazo después: si hay dos builds
+            // instaladas manda la que se instaló con su nombre de verdad.
+            *(BannerHub.PACKAGES + BannerHub.DECOY_PACKAGES +
+                listOf("com.antutu.benchmark.full", "com.ludashi.aibench", "com.miHoYo.GenshinImpact")).toTypedArray(),
+        ),
+        gameHub("gamehub", "GameHub Lite", "gamehub.lite", "emuready.gamehub.lite"),
+        EmulatorProfile(
+            "gamenative", "GameNative", listOf("app.gamenative/.MainActivity"),
+            action = "app.gamenative.LAUNCH_GAME",
+            extras = listOf(
+                ExtraSpec("game_source", ExtraValue.LauncherStore),
+                ExtraSpec("app_id", ExtraValue.LauncherIdInt),
+            ),
+        ),
+        // Mobox y MiceWine no publican ningun intent de lanzamiento: se abren
+        // y el juego se elige dentro. De ahi `launchOnly`.
+        EmulatorProfile("mobox", "Mobox", listOf("com.mobox.launcher", "com.micewine.emu"), launchOnly = true),
 
         // ── GameCube / Wii / Wii U ──
         EmulatorProfile(
@@ -521,6 +607,34 @@ object Emulators {
 
     fun byId(id: String?): EmulatorProfile? = id?.let { byId[it] }
 
-    /** Paquetes de todos los emuladores conocidos: nunca se ofrecen como "juegos detectados". */
-    val allPackages: Set<String> by lazy { ALL.flatMap { it.packages }.toSet() }
+    /**
+     * ¿Este emulador lanza por id de juego en vez de por archivo?
+     *
+     * Son los runtimes de Windows con biblioteca propia (BannerHub, GameHub,
+     * GameNative). Sirve para ofrecer el id del juego también cuando la
+     * carpeta no se dio de alta como PC, que es donde se puede acabar sin
+     * saber por qué no arranca nada.
+     */
+    fun usesGameId(id: String?): Boolean = byId(id)?.extras.orEmpty().any {
+        it.value is ExtraValue.LauncherId || it.value == ExtraValue.LauncherIdInt
+    }
+
+    /**
+     * Paquetes que un emulador toma prestados de otra app.
+     *
+     * Varios runtimes de Windows y algún emulador de Switch publican builds que
+     * se instalan con el paquete de un juego o de un benchmark conocido, para
+     * que el driver de la GPU les aplique el perfil de esa app. Sirven para
+     * lanzar, pero no delatan a un emulador: lo normal es que ahí esté la app
+     * de verdad, y esconderla de la lista de juegos instalados sería peor.
+     */
+    val SPOOFED_PACKAGES = setOf(
+        "com.antutu.ABenchMark", "com.antutu.benchmark.full",
+        "com.ludashi.aibench", "com.ludashi.benchmark",
+        "com.miHoYo.GenshinImpact", "com.miHoYo.Yuanshen",
+        "com.tencent.ig", "com.tencent.tmgp.cf",
+    )
+
+    /** Paquetes que solo pueden ser un emulador, nunca un juego del usuario. */
+    val emulatorOnlyPackages: Set<String> by lazy { ALL.flatMap { it.packages }.toSet() - SPOOFED_PACKAGES }
 }
