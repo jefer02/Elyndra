@@ -114,6 +114,7 @@
     <string name="ok">OK</string>
     <string name="install">Installer</string>
     <string name="choose_other">En choisir un autre</string>
+    <string name="open_runtime">Ouvrir %1$s</string>
     <string name="cancel">Annuler</string>
     <string name="retry">Réessayer</string>
     <string name="dialog_emulator_missing_title">%1$s n\'est pas installé</string>
@@ -122,6 +123,8 @@
     <string name="dialog_needs_path_msg">%1$s n\'ouvre les fichiers que par chemin, et ce dossier n\'est ni dans le stockage de l\'appareil ni sur la carte SD. Choisissez un autre émulateur ou déplacez les ROMs vers le stockage local.</string>
     <string name="dialog_vita_title">ID de titre manquant</string>
     <string name="dialog_vita_msg">Vita3K a besoin de l\'ID du jeu (par exemple PCSE00000) écrit dans le fichier .psvita.</string>
+    <string name="dialog_pc_launcher_title">Le jeu vit dans %1$s</string>
+    <string name="dialog_pc_launcher_msg">%1$s ne lance que les jeux déjà présents dans sa propre bibliothèque : un dossier avec un .exe ne lui dit rien. Exporte le jeu depuis %1$s pour un frontend — il écrit un fichier .desktop ou .steam — puis pointe ce dossier PC vers ces fichiers.</string>
     <string name="dialog_launch_failed_title">Impossible d\'ouvrir le jeu</string>
     <string name="dialog_launch_failed_msg">%1$s n\'a pas pu ouvrir le jeu : %2$s</string>
     <string name="dialog_app_missing_title">App non installée</string>
@@ -351,7 +354,21 @@
     <string name="art_set">Définie</string>
 
     <!-- Jeux PC : un dossier par jeu -->
-    <string name="folder_games_hint">Les jeux PC occupent chacun un dossier. Choisis le dossier racine qui les contient — Elyndra le parcourt dossier par dossier et trouve seul l’exécutable de chaque jeu.</string>
-    <string name="scan_none_folder_games">Aucun jeu trouvé. Chaque jeu a besoin de son propre dossier avec son .exe dedans ; choisis le dossier qui les contient tous, pas celui d’un seul jeu.</string>
+    <string name="folder_games_hint">Les jeux PC occupent chacun un dossier. Choisis le dossier racine qui les contient — Elyndra le parcourt dossier par dossier et trouve seul l’exécutable de chaque jeu. Il repère aussi les raccourcis qu’un runtime Windows exporte pour les frontends (.desktop, .steam…), qui sont ce qui lance vraiment le jeu. Ou un dossier de fichiers-ID : un fichier par jeu (.iso, .txt, .steam), nommé comme le jeu et ne contenant que son ID BannerHub.</string>
+    <string name="scan_none_folder_games">Aucun jeu trouvé. Chaque jeu a besoin de son propre dossier avec son .exe dedans ; choisis le dossier qui les contient tous, pas celui d’un seul jeu. Un dossier de raccourcis exportés depuis ton runtime Windows convient aussi. Ou un dossier de fichiers-ID : un fichier par jeu (.iso, .txt, .steam) dont le contenu est seulement l’ID BannerHub.</string>
     <string name="pc_runtime_explainer">On ne peut pas transmettre un jeu à %1$s depuis l’extérieur : Elyndra se contente de l’ouvrir — choisis le jeu là, dans son conteneur.</string>
+    <string name="pc_shortcut_explainer">On remet à %1$s le raccourci qu’il exporte pour les frontends (.desktop, .steam…), pas le .exe. Choisis le dossier où %1$s les écrit.</string>
+    <string name="save">Enregistrer</string>
+    <string name="change">Changer</string>
+    <string name="installed">Installé</string>
+    <string name="pc_game_id">ID du jeu dans le runtime</string>
+    <string name="pc_game_id_msg">BannerHub, GameHub et GameNative ne lancent que les jeux déjà présents dans leur bibliothèque, chacun avec son ID. Saisis ici son ID : le numéro affiché sur sa fiche dans le runtime (pour un jeu Steam, son appid : 268910, 2551…). Laisse vide pour le supprimer.</string>
+    <string name="pc_game_id_hint">268910</string>
+    <string name="pc_game_id_saved">ID du jeu : %1$s</string>
+    <string name="pc_game_id_cleared">ID du jeu supprimé</string>
+    <string name="bannerhub_package">Build de BannerHub</string>
+    <string name="bannerhub_package_desc">La build installée à laquelle les jeux sont envoyés</string>
+    <string name="bannerhub_package_auto">La détecter</string>
+    <string name="bannerhub_package_none">Non installé</string>
+    <string name="save_and_open">Enregistrer et ouvrir</string>
 </resources>
