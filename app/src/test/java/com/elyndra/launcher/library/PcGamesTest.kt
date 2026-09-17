@@ -23,6 +23,23 @@ class PcGamesTest {
     }
 
     @Test
+    fun idFilesAreGamesToo() {
+        // Un archivo por juego con el id de BannerHub dentro.
+        assertTrue(PcGames.isIdFile("Hollow Knight.iso", 7))
+        assertTrue(PcGames.isIdFile("Hades.txt", 5))
+        assertTrue(PcGames.isIdFile("Celeste.steam", 6))
+        // Un .iso que pesa como un disco es un disco.
+        assertFalse(PcGames.isIdFile("Gran Turismo 4.iso", 4L * 1024 * 1024 * 1024))
+        assertFalse(PcGames.isIdFile("Hollow Knight.iso", 0))
+        assertFalse(PcGames.isIdFile("Hollow Knight.exe", 7))
+        // Los que exporta el runtime valen por su extensión; el resto, solo si
+        // dentro hay un id (de eso se encarga quien analiza la carpeta).
+        assertTrue(PcGames.idFileNeedsContent("Hollow Knight.iso"))
+        assertTrue(PcGames.idFileNeedsContent("Hades.txt"))
+        assertFalse(PcGames.idFileNeedsContent("Celeste.steam"))
+    }
+
+    @Test
     fun folderNameWins() {
         val main = PcGames.pickExecutable(
             "Hollow Knight",
@@ -79,6 +96,43 @@ class PcGamesTest {
         assertFalse(PcGames.looksLikeGame(emptyList()))
         assertTrue(PcGames.looksLikeGame(listOf(exe("game.exe"))))
         assertNull(PcGames.pickExecutable("Saves", emptyList()))
+    }
+
+    @Test
+    fun theExportedShortcutWinsOverTheExecutable() {
+        // Es lo unico que el runtime de Windows sabe abrir desde fuera, aunque
+        // el .exe se parezca mucho mas al nombre de la carpeta.
+        val main = PcGames.pickExecutable(
+            "Hades",
+            listOf(exe("Hades.exe", mb = 40), exe("Hades.desktop")),
+        )
+        assertEquals("Hades.desktop", main?.name)
+    }
+
+    @Test
+    fun aShortcutNamedLikeAnInstallerIsStillTheShortcut() {
+        val main = PcGames.pickExecutable("Setup Game", listOf(exe("setup.desktop")))
+        assertEquals("setup.desktop", main?.name)
+    }
+
+    @Test
+    fun launcherFilesAreRecognisedByExtension() {
+        assertEquals(PcGames.Launcher.Desktop, PcGames.launcherOf("Hades.desktop"))
+        assertEquals(PcGames.Launcher.Steam, PcGames.launcherOf("Hollow Knight.steam"))
+        assertEquals(PcGames.Launcher.Gog, PcGames.launcherOf("Cyberpunk 2077.GOG"))
+        assertNull(PcGames.launcherOf("Hades.exe"))
+        // El .desktop es el acceso directo entero; el resto solo llevan el id.
+        assertFalse(PcGames.Launcher.Desktop.carriesId)
+        assertTrue(PcGames.Launcher.Steam.carriesId)
+        assertTrue(PcGames.Launcher.Steam.isSteam)
+        assertFalse(PcGames.Launcher.Gog.isSteam)
+    }
+
+    @Test
+    fun pcSystemAlsoScansForExportedLaunchers() {
+        val pc = Systems.byId("pc")!!
+        PcGames.LAUNCHER_EXTENSIONS.forEach { assertTrue(it, it in pc.extensions) }
+        assertTrue("desktop" in PcGames.EXECUTABLE_EXTENSIONS)
     }
 
     @Test
