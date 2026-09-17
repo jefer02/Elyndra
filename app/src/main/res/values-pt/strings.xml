@@ -114,6 +114,7 @@
     <string name="ok">OK</string>
     <string name="install">Instalar</string>
     <string name="choose_other">Escolher outro</string>
+    <string name="open_runtime">Abrir %1$s</string>
     <string name="cancel">Cancelar</string>
     <string name="retry">Tentar de novo</string>
     <string name="dialog_emulator_missing_title">%1$s não está instalado</string>
@@ -122,6 +123,8 @@
     <string name="dialog_needs_path_msg">O %1$s só abre arquivos por caminho, e esta pasta não está no armazenamento do aparelho nem no cartão SD. Escolha outro emulador ou mova as ROMs para o armazenamento local.</string>
     <string name="dialog_vita_title">Falta o ID do título</string>
     <string name="dialog_vita_msg">O Vita3K precisa do ID do jogo (por exemplo PCSE00000) escrito dentro do arquivo .psvita.</string>
+    <string name="dialog_pc_launcher_title">O jogo vive dentro do %1$s</string>
+    <string name="dialog_pc_launcher_msg">O %1$s só arranca jogos que já estão na sua própria biblioteca, por isso uma pasta com um .exe não lhe diz nada. Exporta o jogo a partir do %1$s para um frontend — deixa um ficheiro .desktop ou .steam — e aponta esta pasta de PC para esses ficheiros.</string>
     <string name="dialog_launch_failed_title">Não foi possível abrir o jogo</string>
     <string name="dialog_launch_failed_msg">O %1$s não conseguiu abrir o jogo: %2$s</string>
     <string name="dialog_app_missing_title">App não instalado</string>
@@ -351,7 +354,21 @@
     <string name="art_set">Definida</string>
 
     <!-- Jogos de PC: uma pasta por jogo -->
-    <string name="folder_games_hint">Os jogos de PC ficam um por pasta. Escolhe a pasta raiz que os contém — o Elyndra percorre-a pasta a pasta e encontra sozinho o executável de cada jogo.</string>
-    <string name="scan_none_folder_games">Não foi encontrado nenhum jogo. Cada jogo precisa da sua própria pasta com o .exe lá dentro; escolhe a pasta que as contém todas, não a de um jogo.</string>
+    <string name="folder_games_hint">Os jogos de PC ficam um por pasta. Escolhe a pasta raiz que os contém — o Elyndra percorre-a pasta a pasta e encontra sozinho o executável de cada jogo. Também recolhe os atalhos que um runtime de Windows exporta para frontends (.desktop, .steam…), que são o que arranca mesmo o jogo. Ou uma pasta de ficheiros-id: um por jogo (.iso, .txt, .steam), com o nome do jogo e só o id do BannerHub dentro.</string>
+    <string name="scan_none_folder_games">Não foi encontrado nenhum jogo. Cada jogo precisa da sua própria pasta com o .exe lá dentro; escolhe a pasta que as contém todas, não a de um jogo. Uma pasta com os atalhos exportados do teu runtime de Windows também serve. Ou uma pasta de ficheiros-id: um por jogo (.iso, .txt, .steam) cujo conteúdo seja só o id do BannerHub.</string>
     <string name="pc_runtime_explainer">Não se pode passar um jogo ao %1$s a partir de fora, por isso o Elyndra apenas o abre — escolhe aí o jogo, no seu contentor.</string>
+    <string name="pc_shortcut_explainer">Ao %1$s entrega-se o atalho que exporta para frontends (.desktop, .steam…), não o .exe. Escolhe a pasta onde o %1$s os deixa.</string>
+    <string name="save">Guardar</string>
+    <string name="change">Alterar</string>
+    <string name="installed">Instalado</string>
+    <string name="pc_game_id">ID do jogo no runtime</string>
+    <string name="pc_game_id_msg">O BannerHub, o GameHub e o GameNative só iniciam jogos que já estão na sua biblioteca, cada um com o seu ID. Escreve o ID deste jogo: é o número que aparece na ficha dele dentro do runtime (se for da Steam, o appid: 268910, 2551…). Deixa em branco para o remover.</string>
+    <string name="pc_game_id_hint">268910</string>
+    <string name="pc_game_id_saved">ID do jogo: %1$s</string>
+    <string name="pc_game_id_cleared">ID do jogo removido</string>
+    <string name="bannerhub_package">Build do BannerHub</string>
+    <string name="bannerhub_package_desc">A que build instalada se enviam os jogos</string>
+    <string name="bannerhub_package_auto">Detetar</string>
+    <string name="bannerhub_package_none">Não instalado</string>
+    <string name="save_and_open">Guardar e abrir</string>
 </resources>
