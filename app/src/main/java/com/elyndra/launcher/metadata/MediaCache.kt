@@ -42,16 +42,28 @@ class MediaCache(private val filesDir: File) {
             }
             if (bytes.size > MAX_BYTES) return null
             val ext = sniff(bytes) ?: return null
-            val dir = dirFor(key).apply { mkdirs() }
-            dir.listFiles { f -> f.name.startsWith("${kind}_") }?.forEach { it.delete() }
-            val target = File(dir, "${kind}_${System.currentTimeMillis()}.$ext")
-            val tmp = File(dir, target.name + ".tmp")
-            runCatching {
-                tmp.writeBytes(bytes)
-                if (!tmp.renameTo(target)) return null
-            }.onFailure { return null }
-            target.relativeTo(filesDir).path.replace('\\', '/')
+            save(bytes, key, kind, ext)
         }
+    }
+
+    /**
+     * Guarda una imagen ya leída — la que el usuario elige en su galería — como
+     * [kind] de [key]. Devuelve la ruta relativa, igual que [download].
+     *
+     * La marca de tiempo en el nombre es lo que evita que el caché de imágenes
+     * de la interfaz siga enseñando la anterior.
+     */
+    fun save(bytes: ByteArray, key: String, kind: String, ext: String): String? {
+        if (bytes.isEmpty() || bytes.size > MAX_BYTES) return null
+        val dir = dirFor(key).apply { mkdirs() }
+        dir.listFiles { f -> f.name.startsWith("${kind}_") }?.forEach { it.delete() }
+        val target = File(dir, "${kind}_${System.currentTimeMillis()}.$ext")
+        val tmp = File(dir, target.name + ".tmp")
+        runCatching {
+            tmp.writeBytes(bytes)
+            if (!tmp.renameTo(target)) return null
+        }.onFailure { return null }
+        return target.relativeTo(filesDir).path.replace('\\', '/')
     }
 
     fun deleteFor(key: String) {

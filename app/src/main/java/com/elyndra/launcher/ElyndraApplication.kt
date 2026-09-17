@@ -10,6 +10,7 @@ import com.elyndra.launcher.launch.GameLauncher
 import com.elyndra.launcher.library.AppCatalog
 import com.elyndra.launcher.library.RomScanner
 import com.elyndra.launcher.library.SafFiles
+import com.elyndra.launcher.metadata.LocalMedia
 import com.elyndra.launcher.metadata.MediaCache
 import com.elyndra.launcher.metadata.MetadataEngine
 import com.elyndra.launcher.metadata.ServiceCredentials
@@ -33,6 +34,7 @@ class ElyndraApplication : Application(), ImageLoaderFactory {
     val library by lazy { LibraryRepository(File(filesDir, "library.json"), scope) }
     val media by lazy { MediaCache(filesDir) }
     val files by lazy { SafFiles(contentResolver) }
+    val localMedia by lazy { LocalMedia(contentResolver) }
     val scanner by lazy { RomScanner(contentResolver) }
     val apps by lazy { AppCatalog(this) }
     val launcher by lazy { GameLauncher(this) }

@@ -65,18 +65,34 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("darkMode", false)
         set(v) = prefs.edit { putBoolean("darkMode", v) }
 
-    /** URI (SAF, con permiso persistente) del vídeo de fondo de la interfaz. */
-    var videoBgUri: String?
+    /**
+     * URI (SAF, con permiso persistente) del fondo de la interfaz.
+     *
+     * Las claves siguen diciendo "videoBg" a propósito: el ajuste empezó
+     * admitiendo solo vídeo y renombrarlas dejaría sin fondo a quien ya tenía
+     * uno puesto. Lo que cambia es qué se acepta, no dónde se guarda.
+     */
+    var backgroundUri: String?
         get() = prefs.getString("videoBg.uri", null)
         set(v) = prefs.edit { if (v == null) remove("videoBg.uri") else putString("videoBg.uri", v) }
 
-    /** El vídeo de fondo se pinta solo si además está activado. */
-    var videoBgEnabled: Boolean
+    /**
+     * Si el fondo elegido es un vídeo. Falso = imagen fija.
+     *
+     * Por omisión es `true`: lo guardado antes de admitir imágenes solo podía
+     * ser un vídeo, así que esa preferencia se sigue leyendo bien.
+     */
+    var backgroundIsVideo: Boolean
+        get() = prefs.getBoolean("videoBg.isVideo", true)
+        set(v) = prefs.edit { putBoolean("videoBg.isVideo", v) }
+
+    /** El fondo se pinta solo si además está activado. */
+    var backgroundEnabled: Boolean
         get() = prefs.getBoolean("videoBg.enabled", false)
         set(v) = prefs.edit { putBoolean("videoBg.enabled", v) }
 
-    /** Opacidad (%) con la que se mezcla el vídeo sobre el fondo. */
-    var videoBgOpacity: Int
+    /** Opacidad (%) con la que se mezcla el fondo sobre el papel. */
+    var backgroundOpacity: Int
         get() = prefs.getInt("videoBg.opacity", 45)
         set(v) = prefs.edit { putInt("videoBg.opacity", v) }
 

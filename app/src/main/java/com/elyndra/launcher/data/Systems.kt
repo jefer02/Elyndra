@@ -29,7 +29,7 @@ data class GameSystem(
     val emulators: List<String>,
     /** Juegos en disco: ScreenScraper recibe romtype=iso. */
     val disc: Boolean = false,
-    /** Juegos que son carpetas (PS3 en formato JB). */
+    /** Juegos que son carpetas (PS3 en formato JB, Wii U desempaquetado). */
     val dirGames: Boolean = false,
     val raHash: RaHashKind = RaHashKind.None,
 )
@@ -140,8 +140,10 @@ object Systems {
         ),
         sys(
             "wiiu", "Nintendo Wii U", "WII U", "WIU", "wua wud wux rpx wuhb tmd elf",
-            "wiiu nintendowiiu", ss = 18, igdb = listOf(41), ra = 20, pair = 0,
-            emus = listOf("cemu"), disc = true,
+            "wiiu nintendowiiu wiiugames", ss = 18, igdb = listOf(41), ra = 20, pair = 0,
+            // `dirGames`: además del archivo suelto (.wua, .wud…), un juego de Wii U
+            // puede estar desempaquetado en una carpeta con code/content/meta (ver WiiU.kt).
+            emus = listOf("cemu"), disc = true, dirGames = true,
         ),
         sys(
             "gba", "Game Boy Advance", "GBA", "GBA", "gba agb bin 7z zip",
