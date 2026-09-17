@@ -104,6 +104,23 @@ fun ArtKind.label(): Int = when (this) {
     ArtKind.Icon -> R.string.customize_icon
 }
 
+/** Nombre corto para las filas agrupadas del menú ("Carátula", no "Personalizar carátula"). */
+@StringRes
+fun ArtKind.shortLabel(): Int = when (this) {
+    ArtKind.Cover -> R.string.art_kind_cover
+    ArtKind.Background -> R.string.art_kind_background
+    ArtKind.Logo -> R.string.art_kind_logo
+    ArtKind.Icon -> R.string.art_kind_icon
+}
+
+/** Glifo de cada clase de imagen. */
+fun ArtKind.sheetIcon(): SheetIcon = when (this) {
+    ArtKind.Cover -> SheetIcon.Cover
+    ArtKind.Background -> SheetIcon.Background
+    ArtKind.Logo -> SheetIcon.Logo
+    ArtKind.Icon -> SheetIcon.Icon
+}
+
 /** "Quitar carátula / fondo / logo / icono" del menú de pulsación larga. */
 @StringRes
 fun ArtKind.removeLabel(): Int = when (this) {
@@ -123,16 +140,69 @@ data class DialogSpec(
     val extra: DialogButton? = null,
 )
 
+/**
+ * Glifo de una fila del menú de pulsación larga.
+ *
+ * Es un enum y no un recurso porque los iconos de Elyndra se dibujan a mano
+ * (ver `SheetGlyphs.kt`): así el menú no arrastra una librería de iconos ni
+ * un PNG por acción, y cada glifo se tiñe con el acento del tema.
+ */
+enum class SheetIcon {
+    Play,
+    Details,
+    Emulator,
+    Rescan,
+    Refresh,
+    Cover,
+    Background,
+    Logo,
+    Icon,
+    Gallery,
+    Service,
+    App,
+    Remove,
+}
+
+/**
+ * Un bloque de acciones con su rótulo. El menú agrupa por intención —jugar,
+ * imágenes, gestionar, quitar— en vez de encadenar quince filas iguales.
+ */
+data class SheetGroup(val header: UiText? = null, val actions: List<SheetAction>)
+
 data class SheetAction(
     val label: UiText,
     val detail: UiText? = null,
     val selected: Boolean = false,
     val dimmed: Boolean = false,
     val destructive: Boolean = false,
+    val icon: SheetIcon? = null,
+    /** Fila que abre otra hoja: lleva galón a la derecha en vez de nada. */
+    val opensSheet: Boolean = false,
     val action: () -> Unit,
 )
 
-data class ActionSheetSpec(val title: UiText, val subtitle: UiText? = null, val actions: List<SheetAction>)
+/** Miniatura de la cabecera del menú: la carátula o el icono de lo que se pulsó. */
+data class SheetThumb(
+    val coverPath: String? = null,
+    val iconPath: String? = null,
+    val packageName: String? = null,
+    val pairIndex: Int = 0,
+)
+
+data class ActionSheetSpec(
+    val title: UiText,
+    val subtitle: UiText? = null,
+    val groups: List<SheetGroup>,
+    val thumb: SheetThumb? = null,
+)
+
+/**
+ * Hoja de un solo bloque, que es lo que necesitan casi todas las llamadas
+ * (elegir emulador, elegir app…). Es una función y no un constructor porque
+ * `List<SheetGroup>` y `List<SheetAction>` borran al mismo tipo en la JVM.
+ */
+fun ActionSheetSpec(title: UiText, subtitle: UiText? = null, actions: List<SheetAction>): ActionSheetSpec =
+    ActionSheetSpec(title, subtitle, listOf(SheetGroup(null, actions)))
 
 /** Estado de conexión de un servicio de metadatos en Ajustes. */
 data class ServiceState(val status: Status, val detail: UiText? = null) {

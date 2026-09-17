@@ -58,38 +58,57 @@ class SettingsController(private val vm: ElyndraViewModel) {
         P.isDark = darkMode
     }
 
-    /* ── fondo de vídeo de la interfaz ────────────────────────── */
+    /* ── fondo de la interfaz: vídeo o imagen ─────────────────── */
 
-    var videoBgEnabled by mutableStateOf(store.videoBgEnabled); private set
-    var videoBgUri by mutableStateOf(store.videoBgUri); private set
-    var videoBgOpacity by mutableStateOf(store.videoBgOpacity); private set
+    var backgroundEnabled by mutableStateOf(store.backgroundEnabled); private set
+    var backgroundUri by mutableStateOf(store.backgroundUri); private set
+    var backgroundIsVideo by mutableStateOf(store.backgroundIsVideo); private set
+    var backgroundOpacity by mutableStateOf(store.backgroundOpacity); private set
 
-    fun toggleVideoBg() {
-        videoBgEnabled = !videoBgEnabled
-        store.videoBgEnabled = videoBgEnabled
+    fun toggleBackground() {
+        backgroundEnabled = !backgroundEnabled
+        store.backgroundEnabled = backgroundEnabled
     }
 
-    // `updateX`, no `setX`: `setVideoBgOpacity` chocaría con el setter que Kotlin
+    // `updateX`, no `setX`: `setBackgroundOpacity` chocaría con el setter que Kotlin
     // ya genera para la propiedad (misma firma JVM). Igual que `updateBlur`.
-    fun updateVideoBgOpacity(v: Int) {
-        videoBgOpacity = v
-        store.videoBgOpacity = v
+    fun updateBackgroundOpacity(v: Int) {
+        backgroundOpacity = v
+        store.backgroundOpacity = v
     }
 
-    /** Vídeo elegido con SAF: hay que quedarse el permiso o se pierde al reiniciar. */
-    fun onVideoPicked(uri: Uri?) {
+    /**
+     * Fondo elegido con SAF. Hay que quedarse el permiso o se pierde al
+     * reiniciar, y hay que anotar si es vídeo o imagen: se pintan distinto
+     * (ExoPlayer en bucle frente a una imagen recortada).
+     */
+    fun onBackgroundPicked(uri: Uri?) {
         if (uri == null) return
         runCatching { vm.app.files.takePermission(uri) }
-        videoBgUri = uri.toString()
-        store.videoBgUri = videoBgUri
-        if (!videoBgEnabled) toggleVideoBg()
+        val old = backgroundUri
+        backgroundUri = uri.toString()
+        backgroundIsVideo = isVideo(uri)
+        store.backgroundUri = backgroundUri
+        store.backgroundIsVideo = backgroundIsVideo
+        // Se suelta el anterior solo después: si el usuario vuelve a elegir el
+        // mismo archivo, soltarlo antes le quitaría el permiso recién tomado.
+        if (old != null && old != backgroundUri) runCatching { vm.app.files.releasePermission(old) }
+        if (!backgroundEnabled) toggleBackground()
     }
 
-    fun clearVideoBg() {
-        videoBgUri?.let { old -> runCatching { vm.app.files.releasePermission(old) } }
-        videoBgUri = null
-        store.videoBgUri = null
-        if (videoBgEnabled) toggleVideoBg()
+    fun clearBackground() {
+        backgroundUri?.let { old -> runCatching { vm.app.files.releasePermission(old) } }
+        backgroundUri = null
+        store.backgroundUri = null
+        if (backgroundEnabled) toggleBackground()
+    }
+
+    /** El tipo lo dice el proveedor; si calla, la extensión del nombre. */
+    private fun isVideo(uri: Uri): Boolean {
+        val mime = runCatching { vm.app.contentResolver.getType(uri) }.getOrNull()
+        if (mime != null) return mime.startsWith("video/")
+        val ext = uri.toString().substringAfterLast('.', "").lowercase()
+        return ext in VIDEO_EXTENSIONS
     }
 
     /* ── orden de la biblioteca ───────────────────────────────── */
@@ -315,6 +334,9 @@ class SettingsController(private val vm: ElyndraViewModel) {
     }
 
     companion object {
+        /** Reserva por si el proveedor no declara el tipo del archivo elegido. */
+        private val VIDEO_EXTENSIONS = setOf("mp4", "webm", "mkv", "m4v", "mov", "3gp", "avi", "ts")
+
         fun helpUrl(s: Service): String = when (s) {
             Service.ScreenScraper -> "https://www.screenscraper.fr/membreinscription.php"
             Service.Igdb -> "https://dev.twitch.tv/console/apps"
