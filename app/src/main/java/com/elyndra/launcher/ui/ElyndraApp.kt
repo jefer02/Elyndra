@@ -1,6 +1,8 @@
 package com.elyndra.launcher.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.aspectRatio
@@ -23,8 +25,10 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
@@ -37,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.components.ActionSheetView
 import com.elyndra.launcher.ui.components.ArtImage
@@ -76,16 +81,36 @@ fun ElyndraApp(vm: ElyndraViewModel) {
     val configuration = LocalConfiguration.current
     val landscape = configuration.screenWidthDp > configuration.screenHeightDp
 
+    // "Elegir de la galería": el selector solo se puede abrir desde un
+    // composable, así que el ViewModel deja aquí la petición y este efecto la
+    // lanza. Cancelar devuelve null y el ViewModel lo trata como "nada".
+    val mediaPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument(), vm::onMediaPicked)
+    val request = vm.mediaRequest
+    LaunchedEffect(request) {
+        request?.let { mediaPicker.launch(it.mimeTypes.toTypedArray()) }
+    }
+
     ElyndraTheme(skin = vm.settings.skin, landscape = landscape) {
         // Atrás cierra, por orden: diálogo, hoja, ficha, pantalla y buscador.
         BackHandler(enabled = vm.canGoBack) { vm.back() }
 
         Box(Modifier.fillMaxSize().background(P.paper)) {
-            // Fondo animado de la app (solo de Elyndra, no del sistema), debajo de todo.
+            // Fondo de la app (solo de Elyndra, no del sistema), debajo de todo:
+            // el vídeo en bucle o la imagen fija que el usuario haya elegido.
             val s = vm.settings
-            if (s.videoBgEnabled) {
-                s.videoBgUri?.let { uri ->
-                    VideoBackdrop(uri, s.videoBgOpacity / 100f, Modifier.fillMaxSize())
+            if (s.backgroundEnabled) {
+                s.backgroundUri?.let { uri ->
+                    val opacity = s.backgroundOpacity / 100f
+                    if (s.backgroundIsVideo) {
+                        VideoBackdrop(uri, opacity, Modifier.fillMaxSize())
+                    } else {
+                        AsyncImage(
+                            model = uri,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().alpha(opacity),
+                        )
+                    }
                 }
             }
 

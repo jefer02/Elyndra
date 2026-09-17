@@ -529,25 +529,58 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
 
     /* ── menús de pulsación larga ─────────────────────────────── */
 
+    /**
+     * Menú de una card del carrusel: una carpeta de emulador o una app.
+     *
+     * Las acciones salen agrupadas por intención —jugar, imágenes, gestionar,
+     * quitar— en vez de en una lista seguida: así "Quitar carpeta" no queda a
+     * un dedo de "Abrir", y las cuatro clases de imagen se leen juntas.
+     */
     fun itemOptions(item: LibraryItem) {
-        val actions = when (item) {
+        val groups = when (item) {
             is LibraryItem.Folder -> listOf(
-                SheetAction(UiText.res(R.string.open)) { open(item) },
-                SheetAction(UiText.res(R.string.change_emulator), item.emulatorName?.let { UiText.Raw(it) }) { pickFolderEmulator(item.folder) },
-                SheetAction(UiText.res(R.string.rescan_folder)) { rescanFolder(item.folder) },
-                SheetAction(UiText.res(R.string.refresh_metadata)) {
-                    refreshMetadata(library.roms.filter { it.folderId == item.folder.id }.map { it.key })
-                },
-                // Una carpeta de emulador también admite carátula, fondo y logo propios.
-            ) + customizeActions(item.key, item.system.name) + listOf(
-                SheetAction(UiText.res(R.string.remove_folder), destructive = true) { removeFolder(item.folder) },
+                SheetGroup(
+                    UiText.res(R.string.sheet_group_play),
+                    listOf(
+                        SheetAction(UiText.res(R.string.open), icon = SheetIcon.Play) { open(item) },
+                        SheetAction(
+                            UiText.res(R.string.change_emulator),
+                            detail = item.emulatorName?.let { UiText.Raw(it) },
+                            icon = SheetIcon.Emulator,
+                            opensSheet = true,
+                        ) { pickFolderEmulator(item.folder) },
+                    ),
+                ),
+                // Una carpeta de emulador también admite carátula, fondo, logo e icono propios.
+                artworkGroup(item.key, item.system.name),
+                SheetGroup(
+                    UiText.res(R.string.sheet_group_manage),
+                    listOf(
+                        SheetAction(UiText.res(R.string.rescan_folder), icon = SheetIcon.Rescan) { rescanFolder(item.folder) },
+                        SheetAction(UiText.res(R.string.refresh_metadata), icon = SheetIcon.Refresh) {
+                            refreshMetadata(library.roms.filter { it.folderId == item.folder.id }.map { it.key })
+                        },
+                    ),
+                ),
+                removalGroup(UiText.res(R.string.remove_folder)) { removeFolder(item.folder) },
             )
+
             is LibraryItem.App -> listOf(
-                SheetAction(UiText.res(R.string.open)) { open(item) },
-                SheetAction(UiText.res(R.string.details)) { showDetails(item.key) },
-                SheetAction(UiText.res(R.string.refresh_metadata)) { refreshMetadata(listOf(item.key)) },
-            ) + customizeActions(item.key, item.app.displayTitle) + listOf(
-                SheetAction(UiText.res(R.string.remove_from_library), destructive = true) {
+                SheetGroup(
+                    UiText.res(R.string.sheet_group_play),
+                    listOf(
+                        SheetAction(UiText.res(R.string.open), icon = SheetIcon.Play) { open(item) },
+                        SheetAction(UiText.res(R.string.details), icon = SheetIcon.Details, opensSheet = true) { showDetails(item.key) },
+                    ),
+                ),
+                artworkGroup(item.key, item.app.displayTitle),
+                SheetGroup(
+                    UiText.res(R.string.sheet_group_manage),
+                    listOf(
+                        SheetAction(UiText.res(R.string.refresh_metadata), icon = SheetIcon.Refresh) { refreshMetadata(listOf(item.key)) },
+                    ),
+                ),
+                removalGroup(UiText.res(R.string.remove_from_library)) {
                     removeApp(item.app.packageName, item.app.displayTitle)
                 },
             )
@@ -556,7 +589,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
             is LibraryItem.Folder -> UiText.Raw(item.folder.displayPath)
             is LibraryItem.App -> UiText.Raw(item.app.packageName)
         }
-        showSheet(ActionSheetSpec(UiText.Raw(item.name), subtitle, actions))
+        showSheet(ActionSheetSpec(UiText.Raw(item.name), subtitle, groups, thumbOf(item)))
     }
 
     fun romOptions(rom: RomEntry) {
@@ -565,36 +598,89 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                 UiText.Raw(rom.displayTitle),
                 UiText.Raw(rom.relPath),
                 listOf(
-                    SheetAction(UiText.res(R.string.open)) { openRom(rom) },
-                    SheetAction(UiText.res(R.string.details)) { showDetails(rom.key) },
-                    SheetAction(UiText.res(R.string.emulator_for_game), rom.emulatorId?.let { UiText.Raw(emulatorName(it)) }) { pickRomEmulator(rom) },
-                    SheetAction(UiText.res(R.string.refresh_metadata)) { refreshMetadata(listOf(rom.key)) },
-                ) + customizeActions(rom.key, rom.displayTitle),
+                    SheetGroup(
+                        UiText.res(R.string.sheet_group_play),
+                        listOf(
+                            SheetAction(UiText.res(R.string.open), icon = SheetIcon.Play) { openRom(rom) },
+                            SheetAction(UiText.res(R.string.details), icon = SheetIcon.Details, opensSheet = true) { showDetails(rom.key) },
+                            SheetAction(
+                                UiText.res(R.string.emulator_for_game),
+                                detail = rom.emulatorId?.let { UiText.Raw(emulatorName(it)) },
+                                icon = SheetIcon.Emulator,
+                                opensSheet = true,
+                            ) { pickRomEmulator(rom) },
+                        ),
+                    ),
+                    artworkGroup(rom.key, rom.displayTitle),
+                    SheetGroup(
+                        UiText.res(R.string.sheet_group_manage),
+                        listOf(
+                            SheetAction(UiText.res(R.string.refresh_metadata), icon = SheetIcon.Refresh) { refreshMetadata(listOf(rom.key)) },
+                        ),
+                    ),
+                ),
+                SheetThumb(coverPath = rom.meta.cover, pairIndex = romPairIndex(rom)),
             ),
         )
     }
 
+    /** La carátula (o el icono) que se enseña en la cabecera de la hoja. */
+    private fun thumbOf(item: LibraryItem): SheetThumb = when (item) {
+        is LibraryItem.Folder -> SheetThumb(
+            coverPath = item.coverPath,
+            iconPath = item.iconPath ?: item.logoPath,
+            packageName = item.emulatorPackage,
+            pairIndex = pairIndexOf(item),
+        )
+        is LibraryItem.App -> SheetThumb(
+            coverPath = item.app.meta.cover,
+            iconPath = item.app.meta.icon,
+            packageName = item.app.packageName,
+            pairIndex = pairIndexOf(item),
+        )
+    }
+
+    /** El bloque destructivo va solo y al final, con su glifo de papelera. */
+    private fun removalGroup(label: UiText, action: () -> Unit) =
+        SheetGroup(null, listOf(SheetAction(label, destructive = true, icon = SheetIcon.Remove, action = action)))
+
     /* ── personalizar carátula / fondo / icono ────────────────── */
 
     /**
-     * Por cada clase de imagen: "poner…" y, solo si ya hay una puesta,
-     * "quitar…". Así el menú no ofrece borrar lo que no existe.
+     * El bloque "Imágenes" del menú: una fila por clase de imagen que ese
+     * elemento admite, y debajo las que se pueden quitar.
+     *
+     * Cada fila abre el selector de origen, donde ahora lo primero es la
+     * galería del propio dispositivo. Las que ya tienen imagen puesta lo
+     * dicen en su detalle, así que se ve de un vistazo qué falta por poner.
+     *
+     * "Quitar" se ofrece siempre que haya imagen, aunque ya no se pueda
+     * volver a poner: una carátula guardada antes de este cambio se quedaría
+     * si no sin manera de borrarse.
      */
-    private fun customizeActions(key: String, title: String): List<SheetAction> {
+    private fun artworkGroup(key: String, title: String): SheetGroup {
         val settable = artKindsFor(key)
-        return ArtKind.entries.flatMap { kind ->
-            buildList {
-                if (kind in settable) {
-                    add(SheetAction(UiText.res(kind.label())) { chooseArtSource(key, title, kind) })
-                }
-                // "Quitar" se ofrece siempre que haya imagen, aunque ya no se pueda
-                // volver a poner: una carátula guardada antes de este cambio se
-                // quedaría si no sin manera de borrarse.
-                if (art.has(key, kind)) {
-                    add(SheetAction(UiText.res(kind.removeLabel()), destructive = true) { clearArt(key, kind) })
-                }
+        val set = mutableListOf<SheetAction>()
+        val clear = mutableListOf<SheetAction>()
+        for (kind in ArtKind.entries) {
+            val has = art.has(key, kind)
+            if (kind in settable) {
+                set += SheetAction(
+                    UiText.res(kind.shortLabel()),
+                    detail = if (has) UiText.res(R.string.art_set) else null,
+                    icon = kind.sheetIcon(),
+                    opensSheet = true,
+                ) { chooseArtSource(key, title, kind) }
+            }
+            if (has) {
+                clear += SheetAction(
+                    UiText.res(kind.removeLabel()),
+                    destructive = true,
+                    icon = SheetIcon.Remove,
+                ) { clearArt(key, kind) }
             }
         }
+        return SheetGroup(UiText.res(R.string.sheet_group_artwork), set + clear)
     }
 
     /**
@@ -704,6 +790,49 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /* ── imagen propia, elegida en la galería ─────────────────── */
+
+    /**
+     * Petición de archivo pendiente. La interfaz no puede abrir el selector
+     * desde el ViewModel (hace falta un `ActivityResultLauncher`), así que el
+     * ViewModel deja aquí lo que quiere y [ElyndraApp] lo lanza y devuelve el
+     * resultado por [onMediaPicked].
+     */
+    data class MediaRequest(val mimeTypes: List<String>, val onPicked: (Uri?) -> Unit)
+
+    var mediaRequest by mutableStateOf<MediaRequest?>(null); private set
+
+    fun onMediaPicked(uri: Uri?) {
+        val request = mediaRequest ?: return
+        mediaRequest = null
+        request.onPicked(uri)
+    }
+
+    /** Se cerró el selector sin elegir nada. */
+    fun cancelMediaRequest() {
+        mediaRequest = null
+    }
+
+    /**
+     * "Elegir de la galería": el usuario pone su propia carátula, fondo, logo
+     * o icono desde el carrete, sin pasar por ningún servicio ni necesitar
+     * credenciales. Queda fijada igual que una descargada.
+     */
+    fun pickLocalArt(key: String, kind: ArtKind) {
+        mediaRequest = MediaRequest(IMAGE_MIME_TYPES) { uri ->
+            if (uri == null) return@MediaRequest
+            viewModelScope.launch {
+                val image = withContext(Dispatchers.IO) { app.localMedia.readImage(uri) }
+                if (image == null) {
+                    showToast(UiText.res(R.string.art_local_failed))
+                    return@launch
+                }
+                val ok = art.applyLocal(key, kind, image)
+                showToast(UiText.res(if (ok) R.string.art_applied else R.string.art_local_failed))
+            }
+        }
+    }
+
     /** Hoja con los cuatro servicios; los que no están configurados (o no cubren el juego) salen atenuados. */
     private fun chooseArtSource(key: String, title: String, kind: ArtKind) {
         val actions = ART_SERVICES.map { service ->
@@ -714,11 +843,32 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                 !configured -> UiText.res(R.string.art_source_not_configured)
                 else -> null
             }
-            SheetAction(UiText.Raw(serviceName(service)), detail = problem, dimmed = problem != null) {
+            SheetAction(
+                UiText.Raw(serviceName(service)),
+                detail = problem,
+                dimmed = problem != null,
+                icon = SheetIcon.Service,
+            ) {
                 if (problem != null) showToast(problem) else searchArt(key, title, kind, service)
             }
         }
-        showSheet(ActionSheetSpec(UiText.res(kind.label()), UiText.Raw(title), actions))
+        // La galería va primero y aparte: es la única fuente que siempre
+        // funciona, sin credenciales ni conexión.
+        val gallery = SheetAction(
+            UiText.res(R.string.art_from_gallery),
+            detail = UiText.res(R.string.art_from_gallery_hint),
+            icon = SheetIcon.Gallery,
+        ) { pickLocalArt(key, kind) }
+        showSheet(
+            ActionSheetSpec(
+                UiText.res(kind.label()),
+                UiText.Raw(title),
+                listOf(
+                    SheetGroup(UiText.res(R.string.art_group_yours), listOf(gallery)),
+                    SheetGroup(UiText.res(R.string.art_group_services), actions),
+                ),
+            ),
+        )
     }
 
     private fun searchArt(key: String, title: String, kind: ArtKind, service: Service) {
@@ -865,5 +1015,12 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
         private const val MAX_SESSION_MINUTES = 12 * 60
         private const val AUTO_RESCAN_MS = 6L * 60 * 60 * 1000
         private val ART_SERVICES = listOf(Service.ScreenScraper, Service.Igdb, Service.SteamGridDb, Service.RetroAchievements)
+
+        /**
+         * Lo que acepta el selector de "Elegir de la galería": cualquier
+         * imagen, más HEIC y HEIF sueltos — algunos proveedores de fotos los
+         * declaran aparte y si no salen en gris al elegirlos.
+         */
+        private val IMAGE_MIME_TYPES = listOf("image/*", "image/heic", "image/heif")
     }
 }
