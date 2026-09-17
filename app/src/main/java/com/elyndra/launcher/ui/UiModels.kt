@@ -132,12 +132,29 @@ fun ArtKind.removeLabel(): Int = when (this) {
 
 data class DialogButton(val label: UiText, val action: () -> Unit)
 
+/**
+ * Campo de texto de un diálogo (el id del juego dentro de BannerHub, por ahora).
+ *
+ * Va aquí y no en una pantalla propia porque lo que se pide es un dato suelto:
+ * se escribe, se acepta y se vuelve a lo que se estaba haciendo. Cuando el
+ * diálogo lo lleva, el botón de aceptar entrega lo escrito a [onConfirm] en
+ * vez de disparar la acción del botón.
+ */
+data class DialogInput(
+    val initial: String = "",
+    val placeholder: UiText? = null,
+    /** Teclado numérico: los ids de los runtimes son números (268910, 2551…). */
+    val numeric: Boolean = true,
+    val onConfirm: (String) -> Unit,
+)
+
 data class DialogSpec(
     val title: UiText,
     val message: UiText,
     val confirm: DialogButton,
     val dismiss: DialogButton? = null,
     val extra: DialogButton? = null,
+    val input: DialogInput? = null,
 )
 
 /**
@@ -149,6 +166,7 @@ data class DialogSpec(
  */
 enum class SheetIcon {
     Play,
+    GameId,
     Details,
     Emulator,
     Rescan,
