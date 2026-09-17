@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.elyndra.launcher.R
 import com.elyndra.launcher.data.ACCENTS
 import com.elyndra.launcher.data.AppLocale
+import com.elyndra.launcher.data.Emulators
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.data.SecretKeys
 import com.elyndra.launcher.data.TINTS
@@ -23,6 +24,9 @@ import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+
+/** Id del perfil de BannerHub, el único emulador que se instala con varios paquetes a la vez. */
+private const val BANNERHUB = "bannerhub"
 
 /** Ajustes: aspecto, idioma, credenciales de los servicios y mantenimiento de la biblioteca. */
 class SettingsController(private val vm: ElyndraViewModel) {
@@ -310,6 +314,52 @@ class SettingsController(private val vm: ElyndraViewModel) {
             vm.showToast(UiText.res(R.string.toast_rescan, added, removed))
         }
     }
+
+    /* ── BannerHub: qué build se lanza ────────────────────────── */
+
+    /** Paquete elegido a mano para BannerHub; null = el que se detecte. */
+    var bannerHubPackage by mutableStateOf(store.preferredPackage(BANNERHUB)); private set
+
+    /**
+     * Elegir con qué build de BannerHub se lanzan los juegos.
+     *
+     * Hace falta porque el runtime se instala con varios paquetes distintos
+     * según el fork, y algunos se publican bajo el nombre de otra app: con dos
+     * instaladas, "detectar" acierta la primera, no la que el usuario usa.
+     */
+    fun pickBannerHubPackage() {
+        val profile = Emulators.byId(BANNERHUB) ?: return
+        val auto = SheetAction(
+            UiText.res(R.string.bannerhub_package_auto),
+            detail = detectedBannerHubPackage()?.let { UiText.Raw(it) },
+            selected = bannerHubPackage == null,
+        ) { chooseBannerHubPackage(null) }
+        val options = profile.packages.map { pkg ->
+            SheetAction(
+                UiText.Raw(pkg),
+                detail = if (vm.app.launcher.isPackageInstalled(pkg)) UiText.res(R.string.installed) else null,
+                selected = bannerHubPackage == pkg,
+                dimmed = !vm.app.launcher.isPackageInstalled(pkg),
+            ) { chooseBannerHubPackage(pkg) }
+        }
+        vm.showSheet(
+            ActionSheetSpec(
+                UiText.res(R.string.bannerhub_package),
+                UiText.res(R.string.bannerhub_package_desc),
+                listOf(auto) + options,
+            ),
+        )
+    }
+
+    private fun chooseBannerHubPackage(pkg: String?) {
+        bannerHubPackage = pkg
+        store.setPreferredPackage(BANNERHUB, pkg)
+    }
+
+    /** Paquete que se usaría ahora mismo si no se elige ninguno a mano. */
+    fun detectedBannerHubPackage(): String? = Emulators.byId(BANNERHUB)
+        ?.packages
+        ?.firstOrNull { vm.app.launcher.isPackageInstalled(it) }
 
     fun clearImages() {
         vm.showDialog(
