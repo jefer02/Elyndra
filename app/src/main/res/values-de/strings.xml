@@ -110,6 +110,7 @@
     <string name="ok">OK</string>
     <string name="install">Installieren</string>
     <string name="choose_other">Anderen wählen</string>
+    <string name="open_runtime">%1$s öffnen</string>
     <string name="cancel">Abbrechen</string>
     <string name="retry">Erneut versuchen</string>
     <string name="dialog_emulator_missing_title">%1$s ist nicht installiert</string>
@@ -118,6 +119,8 @@
     <string name="dialog_needs_path_msg">%1$s öffnet Dateien nur über einen Pfad, und dieser Ordner liegt weder im Gerätespeicher noch auf der SD-Karte. Wähle einen anderen Emulator oder verschiebe die ROMs in den lokalen Speicher.</string>
     <string name="dialog_vita_title">Titel-ID fehlt</string>
     <string name="dialog_vita_msg">Vita3K braucht die Titel-ID des Spiels (zum Beispiel PCSE00000) in der .psvita-Datei.</string>
+    <string name="dialog_pc_launcher_title">Das Spiel liegt in %1$s</string>
+    <string name="dialog_pc_launcher_msg">%1$s startet nur Spiele aus der eigenen Bibliothek — ein Ordner mit einer .exe sagt ihm nichts. Exportiere das Spiel in %1$s für ein Frontend (es schreibt eine .desktop- oder .steam-Datei) und richte diesen PC-Ordner auf diese Dateien aus.</string>
     <string name="dialog_launch_failed_title">Spiel konnte nicht geöffnet werden</string>
     <string name="dialog_launch_failed_msg">%1$s konnte das Spiel nicht öffnen: %2$s</string>
     <string name="dialog_app_missing_title">App nicht installiert</string>
@@ -337,7 +340,21 @@
     <string name="art_set">Gesetzt</string>
 
     <!-- PC-Spiele: ein Ordner pro Spiel -->
-    <string name="folder_games_hint">PC-Spiele liegen je in einem eigenen Ordner. Wähle den Stammordner, der sie enthält — Elyndra durchsucht ihn Ordner für Ordner und findet die ausführbare Datei jedes Spiels selbst.</string>
-    <string name="scan_none_folder_games">Keine Spiele gefunden. Jedes Spiel braucht einen eigenen Ordner mit seiner .exe darin; wähle den Ordner, der sie alle enthält, nicht den eines einzelnen Spiels.</string>
+    <string name="folder_games_hint">PC-Spiele liegen je in einem eigenen Ordner. Wähle den Stammordner, der sie enthält — Elyndra durchsucht ihn Ordner für Ordner und findet die ausführbare Datei jedes Spiels selbst. Es erkennt auch die Verknüpfungen, die eine Windows-Laufzeitumgebung für Frontends exportiert (.desktop, .steam…) — die starten das Spiel wirklich. Oder ein Ordner mit ID-Dateien: eine Datei pro Spiel (.iso, .txt, .steam), benannt wie das Spiel und mit nur seiner BannerHub-ID darin.</string>
+    <string name="scan_none_folder_games">Keine Spiele gefunden. Jedes Spiel braucht einen eigenen Ordner mit seiner .exe darin; wähle den Ordner, der sie alle enthält, nicht den eines einzelnen Spiels. Ein Ordner mit aus deiner Windows-Laufzeitumgebung exportierten Verknüpfungen geht auch. Oder ein Ordner mit ID-Dateien: eine Datei pro Spiel (.iso, .txt, .steam), deren Inhalt nur die BannerHub-ID ist.</string>
     <string name="pc_runtime_explainer">%1$s nimmt kein Spiel von außen entgegen, also öffnet Elyndra die App nur — wähle das Spiel dort, in seinem Container.</string>
+    <string name="pc_shortcut_explainer">%1$s bekommt die Verknüpfung, die es für Frontends exportiert (.desktop, .steam…), nicht die .exe. Wähle den Ordner, in den %1$s sie schreibt.</string>
+    <string name="save">Speichern</string>
+    <string name="change">Ändern</string>
+    <string name="installed">Installiert</string>
+    <string name="pc_game_id">Spiel-ID in der Runtime</string>
+    <string name="pc_game_id_msg">BannerHub, GameHub und GameNative starten nur Spiele, die bereits in ihrer eigenen Bibliothek sind – jedes mit seiner ID. Gib die ID dieses Spiels ein: die Nummer auf seiner Seite in der Runtime (bei Steam-Spielen die AppID: 268910, 2551…). Leer lassen, um sie zu entfernen.</string>
+    <string name="pc_game_id_hint">268910</string>
+    <string name="pc_game_id_saved">Spiel-ID: %1$s</string>
+    <string name="pc_game_id_cleared">Spiel-ID entfernt</string>
+    <string name="bannerhub_package">BannerHub-Build</string>
+    <string name="bannerhub_package_desc">An welchen installierten Build die Spiele gehen</string>
+    <string name="bannerhub_package_auto">Erkennen</string>
+    <string name="bannerhub_package_none">Nicht installiert</string>
+    <string name="save_and_open">Speichern und öffnen</string>
 </resources>
