@@ -323,6 +323,23 @@ private fun AppearanceColumn(vm: ElyndraViewModel) {
                 }
                 GhostButton(stringResource(R.string.remove), s::clearImages)
             }
+            Spacer(Modifier.height(12.dp))
+            // Con qué build de BannerHub se lanzan los juegos de PC: hay forks
+            // que se instalan bajo el paquete de otra app y puede haber varias.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    ElyText(stringResource(R.string.bannerhub_package), size = 12f, weight = FontWeight.SemiBold, color = P.ink)
+                    Spacer(Modifier.height(2.dp))
+                    ElyText(
+                        s.bannerHubPackage
+                            ?: s.detectedBannerHubPackage()
+                            ?: stringResource(R.string.bannerhub_package_none),
+                        size = 9.5f,
+                        color = P.ink2,
+                    )
+                }
+                GhostButton(stringResource(R.string.change), s::pickBannerHubPackage)
+            }
         }
     }
 }
