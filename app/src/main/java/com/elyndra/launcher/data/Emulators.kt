@@ -44,6 +44,15 @@ data class EmulatorProfile(
     val clearTop: Boolean = false,
     /** Paquete de Google Play, si el emulador está publicado ahí. */
     val storeId: String? = null,
+    /**
+     * El runtime no admite que le pasen el juego: solo se puede abrir.
+     *
+     * Es el caso de los runtimes de Windows (Winlator y sus derivados), que
+     * no exponen ningún intent para arrancar un ejecutable: el juego se elige
+     * dentro, en su propio contenedor. Elyndra abre la app y se aparta, en vez
+     * de mandar un intent con una ruta que el runtime va a ignorar.
+     */
+    val launchOnly: Boolean = false,
 ) {
     val packages: List<String> get() = components.map { it.substringBefore('/') }.distinct()
     val isRetroArch: Boolean get() = id.startsWith("ra_")
@@ -78,6 +87,20 @@ object Emulators {
             ExtraSpec("CONFIGFILE", ExtraValue.RetroArchConfig),
         ),
         storeId = "com.retroarch",
+    )
+
+    /**
+     * Runtime de Windows sobre Android (Winlator, GameHub y sus derivados).
+     *
+     * Se listan varios paquetes por perfil porque cada fork se instala con el
+     * suyo y algunos ofrecen build "de reemplazo" con el paquete del original;
+     * gana el primero que este instalado.
+     */
+    private fun windows(id: String, name: String, vararg packages: String) = EmulatorProfile(
+        id = id,
+        name = name,
+        components = packages.toList(),
+        launchOnly = true,
     )
 
     /** Familia yuzu (Eden, Citron, Sudachi…): acción TECH_DISCOVERED + URI en data. */
@@ -293,6 +316,23 @@ object Emulators {
             "citra_mmj", "Citra MMJ", listOf("org.citra.emu/.ui.EmulationActivity"),
             extras = listOf(rom("GamePath", RomArg.PATH)),
         ),
+
+        // ── PC (Windows sobre Android) ──
+        //
+        // Ninguno de estos acepta hoy un intent con la ruta del juego: se
+        // abren y el juego se elige dentro. De ahi `launchOnly` — ver
+        // EmulatorProfile.launchOnly. Si alguno lo llega a admitir, basta con
+        // quitarle la bandera y darle `data`/`extras` como a cualquier otro.
+        //
+        // Los nombres de actividad no se fijan a proposito: estos proyectos son
+        // forks que renombran clases entre versiones, y GameLauncher ya cae en
+        // el intent de lanzamiento del paquete cuando la actividad no existe.
+        windows("winlator", "Winlator", "com.winlator"),
+        windows("winlator_cmod", "Winlator Cmod", "com.winlator.cmod"),
+        windows("bannerlator", "Bannerlator", "com.winlator.banner"),
+        windows("gamehub", "GameHub", "gamehub.lite"),
+        windows("bannerhub", "BannerHub", "banner.hub", "gamehub.lite"),
+        windows("mobox", "Mobox", "com.mobox.launcher", "com.micewine.emu"),
 
         // ── GameCube / Wii / Wii U ──
         EmulatorProfile(

@@ -65,6 +65,13 @@ data class RomEntry(
     /** Emulador solo para esta ROM (si no, el de la carpeta). */
     val emulatorId: String? = null,
     val hashes: FileHashes? = null,
+    /**
+     * Juegos que son una carpeta (PC): el documento del ejecutable que los
+     * arranca y su ruta dentro de la carpeta ("bin/Hades.exe"). Null en todo
+     * lo demás, donde el juego ya es el propio [docId].
+     */
+    val mainDocId: String? = null,
+    val mainFile: String? = null,
 ) {
     val key: String get() = "r:$id"
     val displayTitle: String get() = meta.name?.takeIf { it.isNotBlank() } ?: title

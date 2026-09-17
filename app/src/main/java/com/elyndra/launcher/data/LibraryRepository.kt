@@ -118,6 +118,10 @@ class LibraryRepository(private val file: File, private val scope: CoroutineScop
                     size = f.size,
                     modified = f.modified,
                     isDirectory = f.isDir,
+                    // El .exe se vuelve a resolver en cada análisis: una
+                    // actualización del juego puede haberlo movido o renombrado.
+                    mainDocId = f.mainDocId,
+                    mainFile = f.mainFile,
                     hashes = existing[f.docId]?.hashes?.takeIf { it.size == f.size && it.modified == f.modified },
                 ) ?: newRom(folder, f).also { added += it.key }
             }
@@ -234,6 +238,8 @@ class LibraryRepository(private val file: File, private val scope: CoroutineScop
         modified = f.modified,
         isDirectory = f.isDir,
         title = Names.cleanTitle(f.name, stripExtension = !f.isDir || f.name.substringAfterLast('.', "").length in 2..5),
+        mainDocId = f.mainDocId,
+        mainFile = f.mainFile,
     )
 
     companion object {
