@@ -39,6 +39,19 @@ class SettingsStore(context: Context) {
         get() = prefs.getInt("hashLimitMb", 256)
         set(v) = prefs.edit { putInt("hashLimitMb", v) }
 
+    /**
+     * Paquete elegido a mano para un emulador que se instala con varios
+     * (BannerHub y compañía). Null = detectarlo solo, que es lo normal.
+     *
+     * Hace falta porque varias builds se instalan bajo paquetes de otras apps
+     * y puede haber más de una a la vez: sin esto se lanzaría siempre la
+     * primera que se encuentre, que no tiene por qué ser la del usuario.
+     */
+    fun preferredPackage(emulatorId: String): String? = prefs.getString("pkg.$emulatorId", null)
+
+    fun setPreferredPackage(emulatorId: String, pkg: String?) =
+        prefs.edit { if (pkg == null) remove("pkg.$emulatorId") else putString("pkg.$emulatorId", pkg) }
+
     /** Credenciales comprobadas con éxito (se invalida al editarlas). */
     fun isVerified(service: String): Boolean = prefs.getBoolean("verified.$service", false)
 
@@ -100,4 +113,16 @@ class SettingsStore(context: Context) {
     var sortMode: String
         get() = prefs.getString("sortMode", "name") ?: "name"
         set(v) = prefs.edit { putString("sortMode", v) }
+
+    /**
+     * Ya se ha pedido el permiso de notificaciones alguna vez.
+     *
+     * Android solo enseña el diálogo las primeras veces: si se vuelve a pedir
+     * después de dos negativas se deniega solo, sin que el usuario vea nada.
+     * Se pregunta una vez, al empezar, y a partir de ahí se ofrece desde
+     * Ajustes cuando hace falta de verdad.
+     */
+    var notificationsAsked: Boolean
+        get() = prefs.getBoolean("perm.notificationsAsked", false)
+        set(v) = prefs.edit { putBoolean("perm.notificationsAsked", v) }
 }
