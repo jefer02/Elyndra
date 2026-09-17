@@ -58,16 +58,25 @@ class GameLauncher(private val context: Context) {
         return start(intent, pkg)
     }
 
-    /** Referencias a la ROM en los tres formatos que piden los emuladores. */
+    /**
+     * Referencias a la ROM en los tres formatos que piden los emuladores.
+     *
+     * En un juego de PC lo que se entrega es su ejecutable, no la carpeta: la
+     * carpeta es como está organizado el juego, pero lo que se arranca es el
+     * .exe que encontró el análisis.
+     */
     fun romRef(folder: RomFolder, rom: RomEntry, vitaTitleId: String? = null): RomRef {
         val tree = Uri.parse(folder.treeUri)
-        val saf = DocumentsContract.buildDocumentUriUsingTree(tree, rom.docId).toString()
+        val docId = rom.mainDocId ?: rom.docId
+        val fileName = rom.mainFile?.substringAfterLast('/') ?: rom.fileName
+        val saf = DocumentsContract.buildDocumentUriUsingTree(tree, docId).toString()
         val authority = SafPaths.authorityOf(folder.treeUri)
         return RomRef(
             safUri = saf,
-            providerUri = RomProvider.uriFor(context, saf, rom.fileName).toString(),
-            path = SafPaths.docIdToPath(authority, rom.docId),
-            isDirectory = rom.isDirectory,
+            providerUri = RomProvider.uriFor(context, saf, fileName).toString(),
+            path = SafPaths.docIdToPath(authority, docId),
+            // Si se apunta al ejecutable ya no se está entregando una carpeta.
+            isDirectory = rom.isDirectory && rom.mainDocId == null,
             vitaTitleId = vitaTitleId,
         )
     }
@@ -80,6 +89,9 @@ class GameLauncher(private val context: Context) {
         }
         val profile = Emulators.byId(emulatorId) ?: return Outcome.NotInstalled
         val component = installedComponent(profile) ?: return Outcome.NotInstalled
+        // Runtimes de Windows: no hay intent al que pasarle el juego, así que
+        // se abre la app y el usuario lo elige dentro (ver EmulatorProfile).
+        if (profile.launchOnly) return launchApp(component.substringBefore('/'))
         return when (val plan = LaunchPlanner.plan(profile, component, ref)) {
             is PlanResult.Ok -> launchSpec(plan.spec)
             PlanResult.NeedsPath -> Outcome.NeedsPath

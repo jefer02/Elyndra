@@ -31,6 +31,11 @@ data class GameSystem(
     val disc: Boolean = false,
     /** Juegos que son carpetas (PS3 en formato JB, Wii U desempaquetado). */
     val dirGames: Boolean = false,
+    /**
+     * Una carpeta por juego bajo una raíz (PC). Cambia el análisis entero:
+     * no se busca por extensión, se recorre carpeta a carpeta (ver PcGames).
+     */
+    val folderGames: Boolean = false,
     val raHash: RaHashKind = RaHashKind.None,
 )
 
@@ -48,6 +53,7 @@ private fun sys(
     emus: List<String>,
     disc: Boolean = false,
     dirGames: Boolean = false,
+    folderGames: Boolean = false,
     raHash: RaHashKind = RaHashKind.None,
 ) = GameSystem(
     id = id,
@@ -63,6 +69,7 @@ private fun sys(
     emulators = emus,
     disc = disc,
     dirGames = dirGames,
+    folderGames = folderGames,
     raHash = raHash,
 )
 
@@ -73,6 +80,16 @@ object Systems {
             "switch", "Nintendo Switch", "SWITCH", "NSW", "nsp xci nca nro nso",
             "switch nsw ns nintendoswitch", ss = 225, igdb = listOf(130), ra = null, pair = 0,
             emus = listOf("eden", "eden_nightly", "citron", "sudachi", "yuzu", "kenjinx", "skyline"),
+        ),
+        sys(
+            // El PC no tiene "ROMs": cada juego es su carpeta con su ejecutable,
+            // y lo mueve un runtime de Windows sobre Android (Winlator y sus
+            // derivados). De ahi `folderGames` — ver PcGames.kt.
+            "pc", "PC (Windows)", "PC", "PC", "exe bat lnk msi",
+            "pc windows win windowspc pcgames juegospc gamespc winlator",
+            ss = 138, igdb = listOf(6), ra = null, pair = 6,
+            emus = listOf("winlator", "winlator_cmod", "bannerlator", "gamehub", "bannerhub", "mobox"),
+            folderGames = true,
         ),
         sys(
             "ps2", "PlayStation 2", "PS2", "PS2", "iso chd cso ciso bin img mdf nrg gz m3u elf isz",
