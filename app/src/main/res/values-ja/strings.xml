@@ -106,6 +106,7 @@
     <string name="ok">OK</string>
     <string name="install">インストール</string>
     <string name="choose_other">ほかを選ぶ</string>
+    <string name="open_runtime">%1$s を開く</string>
     <string name="cancel">キャンセル</string>
     <string name="retry">再試行</string>
     <string name="dialog_emulator_missing_title">%1$s がインストールされていません</string>
@@ -114,6 +115,8 @@
     <string name="dialog_needs_path_msg">%1$s はファイルパスでしか開けませんが、このフォルダーは本体ストレージにも SD カードにもありません。別のエミュレーターを選ぶか、ROM をローカルストレージに移動してください。</string>
     <string name="dialog_vita_title">タイトル ID がありません</string>
     <string name="dialog_vita_msg">Vita3K には .psvita ファイル内に記載されたゲームのタイトル ID（例: PCSE00000）が必要です。</string>
+    <string name="dialog_pc_launcher_title">ゲームは %1$s の中にあります</string>
+    <string name="dialog_pc_launcher_msg">%1$s は自分のライブラリにあるゲームしか起動できないため、.exe が入ったフォルダーを渡しても意味がありません。%1$s でゲームをフロントエンド用にエクスポートすると .desktop や .steam ファイルが作られるので、この PC フォルダーをその場所に向けてください。</string>
     <string name="dialog_launch_failed_title">ゲームを開けませんでした</string>
     <string name="dialog_launch_failed_msg">%1$s がゲームを開けませんでした: %2$s</string>
     <string name="dialog_app_missing_title">アプリがインストールされていません</string>
@@ -323,7 +326,21 @@
     <string name="art_set">設定済み</string>
 
     <!-- PC ゲーム: 1 ゲームにつき 1 フォルダ -->
-    <string name="folder_games_hint">PC ゲームは 1 本ずつフォルダに入っています。それらをまとめたルートフォルダを選んでください。Elyndra がフォルダごとに調べ、各ゲームの実行ファイルを自動で見つけます。</string>
-    <string name="scan_none_folder_games">ゲームが見つかりませんでした。各ゲームには .exe を含む専用フォルダが必要です。1 本のゲームのフォルダではなく、それらをまとめたフォルダを選んでください。</string>
+    <string name="folder_games_hint">PC ゲームは 1 本ずつフォルダに入っています。それらをまとめたルートフォルダを選んでください。Elyndra がフォルダごとに調べ、各ゲームの実行ファイルを自動で見つけます。Windows ランタイムがフロントエンド用に書き出したショートカット（.desktop、.steam など）も取り込みます。実際にゲームを起動するのはこちらです。 IDファイルのフォルダーでも構いません。ゲームごとに1つ（.iso、.txt、.steam）、ファイル名がゲーム名、中身は BannerHub のIDだけです。</string>
+    <string name="scan_none_folder_games">ゲームが見つかりませんでした。各ゲームには .exe を含む専用フォルダが必要です。1 本のゲームのフォルダではなく、それらをまとめたフォルダを選んでください。Windows ランタイムから書き出したショートカットを集めたフォルダでもかまいません。 IDファイルのフォルダーでも構いません。ゲームごとに1つ（.iso、.txt、.steam）、中身は BannerHub のIDだけです。</string>
     <string name="pc_runtime_explainer">%1$s には外部からゲームを渡せないため、Elyndra はアプリを開くだけです。ゲームはそのコンテナ内で選んでください。</string>
+    <string name="pc_shortcut_explainer">%1$s には .exe ではなく、フロントエンド用にエクスポートされたショートカット（.desktop、.steam など）を渡します。%1$s がそれを書き出すフォルダーを選んでください。</string>
+    <string name="save">保存</string>
+    <string name="change">変更</string>
+    <string name="installed">インストール済み</string>
+    <string name="pc_game_id">ランタイム内のゲームID</string>
+    <string name="pc_game_id_msg">BannerHub・GameHub・GameNative は自身のライブラリにあるゲームしか起動できず、それぞれにIDがあります。このゲームのIDを入力してください。ランタイム内のゲーム画面に表示される番号です（Steam のゲームなら appid: 268910、2551 など）。空にすると削除します。</string>
+    <string name="pc_game_id_hint">268910</string>
+    <string name="pc_game_id_saved">ゲームID: %1$s</string>
+    <string name="pc_game_id_cleared">ゲームIDを削除しました</string>
+    <string name="bannerhub_package">BannerHub のビルド</string>
+    <string name="bannerhub_package_desc">ゲームを渡すインストール済みビルド</string>
+    <string name="bannerhub_package_auto">自動で判別</string>
+    <string name="bannerhub_package_none">未インストール</string>
+    <string name="save_and_open">保存して開く</string>
 </resources>
