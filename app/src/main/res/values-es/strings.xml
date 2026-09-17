@@ -114,6 +114,7 @@
     <string name="ok">Aceptar</string>
     <string name="install">Instalar</string>
     <string name="choose_other">Elegir otro</string>
+    <string name="open_runtime">Abrir %1$s</string>
     <string name="cancel">Cancelar</string>
     <string name="retry">Reintentar</string>
     <string name="dialog_emulator_missing_title">%1$s no está instalado</string>
@@ -122,6 +123,8 @@
     <string name="dialog_needs_path_msg">%1$s solo abre archivos por ruta y esta carpeta no está en el almacenamiento del dispositivo ni en la tarjeta SD. Elige otro emulador o mueve las ROMs al almacenamiento local.</string>
     <string name="dialog_vita_title">Falta el ID del título</string>
     <string name="dialog_vita_msg">Vita3K necesita el ID del juego (por ejemplo PCSE00000) escrito dentro del archivo .psvita.</string>
+    <string name="dialog_pc_launcher_title">El juego vive dentro de %1$s</string>
+    <string name="dialog_pc_launcher_msg">%1$s solo arranca juegos que ya están en su biblioteca, así que una carpeta con un .exe no le dice nada. Exporta el juego desde %1$s para un frontend — deja un archivo .desktop o .steam — y apunta esta carpeta de PC a esos archivos.</string>
     <string name="dialog_launch_failed_title">No se pudo abrir el juego</string>
     <string name="dialog_launch_failed_msg">%1$s no pudo abrir el juego: %2$s</string>
     <string name="dialog_app_missing_title">App no instalada</string>
@@ -351,7 +354,21 @@
     <string name="art_set">Puesta</string>
 
     <!-- Juegos de PC: una carpeta por juego -->
-    <string name="folder_games_hint">Los juegos de PC van uno por carpeta. Elige la carpeta raíz que los contiene: Elyndra la recorre carpeta a carpeta y encuentra solo el ejecutable de cada juego.</string>
-    <string name="scan_none_folder_games">No se encontró ningún juego. Cada juego necesita su propia carpeta con su .exe dentro; elige la carpeta que las contiene todas, no la de un juego.</string>
+    <string name="folder_games_hint">Los juegos de PC van uno por carpeta. Elige la carpeta raíz que los contiene: Elyndra la recorre carpeta a carpeta y encuentra solo el ejecutable de cada juego. También recoge los accesos directos que un runtime de Windows exporta para frontends (.desktop, .steam…), que son los que de verdad arrancan el juego. O una carpeta de archivos-id: uno por juego (.iso, .txt, .steam), con el nombre del juego y dentro solo su id de BannerHub.</string>
+    <string name="scan_none_folder_games">No se encontró ningún juego. Cada juego necesita su propia carpeta con su .exe dentro; elige la carpeta que las contiene todas, no la de un juego. También vale una carpeta con los accesos directos exportados desde tu runtime de Windows. O una carpeta de archivos-id: uno por juego (.iso, .txt, .steam) cuyo contenido sea solo el id de BannerHub.</string>
     <string name="pc_runtime_explainer">A %1$s no se le puede pasar un juego desde fuera, así que Elyndra solo lo abre: elige ahí el juego, en su contenedor.</string>
+    <string name="pc_shortcut_explainer">A %1$s se le entrega el acceso directo que exporta para frontends (.desktop, .steam…), no el .exe. Elige la carpeta donde %1$s los deja.</string>
+    <string name="save">Guardar</string>
+    <string name="change">Cambiar</string>
+    <string name="installed">Instalado</string>
+    <string name="pc_game_id">Id del juego en el runtime</string>
+    <string name="pc_game_id_msg">BannerHub, GameHub y GameNative solo arrancan juegos que ya están en su biblioteca, cada uno con su id. Escribe el id de este juego: es el número que aparece en su ficha dentro del runtime (si es de Steam, su appid: 268910, 2551…). Déjalo en blanco para quitarlo.</string>
+    <string name="pc_game_id_hint">268910</string>
+    <string name="pc_game_id_saved">Id del juego: %1$s</string>
+    <string name="pc_game_id_cleared">Id del juego quitado</string>
+    <string name="bannerhub_package">Build de BannerHub</string>
+    <string name="bannerhub_package_desc">A qué build instalada se le mandan los juegos</string>
+    <string name="bannerhub_package_auto">Detectarla</string>
+    <string name="bannerhub_package_none">Sin instalar</string>
+    <string name="save_and_open">Guardar y abrir</string>
 </resources>
