@@ -26,6 +26,14 @@ class RomScanner(private val resolver: ContentResolver) {
         val size: Long,
         val modified: Long,
         val isDir: Boolean,
+        /**
+         * Juegos que son una carpeta (PC): el ejecutable que los arranca.
+         * [mainDocId] es su documento — se guarda entero y no montado a mano
+         * sobre el de la carpeta, porque no todos los proveedores de
+         * almacenamiento construyen sus documentId concatenando rutas.
+         */
+        val mainDocId: String? = null,
+        val mainFile: String? = null,
     )
 
     data class Progress(val scanned: Int, val found: Int, val current: String)
@@ -85,6 +93,9 @@ class RomScanner(private val resolver: ContentResolver) {
         system: GameSystem,
         onProgress: (Progress) -> Unit = {},
     ): List<Found> = withContext(Dispatchers.IO) {
+        // El PC no se analiza por extensión: una carpeta por juego (ver abajo).
+        if (system.folderGames) return@withContext scanFolderGames(treeUri, rootDocId, system, onProgress)
+
         val results = ArrayList<Found>()
         val queue = ArrayDeque<Triple<String, String, Int>>()
         queue += Triple(rootDocId, "", 0)
@@ -131,6 +142,91 @@ class RomScanner(private val resolver: ContentResolver) {
     }
 
     /**
+     * Análisis de una biblioteca de PC: **una carpeta por juego**.
+     *
+     * El usuario elige la carpeta raíz donde tiene sus juegos y aquí se
+     * recorre subcarpeta a subcarpeta. Cada subcarpeta directa es un juego —
+     * no se baja un nivel más a buscar "juegos dentro de juegos", que es justo
+     * lo que llenaría la biblioteca de ejecutables sueltos— y de cada una se
+     * saca el .exe que la arranca ([PcGames.pickExecutable]).
+     *
+     * Una subcarpeta sin ningún ejecutable dentro se deja fuera: es la carpeta
+     * de guardados, la de mods o una descompresión a medias.
+     *
+     * También se recogen los ejecutables sueltos que haya en la propia raíz,
+     * para el portable que no está metido en su carpeta.
+     */
+    private suspend fun scanFolderGames(
+        treeUri: Uri,
+        rootDocId: String,
+        system: GameSystem,
+        onProgress: (Progress) -> Unit,
+    ): List<Found> {
+        val results = ArrayList<Found>()
+        val kids = runCatching { children(treeUri, rootDocId) }.getOrDefault(emptyList())
+        var scanned = kids.size
+
+        // Portables sueltos en la raíz.
+        kids.filter { !it.isDir && !it.name.startsWith(".") && it.extension in system.extensions }
+            .forEach { results += Found(it.docId, it.name, it.name, it.size, it.modified, isDir = false) }
+
+        val dirs = kids.filter { it.isDir && !it.name.startsWith(".") && it.name.lowercase() !in SKIP_DIRS }
+        for (dir in dirs) {
+            coroutineContext.ensureActive()
+            if (results.size >= MAX_RESULTS) break
+            onProgress(Progress(scanned, results.size, dir.name))
+
+            val executables = ArrayList<PcGames.Executable>()
+            scanned += collectExecutables(treeUri, dir.docId, "", 0, executables)
+            if (!PcGames.looksLikeGame(executables)) continue
+
+            val main = PcGames.pickExecutable(dir.name, executables)
+            results += Found(
+                docId = dir.docId,
+                name = dir.name,
+                relPath = dir.name,
+                size = main?.size ?: 0L,
+                modified = dir.modified,
+                isDir = true,
+                mainDocId = main?.docId,
+                mainFile = main?.relPath,
+            )
+            onProgress(Progress(scanned, results.size, dir.name))
+        }
+        return results.sortedBy { it.relPath.lowercase() }
+    }
+
+    /**
+     * Ejecutables de la carpeta de un juego, bajando hasta [PcGames.MAX_DEPTH].
+     *
+     * Devuelve cuántas entradas se han mirado, solo para el contador de
+     * progreso. El tope de candidatos evita que una carpeta con miles de
+     * archivos (un juego con mods, o la raíz equivocada) se coma el análisis.
+     */
+    private fun collectExecutables(
+        treeUri: Uri,
+        docId: String,
+        rel: String,
+        depth: Int,
+        out: MutableList<PcGames.Executable>,
+    ): Int {
+        if (depth > PcGames.MAX_DEPTH || out.size >= MAX_EXECUTABLES) return 0
+        val kids = runCatching { children(treeUri, docId) }.getOrDefault(emptyList())
+        var scanned = kids.size
+        for (child in kids) {
+            if (child.name.startsWith(".")) continue
+            if (child.isDir) {
+                if (child.name.lowercase() in SKIP_DIRS) continue
+                scanned += collectExecutables(treeUri, child.docId, "$rel${child.name}/", depth + 1, out)
+            } else if (child.extension in PcGames.EXECUTABLE_EXTENSIONS) {
+                if (out.size >= MAX_EXECUTABLES) break
+                out += PcGames.Executable(child.docId, rel + child.name, child.size)
+            }
+        }
+        return scanned
+    }
+
+    /**
      * Carpetas que son un juego entero: PS3 en formato JB (con `PS3_GAME` dentro)
      * y Wii U desempaquetado (con `code`, `content` y `meta`).
      */
@@ -154,6 +250,9 @@ class RomScanner(private val resolver: ContentResolver) {
         )
         private const val MAX_DEPTH = 8
         private const val MAX_RESULTS = 50_000
+
+        /** Candidatos a ejecutable que se miran por juego de PC antes de elegir. */
+        private const val MAX_EXECUTABLES = 400
 
         /** Carpetas de medios, partidas o BIOS que nunca contienen juegos. */
         private val SKIP_DIRS = setOf(
