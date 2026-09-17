@@ -1,8 +1,13 @@
 package com.elyndra.launcher
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.drawable.ColorDrawable
+import android.os.Build
 import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -19,6 +24,16 @@ import com.elyndra.launcher.ui.ElyndraViewModel
 class MainActivity : ComponentActivity() {
 
     private val vm: ElyndraViewModel by viewModels()
+
+    /**
+     * El único permiso que Elyndra pide al sistema.
+     *
+     * Todo lo demás lo concede el propio usuario al usar la app: las carpetas
+     * de juegos llegan por SAF (`ACTION_OPEN_DOCUMENT_TREE`, con permiso
+     * persistente por carpeta) y la lista de apps y emuladores instalados sale
+     * del bloque `<queries>` del manifiesto, que no se pide, se declara.
+     */
+    private val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     /** Antes de Android 13 el idioma elegido en la app se aplica envolviendo el contexto. */
     override fun attachBaseContext(newBase: Context) {
@@ -38,6 +53,7 @@ class MainActivity : ComponentActivity() {
         window.setBackgroundDrawable(ColorDrawable(if (dark) 0xFF13161A.toInt() else 0xFFF6F8F9.toInt()))
 
         hideSystemBars()
+        askForNotifications()
 
         // Al volver de un juego se cierra la sesión medida; al salir, se retira el velo de lanzamiento.
         lifecycle.addObserver(
@@ -51,6 +67,23 @@ class MainActivity : ComponentActivity() {
         )
 
         setContent { ElyndraApp(vm) }
+    }
+
+    /**
+     * Permiso de notificaciones, una vez y al empezar.
+     *
+     * Sin él, "aplicar metadatos a toda la biblioteca" corre igual —es un
+     * servicio en primer plano— pero en silencio: ni progreso ni aviso al
+     * terminar. Se pide aquí para que la primera descarga larga ya se vea.
+     */
+    private fun askForNotifications() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val settings = (application as ElyndraApplication).settings
+        if (settings.notificationsAsked) return
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        settings.notificationsAsked = true
+        if (!granted) notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     /**
