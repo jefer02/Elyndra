@@ -52,7 +52,7 @@ class AppCatalog(private val context: Context) {
 
     @Suppress("DEPRECATION")
     private fun isGame(ai: ApplicationInfo): Boolean {
-        if (ai.packageName in Emulators.allPackages) return false
+        if (ai.packageName in Emulators.emulatorOnlyPackages) return false
         return ai.category == ApplicationInfo.CATEGORY_GAME || (ai.flags and ApplicationInfo.FLAG_IS_GAME) != 0
     }
 
