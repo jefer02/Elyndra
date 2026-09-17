@@ -85,10 +85,17 @@ object Systems {
             // El PC no tiene "ROMs": cada juego es su carpeta con su ejecutable,
             // y lo mueve un runtime de Windows sobre Android (Winlator y sus
             // derivados). De ahi `folderGames` — ver PcGames.kt.
-            "pc", "PC (Windows)", "PC", "PC", "exe bat lnk msi",
+            //
+            // Ademas del ejecutable se reconocen los archivos lanzador que
+            // exportan esos runtimes (.desktop, .steam, .gog…): son lo unico
+            // que aceptan por intent, asi que son lo que de verdad se lanza.
+            "pc", "PC (Windows)", "PC", "PC", "exe bat lnk msi desktop steam gog epic amazon pcgame",
             "pc windows win windowspc pcgames juegospc gamespc winlator",
             ss = 138, igdb = listOf(6), ra = null, pair = 6,
-            emus = listOf("winlator", "winlator_cmod", "bannerlator", "gamehub", "bannerhub", "mobox"),
+            emus = listOf(
+                "winlator_cmod", "winlator", "winlator_proot", "bannerlator",
+                "bannerhub", "gamehub", "gamenative", "winnative", "mobox",
+            ),
             folderGames = true,
         ),
         sys(
