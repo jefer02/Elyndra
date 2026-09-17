@@ -1,5 +1,7 @@
 package com.elyndra.launcher.library
 
+import com.elyndra.launcher.data.BannerHub
+
 /* ─────────────────────────────────────────────────────────────
    Juegos de PC (Windows) corriendo en Android.
 
@@ -19,15 +21,92 @@ package com.elyndra.launcher.library
    es recorrer carpeta a carpeta y, dentro de cada una, elegir **un**
    ejecutable: el que de verdad arranca el juego.
 
-   Ese ejecutable es además lo que se le pasa al runtime de Windows
-   (Winlator y compañía) cuando acepta una ruta.
+   Ese ejecutable identifica al juego dentro de su carpeta, pero **no es
+   lo que se lanza**: ningún runtime de Windows acepta hoy que le pasen
+   un .exe por intent. Lo que sí aceptan es el archivo lanzador que ellos
+   mismos exportan ("Frontend Export" / "Export for frontends") — ver
+   [Launcher].
    ───────────────────────────────────────────────────────────── */
 object PcGames {
 
     const val SYSTEM_ID = "pc"
 
-    /** Lo que cuenta como "esto arranca algo". */
-    val EXECUTABLE_EXTENSIONS = setOf("exe", "bat", "lnk", "msi")
+    /**
+     * Archivos que exporta un runtime de Windows para que lo lance un frontend.
+     *
+     * Son la única forma de arrancar un juego de PC desde fuera, porque el
+     * juego no vive suelto en el disco: vive dentro del runtime, en un
+     * contenedor con su Wine, sus componentes y sus ajustes. El archivo es el
+     * puente — o lleva dentro el id del juego dentro del runtime, o es el
+     * propio acceso directo que el runtime sabe abrir.
+     *
+     * Las extensiones son las de la configuración Android de ES-DE
+     * (`.amazon .desktop .epic .gog .pcgame .steam` en el sistema `windows`):
+     *
+     *   - `.desktop` → Winlator y sus forks. Se le pasa **la ruta** del archivo
+     *     (`shortcut_path`); dentro están el contenedor y el ejecutable.
+     *   - el resto → GameHub/BannerHub y GameNative. Se les pasa **el
+     *     contenido**: el id del juego en la biblioteca del runtime.
+     */
+    enum class Launcher(val ext: String, val store: String?) {
+        Desktop("desktop", null),
+        Steam("steam", "STEAM"),
+        Epic("epic", "EPIC"),
+        Gog("gog", "GOG"),
+        Amazon("amazon", "AMAZON"),
+        /** Juego añadido a mano dentro del runtime, sin tienda detrás. */
+        Local("pcgame", "CUSTOM_GAME"),
+        ;
+
+        /** El archivo lleva dentro el id; el `.desktop` es el acceso directo entero. */
+        val carriesId: Boolean get() = this != Desktop
+
+        /** Un juego de Steam viaja con su appid; el resto, con el id interno del runtime. */
+        val isSteam: Boolean get() = store == "STEAM"
+    }
+
+    val LAUNCHER_EXTENSIONS: Set<String> = Launcher.entries.map { it.ext }.toSet()
+
+    /** Tope de lectura del archivo lanzador: solo lleva un id (ES-DE usa 4 kB). */
+    const val MAX_LAUNCHER_BYTES = 4096
+
+    /** ¿Es este archivo un lanzador exportado por un runtime, y de cuál? */
+    fun launcherOf(fileName: String): Launcher? {
+        val ext = fileName.substringAfterLast('.', "").lowercase()
+        return Launcher.entries.firstOrNull { it.ext == ext }
+    }
+
+    /** Lo que cuenta como "esto arranca algo": el binario, o su lanzador. */
+    val EXECUTABLE_EXTENSIONS = setOf("exe", "bat", "lnk", "msi") + LAUNCHER_EXTENSIONS
+
+    /**
+     * Archivo suelto cuyo contenido es el id del juego dentro del runtime.
+     *
+     * Es la otra forma de tener una biblioteca de PC, y para BannerHub la más
+     * cómoda: en vez de la carpeta entera del juego —que en Android muchas
+     * veces ni está, porque el juego vive dentro del runtime— se deja un
+     * archivo por juego con su id dentro ("Hollow Knight.iso" → `367520`). El
+     * nombre del archivo es el nombre del juego y su contenido, el id.
+     *
+     * Se exige que pese poco: así un `.iso` que sea un disco de verdad no se
+     * confunde nunca con uno de estos (ver [com.elyndra.launcher.data.BannerHub.ID_FILE_EXTENSIONS]).
+     */
+    fun isIdFile(fileName: String, size: Long): Boolean =
+        isIdFileName(fileName) && size in 1L..MAX_LAUNCHER_BYTES.toLong()
+
+    /** Lo mismo mirando solo el nombre, para cuando el tamaño no viene a mano. */
+    fun isIdFileName(fileName: String): Boolean =
+        fileName.substringAfterLast('.', "").lowercase() in BannerHub.ID_FILE_EXTENSIONS
+
+    /**
+     * ¿Hay que mirar dentro para dar este archivo por bueno?
+     *
+     * Los que exporta el propio runtime (.steam, .gog…) se aceptan por la
+     * extensión: no hay otra cosa que puedan ser. Un `.iso` o un `.txt`, sí:
+     * son extensiones de uso común y lo que los distingue es llevar un id
+     * dentro y no un disco o un léeme.
+     */
+    fun idFileNeedsContent(fileName: String): Boolean = launcherOf(fileName) == null
 
     /** Hasta dónde se baja dentro de la carpeta de un juego buscando su .exe. */
     const val MAX_DEPTH = 3
@@ -66,14 +145,18 @@ object PcGames {
     /**
      * ¿Qué ejecutable arranca este juego?
      *
-     * Gana el que más se parece al nombre de la carpeta — que es como está
-     * nombrado en la inmensa mayoría de los juegos —, y a igualdad manda el
-     * que esté menos enterrado y el más grande, porque el binario del motor
-     * pesa órdenes de magnitud más que cualquier utilidad que lo acompañe.
+     * Si dentro hay un archivo lanzador ([Launcher]) manda ese, por encima de
+     * cualquier .exe: es lo único que el runtime de Windows sabe abrir desde
+     * fuera. Si no lo hay, gana el ejecutable que más se parece al nombre de
+     * la carpeta — que es como está nombrado en la inmensa mayoría de los
+     * juegos —, y a igualdad manda el que esté menos enterrado y el más
+     * grande, porque el binario del motor pesa órdenes de magnitud más que
+     * cualquier utilidad que lo acompañe.
      */
     fun pickExecutable(folderName: String, candidates: List<Executable>): Executable? {
         if (candidates.isEmpty()) return null
-        val useful = candidates.filterNot { isJunk(it.name) }.ifEmpty { candidates }
+        val pool = candidates.filter { launcherOf(it.name) != null }.ifEmpty { candidates }
+        val useful = pool.filterNot { isJunk(it.name) }.ifEmpty { pool }
         val folder = Names.normalize(folderName)
         return useful.maxByOrNull { exe ->
             val stem = Names.normalize(exe.name.substringBeforeLast('.'))
