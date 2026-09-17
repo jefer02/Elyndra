@@ -307,6 +307,18 @@ private fun RomsTab(vm: ElyndraViewModel, landscape: Boolean) {
                         Pill(s.short, add.systemId == s.id, { add.setSystem(s.id) }, fontSize = 10.5f, horizontalPadding = 11.dp)
                     }
                 }
+                // El PC se da de alta distinto y conviene decirlo aquí: lo que
+                // se elige no es una carpeta de ROMs, es la raíz que tiene
+                // dentro una carpeta por juego.
+                if (system?.folderGames == true) {
+                    Spacer(Modifier.height(10.dp))
+                    ElyText(
+                        stringResource(R.string.folder_games_hint),
+                        size = 10f,
+                        color = P.ink2,
+                        lineHeightRatio = 1.5f,
+                    )
+                }
             }
         }
         add {
@@ -339,8 +351,16 @@ private fun RomsTab(vm: ElyndraViewModel, landscape: Boolean) {
                     ElyText(stringResource(R.string.emulator_legend), size = 9f, color = P.ink2.copy(alpha = 0.8f))
                     Spacer(Modifier.height(8.dp))
                     if (emuName != null) {
+                        // Un runtime de Windows no recibe el juego por intent:
+                        // se abre y ya. Mejor decirlo antes de añadir la
+                        // carpeta que dejar que parezca que Elyndra falla.
+                        val launchOnly = Emulators.byId(emuId)?.launchOnly == true
                         ElyText(
-                            stringResource(R.string.emulator_explainer, emuName),
+                            if (launchOnly) {
+                                stringResource(R.string.pc_runtime_explainer, emuName)
+                            } else {
+                                stringResource(R.string.emulator_explainer, emuName)
+                            },
                             size = 10.5f,
                             color = P.ink2,
                             lineHeightRatio = 1.5f,
@@ -391,6 +411,8 @@ private fun RomsTab(vm: ElyndraViewModel, landscape: Boolean) {
                             ElyText(
                                 if (scan.found.isNotEmpty()) {
                                     pluralStringResource(R.plurals.scan_found, scan.found.size, scan.found.size, system?.name ?: "")
+                                } else if (system?.folderGames == true) {
+                                    stringResource(R.string.scan_none_folder_games)
                                 } else {
                                     stringResource(
                                         R.string.scan_none,

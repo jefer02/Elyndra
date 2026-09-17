@@ -132,13 +132,19 @@ fun ElyDialogView(spec: DialogSpec, onDismiss: () -> Unit) {
  */
 @Composable
 fun ActionSheetView(spec: ActionSheetSpec, onDismiss: () -> Unit) {
-    val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.82f).dp
+    // A la lista se le da un alto máximo propio en vez de repartir el de la
+    // hoja con `weight`: con `weight(fill = false)` la lista se medía más corta
+    // de lo que luego pintaba y la última fila acababa por debajo de "Cerrar".
+    // Midiendo así, la hoja es exactamente asa + cabecera + lista + botón, y
+    // sigue encogiendo cuando el menú es corto.
+    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+    val listMax = (screenHeight * 0.82f - SHEET_CHROME).coerceAtLeast(120.dp)
+
     ScrimLayer(onDismiss = onDismiss, alignment = Alignment.BottomCenter, key = spec) {
         Column(
             Modifier
                 .widthIn(max = 560.dp)
                 .fillMaxWidth()
-                .heightIn(max = maxHeight)
                 .padding(10.dp)
                 .animRiseSheet(key = spec)
                 .glass(RoundedCornerShape(28.dp), solid = true)
@@ -149,8 +155,8 @@ fun ActionSheetView(spec: ActionSheetSpec, onDismiss: () -> Unit) {
             SheetHeader(spec)
 
             LazyColumn(
-                Modifier.fillMaxWidth().weight(1f, fill = false),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 2.dp),
+                Modifier.fillMaxWidth().heightIn(max = listMax),
+                contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 4.dp),
             ) {
                 spec.groups.filter { it.actions.isNotEmpty() }.forEachIndexed { index, group ->
                     group.header?.let { header ->
@@ -168,7 +174,7 @@ fun ActionSheetView(spec: ActionSheetSpec, onDismiss: () -> Unit) {
 
             // GhostButton no centra su rótulo, así que se centra el botón entero.
             Box(
-                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 2.dp),
+                Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 4.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 GhostButton(stringResource(R.string.close), onDismiss)
@@ -176,6 +182,9 @@ fun ActionSheetView(spec: ActionSheetSpec, onDismiss: () -> Unit) {
         }
     }
 }
+
+/** Lo que ocupa la hoja aparte de la lista: asa, cabecera, "Cerrar" y márgenes. */
+private val SHEET_CHROME = 170.dp
 
 /** El asa de una hoja: no arrastra, pero dice "esto se cierra hacia abajo". */
 @Composable
