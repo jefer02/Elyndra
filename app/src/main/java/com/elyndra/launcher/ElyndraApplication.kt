@@ -37,7 +37,7 @@ class ElyndraApplication : Application(), ImageLoaderFactory {
     val localMedia by lazy { LocalMedia(contentResolver) }
     val scanner by lazy { RomScanner(contentResolver) }
     val apps by lazy { AppCatalog(this) }
-    val launcher by lazy { GameLauncher(this) }
+    val launcher by lazy { GameLauncher(this, settings) }
     val metadata by lazy { MetadataEngine(this, library, credentials, settings, media, files, scope) }
 
     override fun onCreate() {
