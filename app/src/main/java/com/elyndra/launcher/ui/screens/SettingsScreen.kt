@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -37,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -45,6 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import coil.compose.AsyncImage
 import com.elyndra.launcher.R
 import com.elyndra.launcher.data.ACCENTS
 import com.elyndra.launcher.data.AppLocale
@@ -115,9 +118,10 @@ private fun AppearanceColumn(vm: ElyndraViewModel) {
     val skin = LocalSkin.current
     val s = vm.settings
     val activity = LocalContext.current.findActivity()
-    // SAF: se queda el permiso del vídeo para que siga ahí tras reiniciar.
-    val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        s.onVideoPicked(uri)
+    // SAF: se queda el permiso del archivo para que siga ahí tras reiniciar.
+    // Admite vídeo e imagen; cuál es lo decide el propio controlador por el tipo.
+    val backgroundPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        s.onBackgroundPicked(uri)
     }
 
     Column(Modifier.fillMaxWidth()) {
@@ -134,46 +138,62 @@ private fun AppearanceColumn(vm: ElyndraViewModel) {
             }
         }
 
-        SectionLabel(stringResource(R.string.section_video_bg))
+        SectionLabel(stringResource(R.string.section_background))
         GlassPanel {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    ElyText(stringResource(R.string.video_bg_title), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
+                    ElyText(stringResource(R.string.background_title), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
                     Spacer(Modifier.height(4.dp))
-                    ElyText(stringResource(R.string.video_bg_desc), size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
+                    ElyText(stringResource(R.string.background_desc), size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
                 }
                 Spacer(Modifier.width(12.dp))
-                AccentSwitch(s.videoBgEnabled, s::toggleVideoBg)
+                AccentSwitch(s.backgroundEnabled, s::toggleBackground)
             }
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                ElyText(
-                    s.videoBgUri?.let { Uri.parse(it).lastPathSegment ?: it } ?: stringResource(R.string.video_bg_none),
-                    size = 9.5f,
-                    color = P.ink2,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(8.dp))
+                // Miniatura de lo elegido. Coil saca el primer fotograma de un
+                // vídeo igual que pinta una imagen, así que sirve para los dos.
+                BackgroundThumb(s.backgroundUri)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    ElyText(
+                        s.backgroundUri?.let { Uri.parse(it).lastPathSegment ?: it } ?: stringResource(R.string.background_none),
+                        size = 10.5f,
+                        weight = FontWeight.Medium,
+                        color = if (s.backgroundUri == null) P.ink2 else P.ink,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (s.backgroundUri != null) {
+                        Spacer(Modifier.height(4.dp))
+                        KindBadge(
+                            stringResource(
+                                if (s.backgroundIsVideo) R.string.background_kind_video else R.string.background_kind_image,
+                            ),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 // `onClick` va posicional: en GhostButton el último parámetro es el
                 // modifier, así que una lambda al final no sería el clic.
                 GhostButton(
-                    stringResource(if (s.videoBgUri == null) R.string.video_bg_choose else R.string.video_bg_change),
-                    { videoPicker.launch(arrayOf("video/*")) },
+                    stringResource(if (s.backgroundUri == null) R.string.background_choose else R.string.background_change),
+                    { backgroundPicker.launch(arrayOf("video/*", "image/*")) },
                 )
-                if (s.videoBgUri != null) {
+                if (s.backgroundUri != null) {
                     Spacer(Modifier.width(6.dp))
-                    GhostButton(stringResource(R.string.remove), s::clearVideoBg)
+                    GhostButton(stringResource(R.string.remove), s::clearBackground)
                 }
             }
-            if (s.videoBgUri != null) {
+            if (s.backgroundUri != null) {
                 SliderRow(
-                    stringResource(R.string.video_bg_opacity),
-                    "${s.videoBgOpacity} %",
-                    s.videoBgOpacity,
+                    stringResource(R.string.background_opacity),
+                    "${s.backgroundOpacity} %",
+                    s.backgroundOpacity,
                     10..100,
-                    s::updateVideoBgOpacity,
+                    s::updateBackgroundOpacity,
                 )
             }
         }
@@ -462,4 +482,44 @@ internal tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+/* ── Fondo de la interfaz: miniatura y etiqueta de tipo ────────── */
+
+/**
+ * Lo elegido como fondo, en pequeño. Coil saca el primer fotograma de un vídeo
+ * con el mismo `model`, así que la misma miniatura vale para vídeo e imagen; si
+ * no puede (códec raro, permiso perdido) queda el recuadro vacío, sin error.
+ */
+@Composable
+private fun BackgroundThumb(uri: String?) {
+    val shape = RoundedCornerShape(10.dp)
+    Box(
+        Modifier
+            .size(width = 58.dp, height = 36.dp)
+            .clip(shape)
+            .background(P.chip)
+            .border(1.dp, P.hairline, shape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (uri == null) {
+            ElyText("—", size = 12f, color = P.ink2)
+        } else {
+            AsyncImage(
+                model = uri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+/** Etiqueta pasiva ("Vídeo" / "Imagen"). La píldora de verdad es un control. */
+@Composable
+private fun KindBadge(text: String) {
+    val shape = RoundedCornerShape(7.dp)
+    Box(Modifier.clip(shape).background(P.chip).padding(horizontal = 8.dp, vertical = 3.dp)) {
+        ElyText(text, size = 8.5f, weight = FontWeight.SemiBold, color = P.ink2, letterSpacing = tracking(0.1f))
+    }
 }
