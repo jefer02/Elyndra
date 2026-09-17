@@ -72,6 +72,14 @@ data class RomEntry(
      */
     val mainDocId: String? = null,
     val mainFile: String? = null,
+    /**
+     * Id de este juego dentro de la biblioteca de un runtime de Windows
+     * (BannerHub / GameHub / GameNative), puesto a mano por el usuario.
+     *
+     * Manda sobre lo que se pueda leer del disco: si está, es el id que se
+     * manda en el intent (ver [BannerHub]).
+     */
+    val pcGameId: String? = null,
 ) {
     val key: String get() = "r:$id"
     val displayTitle: String get() = meta.name?.takeIf { it.isNotBlank() } ?: title
