@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.elyndra.launcher.ElyndraApplication
 import com.elyndra.launcher.R
 import com.elyndra.launcher.data.AppEntry
+import com.elyndra.launcher.data.BannerHub
 import com.elyndra.launcher.data.Emulators
 import com.elyndra.launcher.data.Library
 import com.elyndra.launcher.data.LibraryRepository
@@ -21,6 +22,8 @@ import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.data.pairIndexFor
 import com.elyndra.launcher.launch.GameLauncher
 import com.elyndra.launcher.library.InstalledApp
+import com.elyndra.launcher.library.PcGameIds
+import com.elyndra.launcher.library.PcGames
 import com.elyndra.launcher.metadata.ArtCandidate
 import com.elyndra.launcher.metadata.ArtKind
 import com.elyndra.launcher.metadata.ArtSources
@@ -68,6 +71,9 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
     var achievements by mutableStateOf<AchievementsState>(AchievementsState.Idle); private set
     var toast by mutableStateOf<UiText?>(null); private set
     var artPicker by mutableStateOf<ArtPickerState?>(null); private set
+
+    /** De dónde sale el id con el que arranca un juego de PC (ver [PcGameIds]). */
+    private val pcGameIds = PcGameIds(app.scanner)
 
     private val art = ArtSources(engine, repo, app.media)
     private var artJob: Job? = null
@@ -374,8 +380,10 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                     app.scanner.readSmallText(Uri.parse(folder.treeUri), rom.docId, 256)?.lineSequence()?.firstOrNull()?.trim()
                 }
             } else null
+            val pcId = pcGameIds.resolve(folder, rom)
             delay(LAUNCH_DELAY_MS)
-            val outcome = launcher.launchRom(emuId, launcher.romRef(folder, rom, vitaTitle))
+            val ref = launcher.romRef(folder, rom, vitaTitle, pcId.id, pcId.assigned)
+            val outcome = launcher.launchRom(emuId, ref)
             if (outcome == GameLauncher.Outcome.Started) {
                 startSession(rom.key)
                 return@launch
@@ -398,6 +406,25 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                         confirm = DialogButton(UiText.res(R.string.ok)) {},
                     ),
                 )
+                // Sin el archivo que exporta el runtime no hay nada que lanzar,
+                // pero abrir el runtime y elegir el juego dentro sigue siendo
+                // una salida: se ofrece, ya explicado, en vez de hacerlo a ciegas.
+                GameLauncher.Outcome.NeedsPcLauncher -> showDialog(
+                    DialogSpec(
+                        title = UiText.res(R.string.dialog_pc_launcher_title, emuName),
+                        message = UiText.res(R.string.dialog_pc_launcher_msg, emuName),
+                        confirm = DialogButton(UiText.res(R.string.open_runtime, emuName)) { openRuntime(emuId) },
+                        dismiss = DialogButton(UiText.res(R.string.close)) {},
+                        // Poner el id a mano es la otra salida, y en un juego de
+                        // PC suele ser la buena: se copia de la ficha del juego
+                        // dentro del runtime y ya se lanza solo.
+                        extra = if (usesGameId(rom)) {
+                            DialogButton(UiText.res(R.string.pc_game_id)) { editPcGameId(rom, launchAfterSave = true) }
+                        } else {
+                            DialogButton(UiText.res(R.string.choose_other)) { pickFolderEmulator(folder) }
+                        },
+                    ),
+                )
                 is GameLauncher.Outcome.Failed -> showDialog(
                     DialogSpec(
                         title = UiText.res(R.string.dialog_launch_failed_title),
@@ -409,6 +436,87 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                 GameLauncher.Outcome.Started -> Unit
             }
         }
+    }
+
+    /**
+     * "Id en el runtime" del menú de un juego.
+     *
+     * Sale en lo que se lanza por id ([usesGameId]): es el número con el que
+     * BannerHub y compañía conocen al juego dentro de su propia biblioteca, y
+     * sin él lo único que se puede hacer es abrir el runtime. En el detalle va
+     * el id escrito a mano, que es lo único que se puede cambiar desde ahí —
+     * el que lleve dentro un archivo se lee al lanzar.
+     */
+    private fun pcGameIdActions(rom: RomEntry): List<SheetAction> {
+        if (!usesGameId(rom)) return emptyList()
+        return listOf(
+            SheetAction(
+                UiText.res(R.string.pc_game_id),
+                detail = rom.pcGameId?.let { UiText.Raw(it) },
+                icon = SheetIcon.GameId,
+            ) { editPcGameId(rom) },
+        )
+    }
+
+    /**
+     * ¿Se lanza este juego por id, y no por archivo?
+     *
+     * Lo son los runtimes de Windows con biblioteca propia. Se mira también el
+     * emulador y no solo el sistema porque una carpeta de archivos-id se puede
+     * haber dado de alta como otra cosa (un `.iso` parece de PS2), y ahí es
+     * justo donde hace falta poder poner el id a mano.
+     */
+    private fun usesGameId(rom: RomEntry): Boolean {
+        if (rom.systemId == PcGames.SYSTEM_ID) return true
+        val folder = repo.folder(rom.folderId)
+        return Emulators.usesGameId(rom.emulatorId ?: folder?.emulatorId ?: defaultEmulator(rom.systemId))
+    }
+
+    /**
+     * Pide el id del juego dentro del runtime; en blanco, lo borra.
+     *
+     * Se rellena con el id que está en vigor —el escrito a mano o el que lleve
+     * dentro su archivo—, así que el diálogo enseña siempre con qué se va a
+     * lanzar. Con [launchAfterSave] el juego arranca en cuanto se guarda: es
+     * como se llega aquí desde un lanzamiento que se quedó sin id, y lo que se
+     * quería hacer era jugar, no rellenar una ficha.
+     */
+    fun editPcGameId(rom: RomEntry, launchAfterSave: Boolean = false) {
+        viewModelScope.launch {
+            val folder = repo.folder(rom.folderId)
+            val current = rom.pcGameId ?: folder?.let { pcGameIds.resolve(it, rom).id }
+            showDialog(
+                DialogSpec(
+                    title = UiText.res(R.string.pc_game_id),
+                    message = UiText.res(R.string.pc_game_id_msg),
+                    confirm = DialogButton(UiText.res(if (launchAfterSave) R.string.save_and_open else R.string.save)) {},
+                    dismiss = DialogButton(UiText.res(R.string.cancel)) {},
+                    input = DialogInput(
+                        initial = current.orEmpty(),
+                        placeholder = UiText.res(R.string.pc_game_id_hint),
+                    ) { typed -> savePcGameId(rom, typed, launchAfterSave) },
+                ),
+            )
+        }
+    }
+
+    private fun savePcGameId(rom: RomEntry, typed: String, launchAfterSave: Boolean) {
+        val id = BannerHub.normalizeId(typed)
+        repo.setPcGameId(rom.id, id)
+        if (id == null) {
+            showToast(UiText.res(R.string.pc_game_id_cleared))
+            return
+        }
+        showToast(UiText.res(R.string.pc_game_id_saved, id))
+        // Se relee de la biblioteca: lo que tiene el id recién guardado es la
+        // entrada nueva, no la copia con la que se abrió el menú.
+        if (launchAfterSave) repo.current.roms.firstOrNull { it.id == rom.id }?.let { openRom(it) }
+    }
+
+    /** Abrir el runtime de Windows y apartarse: el juego se elige dentro. */
+    private fun openRuntime(emuId: String) {
+        val pkg = Emulators.byId(emuId)?.let { launcher.installedComponent(it) }?.substringBefore('/') ?: return
+        launcher.launchApp(pkg)
     }
 
     private fun emulatorMissing(emuId: String, emuName: String, folder: RomFolder, rom: RomEntry) {
@@ -609,7 +717,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                                 icon = SheetIcon.Emulator,
                                 opensSheet = true,
                             ) { pickRomEmulator(rom) },
-                        ),
+                        ) + pcGameIdActions(rom),
                     ),
                     artworkGroup(rom.key, rom.displayTitle),
                     SheetGroup(
