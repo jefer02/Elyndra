@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.data.PAIRS
 import kotlin.math.max
+import kotlin.math.min
 
 /* ─────────────────────────────────────────────────────────────
    Liquid glass.
@@ -43,8 +44,108 @@ import kotlin.math.max
 /** Velo blanco con el que se sustituye el `backdrop-filter: blur(N)`. */
 private fun hazeFor(blur: Int): Float = (blur / 40f) * 0.20f
 
+/** Lado a partir del cual una pieza recibe el reflejo entero (ver [liquidSheen]). */
+private val SHEEN_REFERENCE = 140.dp
+
+/* ─────────────────────────────────────────────────────────────
+   El acabado "liquid glass".
+
+   Lo que separa un panel translúcido de una lámina de cristal es
+   cómo se comporta la luz en su canto. Son tres capas, y las comparte
+   toda la app porque van dentro de los modificadores de siempre
+   ([glass], [liquidGlass], [darkGlass]): cualquier panel, hoja, menú
+   o píldora que ya los usara queda con el mismo material, sin tocar
+   un solo sitio de llamada.
+
+     · Barrido especular en diagonal — el reflejo que cruza la pieza
+       de la esquina superior izquierda a la inferior derecha, con un
+       valle transparente en medio. Es lo que da sensación de grosor.
+     · Lente superior — un halo radial pegado al borde de arriba, la
+       luz que entra por el canto y se difunde hacia dentro.
+       (Las dos, en [liquidSheen].)
+     · Canto con degradado — el borde no es de un solo blanco: brilla
+       arriba, se apaga en los lados y vuelve a encenderse abajo, como
+       haría un bisel real. (En [rimBrush].)
+
+   Todo se apoya sobre el tinte y el velo que ya tenía el diseño, así
+   que un panel sigue siendo el mismo color: solo cambia su canto.
+   ───────────────────────────────────────────────────────────── */
+
 /**
- * `glass()` del diseño.
+ * Las dos capas de reflejo.
+ *
+ * El reflejo se atenúa solo en las piezas pequeñas. Un barrido diagonal que
+ * queda precioso cruzando una hoja de 500 dp, metido en una píldora de 30,
+ * pasa a ser un degradado que se come el rótulo: ahí la diagonal no llega a
+ * leerse como reflejo, solo aclara el fondo. Se mide por el lado corto contra
+ * [SHEEN_REFERENCE], así que ningún sitio de llamada tiene que acordarse.
+ *
+ * [strength] es el ajuste manual encima de eso, para el cristal oscuro.
+ */
+private fun Modifier.liquidSheen(strength: Float = 1f): Modifier = drawBehind {
+    // Una pieza sin área todavía no tiene canto que iluminar, y los degradados
+    // que vienen abajo se dividen por su tamaño.
+    if (size.width <= 0f || size.height <= 0f) return@drawBehind
+    val dark = P.isDark
+    val fit = (min(size.width, size.height) / SHEEN_REFERENCE.toPx()).coerceIn(0.35f, 1f)
+    val amount = strength * fit
+    // En oscuro el reflejo tiene que ser mucho más tenue: el mismo blanco que
+    // en claro apenas se nota sobre papel, pero sobre un panel oscuro se lee
+    // como una mancha gris.
+    val peak = (if (dark) 0.10f else 0.22f) * amount
+    val tail = (if (dark) 0.04f else 0.09f) * amount
+
+    drawRect(
+        Brush.linearGradient(
+            0.00f to Color.White.copy(alpha = peak),
+            0.18f to Color.White.copy(alpha = peak * 0.35f),
+            0.48f to Color.Transparent,
+            0.82f to Color.Transparent,
+            1.00f to Color.White.copy(alpha = tail),
+            start = Offset.Zero,
+            end = Offset(size.width, size.height),
+        ),
+    )
+
+    // Halo del canto de arriba: elipse ancha y baja, centrada sobre el borde,
+    // que se desvanece hacia dentro. El radio se estira en horizontal para que
+    // cubra toda la anchura sin subir el foco.
+    val radius = size.width * 0.75f
+    val center = Offset(size.width * 0.5f, 0f)
+    withTransform({ scale(1f, (size.height * 0.9f) / radius, center) }) {
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = (if (dark) 0.07f else 0.16f) * amount),
+                    Color.Transparent,
+                ),
+                center = center,
+                radius = radius,
+            ),
+            radius = radius,
+            center = center,
+        )
+    }
+}
+
+/** El canto: blanco vivo arriba, apagado en medio, medio encendido abajo. */
+@Composable
+private fun rimBrush(base: Color): Brush {
+    val dark = P.isDark
+    val top = if (dark) 0.26f else 0.92f
+    val mid = if (dark) 0.08f else 0.42f
+    val bottom = if (dark) 0.16f else 0.66f
+    return Brush.linearGradient(
+        0f to base.copy(alpha = base.alpha * top + if (dark) 0.10f else 0f),
+        0.45f to base.copy(alpha = base.alpha * mid),
+        1f to base.copy(alpha = base.alpha * bottom),
+        start = Offset.Zero,
+        end = Offset.Infinite,
+    )
+}
+
+/**
+ * `glass()` del diseño, ya con el acabado liquid glass.
  *
  * @param shadow sombra externa; el diseño usa `0 10px 26px rgba(51,51,51,.10)`.
  * @param borderColor por defecto `rgba(255,255,255,.72)`.
@@ -56,10 +157,13 @@ fun Modifier.glass(
     borderColor: Color = P.hairline,
     /** Capas flotantes (diálogos, hojas, ficha): base opaca para que no se transparente lo de detrás. */
     solid: Boolean = false,
+    /** Cuánto reflejo. Se baja en las piezas pequeñas (píldoras, botones). */
+    sheen: Float = 1f,
 ): Modifier {
     val skin = LocalSkin.current
     val haze = hazeFor(skin.blur)
     val dark = P.isDark
+    val rim = rimBrush(borderColor)
     return this
         .shadow(shadow, shape, clip = false, ambientColor = P.shade.copy(alpha = 0.10f), spotColor = P.shade.copy(alpha = 0.10f))
         .clip(shape)
@@ -78,8 +182,9 @@ fun Modifier.glass(
                 ),
             ),
         )
+        .liquidSheen(sheen)
         .insetHighlight()
-        .border(1.dp, borderColor, shape)
+        .border(1.dp, rim, shape)
 }
 
 /** `darkGlass()` — la variante oscura del hero y la barra superior. */
@@ -93,23 +198,29 @@ fun Modifier.darkGlass(
         .clip(shape)
         .background(P.shade.copy(alpha = a))
         .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = hazeFor(skin.blur) * 0.5f), Color.Transparent)))
-        .border(1.dp, Color.White.copy(alpha = 0.28f), shape)
+        // Sobre tinta oscura el reflejo sí puede subir: no hay texto oscuro que
+        // perder y es lo que separa la barra del fondo del hero.
+        .liquidSheen(0.7f)
+        .border(1.dp, rimBrush(Color.White.copy(alpha = 0.28f)), shape)
 }
 
 /**
  * `liquidGlass()` — cristal semitransparente sin base opaca.
  *
  * Igual que [glass] pero sin el relleno que tapa lo de detrás: se usa donde el
- * fondo de la pantalla (la aurora, el fondo del hero) tiene que verse a través.
+ * fondo de la pantalla (la aurora, el fondo del hero) tiene que verse a través,
+ * y en los bloques del menú de pulsación larga, que flotan sobre la hoja.
  */
 @Composable
 fun Modifier.liquidGlass(
     shape: Shape = RoundedCornerShape(16.dp),
     borderColor: Color = P.hairline,
+    sheen: Float = 1f,
 ): Modifier {
     val skin = LocalSkin.current
     val haze = hazeFor(skin.blur)
     val dark = P.isDark
+    val rim = rimBrush(borderColor)
     return this
         .clip(shape)
         .background(skin.tint.color.copy(alpha = if (dark) skin.alpha * 0.22f else skin.alpha * 0.5f))
@@ -121,8 +232,9 @@ fun Modifier.liquidGlass(
                 ),
             ),
         )
+        .liquidSheen(sheen)
         .insetHighlight()
-        .border(1.dp, borderColor, shape)
+        .border(1.dp, rim, shape)
 }
 
 /** `inset 0 1px 0 rgba(255,255,255,.7)` — la línea de luz del borde superior. */
