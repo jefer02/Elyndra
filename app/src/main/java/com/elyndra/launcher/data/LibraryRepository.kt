@@ -150,6 +150,9 @@ class LibraryRepository(private val file: File, private val scope: CoroutineScop
 
     fun setRomEmulator(romId: String, emulatorId: String?) = updateRom(romId) { it.copy(emulatorId = emulatorId) }
 
+    /** Id del juego dentro del runtime de Windows; null lo borra. */
+    fun setPcGameId(romId: String, gameId: String?) = updateRom(romId) { it.copy(pcGameId = gameId) }
+
     fun updateFolder(folderId: String, transform: (RomFolder) -> RomFolder) = update { lib ->
         lib.copy(folders = lib.folders.map { if (it.id == folderId) transform(it) else it })
     }
