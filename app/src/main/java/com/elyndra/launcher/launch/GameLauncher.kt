@@ -13,19 +13,27 @@ import com.elyndra.launcher.data.EmulatorProfile
 import com.elyndra.launcher.data.Emulators
 import com.elyndra.launcher.data.RomEntry
 import com.elyndra.launcher.data.RomFolder
+import com.elyndra.launcher.data.SettingsStore
+import com.elyndra.launcher.library.PcGames
 import com.elyndra.launcher.library.SafPaths
 
 /**
  * Lanza apps Android y entrega ROMs al emulador de su carpeta.
  * Elyndra nunca emula: solo construye el intent que cada emulador entiende.
  */
-class GameLauncher(private val context: Context) {
+class GameLauncher(
+    private val context: Context,
+    /** Para saber si el usuario ha fijado un paquete concreto de un emulador. */
+    private val settings: SettingsStore? = null,
+) {
 
     sealed interface Outcome {
         data object Started : Outcome
         data object NotInstalled : Outcome
         data object NeedsPath : Outcome
         data object NeedsVitaTitle : Outcome
+        /** Juego de PC sin el archivo lanzador que pide su runtime de Windows. */
+        data object NeedsPcLauncher : Outcome
         data class Failed(val reason: String) : Outcome
     }
 
@@ -41,9 +49,29 @@ class GameLauncher(private val context: Context) {
         true
     }.getOrDefault(false)
 
-    /** Primer componente del perfil cuyo paquete está instalado. */
-    fun installedComponent(profile: EmulatorProfile): String? =
-        profile.components.firstOrNull { isPackageInstalled(it.substringBefore('/')) }
+    /**
+     * Componente instalado de este perfil.
+     *
+     * Gana el que además tenga su actividad: varios forks de Winlator y de
+     * GameHub publican builds "de reemplazo" bajo el mismo paquete de otra app
+     * (com.tencent.ig, com.ludashi.benchmark…), y lo único que distingue un
+     * fork de otro es el nombre de la actividad.
+     *
+     * Si ninguna está, vale el primer paquete propio: hay emuladores que
+     * renombran su actividad entre versiones y `launchSpec` sabe caer en el
+     * intent del paquete. Un paquete prestado no vale para eso — ahí la
+     * actividad es justo lo que decide de quién es la build.
+     */
+    fun installedComponent(profile: EmulatorProfile): String? {
+        val all = profile.components.filter { isPackageInstalled(it.substringBefore('/')) }
+        // Si el usuario ha elegido paquete y está instalado, no se mira otro.
+        val chosen = settings?.preferredPackage(profile.id)
+        val installed = all.filter { it.substringBefore('/') == chosen }.ifEmpty { all }
+        return installed.firstOrNull { component ->
+            val (pkg, cls) = LaunchPlanner.expandComponent(component)
+            cls != null && activityExists(pkg, cls)
+        } ?: installed.firstOrNull { it.substringBefore('/') !in Emulators.SPOOFED_PACKAGES }
+    }
 
     /** ¿Está instalado el emulador con este id (perfil conocido o "custom:paquete")? */
     fun isEmulatorInstalled(emulatorId: String?): Boolean {
@@ -65,7 +93,13 @@ class GameLauncher(private val context: Context) {
      * carpeta es como está organizado el juego, pero lo que se arranca es el
      * .exe que encontró el análisis.
      */
-    fun romRef(folder: RomFolder, rom: RomEntry, vitaTitleId: String? = null): RomRef {
+    fun romRef(
+        folder: RomFolder,
+        rom: RomEntry,
+        vitaTitleId: String? = null,
+        launcherId: String? = null,
+        idIsAssigned: Boolean = false,
+    ): RomRef {
         val tree = Uri.parse(folder.treeUri)
         val docId = rom.mainDocId ?: rom.docId
         val fileName = rom.mainFile?.substringAfterLast('/') ?: rom.fileName
@@ -78,6 +112,9 @@ class GameLauncher(private val context: Context) {
             // Si se apunta al ejecutable ya no se está entregando una carpeta.
             isDirectory = rom.isDirectory && rom.mainDocId == null,
             vitaTitleId = vitaTitleId,
+            pcLauncher = PcGames.launcherOf(fileName),
+            launcherId = launcherId,
+            idIsAssigned = idIsAssigned,
         )
     }
 
@@ -89,13 +126,14 @@ class GameLauncher(private val context: Context) {
         }
         val profile = Emulators.byId(emulatorId) ?: return Outcome.NotInstalled
         val component = installedComponent(profile) ?: return Outcome.NotInstalled
-        // Runtimes de Windows: no hay intent al que pasarle el juego, así que
-        // se abre la app y el usuario lo elige dentro (ver EmulatorProfile).
+        // Mobox y MiceWine no publican ningún intent al que pasarle el juego,
+        // así que se abre la app y el usuario lo elige dentro (ver EmulatorProfile).
         if (profile.launchOnly) return launchApp(component.substringBefore('/'))
         return when (val plan = LaunchPlanner.plan(profile, component, ref)) {
             is PlanResult.Ok -> launchSpec(plan.spec)
             PlanResult.NeedsPath -> Outcome.NeedsPath
             PlanResult.NeedsVitaTitle -> Outcome.NeedsVitaTitle
+            PlanResult.NeedsPcLauncher -> Outcome.NeedsPcLauncher
         }
     }
 
@@ -114,6 +152,7 @@ class GameLauncher(private val context: Context) {
         spec.data?.let { intent.data = Uri.parse(it) }
         spec.stringExtras.forEach { (k, v) -> intent.putExtra(k, v) }
         spec.boolExtras.forEach { (k, v) -> intent.putExtra(k, v) }
+        spec.intExtras.forEach { (k, v) -> intent.putExtra(k, v) }
         spec.arrayExtras.forEach { (k, v) -> intent.putExtra(k, v.toTypedArray()) }
 
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
