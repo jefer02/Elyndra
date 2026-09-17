@@ -351,15 +351,16 @@ private fun RomsTab(vm: ElyndraViewModel, landscape: Boolean) {
                     ElyText(stringResource(R.string.emulator_legend), size = 9f, color = P.ink2.copy(alpha = 0.8f))
                     Spacer(Modifier.height(8.dp))
                     if (emuName != null) {
-                        // Un runtime de Windows no recibe el juego por intent:
-                        // se abre y ya. Mejor decirlo antes de añadir la
-                        // carpeta que dejar que parezca que Elyndra falla.
+                        // Un runtime de Windows no recibe el .exe: o se le da el
+                        // acceso directo que exporta, o ni eso y solo se abre.
+                        // Mejor decirlo antes de añadir la carpeta que dejar que
+                        // parezca que Elyndra falla.
                         val launchOnly = Emulators.byId(emuId)?.launchOnly == true
                         ElyText(
-                            if (launchOnly) {
-                                stringResource(R.string.pc_runtime_explainer, emuName)
-                            } else {
-                                stringResource(R.string.emulator_explainer, emuName)
+                            when {
+                                launchOnly -> stringResource(R.string.pc_runtime_explainer, emuName)
+                                system.folderGames -> stringResource(R.string.pc_shortcut_explainer, emuName)
+                                else -> stringResource(R.string.emulator_explainer, emuName)
                             },
                             size = 10.5f,
                             color = P.ink2,
