@@ -335,4 +335,9 @@
     <string name="art_from_gallery_hint">Ein Foto oder Bild von diesem Gerät verwenden</string>
     <string name="art_local_failed">Bild konnte nicht gelesen werden</string>
     <string name="art_set">Gesetzt</string>
+
+    <!-- PC-Spiele: ein Ordner pro Spiel -->
+    <string name="folder_games_hint">PC-Spiele liegen je in einem eigenen Ordner. Wähle den Stammordner, der sie enthält — Elyndra durchsucht ihn Ordner für Ordner und findet die ausführbare Datei jedes Spiels selbst.</string>
+    <string name="scan_none_folder_games">Keine Spiele gefunden. Jedes Spiel braucht einen eigenen Ordner mit seiner .exe darin; wähle den Ordner, der sie alle enthält, nicht den eines einzelnen Spiels.</string>
+    <string name="pc_runtime_explainer">%1$s nimmt kein Spiel von außen entgegen, also öffnet Elyndra die App nur — wähle das Spiel dort, in seinem Container.</string>
 </resources>

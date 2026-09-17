@@ -321,4 +321,9 @@
     <string name="art_from_gallery_hint">この端末の写真や画像を使います</string>
     <string name="art_local_failed">その画像を読み込めませんでした</string>
     <string name="art_set">設定済み</string>
+
+    <!-- PC ゲーム: 1 ゲームにつき 1 フォルダ -->
+    <string name="folder_games_hint">PC ゲームは 1 本ずつフォルダに入っています。それらをまとめたルートフォルダを選んでください。Elyndra がフォルダごとに調べ、各ゲームの実行ファイルを自動で見つけます。</string>
+    <string name="scan_none_folder_games">ゲームが見つかりませんでした。各ゲームには .exe を含む専用フォルダが必要です。1 本のゲームのフォルダではなく、それらをまとめたフォルダを選んでください。</string>
+    <string name="pc_runtime_explainer">%1$s には外部からゲームを渡せないため、Elyndra はアプリを開くだけです。ゲームはそのコンテナ内で選んでください。</string>
 </resources>

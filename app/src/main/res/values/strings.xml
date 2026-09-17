@@ -341,4 +341,9 @@
     <string name="art_from_gallery_hint">Use a photo or image from this device</string>
     <string name="art_local_failed">Couldn\'t read that image</string>
     <string name="art_set">Set</string>
+
+    <!-- Juegos de PC: una carpeta por juego -->
+    <string name="folder_games_hint">PC games live one per folder. Pick the root folder that holds them — Elyndra scans it folder by folder and finds each game\'s executable on its own.</string>
+    <string name="scan_none_folder_games">No games found. Each game needs its own folder with its .exe inside; pick the folder that contains them all, not one game\'s folder.</string>
+    <string name="pc_runtime_explainer">%1$s can\'t be handed a game from outside, so Elyndra just opens it — pick the game there, in its own container.</string>
 </resources>

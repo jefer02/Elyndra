@@ -349,4 +349,9 @@
     <string name="art_from_gallery_hint">Usa una foto o imagen de este dispositivo</string>
     <string name="art_local_failed">No se pudo leer esa imagen</string>
     <string name="art_set">Puesta</string>
+
+    <!-- Juegos de PC: una carpeta por juego -->
+    <string name="folder_games_hint">Los juegos de PC van uno por carpeta. Elige la carpeta raíz que los contiene: Elyndra la recorre carpeta a carpeta y encuentra solo el ejecutable de cada juego.</string>
+    <string name="scan_none_folder_games">No se encontró ningún juego. Cada juego necesita su propia carpeta con su .exe dentro; elige la carpeta que las contiene todas, no la de un juego.</string>
+    <string name="pc_runtime_explainer">A %1$s no se le puede pasar un juego desde fuera, así que Elyndra solo lo abre: elige ahí el juego, en su contenedor.</string>
 </resources>

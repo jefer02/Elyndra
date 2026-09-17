@@ -349,4 +349,9 @@
     <string name="art_from_gallery_hint">Usa uma foto ou imagem deste dispositivo</string>
     <string name="art_local_failed">Não foi possível ler essa imagem</string>
     <string name="art_set">Definida</string>
+
+    <!-- Jogos de PC: uma pasta por jogo -->
+    <string name="folder_games_hint">Os jogos de PC ficam um por pasta. Escolhe a pasta raiz que os contém — o Elyndra percorre-a pasta a pasta e encontra sozinho o executável de cada jogo.</string>
+    <string name="scan_none_folder_games">Não foi encontrado nenhum jogo. Cada jogo precisa da sua própria pasta com o .exe lá dentro; escolhe a pasta que as contém todas, não a de um jogo.</string>
+    <string name="pc_runtime_explainer">Não se pode passar um jogo ao %1$s a partir de fora, por isso o Elyndra apenas o abre — escolhe aí o jogo, no seu contentor.</string>
 </resources>

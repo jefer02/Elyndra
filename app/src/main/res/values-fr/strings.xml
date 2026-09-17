@@ -349,4 +349,9 @@
     <string name="art_from_gallery_hint">Utiliser une photo ou une image de cet appareil</string>
     <string name="art_local_failed">Impossible de lire cette image</string>
     <string name="art_set">Définie</string>
+
+    <!-- Jeux PC : un dossier par jeu -->
+    <string name="folder_games_hint">Les jeux PC occupent chacun un dossier. Choisis le dossier racine qui les contient — Elyndra le parcourt dossier par dossier et trouve seul l’exécutable de chaque jeu.</string>
+    <string name="scan_none_folder_games">Aucun jeu trouvé. Chaque jeu a besoin de son propre dossier avec son .exe dedans ; choisis le dossier qui les contient tous, pas celui d’un seul jeu.</string>
+    <string name="pc_runtime_explainer">On ne peut pas transmettre un jeu à %1$s depuis l’extérieur : Elyndra se contente de l’ouvrir — choisis le jeu là, dans son conteneur.</string>
 </resources>
