@@ -2,6 +2,7 @@ package com.elyndra.launcher.launch
 
 import com.elyndra.launcher.data.Emulators
 import com.elyndra.launcher.data.Systems
+import com.elyndra.launcher.library.PcGames
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -88,6 +89,129 @@ class LaunchPlannerTest {
         assertEquals(PlanResult.NeedsVitaTitle, LaunchPlanner.plan(p, p.components.first(), rom))
         val spec = ok(LaunchPlanner.plan(p, p.components.first(), rom.copy(vitaTitleId = "PCSE00000")))
         assertEquals(listOf("-r", "PCSE00000"), spec.arrayExtras["AppStartParameters"])
+    }
+
+    /* ── Juegos de PC ─────────────────────────────────────────── */
+
+    /** Carpeta de juego con su .exe: lo que hay hoy en una biblioteca de PC. */
+    private val pcFolder = rom.copy(
+        path = "/storage/emulated/0/Juegos PC/Hades/Hades.exe",
+        pcLauncher = null,
+    )
+
+    /** Acceso directo exportado por Winlator. */
+    private val pcShortcut = rom.copy(
+        path = "/storage/emulated/0/Winlator/Hades.desktop",
+        pcLauncher = PcGames.Launcher.Desktop,
+    )
+
+    private fun pcId(launcher: PcGames.Launcher, id: String) =
+        rom.copy(pcLauncher = launcher, launcherId = id)
+
+    @Test
+    fun winlatorGetsTheShortcutPath() {
+        val p = Emulators.byId("winlator_cmod")!!
+        val spec = ok(LaunchPlanner.plan(p, p.components.first(), pcShortcut))
+        assertEquals("com.winlator.cmod", spec.packageName)
+        assertEquals("com.winlator.cmod.XServerDisplayActivity", spec.className)
+        assertEquals(pcShortcut.path, spec.stringExtras["shortcut_path"])
+        assertTrue(spec.clearTask && spec.clearTop)
+        assertTrue(spec.grantUris.isEmpty())
+    }
+
+    @Test
+    fun winlatorWontTakeAnExecutable() {
+        // Pasarle el .exe abriría la ventana del runtime y se cerraría sola:
+        // mejor decirlo que fingir que se ha lanzado algo.
+        val p = Emulators.byId("winlator_cmod")!!
+        assertEquals(PlanResult.NeedsPcLauncher, LaunchPlanner.plan(p, p.components.first(), pcFolder))
+    }
+
+    @Test
+    fun bannerHubGetsTheGameIdAndItsOwnAction() {
+        val p = Emulators.byId("bannerhub")!!
+        val spec = ok(LaunchPlanner.plan(p, p.components.first(), pcId(PcGames.Launcher.Steam, "1145360")))
+        assertEquals("banner.hub", spec.packageName)
+        assertEquals("com.xiaoji.egggame.DeepLinkActivity", spec.className)
+        // La acción lleva delante el paquete de la build instalada.
+        assertEquals("banner.hub.LAUNCH_GAME", spec.action)
+        // El id va en las dos claves: cada build lee la suya.
+        assertEquals("1145360", spec.stringExtras["steamAppId"])
+        assertEquals("1145360", spec.stringExtras["localGameId"])
+        assertEquals(true, spec.boolExtras["autoStartGame"])
+    }
+
+    @Test
+    fun bannerHubKeepsBothActivitiesOfEveryPackage() {
+        val p = Emulators.byId("bannerhub")!!
+        val banner = p.components.filter { it.startsWith("banner.hub/") }
+        assertEquals(
+            listOf(
+                "banner.hub/com.xiaoji.egggame.DeepLinkActivity",
+                "banner.hub/com.xj.landscape.launcher.ui.gamedetail.GameDetailActivity",
+            ),
+            banner,
+        )
+        assertTrue(p.packages.containsAll(listOf("banner.hub", "gamehub.lite", "com.xiaoji.egggame")))
+    }
+
+    /** Id puesto a mano sobre la carpeta del juego: no hay archivo lanzador y da igual. */
+    @Test
+    fun bannerHubTakesAnAssignedIdWithoutAnExportedFile() {
+        val p = Emulators.byId("bannerhub")!!
+        val assigned = pcFolder.copy(launcherId = "268910", idIsAssigned = true)
+        val spec = ok(LaunchPlanner.plan(p, p.components.first(), assigned))
+        assertEquals("268910", spec.stringExtras["steamAppId"])
+        assertEquals("268910", spec.stringExtras["localGameId"])
+    }
+
+    @Test
+    fun gameNativeTreatsAnAssignedIdAsSteam() {
+        val p = Emulators.byId("gamenative")!!
+        val assigned = pcFolder.copy(launcherId = "2551", idIsAssigned = true)
+        val spec = ok(LaunchPlanner.plan(p, p.components.first(), assigned))
+        assertEquals("STEAM", spec.stringExtras["game_source"])
+        assertEquals(2551, spec.intExtras["app_id"])
+    }
+
+    @Test
+    fun bannerHubOnADecoyPackageKeepsItsOwnAction() {
+        val p = Emulators.byId("bannerhub")!!
+        val component = p.components.first { it.startsWith("com.tencent.ig/") }
+        val spec = ok(LaunchPlanner.plan(p, component, pcId(PcGames.Launcher.Steam, "70")))
+        assertEquals("com.tencent.ig.LAUNCH_GAME", spec.action)
+    }
+
+    @Test
+    fun gamesOutsideSteamTravelWithTheSameIdInBothKeys() {
+        val p = Emulators.byId("bannerhub")!!
+        val spec = ok(LaunchPlanner.plan(p, p.components.first(), pcId(PcGames.Launcher.Gog, "42")))
+        assertEquals("42", spec.stringExtras["localGameId"])
+        assertEquals("42", spec.stringExtras["steamAppId"])
+    }
+
+    @Test
+    fun bannerHubWithoutAnIdAsksForTheExportedFile() {
+        val p = Emulators.byId("bannerhub")!!
+        assertEquals(PlanResult.NeedsPcLauncher, LaunchPlanner.plan(p, p.components.first(), pcFolder))
+        // El .desktop de Winlator no lleva id dentro: tampoco le sirve.
+        assertEquals(PlanResult.NeedsPcLauncher, LaunchPlanner.plan(p, p.components.first(), pcShortcut))
+    }
+
+    @Test
+    fun gameNativeGetsTheStoreAndAnIntegerAppId() {
+        val p = Emulators.byId("gamenative")!!
+        val spec = ok(LaunchPlanner.plan(p, p.components.first(), pcId(PcGames.Launcher.Epic, "1017")))
+        assertEquals("app.gamenative.LAUNCH_GAME", spec.action)
+        assertEquals("EPIC", spec.stringExtras["game_source"])
+        assertEquals(1017, spec.intExtras["app_id"])
+    }
+
+    @Test
+    fun onlyMoboxIsOpenedWithoutTheGame() {
+        val pc = Systems.byId("pc")!!
+        val launchOnly = pc.emulators.filter { Emulators.byId(it)!!.launchOnly }
+        assertEquals(listOf("mobox"), launchOnly)
     }
 
     @Test
