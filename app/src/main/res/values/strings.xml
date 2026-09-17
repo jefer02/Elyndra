@@ -116,6 +116,7 @@
     <string name="ok">OK</string>
     <string name="install">Install</string>
     <string name="choose_other">Choose another</string>
+    <string name="open_runtime">Open %1$s</string>
     <string name="cancel">Cancel</string>
     <string name="retry">Retry</string>
     <string name="dialog_emulator_missing_title">%1$s isn\'t installed</string>
@@ -124,6 +125,8 @@
     <string name="dialog_needs_path_msg">%1$s only opens files by path, and this folder isn\'t on the device storage or SD card. Choose another emulator or move the ROMs to local storage.</string>
     <string name="dialog_vita_title">Missing title ID</string>
     <string name="dialog_vita_msg">Vita3K needs the game\'s title ID (for example PCSE00000) written inside the .psvita file.</string>
+    <string name="dialog_pc_launcher_title">The game lives inside %1$s</string>
+    <string name="dialog_pc_launcher_msg">%1$s only starts games that are already in its own library, so a folder with an .exe means nothing to it. Export the game from %1$s for a frontend — it writes a .desktop or .steam file — and point this PC folder at those files.</string>
     <string name="dialog_launch_failed_title">Couldn\'t open the game</string>
     <string name="dialog_launch_failed_msg">%1$s couldn\'t open the game: %2$s</string>
     <string name="dialog_app_missing_title">App not installed</string>
@@ -343,7 +346,21 @@
     <string name="art_set">Set</string>
 
     <!-- Juegos de PC: una carpeta por juego -->
-    <string name="folder_games_hint">PC games live one per folder. Pick the root folder that holds them — Elyndra scans it folder by folder and finds each game\'s executable on its own.</string>
-    <string name="scan_none_folder_games">No games found. Each game needs its own folder with its .exe inside; pick the folder that contains them all, not one game\'s folder.</string>
+    <string name="folder_games_hint">PC games live one per folder. Pick the root folder that holds them — Elyndra scans it folder by folder and finds each game\'s executable on its own. It also picks up the shortcuts a Windows runtime exports for frontends (.desktop, .steam…), which is what actually starts the game. Or a folder of ID files: one file per game (.iso, .txt, .steam) named after the game and holding only its BannerHub ID.</string>
+    <string name="scan_none_folder_games">No games found. Each game needs its own folder with its .exe inside; pick the folder that contains them all, not one game\'s folder. A folder of shortcuts exported from your Windows runtime works too. Or a folder of ID files: one file per game (.iso, .txt, .steam) whose content is just the BannerHub ID.</string>
     <string name="pc_runtime_explainer">%1$s can\'t be handed a game from outside, so Elyndra just opens it — pick the game there, in its own container.</string>
+    <string name="pc_shortcut_explainer">%1$s is handed the shortcut it exports for frontends (.desktop, .steam…), not the .exe. Pick the folder where %1$s writes them.</string>
+    <string name="save">Save</string>
+    <string name="change">Change</string>
+    <string name="installed">Installed</string>
+    <string name="pc_game_id">Game ID in the runtime</string>
+    <string name="pc_game_id_msg">BannerHub, GameHub and GameNative only start games that are already in their own library, each one with its ID. Type the ID of this game — the number on its page inside the runtime (a Steam game uses its appid: 268910, 2551…). Leave it blank to remove it.</string>
+    <string name="pc_game_id_hint">268910</string>
+    <string name="pc_game_id_saved">Game ID: %1$s</string>
+    <string name="pc_game_id_cleared">Game ID removed</string>
+    <string name="bannerhub_package">BannerHub build</string>
+    <string name="bannerhub_package_desc">Which installed build the games are sent to</string>
+    <string name="bannerhub_package_auto">Detect it</string>
+    <string name="bannerhub_package_none">Not installed</string>
+    <string name="save_and_open">Save and open</string>
 </resources>
