@@ -78,6 +78,9 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
     private val art = ArtSources(engine, repo, app.media)
     private var artJob: Job? = null
 
+    /** El mando: traduce sus botones a lo que hace cada capa (ver [InputController]). */
+    val input = InputController(this)
+
     val add = AddController(this)
     val settings = SettingsController(this)
     val lucy = LucyController(this)
@@ -621,6 +624,44 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
         )
     }
 
+    /**
+     * Quita un juego de la biblioteca.
+     *
+     * No borra el archivo —Elyndra nunca toca el almacenamiento—: lo saca de
+     * la biblioteca y lo anota como quitado para que no vuelva en el
+     * siguiente análisis. Se deshace con "Restaurar" en el menú de la carpeta.
+     */
+    fun removeRom(rom: RomEntry) {
+        showDialog(
+            DialogSpec(
+                title = UiText.res(R.string.confirm_remove_title),
+                message = UiText.res(R.string.confirm_remove_game_msg, rom.displayTitle),
+                confirm = DialogButton(UiText.res(R.string.remove)) {
+                    app.media.deleteFor(rom.key)
+                    repo.removeRom(rom.id)
+                    if (selectedRomKey == rom.key) selectedRomKey = null
+                    showToast(UiText.res(R.string.toast_game_removed, rom.displayTitle))
+                },
+                dismiss = DialogButton(UiText.res(R.string.close)) {},
+            ),
+        )
+    }
+
+    /** "Restaurar juegos quitados", solo si hay alguno que restaurar. */
+    private fun restoreAction(folder: RomFolder): List<SheetAction> {
+        if (folder.excluded.isEmpty()) return emptyList()
+        return listOf(
+            SheetAction(
+                UiText.res(R.string.restore_removed),
+                detail = UiText.plural(R.plurals.removed_games_count, folder.excluded.size, folder.excluded.size),
+                icon = SheetIcon.Refresh,
+            ) {
+                repo.restoreRemoved(folder.id)
+                rescanFolder(folder)
+            },
+        )
+    }
+
     fun removeApp(pkg: String, title: String) {
         showDialog(
             DialogSpec(
@@ -668,7 +709,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                         SheetAction(UiText.res(R.string.refresh_metadata), icon = SheetIcon.Refresh) {
                             refreshMetadata(library.roms.filter { it.folderId == item.folder.id }.map { it.key })
                         },
-                    ),
+                    ) + restoreAction(item.folder),
                 ),
                 removalGroup(UiText.res(R.string.remove_folder)) { removeFolder(item.folder) },
             )
@@ -726,6 +767,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                             SheetAction(UiText.res(R.string.refresh_metadata), icon = SheetIcon.Refresh) { refreshMetadata(listOf(rom.key)) },
                         ),
                     ),
+                    removalGroup(UiText.res(R.string.remove_game)) { removeRom(rom) },
                 ),
                 SheetThumb(coverPath = rom.meta.cover, pairIndex = romPairIndex(rom)),
             ),
@@ -1096,11 +1138,26 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
     fun showDialog(spec: DialogSpec) {
         sheet = null
         dialog = spec
+        input.onDialogShown()
     }
 
     fun dismissDialog() { dialog = null }
 
-    fun showSheet(spec: ActionSheetSpec) { sheet = spec }
+    fun showSheet(spec: ActionSheetSpec) {
+        sheet = spec
+        input.onSheetShown()
+    }
+
+    /**
+     * El menú de la app, para quien juega con mando.
+     *
+     * Con el dedo, buscar, ordenar, añadir, Ajustes y Lucy están repartidos
+     * por la pantalla —cabecera, dock, botón flotante—. Con mando no hay
+     * puntero que los alcance, así que Start los junta aquí en una sola hoja.
+     */
+    fun mainMenu() {
+        showSheet(ActionSheetSpec(UiText.Raw("ELYNDRA"), null, input.mainMenuActions()))
+    }
 
     fun dismissSheet() { sheet = null }
 
