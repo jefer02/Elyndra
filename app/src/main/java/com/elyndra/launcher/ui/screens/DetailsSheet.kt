@@ -45,6 +45,7 @@ import com.elyndra.launcher.metadata.RetroAchievementsClient
 import com.elyndra.launcher.metadata.Service
 import com.elyndra.launcher.ui.AchievementsState
 import com.elyndra.launcher.ui.ElyndraViewModel
+import com.elyndra.launcher.ui.PadScrollBinding
 import com.elyndra.launcher.ui.LibraryItem
 import com.elyndra.launcher.ui.components.AccentButton
 import com.elyndra.launcher.ui.components.GameIcon
@@ -140,10 +141,13 @@ fun DetailsSheet(vm: ElyndraViewModel, key: String) {
             }
 
             // ── Cuerpo desplazable ──
+            // La ficha se lee entera; con mando, la cruceta la desplaza.
+            val body = rememberScrollState()
+            PadScrollBinding(vm, body)
             Column(
                 Modifier
                     .weight(1f, fill = false)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(body)
                     .padding(start = 16.dp, end = 16.dp, bottom = 18.dp),
             ) {
                 if (!meta.matched && meta.description == null) {
