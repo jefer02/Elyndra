@@ -136,8 +136,8 @@ fun ElyndraApp(vm: ElyndraViewModel) {
 
             vm.detailsKey?.let { DetailsSheet(vm, it) }
             vm.artPicker?.let { ArtPickerSheet(vm, it) }
-            vm.sheet?.let { ActionSheetView(it, onDismiss = vm::dismissSheet) }
-            vm.dialog?.let { ElyDialogView(it, onDismiss = vm::dismissDialog) }
+            vm.sheet?.let { ActionSheetView(it, onDismiss = vm::dismissSheet, focus = vm.input.sheetFocus) }
+            vm.dialog?.let { ElyDialogView(it, onDismiss = vm::dismissDialog, focus = vm.input.dialogFocus) }
             vm.launching?.let { LaunchOverlay(it, landscape) }
             vm.toast?.let {
                 ToastView(
