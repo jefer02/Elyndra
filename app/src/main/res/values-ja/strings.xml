@@ -41,8 +41,6 @@
     <!-- フォルダー -->
     <string name="rom_chip">ROM · %1$s</string>
     <string name="roms_header">ROM</string>
-    <string name="library_back">ライブラリ</string>
-    <string name="open_in">%1$s で開く</string>
     <string name="folder_empty">このフォルダーに ROM がありません。再スキャンするか、システムの設定を確認してください。</string>
     <plurals name="roms_summary">
         <item quantity="other">%1$d ROM · %2$s</item>
