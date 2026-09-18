@@ -45,8 +45,6 @@
     <!-- Carpeta -->
     <string name="rom_chip">ROM · %1$s</string>
     <string name="roms_header">ROMs</string>
-    <string name="library_back">Biblioteca</string>
-    <string name="open_in">Abrir en %1$s</string>
     <string name="folder_empty">No hay ROMs en esta carpeta. Vuelve a escanearla o comprueba que el sistema es el correcto.</string>
     <plurals name="roms_summary">
         <item quantity="one">%1$d ROM · %2$s</item>
