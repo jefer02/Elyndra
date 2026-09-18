@@ -11,6 +11,15 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Mandos. Elyndra se maneja entero con un mando (Xbox, PlayStation,
+         Switch Pro, clónicos y los mandos integrados de las portátiles
+         Android), pero no lo exige: `required="false"` para que siga
+         instalándose en un móvil. Lo mismo con la pantalla táctil al revés —
+         declararla opcional es lo que permite instalarla en una tele. -->
+    <uses-feature android:name="android.hardware.gamepad" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+
     <!-- Visibilidad de paquetes (Android 11+): Elyndra tiene que ver los juegos
          instalados y los emuladores a los que entrega cada ROM. No es un permiso
          que se pida al usuario, se declara aquí: sin esto el PackageManager
@@ -65,6 +74,7 @@
         android:name=".ElyndraApplication"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
+        android:banner="@drawable/tv_banner"
         android:label="@string/app_name"
         android:localeConfig="@xml/locales_config"
         android:supportsRtl="true"
@@ -79,6 +89,10 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <!-- En una tele el lanzador de Android TV solo lista lo que
+                     declara LEANBACK_LAUNCHER; sin esto, Elyndra se instala
+                     pero no aparece por ningún lado. -->
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
 
