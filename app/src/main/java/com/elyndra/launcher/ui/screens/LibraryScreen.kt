@@ -25,15 +25,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
@@ -44,6 +48,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.painterResource
@@ -98,6 +103,13 @@ fun LibraryScreen(vm: ElyndraViewModel) {
     val skin = LocalSkin.current
     val items = vm.items()
     val sel = vm.selected()
+    // Con mando la selección se mueve sin tocar el carrusel, así que el
+    // carrusel va detrás de ella: si no, se estaría eligiendo a ciegas.
+    val carousel = rememberLazyListState()
+    LaunchedEffect(sel?.key, items.size) {
+        val index = items.indexOfFirst { it.key == sel?.key }
+        if (index >= 0) runCatching { carousel.animateScrollToItem(index) }
+    }
     val libraryEmpty = vm.loaded && vm.library.folders.isEmpty() && vm.library.apps.isEmpty()
 
     Box(Modifier.fillMaxSize()) {
@@ -275,6 +287,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                 } else {
                     LazyRow(
                         Modifier.fillMaxWidth().weight(1f),
+                        state = carousel,
                         contentPadding = PaddingValues(
                             start = m.pad,
                             end = m.pad,
@@ -439,8 +452,19 @@ private fun FilterTab(label: String, active: Boolean, onClick: () -> Unit) {
 private fun SearchField(vm: ElyndraViewModel, m: Metrics) {
     val open = vm.searchOpen
     // Al cerrarse, el campo suelta el foco para que el teclado no siga escribiendo en un buscador invisible.
+    // Al abrirse lo pide, con su teclado: el buscador también se abre con el
+    // mando (Select), y ahí no hay dedo que vaya a tocar el campo después.
     val focusManager = LocalFocusManager.current
-    LaunchedEffect(open) { if (!open) focusManager.clearFocus() }
+    val focus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(open) {
+        if (open) {
+            runCatching { focus.requestFocus() }
+            keyboard?.show()
+        } else {
+            focusManager.clearFocus()
+        }
+    }
     val fieldWidth by animateDpAsState(
         targetValue = if (open) (if (m.landscape) 190.dp else 96.dp) else 0.dp,
         animationSpec = tween(300, easing = Swift),
@@ -467,7 +491,7 @@ private fun SearchField(vm: ElyndraViewModel, m: Metrics) {
                 singleLine = true,
                 textStyle = inputStyle(12f, Color.White),
                 cursorBrush = SolidColor(Color.White),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().focusRequester(focus),
                 decorationBox = { inner ->
                     if (vm.query.isEmpty()) {
                         ElyText(stringResource(R.string.search_hint), size = 12f, color = Color.White.copy(alpha = 0.55f), maxLines = 1)
