@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,13 +38,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.elyndra.launcher.R
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.Swift
 import com.elyndra.launcher.ui.theme.accentGradient
+import com.elyndra.launcher.ui.theme.darkGlass
 import com.elyndra.launcher.ui.theme.drawArcSpinner
 import com.elyndra.launcher.ui.theme.glass
 import com.elyndra.launcher.ui.theme.spinAngle
@@ -195,6 +199,41 @@ fun GhostButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifie
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         ElyText(label, size = 11f, weight = FontWeight.Medium, color = P.ink, maxLines = 1)
+    }
+}
+
+/** Alto de la barra del hero, que "Abrir" comparte con los botones de al lado. */
+val HeroBarHeight = 34.dp
+
+/**
+ * "Abrir", en la barra de arriba del hero y sobre el fondo del juego.
+ *
+ * El mismo botón en Biblioteca y en Carpeta, y discreto a propósito: el
+ * cristal oscuro de sus vecinos, el alto de la barra y ni rastro del degradado
+ * de acento que llevaba en el dock. Ahí arriba lo que se tiene que ver es el
+ * fondo del juego, y abrir se hace además con doble toque sobre la card o con
+ * el mando.
+ */
+@Composable
+fun OpenButton(enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Row(
+        modifier
+            .height(HeroBarHeight)
+            .alpha(if (enabled) 1f else 0.45f)
+            .darkGlass(RoundedCornerShape(12.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PlayGlyph(size = 8.dp)
+        Spacer(Modifier.width(6.dp))
+        ElyText(
+            stringResource(R.string.open),
+            size = 11f,
+            weight = FontWeight.SemiBold,
+            color = Color.White,
+            maxLines = 1,
+        )
     }
 }
 
