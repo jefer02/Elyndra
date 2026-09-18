@@ -343,4 +343,12 @@
     <string name="bannerhub_package_auto">自動で判別</string>
     <string name="bannerhub_package_none">未インストール</string>
     <string name="save_and_open">保存して開く</string>
+    <string name="lucy">Lucy</string>
+    <string name="remove_game">ゲームを削除</string>
+    <string name="confirm_remove_game_msg">%1$s をライブラリから外します。ファイルはストレージに残り、再スキャンしても戻りません。フォルダーのメニューから復元できます。</string>
+    <string name="toast_game_removed">%1$s を削除しました</string>
+    <string name="restore_removed">削除したゲームを復元</string>
+    <plurals name="removed_games_count">
+        <item quantity="other">削除したゲーム %d 件</item>
+    </plurals>
 </resources>
