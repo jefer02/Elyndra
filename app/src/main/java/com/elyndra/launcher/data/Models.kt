@@ -43,6 +43,14 @@ data class RomFolder(
     val hero: String? = null,
     val logo: String? = null,
     val icon: String? = null,
+    /**
+     * Juegos que el usuario ha quitado de la biblioteca, por su documento.
+     *
+     * Se guardan porque el archivo sigue en el disco: sin esta lista, el
+     * siguiente análisis los volvería a dar de alta y "quitar" no querría
+     * decir nada. Se vacía con "restaurar" (ver `LibraryRepository`).
+     */
+    val excluded: Set<String> = emptySet(),
 ) {
     val key: String get() = "f:$id"
 }
