@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Banner del lanzador de Android TV (320×180).
+
+  Una tele no enseña iconos cuadrados: cada app es un rectángulo con su
+  nombre dentro. Se dibuja aquí en vez de traerlo como imagen para que siga
+  al icono de Elyndra — el mismo fondo y la misma marca — sin añadir un PNG
+  por densidad.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/ic_launcher_background" />
+    <item
+        android:gravity="center"
+        android:width="120dp"
+        android:height="120dp">
+        <bitmap
+            android:src="@mipmap/ic_launcher_foreground"
+            android:gravity="center" />
+    </item>
+</layer-list>
