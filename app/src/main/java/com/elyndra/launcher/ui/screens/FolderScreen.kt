@@ -55,18 +55,16 @@ import com.elyndra.launcher.ui.components.GameIcon
 import com.elyndra.launcher.ui.components.GhostButton
 import com.elyndra.launcher.ui.components.Hero
 import com.elyndra.launcher.ui.components.LogoImage
-import com.elyndra.launcher.ui.components.PlayGlyph
+import com.elyndra.launcher.ui.components.OpenButton
 import com.elyndra.launcher.ui.components.metrics
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.theme.HeroTitleShadow
 import com.elyndra.launcher.ui.theme.LocalSkin
-import com.elyndra.launcher.ui.theme.accentGradient
 import com.elyndra.launcher.ui.theme.animFadeIn
 import com.elyndra.launcher.ui.theme.animPopIn
 import com.elyndra.launcher.ui.theme.animTitleIn
 import com.elyndra.launcher.ui.theme.curtainAlpha
 import com.elyndra.launcher.ui.theme.darkGlass
-import com.elyndra.launcher.ui.theme.glass
 import com.elyndra.launcher.ui.theme.pulseHintAlpha
 import com.elyndra.launcher.ui.theme.romScrimBrush
 import com.elyndra.launcher.ui.theme.selectionLift
@@ -77,7 +75,6 @@ import com.elyndra.launcher.ui.theme.sheenProgress
 @Composable
 fun FolderScreen(vm: ElyndraViewModel) {
     val m = metrics()
-    val skin = LocalSkin.current
     val item = vm.currentFolder()
     if (item == null) {
         LaunchedEffect(Unit) { vm.go(Screen.Library) }
@@ -129,14 +126,30 @@ fun FolderScreen(vm: ElyndraViewModel) {
                         )
                     }
                     Spacer(Modifier.width(8.dp))
+                    // "Abrir" vive aquí, sobre el fondo del juego y con la misma
+                    // pinta que en la biblioteca: el dock de abajo ya no existe.
+                    // Con qué emulador se abre lo dice el botón de al lado.
+                    OpenButton(enabled = rom != null) { rom?.let { vm.openRom(it) } }
+                    Spacer(Modifier.width(8.dp))
+                    // Con "Abrir" en medio la barra va justa, así que el nombre del
+                    // emulador —que puede ser larguísimo— no se queda con más de la
+                    // mitad de lo que sobra: el resto es para el título de la carpeta.
                     Box(
                         Modifier
+                            .weight(1f, fill = false)
                             .alpha(if (item.emulatorInstalled) 1f else 0.6f)
                             .darkGlass(RoundedCornerShape(11.dp))
                             .clickable { vm.pickFolderEmulator(item.folder) }
                             .padding(horizontal = 11.dp, vertical = 6.dp),
                     ) {
-                        ElyText(emulatorLabel, size = 10f, weight = FontWeight.SemiBold, color = Color.White, maxLines = 1)
+                        ElyText(
+                            emulatorLabel,
+                            size = 10f,
+                            weight = FontWeight.SemiBold,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
             },
@@ -249,9 +262,10 @@ fun FolderScreen(vm: ElyndraViewModel) {
                     contentPadding = PaddingValues(
                         start = m.pad,
                         end = m.pad,
-                        // Hueco extra arriba para la card seleccionada, que sube y se amplía.
-                        top = if (m.landscape) 12.dp else 14.dp,
-                        bottom = if (m.landscape) 6.dp else 10.dp,
+                        // Hueco para la card seleccionada, que sube y se amplía: sin él
+                        // se metía sobre el rótulo de ROMS.
+                        top = m.carouselTop,
+                        bottom = m.carouselBottom,
                     ),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.Top,
@@ -277,51 +291,9 @@ fun FolderScreen(vm: ElyndraViewModel) {
             }
         }
 
-        // ── DOCK ──
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(start = m.pad, end = m.pad, bottom = if (m.landscape) 6.dp else 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(
-                Modifier
-                    .height(34.dp)
-                    .glass(RoundedCornerShape(12.dp))
-                    .clickable { vm.go(Screen.Library) }
-                    .padding(horizontal = 11.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BackChevron(size = 13.dp)
-                Spacer(Modifier.width(5.dp))
-                ElyText(stringResource(R.string.library_back), size = 11.5f, weight = FontWeight.SemiBold, color = P.ink, maxLines = 1)
-            }
-
-            Row(
-                Modifier
-                    .weight(1f)
-                    .height(34.dp)
-                    .alpha(if (rom != null) 1f else 0.45f)
-                    .shadow(10.dp, RoundedCornerShape(12.dp), clip = false, ambientColor = P.shade.copy(alpha = 0.24f), spotColor = P.shade.copy(alpha = 0.24f))
-                    .clip(RoundedCornerShape(12.dp))
-                    .drawBehind { drawRect(accentGradient(skin, 145f, size)) }
-                    .clickable(enabled = rom != null) { rom?.let { vm.openRom(it) } },
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                PlayGlyph()
-                Spacer(Modifier.width(7.dp))
-                ElyText(
-                    stringResource(R.string.open_in, rom?.emulatorId?.let { vm.emulatorName(it) } ?: emulatorLabel),
-                    size = 12.5f,
-                    weight = FontWeight.SemiBold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+        // Sin dock: "Abrir" está arriba, sobre el fondo del juego, junto al
+        // botón de emulador, y para volver está la flecha de la misma barra.
+        // El alto que ocupaba se lo reparten hero y cards (ver Metrics).
     }
 }
 
