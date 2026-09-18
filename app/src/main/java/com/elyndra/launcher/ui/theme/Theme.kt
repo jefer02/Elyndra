@@ -1,6 +1,8 @@
 package com.elyndra.launcher.ui.theme
 
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -69,10 +71,15 @@ val LocalLandscape = staticCompositionLocalOf { false }
 
 @Composable
 fun ElyndraTheme(skin: ElyndraSkin, landscape: Boolean, content: @Composable () -> Unit) {
+    // El realce de lo pulsable va aquí y no en cada composable: así todo lo
+    // que se pueda pulsar —incluidas las pantallas de formulario— se señala
+    // solo cuando lo alcanza el foco del mando (ver FocusRing).
+    val indication = remember(skin.accent) { focusRingFor(skin) }
     CompositionLocalProvider(
         LocalSkin provides skin,
         LocalLandscape provides landscape,
         LocalPoppins provides Poppins,
+        LocalIndication provides indication,
         content = content,
     )
 }
