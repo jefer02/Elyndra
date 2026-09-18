@@ -45,8 +45,6 @@
     <!-- Dossier -->
     <string name="rom_chip">ROM · %1$s</string>
     <string name="roms_header">ROMs</string>
-    <string name="library_back">Bibliothèque</string>
-    <string name="open_in">Ouvrir dans %1$s</string>
     <string name="folder_empty">Aucune ROM dans ce dossier. Relancez l\'analyse ou vérifiez le système choisi.</string>
     <plurals name="roms_summary">
         <item quantity="one">%1$d ROM · %2$s</item>
