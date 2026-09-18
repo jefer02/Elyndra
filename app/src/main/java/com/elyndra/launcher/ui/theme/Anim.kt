@@ -255,24 +255,33 @@ fun auroraOffset(periodMs: Int, reverse: Boolean): Triple<Float, Float, Float> {
 }
 
 /**
- * Elevación en dp de la card seleccionada. El diseño subía 8px; aquí sube
- * más para que la selección se lea de un vistazo desde lejos (modo salón).
+ * Lo que sube la card seleccionada. El diseño subía 8px; aquí sube más para
+ * que la selección se lea de un vistazo desde lejos (modo salón).
+ *
+ * Público porque el carrusel tiene que reservar este hueco por encima de las
+ * cards (ver `metrics` en Layout.kt); si no, la elegida se sale por arriba.
  */
+val SelectionLift = 14.dp
+
+/** Ampliación de la card seleccionada (el diseño usaba 1.08). */
+const val SelectionScale = 1.14f
+
+/** Elevación en dp de la card seleccionada. */
 @Composable
 fun selectionLift(selected: Boolean): Dp {
     val t = androidx.compose.animation.core.animateDpAsState(
-        targetValue = if (selected) (-14).dp else 0.dp,
+        targetValue = if (selected) -SelectionLift else 0.dp,
         animationSpec = tween(300, easing = Swift),
         label = "lift",
     )
     return t.value
 }
 
-/** Ampliación de la card seleccionada (el diseño usaba 1.08). */
+/** Ampliación animada de la card seleccionada. */
 @Composable
 fun selectionScale(selected: Boolean): Float {
     val t = androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (selected) 1.14f else 1f,
+        targetValue = if (selected) SelectionScale else 1f,
         animationSpec = tween(300, easing = Swift),
         label = "scale",
     )
