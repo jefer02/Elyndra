@@ -41,3 +41,6 @@ Thumbs.db
 # KeyStore y firmas de seguridad
 *.jks
 *.keystore
+
+# Ignorar builds y releases compilados
+app/release/
