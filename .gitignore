@@ -36,3 +36,8 @@ keystore.properties
 Thumbs.db
 *.swp
 *.swo
+
+
+# KeyStore y firmas de seguridad
+*.jks
+*.keystore
