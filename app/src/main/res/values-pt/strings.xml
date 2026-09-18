@@ -45,8 +45,6 @@
     <!-- Pasta -->
     <string name="rom_chip">ROM · %1$s</string>
     <string name="roms_header">ROMs</string>
-    <string name="library_back">Biblioteca</string>
-    <string name="open_in">Abrir no %1$s</string>
     <string name="folder_empty">Não há ROMs nesta pasta. Escaneie de novo ou confira se o sistema está certo.</string>
     <plurals name="roms_summary">
         <item quantity="one">%1$d ROM · %2$s</item>
