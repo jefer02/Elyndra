@@ -122,6 +122,29 @@ fun heroScrimBrush(scrim: Float, size: Size): Brush = cssLinearGradient(
     stops = listOf(0f, 0.42f, 1f),
 )
 
+/**
+ * Velo del hero cuando el juego sí tiene fondo: solo sus dos cantos.
+ *
+ * El fondo de un juego es la pieza que más se mira de la pantalla, así que
+ * en el centro el velo vale cero — la imagen se ve tal cual, sin lavar— y el
+ * degradado se guarda para la franja de la barra de arriba y para la del
+ * titular, que es donde el texto blanco necesita algo debajo. La tinta es
+ * negra y no el gris del diseño: da el mismo contraste con menos opacidad y,
+ * sobre todo, oscurece la imagen en vez de desteñirla.
+ * "Intensidad del hero" sigue mandando sobre las dos franjas.
+ */
+fun heroEdgeScrimBrush(scrim: Float, size: Size): Brush = cssLinearGradient(
+    180f,
+    listOf(
+        Color.Black.copy(alpha = scrim * 0.55f),
+        Color.Transparent,
+        Color.Transparent,
+        Color.Black.copy(alpha = scrim * 0.85f),
+    ),
+    size,
+    stops = listOf(0f, 0.30f, 0.58f, 1f),
+)
+
 /** Velo de las carátulas de ROM: claro arriba, tinta abajo para que se lea el título. */
 fun romScrimBrush(size: Size): Brush = cssLinearGradient(
     180f,
