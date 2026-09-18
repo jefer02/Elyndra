@@ -7,6 +7,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +35,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -46,8 +49,10 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.pluralStringResource
@@ -57,6 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
 import com.elyndra.launcher.data.P
@@ -68,9 +74,10 @@ import com.elyndra.launcher.ui.Screen
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GameIcon
 import com.elyndra.launcher.ui.components.Hero
+import com.elyndra.launcher.ui.components.LocalScreenSize
 import com.elyndra.launcher.ui.components.LogoImage
+import com.elyndra.launcher.ui.components.OpenButton
 import com.elyndra.launcher.ui.components.Metrics
-import com.elyndra.launcher.ui.components.PlayGlyph
 import com.elyndra.launcher.ui.components.SearchGlyph
 import com.elyndra.launcher.ui.components.SettingsGlyph
 import com.elyndra.launcher.ui.components.inputStyle
@@ -151,6 +158,13 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                             maxLines = 1,
                         )
                         Spacer(Modifier.weight(1f))
+                        // "Abrir" vive aquí, sobre el fondo del juego. Mientras
+                        // se busca desaparece: el campo abierto necesita ese
+                        // ancho y ahí nadie está lanzando nada.
+                        if (!vm.searchOpen) {
+                            OpenButton(enabled = sel != null) { sel?.let { vm.open(it) } }
+                            Spacer(Modifier.width(8.dp))
+                        }
                         SearchField(vm, m)
                         Spacer(Modifier.width(8.dp))
                         Box(
@@ -291,16 +305,14 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         contentPadding = PaddingValues(
                             start = m.pad,
                             end = m.pad,
-                            // Hueco extra arriba para la card seleccionada, que sube y se amplía.
-                            top = if (m.landscape) 12.dp else 14.dp,
-                            bottom = if (m.landscape) 6.dp else 10.dp,
+                            // Hueco para la card seleccionada, que sube y se amplía: sin él
+                            // se metía sobre la fila de filtros.
+                            top = m.carouselTop,
+                            bottom = m.carouselBottom,
                         ),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.Top,
                     ) {
-                        if (libraryEmpty) {
-                            item(key = "add") { AddTile(m) { vm.go(Screen.Add) } }
-                        }
                         itemsIndexed(items, key = { _, it -> it.key }) { i, item ->
                             LibraryTile(
                                 item = item,
@@ -316,59 +328,24 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                                 },
                             )
                         }
+                        // "Añadir" es una card más y va al final de la fila: con la
+                        // biblioteca vacía es la única que hay, y en cuanto entra
+                        // un juego se corre detrás de todos sin dejar de estar a mano.
+                        // El `loaded` evita que la card asome mientras se lee la
+                        // biblioteca del disco, con el carrusel todavía vacío.
+                        if (vm.loaded) {
+                            item(key = "add") { AddTile(m, items.size) { vm.go(Screen.Add) } }
+                        }
                     }
                 }
             }
 
-            // ── DOCK ──
-            // Compacto a propósito: "Añadir" y Lucy quedan como iconos y solo
-            // "Abrir" conserva rótulo, para que el dock reste lo mínimo posible
-            // al alto de las carátulas (ver `chrome` en Metrics).
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(start = m.pad, end = m.pad, bottom = if (m.landscape) 6.dp else 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    Modifier
-                        .size(DOCK_H)
-                        .glass(RoundedCornerShape(12.dp))
-                        .clickable { vm.go(Screen.Add) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    ElyText("+", size = 17f, weight = FontWeight.SemiBold, color = skin.a2, lineHeightRatio = 1f)
-                }
-
-                Row(
-                    Modifier
-                        .weight(1f)
-                        .height(DOCK_H)
-                        .alpha(if (sel != null) 1f else 0.45f)
-                        .shadow(10.dp, RoundedCornerShape(12.dp), clip = false, ambientColor = P.shade.copy(alpha = 0.24f), spotColor = P.shade.copy(alpha = 0.24f))
-                        .clip(RoundedCornerShape(12.dp))
-                        .drawBehind { drawRect(accentGradient(skin, 145f, size)) }
-                        .clickable(enabled = sel != null) { sel?.let { vm.open(it) } },
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    PlayGlyph()
-                    Spacer(Modifier.width(7.dp))
-                    ElyText(stringResource(R.string.open), size = 12f, weight = FontWeight.SemiBold, color = Color.White, maxLines = 1)
-                }
-            }
+            // Sin dock: "Abrir" está arriba, sobre el fondo del juego, y
+            // "Añadir" es la última card del carrusel. El alto que ocupaba se
+            // lo reparten hero y cards (ver `libFree` en Metrics).
         }
 
-        // Lucy, flotando justo encima del dock.
-        LucyFab(
-            Modifier
-                .align(Alignment.BottomEnd)
-                .padding(
-                    end = m.pad,
-                    bottom = (if (m.landscape) 6.dp else 10.dp) + DOCK_H + 12.dp,
-                ),
-        ) { vm.go(Screen.Lucy) }
+        LucyFab(vm, m)
     }
 }
 
@@ -510,29 +487,85 @@ private fun SearchField(vm: ElyndraViewModel, m: Metrics) {
     }
 }
 
-/** Alto del dock compacto; `chrome` en Metrics cuenta con este número. */
-private val DOCK_H = 34.dp
-
-/** Lado del botón de Lucy: flota sobre el dock, así que no se ata a su alto. */
+/** Lado del botón de Lucy: flota sobre el carrusel, así que no se ata a nada. */
 private val LUCY_FAB = 58.dp
+
+/** Margen del botón de Lucy en la esquina donde nace. */
+private val LUCY_MARGIN = 16.dp
 
 /**
  * Botón de Lucy, con el aro que late.
  *
- * Flota sobre el carrusel, en la esquina de abajo a la derecha: dentro del dock
- * quedaba del tamaño de un icono más y pasaba desapercibido.
+ * Flota sobre el carrusel: dentro del dock quedaba del tamaño de un icono más
+ * y pasaba desapercibido. Nace abajo a la derecha, pero se puede mantener
+ * pulsado —vibra y se agranda: ya está cogido— y arrastrar a cualquier punto
+ * de la pantalla, y ahí se queda, también al volver a abrir la app
+ * ([com.elyndra.launcher.ui.SettingsController.moveLucy]).
+ *
+ * La posición se guarda en dp desde la esquina superior izquierda y se recorta
+ * al pintar, no al guardar: así girar el móvil lo devuelve a la pantalla sin
+ * perder el sitio que tenía en la otra orientación.
  */
 @Composable
-private fun LucyFab(modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun LucyFab(vm: ElyndraViewModel, metrics: Metrics) {
     val skin = LocalSkin.current
+    val screen = LocalScreenSize.current
+    val haptics = LocalHapticFeedback.current
     val ring = ringProgress()
     val shape = CircleShape
+
+    val maxX = (screen.width - LUCY_FAB).value.coerceAtLeast(0f)
+    val maxY = (screen.height - LUCY_FAB).value.coerceAtLeast(0f)
+    val homeX = (maxX - metrics.pad.value).coerceAtLeast(0f)
+    val homeY = (maxY - LUCY_MARGIN.value).coerceAtLeast(0f)
+
+    var x by remember { mutableStateOf(vm.settings.lucyX ?: homeX) }
+    var y by remember { mutableStateOf(vm.settings.lucyY ?: homeY) }
+    var dragging by remember { mutableStateOf(false) }
+    val left = x.coerceIn(0f, maxX)
+    val top = y.coerceIn(0f, maxY)
+    // Mientras se arrastra crece un poco y levanta más sombra: es lo que
+    // distingue "lo llevo en el dedo" de "lo he pulsado".
+    val lift by animateFloatAsState(if (dragging) 1.12f else 1f, tween(160), label = "lucyLift")
+
     Box(
-        modifier
+        Modifier
+            .offset { IntOffset(left.dp.roundToPx(), top.dp.roundToPx()) }
             .size(LUCY_FAB)
-            .shadow(14.dp, shape, clip = false, ambientColor = P.shade.copy(alpha = 0.3f), spotColor = P.shade.copy(alpha = 0.3f))
+            .graphicsLayer {
+                scaleX = lift
+                scaleY = lift
+            }
+            .shadow(
+                if (dragging) 22.dp else 14.dp,
+                shape,
+                clip = false,
+                ambientColor = P.shade.copy(alpha = 0.3f),
+                spotColor = P.shade.copy(alpha = 0.3f),
+            )
             .glass(shape)
-            .clickable(onClick = onClick),
+            .clickable { vm.go(Screen.Lucy) }
+            .pointerInput(maxX, maxY) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = {
+                        dragging = true
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    },
+                    onDragEnd = {
+                        dragging = false
+                        vm.settings.moveLucy(x.coerceIn(0f, maxX), y.coerceIn(0f, maxY))
+                    },
+                    onDragCancel = {
+                        dragging = false
+                        vm.settings.moveLucy(x.coerceIn(0f, maxX), y.coerceIn(0f, maxY))
+                    },
+                    onDrag = { change, delta ->
+                        change.consume()
+                        x = (x + delta.x.toDp().value).coerceIn(0f, maxX)
+                        y = (y + delta.y.toDp().value).coerceIn(0f, maxY)
+                    },
+                )
+            },
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -556,12 +589,18 @@ private fun LucyFab(modifier: Modifier = Modifier, onClick: () -> Unit) {
     }
 }
 
-/** Primera vez: la biblioteca está vacía y la única card invita a añadir. */
+/**
+ * La card de "Añadir": la única del carrusel cuando la biblioteca está vacía
+ * y, en cuanto hay juegos, la última de la fila.
+ */
 @Composable
-private fun AddTile(metrics: Metrics, onClick: () -> Unit) {
+private fun AddTile(metrics: Metrics, index: Int, onClick: () -> Unit) {
     val skin = LocalSkin.current
     Column(
-        Modifier.width(metrics.iconTile).animPopIn(key = "add").clickable(onClick = onClick),
+        Modifier
+            .width(metrics.iconTile)
+            .animPopIn(delayMs = minOf(index, 12) * 35, key = "add")
+            .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
