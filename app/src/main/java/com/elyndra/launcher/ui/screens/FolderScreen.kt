@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -85,6 +86,12 @@ fun FolderScreen(vm: ElyndraViewModel) {
     val roms = vm.folderRoms(item.folder.id)
     val rom = vm.selectedRom()
     val emulatorLabel = item.emulatorName ?: stringResource(R.string.choose_emulator)
+    // Con mando la selección se mueve sin arrastrar el carrusel: va detrás.
+    val carousel = rememberLazyListState()
+    LaunchedEffect(rom?.key, roms.size) {
+        val index = roms.indexOfFirst { it.key == rom?.key }
+        if (index >= 0) runCatching { carousel.animateScrollToItem(index) }
+    }
 
     Column(Modifier.fillMaxSize().animFadeIn(key = Screen.Folder)) {
 
@@ -238,6 +245,7 @@ fun FolderScreen(vm: ElyndraViewModel) {
             } else {
                 LazyRow(
                     Modifier.fillMaxWidth().weight(1f),
+                    state = carousel,
                     contentPadding = PaddingValues(
                         start = m.pad,
                         end = m.pad,
