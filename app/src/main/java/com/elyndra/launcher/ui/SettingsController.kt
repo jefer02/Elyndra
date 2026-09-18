@@ -115,6 +115,24 @@ class SettingsController(private val vm: ElyndraViewModel) {
         return ext in VIDEO_EXTENSIONS
     }
 
+    /* ── botón de Lucy ────────────────────────────────────────── */
+
+    /**
+     * Dónde está el botón de Lucy, en dp desde la esquina superior izquierda.
+     * `null` en cualquiera de los dos = nunca se ha movido, y entonces manda
+     * su esquina de siempre.
+     */
+    var lucyX by mutableStateOf(store.lucyX); private set
+    var lucyY by mutableStateOf(store.lucyY); private set
+
+    /** Lucy se queda donde se la suelte, también al volver a abrir la app. */
+    fun moveLucy(x: Float, y: Float) {
+        lucyX = x
+        lucyY = y
+        store.lucyX = x
+        store.lucyY = y
+    }
+
     /* ── orden de la biblioteca ───────────────────────────────── */
 
     var sortMode by mutableStateOf(SortMode.byId(store.sortMode)); private set
