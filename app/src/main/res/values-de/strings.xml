@@ -43,8 +43,6 @@
     <!-- Ordner -->
     <string name="rom_chip">ROM · %1$s</string>
     <string name="roms_header">ROMs</string>
-    <string name="library_back">Bibliothek</string>
-    <string name="open_in">In %1$s öffnen</string>
     <string name="folder_empty">Keine ROMs in diesem Ordner. Scanne ihn erneut oder prüfe, ob das System stimmt.</string>
     <plurals name="roms_summary">
         <item quantity="one">%1$d ROM · %2$s</item>
