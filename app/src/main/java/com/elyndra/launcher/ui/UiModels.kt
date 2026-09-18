@@ -167,6 +167,8 @@ data class DialogSpec(
 enum class SheetIcon {
     Play,
     GameId,
+    Search,
+    Sort,
     Details,
     Emulator,
     Rescan,
