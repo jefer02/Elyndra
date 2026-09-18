@@ -205,6 +205,25 @@ private fun DrawScope.drawSheetGlyph(icon: SheetIcon, color: Color) {
             line(0.50f, 0.36f, 0.50f, 0.64f)
         }
 
+        // Buscar: lupa.
+        SheetIcon.Search -> {
+            drawCircle(color, radius = w * 0.26f, center = Offset(w * 0.44f, h * 0.44f), style = stroke)
+            line(0.63f, 0.63f, 0.84f, 0.84f)
+        }
+
+        // Ordenar: tres reglones de menos a más, como una lista ordenada.
+        SheetIcon.Sort -> {
+            line(0.18f, 0.30f, 0.66f, 0.30f)
+            line(0.18f, 0.50f, 0.54f, 0.50f)
+            line(0.18f, 0.70f, 0.42f, 0.70f)
+            line(0.78f, 0.26f, 0.78f, 0.74f)
+            shape(stroke) {
+                moveTo(w * 0.70f, h * 0.64f)
+                lineTo(w * 0.78f, h * 0.76f)
+                lineTo(w * 0.86f, h * 0.64f)
+            }
+        }
+
         // Quitar: papelera.
         SheetIcon.Remove -> {
             line(0.14f, 0.28f, 0.86f, 0.28f)
