@@ -1,6 +1,5 @@
 package com.elyndra.launcher.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,9 +11,6 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
@@ -26,14 +22,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import com.elyndra.launcher.ui.theme.LocalLandscape
 import com.elyndra.launcher.ui.theme.LocalSkin
+import com.elyndra.launcher.ui.theme.SelectionLift
+import com.elyndra.launcher.ui.theme.SelectionScale
 import com.elyndra.launcher.ui.theme.animHeroIn
+import com.elyndra.launcher.ui.theme.heroEdgeScrimBrush
 import com.elyndra.launcher.ui.theme.heroScrimBrush
 import com.elyndra.launcher.ui.theme.liquidGlass
 import java.io.File
 
 /* ─────────────────────────────────────────────────────────────
      Escalan igual en móvil y en tableta:
-     libre = alto − (filtros + márgenes + nombre + dock compacto)
+     libre = alto − (filtros + márgenes + nombre + hueco de selección)
 
    El reparto es exacto: **hero + card == libre**, siempre. El hero se
    lleva su porcentaje y la card se queda con el resto; si algún tope
@@ -42,9 +41,10 @@ import java.io.File
    el carrusel en vertical (antes hero y card se calculaban por separado
    y un mínimo posterior podía deshacer el tope).
 
-   Topes de la card:
-     · ancho: su carátula 2:3 no puede comerse la fila.
-     · mínimo: por debajo no se distingue la carátula.
+   Ya no hay dock en ninguna pantalla —"Abrir" vive en la barra del hero—,
+   así que ese alto se reparte entre hero y cards, y una parte se la lleva el
+   hueco de arriba del carrusel (`carouselTop`), que es lo que evita que la
+   card seleccionada se suba al rótulo de su fila.
 
    Todas las cards miden igual —carpetas de emulador, juegos Android y
    ROMs— con proporción de carátula 2:3.
@@ -64,10 +64,17 @@ data class Metrics(
     val titleSize: Float,
     /** Alto del logo que sustituye a ese título. */
     val logoH: Dp,
+    /** Hueco sobre las cards del carrusel: lo que la seleccionada sube y crece. */
+    val carouselTop: Dp,
+    /** Hueco bajo las cards del carrusel. */
+    val carouselBottom: Dp,
 )
 
 /** Lado máximo de la card de icono: por encima se ve desproporcionada en tablet. */
 private const val ICON_TILE_MAX = 168f
+
+/** Aire de cortesía entre la card seleccionada y el rótulo de su fila. */
+private const val TILE_SLACK = 6f
 
 /** Proporción de las carátulas (2:3, el estándar de box art). */
 const val COVER_RATIO = 2f / 3f
@@ -81,28 +88,38 @@ fun metrics(): Metrics {
     val screen = LocalScreenSize.current
     val w = screen.width.value
     val h = screen.height.value
-    // Alto que no es ni hero ni card: filtros, márgenes del carrusel, nombre bajo
-    // la card y el dock compacto (ver LibraryScreen: 34dp + aire).
-    val chrome = if (l) 118f else 132f
-    val free = (h - chrome).coerceAtLeast(150f)
+    // Alto fijo que no es ni hero ni card: la fila de filtros, el nombre bajo la
+    // card y el aire entre medias. Ninguna pantalla lleva ya dock —"Abrir" está
+    // en la barra del hero—, así que esos dp vuelven al reparto.
+    val fixed = if (l) 62f else 74f
+    val bottom = if (l) 6f else 10f
+    // La card seleccionada sube [SelectionLift] y se amplía [SelectionScale]
+    // desde su centro, o sea que la mitad de lo que crece se le va por arriba.
+    // Ese hueco lo reserva el carrusel; sin él la card elegida se metía encima
+    // del rótulo de la fila (ROMS en Carpeta, los filtros en Biblioteca).
+    val grow = (SelectionScale - 1f) / 2f
+    val headroom = SelectionLift.value + TILE_SLACK
+    // El alto de la card sale de despejar `card = (libre − hueco) · f` con
+    // `hueco = headroom + card · grow`: así el hueco crece con la card y la
+    // suma sigue cuadrando con la pantalla, también en tablet.
+    val f = 1f - (if (l) 0.60f else 0.61f)
+    val room = (h - fixed - bottom - headroom).coerceAtLeast(150f)
 
     // El hero manda —con logo ocupa menos que una carátula, así que se le da
     // más sitio— y la card se queda con el resto exacto.
-    var hero = free * (if (l) 0.60f else 0.64f)
-    var tile = free - hero
-
-    val maxTileByWidth = w * (if (l) 0.30f else 0.46f) / COVER_RATIO
-    if (tile > maxTileByWidth) {
-        tile = maxTileByWidth
-        hero = free - tile
-    }
+    // Topes de la card: su carátula 2:3 no puede comerse la fila, y por debajo
+    // de un mínimo no se distingue.
+    var tile = room * f / (1f + grow * f)
+    val maxTileByWidth = w * (if (l) 0.30f else 0.50f) / COVER_RATIO
+    if (tile > maxTileByWidth) tile = maxTileByWidth
     val minTile = if (l) 72f else 104f
-    if (tile < minTile) {
-        // En una pantalla muy baja la card se queda como mucho con la mitad:
-        // repartir a medias es preferible a que el hero la deje sin sitio.
-        tile = minTile.coerceAtMost(free * 0.5f)
-        hero = free - tile
-    }
+    // En una pantalla muy baja la card se queda como mucho con la mitad:
+    // repartir a medias es preferible a que el hero la deje sin sitio.
+    if (tile < minTile) tile = minTile.coerceAtMost(room * 0.5f)
+
+    val top = headroom + tile * grow
+    val free = (h - fixed - bottom - top).coerceAtLeast(150f)
+    val hero = free - tile
 
     // La biblioteca no usa carátulas: sus cards son cuadradas (formato de
     // icono). El lado lo manda el ancho —una card cuadrada tan alta como una
@@ -136,14 +153,23 @@ fun metrics(): Metrics {
         iconHeroH = iconHero.dp,
         titleSize = titleSize,
         logoH = (titleSize * if (l) 1.25f else 1.6f).dp,
+        carouselTop = top.dp,
+        carouselBottom = bottom.dp,
     )
 }
 
 /**
- * El bloque de hero compartido por Biblioteca y Carpeta: carátula ampliada,
- * velo degradado y, encima, la barra superior y el bloque de título. Si el
- * juego tiene fondo descargado (fanart, hero de SteamGridDB, captura), se
- * pinta sobre la carátula procedural con la misma ampliación del 115 %.
+ * El bloque de hero compartido por Biblioteca y Carpeta: el fondo del juego
+ * y, encima, la barra superior y el bloque de título.
+ *
+ * Con fondo (fanart, hero de SteamGridDB, captura) la imagen se pinta limpia:
+ * ni cristal ni ampliación, que era lo que la dejaba lechosa y blanda. Encima
+ * solo va el velo de los cantos, que no toca el centro (ver
+ * [heroEdgeScrimBrush]).
+ *
+ * Sin fondo no hay nada que enseñar y el texto blanco se quedaría sobre el
+ * papel de la app: ahí sí entran el cristal —que además deja ver la aurora—
+ * y el velo entero del diseño.
  */
 @Composable
 fun Hero(
@@ -163,32 +189,24 @@ fun Hero(
             .height(height)
             .clipToBounds(),
     ) {
-        // Sin fondo de serie: solo el fondo del juego, si lo hay. Lo demás lo
-        // pone el cristal, que deja ver la aurora de la pantalla.
-        Box(
-            Modifier
-                .fillMaxSize()
-                .animHeroIn(key = heroKey),
-        ) {
-            if (imagePath != null) {
-                val file = remember(imagePath) { File(context.filesDir, imagePath) }
-                AsyncImage(
-                    model = file,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            scaleX = 1.15f
-                            scaleY = 1.15f
-                        },
-                )
-            }
+        if (imagePath != null) {
+            val file = remember(imagePath) { File(context.filesDir, imagePath) }
+            AsyncImage(
+                model = file,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .animHeroIn(key = heroKey),
+            )
+            Box(Modifier.fillMaxSize().drawBehind { drawRect(heroEdgeScrimBrush(skin.scrim, size)) })
+        } else {
+            // Sin animar: el cristal es material de la pantalla, no del juego,
+            // y encenderlo en cada cambio de selección se lee como parpadeo.
+            Box(Modifier.fillMaxSize().liquidGlass(RectangleShape, Color.Transparent))
+            // `heroScrim`
+            Box(Modifier.fillMaxSize().drawBehind { drawRect(heroScrimBrush(skin.scrim, size)) })
         }
-        // Cristal líquido sobre el fondo, y encima el velo que hace legible el texto.
-        Box(Modifier.fillMaxSize().liquidGlass(RectangleShape, Color.Transparent))
-        // `heroScrim`
-        Box(Modifier.fillMaxSize().drawBehind { drawRect(heroScrimBrush(skin.scrim, size)) })
         topBar()
         info()
     }
