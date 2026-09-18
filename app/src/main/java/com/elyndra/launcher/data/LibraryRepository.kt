@@ -92,7 +92,7 @@ class LibraryRepository(private val file: File, private val scope: CoroutineScop
 
     /** Da de alta una carpeta con las ROMs encontradas. Devuelve las claves de las ROMs nuevas. */
     fun addFolder(folder: RomFolder, found: List<RomScanner.Found>): List<String> {
-        val roms = found.map { newRom(folder, it) }
+        val roms = found.filterNot { it.docId in folder.excluded }.map { newRom(folder, it) }
         update { lib ->
             lib.copy(
                 folders = lib.folders.filterNot { it.id == folder.id } + folder,
@@ -111,7 +111,9 @@ class LibraryRepository(private val file: File, private val scope: CoroutineScop
             val folder = lib.folders.firstOrNull { it.id == folderId } ?: return@update lib
             val existing = lib.roms.filter { it.folderId == folderId }.associateBy { it.docId }
             val added = mutableListOf<String>()
-            val merged = found.map { f ->
+            // Lo que el usuario quitó no vuelve por un reanálisis: el archivo
+            // sigue ahí, pero él ya dijo que no lo quiere en la biblioteca.
+            val merged = found.filterNot { it.docId in folder.excluded }.map { f ->
                 existing[f.docId]?.copy(
                     fileName = f.name,
                     relPath = f.relPath,
@@ -149,6 +151,27 @@ class LibraryRepository(private val file: File, private val scope: CoroutineScop
     }
 
     fun setRomEmulator(romId: String, emulatorId: String?) = updateRom(romId) { it.copy(emulatorId = emulatorId) }
+
+    /**
+     * Quita un juego de la biblioteca sin tocar el archivo.
+     *
+     * Elyndra no borra nada del almacenamiento: lo que hace es olvidarse del
+     * juego y anotar su documento en [RomFolder.excluded], para que el
+     * siguiente análisis no lo devuelva.
+     */
+    fun removeRom(romId: String) = update { lib ->
+        val rom = lib.roms.firstOrNull { it.id == romId } ?: return@update lib
+        lib.copy(
+            roms = lib.roms.filterNot { it.id == romId },
+            folders = lib.folders.map {
+                if (it.id == rom.folderId) it.copy(excluded = it.excluded + rom.docId) else it
+            },
+            sessions = lib.sessions.filterNot { it.key == rom.key },
+        )
+    }
+
+    /** Deshace todos los "quitar" de una carpeta; los juegos vuelven al reanalizar. */
+    fun restoreRemoved(folderId: String) = updateFolder(folderId) { it.copy(excluded = emptySet()) }
 
     /** Id del juego dentro del runtime de Windows; null lo borra. */
     fun setPcGameId(romId: String, gameId: String?) = updateRom(romId) { it.copy(pcGameId = gameId) }
