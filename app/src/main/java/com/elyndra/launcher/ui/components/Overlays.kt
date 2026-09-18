@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -48,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
 import com.elyndra.launcher.data.P
@@ -95,8 +97,16 @@ fun ScrimLayer(
     )
 }
 
+/**
+ * Diálogo.
+ *
+ * [focus] es el botón que señala el mando (-1 = ninguno, que es lo normal con
+ * el dedo). Se pinta como un aro de acento alrededor del botón, en el mismo
+ * orden en que los lee [com.elyndra.launcher.ui.InputController.dialogButtons]:
+ * aceptar, descartar y el tercero.
+ */
 @Composable
-fun ElyDialogView(spec: DialogSpec, onDismiss: () -> Unit) {
+fun ElyDialogView(spec: DialogSpec, onDismiss: () -> Unit, focus: Int = -1) {
     ScrimLayer(onDismiss = onDismiss, alignment = Alignment.Center, key = spec) {
         Column(
             Modifier
@@ -124,10 +134,15 @@ fun ElyDialogView(spec: DialogSpec, onDismiss: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                spec.extra?.let { b -> GhostButton(b.label.resolve(), { onDismiss(); b.action() }) }
+                spec.extra?.let { b ->
+                    Box(Modifier.padFocus(focus == 2)) { GhostButton(b.label.resolve(), { onDismiss(); b.action() }) }
+                }
                 Spacer(Modifier.weight(1f))
-                spec.dismiss?.let { b -> GhostButton(b.label.resolve(), { onDismiss(); b.action() }) }
+                spec.dismiss?.let { b ->
+                    Box(Modifier.padFocus(focus == 1)) { GhostButton(b.label.resolve(), { onDismiss(); b.action() }) }
+                }
                 val input = spec.input
+                Box(Modifier.padFocus(focus == 0)) {
                 AccentButton(
                     spec.confirm.label.resolve(),
                     {
@@ -139,9 +154,26 @@ fun ElyDialogView(spec: DialogSpec, onDismiss: () -> Unit) {
                     },
                     fontSize = 12f,
                 )
+                }
             }
         }
     }
+}
+
+/**
+ * Aro de acento alrededor de lo que señala el mando.
+ *
+ * Con el dedo se ve lo que se toca; con mando, no: sin una marca no hay forma
+ * de saber sobre qué va a caer el botón A. Va como un aro por fuera —no tiñe
+ * ni mueve nada— para que el mismo menú sirva para las dos formas de manejarlo.
+ */
+@Composable
+fun Modifier.padFocus(focused: Boolean, radius: Dp = 13.dp): Modifier {
+    if (!focused) return this
+    val skin = LocalSkin.current
+    return this
+        .border(2.dp, skin.a2, RoundedCornerShape(radius))
+        .padding(2.dp)
 }
 
 /**
@@ -202,7 +234,7 @@ private fun DialogField(input: DialogInput, value: String, onChange: (String) ->
  *   · Asa arriba y "Cerrar" abajo: la hoja se lee y se cierra sin apuntar.
  */
 @Composable
-fun ActionSheetView(spec: ActionSheetSpec, onDismiss: () -> Unit) {
+fun ActionSheetView(spec: ActionSheetSpec, onDismiss: () -> Unit, focus: Int = -1) {
     // A la lista se le da un alto máximo propio en vez de repartir el de la
     // hoja con `weight`: con `weight(fill = false)` la lista se medía más corta
     // de lo que luego pintaba y la última fila acababa por debajo de "Cerrar".
@@ -210,6 +242,18 @@ fun ActionSheetView(spec: ActionSheetSpec, onDismiss: () -> Unit) {
     // sigue encogiendo cuando el menú es corto.
     val screenHeight = LocalConfiguration.current.screenHeightDp.dp
     val listMax = (screenHeight * 0.82f - SHEET_CHROME).coerceAtLeast(120.dp)
+
+    val groups = spec.groups.filter { it.actions.isNotEmpty() }
+    // Dónde empieza cada bloque: la primera fila que le toca (para saber cuál
+    // está señalada) y su sitio en la lista (para poder llevarlo a la vista).
+    val rowStarts = groups.runningFold(0) { acc, group -> acc + group.actions.size }
+    val listIndex = groups.runningFold(0) { acc, group -> acc + if (group.header != null) 2 else 1 }
+    val listState = rememberLazyListState()
+    LaunchedEffect(focus) {
+        if (focus < 0) return@LaunchedEffect
+        val group = rowStarts.indexOfLast { it <= focus }.coerceIn(0, groups.lastIndex)
+        runCatching { listState.animateScrollToItem(listIndex[group]) }
+    }
 
     ScrimLayer(onDismiss = onDismiss, alignment = Alignment.BottomCenter, key = spec) {
         Column(
@@ -227,14 +271,19 @@ fun ActionSheetView(spec: ActionSheetSpec, onDismiss: () -> Unit) {
 
             LazyColumn(
                 Modifier.fillMaxWidth().heightIn(max = listMax),
+                state = listState,
                 contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 4.dp),
             ) {
-                spec.groups.filter { it.actions.isNotEmpty() }.forEachIndexed { index, group ->
+                // La fila señalada por el mando se cuenta sobre el menú entero
+                // y no sobre cada bloque: el mando no sabe de bloques, baja
+                // fila a fila.
+                groups.forEachIndexed { index, group ->
+                    val start = rowStarts[index]
                     group.header?.let { header ->
                         item(key = "h$index") { GroupLabel(header) }
                     }
                     item(key = "g$index") {
-                        GroupCard(group.actions) { action ->
+                        GroupCard(group.actions, focus - start) { action ->
                             onDismiss()
                             action.action()
                         }
@@ -325,7 +374,7 @@ private fun GroupLabel(text: UiText) {
 
 /** Un bloque de filas como una sola tarjeta, con filo entre fila y fila. */
 @Composable
-private fun GroupCard(actions: List<SheetAction>, onClick: (SheetAction) -> Unit) {
+private fun GroupCard(actions: List<SheetAction>, focus: Int, onClick: (SheetAction) -> Unit) {
     Column(Modifier.fillMaxWidth().liquidGlass(RoundedCornerShape(18.dp))) {
         actions.forEachIndexed { i, action ->
             if (i > 0) {
@@ -337,19 +386,20 @@ private fun GroupCard(actions: List<SheetAction>, onClick: (SheetAction) -> Unit
                         .background(P.hairline.copy(alpha = 0.55f)),
                 )
             }
-            SheetRow(action) { onClick(action) }
+            SheetRow(action, focused = i == focus) { onClick(action) }
         }
     }
 }
 
 @Composable
-private fun SheetRow(action: SheetAction, onClick: () -> Unit) {
+private fun SheetRow(action: SheetAction, focused: Boolean, onClick: () -> Unit) {
     val skin = LocalSkin.current
     val accent = if (action.destructive) P.red else skin.a2
 
     Row(
         Modifier
             .fillMaxWidth()
+            .padFocus(focused, radius = 12.dp)
             .clickable(onClick = onClick)
             .alpha(if (action.dimmed) 0.5f else 1f)
             .padding(horizontal = 12.dp, vertical = 10.dp),
