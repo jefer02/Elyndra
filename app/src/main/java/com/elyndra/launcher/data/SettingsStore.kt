@@ -109,6 +109,25 @@ class SettingsStore(context: Context) {
         get() = prefs.getInt("videoBg.opacity", 45)
         set(v) = prefs.edit { putInt("videoBg.opacity", v) }
 
+    /* ── botón de Lucy ────────────────────────────────────────── */
+
+    /**
+     * Dónde dejó el usuario el botón de Lucy: dp desde la esquina superior
+     * izquierda del espacio útil. Sin valor = su esquina de siempre (abajo a
+     * la derecha), así que se guarda como par y se lee como par.
+     *
+     * Se guarda en dp y no en fracción de pantalla porque el botón mide dp:
+     * al girar el móvil se recorta contra el nuevo tamaño (ver LibraryScreen)
+     * y así conserva la distancia al borde en vez de saltar.
+     */
+    var lucyX: Float?
+        get() = if (prefs.contains(LUCY_X)) prefs.getFloat(LUCY_X, 0f) else null
+        set(v) = prefs.edit { if (v == null) remove(LUCY_X) else putFloat(LUCY_X, v) }
+
+    var lucyY: Float?
+        get() = if (prefs.contains(LUCY_Y)) prefs.getFloat(LUCY_Y, 0f) else null
+        set(v) = prefs.edit { if (v == null) remove(LUCY_Y) else putFloat(LUCY_Y, v) }
+
     /** Criterio de orden de la biblioteca (id de [com.elyndra.launcher.ui.SortMode]). */
     var sortMode: String
         get() = prefs.getString("sortMode", "name") ?: "name"
@@ -125,4 +144,9 @@ class SettingsStore(context: Context) {
     var notificationsAsked: Boolean
         get() = prefs.getBoolean("perm.notificationsAsked", false)
         set(v) = prefs.edit { putBoolean("perm.notificationsAsked", v) }
+
+    private companion object {
+        const val LUCY_X = "lucy.x"
+        const val LUCY_Y = "lucy.y"
+    }
 }
