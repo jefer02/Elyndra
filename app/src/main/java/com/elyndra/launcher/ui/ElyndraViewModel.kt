@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -67,6 +68,15 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
     /* ── capas superpuestas ───────────────────────────────────── */
     var dialog by mutableStateOf<DialogSpec?>(null); private set
     var sheet by mutableStateOf<ActionSheetSpec?>(null); private set
+
+    /**
+     * Centro de la card que abrió el menú, en coordenadas de ventana.
+     *
+     * El overlay crece desde ahí, así que el menú sale literalmente de lo que
+     * se mantuvo pulsado. Null = no se sabe (mando, menú de la app): entonces
+     * crece desde su propio centro.
+     */
+    var sheetOrigin by mutableStateOf<Offset?>(null); private set
     var detailsKey by mutableStateOf<String?>(null); private set
     var achievements by mutableStateOf<AchievementsState>(AchievementsState.Idle); private set
     var toast by mutableStateOf<UiText?>(null); private set
@@ -832,6 +842,11 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
      * quitar— en vez de en una lista seguida: así "Quitar carpeta" no queda a
      * un dedo de "Abrir", y las cuatro clases de imagen se leen juntas.
      */
+    /** Deja apuntado de dónde sale el menú antes de abrirlo. */
+    fun markSheetOrigin(origin: Offset?) {
+        sheetOrigin = origin
+    }
+
     fun itemOptions(item: LibraryItem) {
         val groups = when (item) {
             is LibraryItem.Folder -> listOf(
@@ -966,6 +981,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                     UiText.res(kind.shortLabel()),
                     detail = if (has) UiText.res(R.string.art_set) else null,
                     icon = kind.sheetIcon(),
+                    preview = art.path(key, kind),
                     opensSheet = true,
                 ) { chooseArtSource(key, title, kind) }
             }
@@ -977,7 +993,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                 ) { clearArt(key, kind) }
             }
         }
-        return SheetGroup(UiText.res(R.string.sheet_group_artwork), set + clear)
+        return SheetGroup(UiText.res(R.string.sheet_group_artwork), set + clear, GroupStyle.Thumbnails)
     }
 
     /**
