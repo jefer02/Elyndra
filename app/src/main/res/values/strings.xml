@@ -30,6 +30,8 @@
     <string name="empty_library_hint">Add Android games or a ROM folder</string>
     <string name="hint_gestures">Tap to select · Double tap to open · Hold for options</string>
     <string name="no_results">Nothing matches your search</string>
+    <string name="empty_filter_android">No Android games yet</string>
+    <string name="empty_filter_consoles">No consoles added yet</string>
     <string name="add_short">Add</string>
     <string name="add_long">Add games or ROMs</string>
     <string name="open">Open</string>
@@ -208,6 +210,7 @@
 
     <!-- Ajustes -->
     <string name="settings_title">Settings</string>
+    <string name="menu_title">Menu</string>
     <string name="section_accent">Accent color</string>
     <string name="accent_label">Accent: %1$s</string>
     <string name="section_glass">Liquid glass</string>
