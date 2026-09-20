@@ -57,7 +57,7 @@ data class ElyndraSkin(
 }
 
 val DefaultSkin = ElyndraSkin(
-    accent = ACCENTS[0],
+    accent = ACCENTS.first { it.id == "lila" },
     tint = TINTS[0],
     blur = 16,
     alphaPct = 55,
