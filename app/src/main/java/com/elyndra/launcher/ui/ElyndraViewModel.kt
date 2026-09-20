@@ -607,6 +607,114 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch { rescan(folder, silent = false) }
     }
 
+    /* ── lo que entra se monta desde el polvo ─────────────────── */
+
+    /** Cards recién añadidas que todavía tienen que montarse. */
+    var materializing by mutableStateOf<Set<String>>(emptySet()); private set
+
+    /** Imagen recién puesta que todavía tiene que montarse. */
+    var materializingArt by mutableStateOf<Pair<String, ArtKind>?>(null); private set
+
+    /**
+     * Marca [keys] para que sus cards se monten al aparecer.
+     *
+     * El temporizador limpia lo que nadie llegó a pintar —lo que se añadió
+     * fuera de pantalla, o en otra pantalla—: sin él, esa marca se quedaría
+     * puesta y la card se montaría más tarde, al asomar con el scroll, sin
+     * venir a cuento.
+     */
+    fun materialize(keys: Collection<String>) {
+        val fresh = keys.toSet()
+        if (fresh.isEmpty()) return
+        materializing = materializing + fresh
+        viewModelScope.launch {
+            delay(MATERIALIZE_TIMEOUT_MS)
+            materializing = materializing - fresh
+        }
+    }
+
+    fun materializeArt(key: String, kind: ArtKind) {
+        materializingArt = key to kind
+        viewModelScope.launch {
+            delay(MATERIALIZE_TIMEOUT_MS)
+            if (isMaterializingArt(key, kind)) materializingArt = null
+        }
+    }
+
+    /** ¿Es *esta* imagen la que se está montando? Lo pregunta quien la pinta. */
+    fun isMaterializingArt(key: String, kind: ArtKind): Boolean {
+        val target = materializingArt ?: return false
+        return target.first == key && target.second == kind
+    }
+
+    /** Las llaman la card y la imagen al terminar de montarse. */
+    fun finishMaterialize(key: String) {
+        if (key in materializing) materializing = materializing - key
+    }
+
+    fun finishMaterializeArt() {
+        materializingArt = null
+    }
+
+    /* ── quitar algo se ve: se deshace antes de irse ──────────── */
+
+    /**
+     * La card que se está deshaciendo ahora mismo, por su clave.
+     *
+     * La card que coincide se desintegra (ver `DisintegratableBox`) y el
+     * borrado de verdad espera a que termine la animación.
+     */
+    var vanishing by mutableStateOf<String?>(null); private set
+
+    /** Lo mismo para una imagen: de qué juego y qué clase de imagen. */
+    var vanishingArt by mutableStateOf<Pair<String, ArtKind>?>(null); private set
+
+    /** ¿Es *esta* imagen la que se está deshaciendo? Lo pregunta quien la pinta. */
+    fun isVanishingArt(key: String, kind: ArtKind): Boolean {
+        val target = vanishingArt ?: return false
+        return target.first == key && target.second == kind
+    }
+
+    private var pendingVanish: (() -> Unit)? = null
+
+    /**
+     * Aplaza [action] hasta que termine la animación.
+     *
+     * Quien avisa de que ha terminado es la propia card ([finishVanish]),
+     * pero el borrado no puede quedar colgando de que alguien la esté
+     * pintando: si lo que se quita no está en pantalla —o su card se va
+     * antes de acabar— el temporizador lo ejecuta igual.
+     */
+    private fun startVanish(action: () -> Unit) {
+        // Si había otra desintegración en curso se cierra antes de empezar
+        // esta: nunca hay dos borrados aplazados a la vez.
+        finishVanish()
+        pendingVanish = action
+        viewModelScope.launch {
+            delay(VANISH_TIMEOUT_MS)
+            finishVanish()
+        }
+    }
+
+    private fun vanishItem(key: String, action: () -> Unit) {
+        startVanish(action)
+        vanishing = key
+    }
+
+    private fun vanishArt(key: String, kind: ArtKind, action: () -> Unit) {
+        startVanish(action)
+        vanishingArt = key to kind
+    }
+
+    /** Lo llama la card al acabar la animación (o el temporizador); corre una sola vez. */
+    fun finishVanish() {
+        val action = pendingVanish ?: return
+        pendingVanish = null
+        vanishing = null
+        vanishingArt = null
+        action()
+    }
+
     fun removeFolder(folder: RomFolder) {
         val count = library.roms.count { it.folderId == folder.id }
         showDialog(
@@ -614,10 +722,12 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                 title = UiText.res(R.string.confirm_remove_title),
                 message = UiText.plural(R.plurals.confirm_remove_folder_msg, count, count),
                 confirm = DialogButton(UiText.res(R.string.remove)) {
-                    library.roms.filter { it.folderId == folder.id }.forEach { app.media.deleteFor(it.key) }
-                    repo.removeFolder(folder.id)
-                    if (library.folders.none { it.treeUri == folder.treeUri }) app.files.releasePermission(folder.treeUri)
-                    if (folderId == folder.id) screen = Screen.Library
+                    vanishItem(folder.key) {
+                        library.roms.filter { it.folderId == folder.id }.forEach { app.media.deleteFor(it.key) }
+                        repo.removeFolder(folder.id)
+                        if (library.folders.none { it.treeUri == folder.treeUri }) app.files.releasePermission(folder.treeUri)
+                        if (folderId == folder.id) screen = Screen.Library
+                    }
                 },
                 dismiss = DialogButton(UiText.res(R.string.close)) {},
             ),
@@ -637,10 +747,12 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                 title = UiText.res(R.string.confirm_remove_title),
                 message = UiText.res(R.string.confirm_remove_game_msg, rom.displayTitle),
                 confirm = DialogButton(UiText.res(R.string.remove)) {
-                    app.media.deleteFor(rom.key)
-                    repo.removeRom(rom.id)
-                    if (selectedRomKey == rom.key) selectedRomKey = null
-                    showToast(UiText.res(R.string.toast_game_removed, rom.displayTitle))
+                    vanishItem(rom.key) {
+                        app.media.deleteFor(rom.key)
+                        repo.removeRom(rom.id)
+                        if (selectedRomKey == rom.key) selectedRomKey = null
+                        showToast(UiText.res(R.string.toast_game_removed, rom.displayTitle))
+                    }
                 },
                 dismiss = DialogButton(UiText.res(R.string.close)) {},
             ),
@@ -668,8 +780,10 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                 title = UiText.res(R.string.confirm_remove_title),
                 message = UiText.res(R.string.confirm_remove_app_msg, title),
                 confirm = DialogButton(UiText.res(R.string.remove)) {
-                    app.media.deleteFor("a:$pkg")
-                    repo.removeApp(pkg)
+                    vanishItem("a:$pkg") {
+                        app.media.deleteFor("a:$pkg")
+                        repo.removeApp(pkg)
+                    }
                 },
                 dismiss = DialogButton(UiText.res(R.string.close)) {},
             ),
@@ -929,15 +1043,25 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
         val keys = repo.addApps(listOf(AppEntry(packageName = pkg, label = label, addedAt = System.currentTimeMillis())))
         val key = keys.firstOrNull() ?: return null
         select(key)
+        materialize(keys)
         if (app.settings.autoMeta && app.credentials.anyConfigured()) engine.start(keys, force = false)
         return key
     }
 
     fun clearArt(key: String, kind: ArtKind) {
-        viewModelScope.launch {
-            art.clear(key, kind)
-            showToast(UiText.res(R.string.art_cleared))
+        val clear = {
+            viewModelScope.launch {
+                art.clear(key, kind)
+                showToast(UiText.res(R.string.art_cleared))
+            }
+            Unit
         }
+        // La carátula y el logo se ven como imagen suelta en pantalla, así que
+        // se deshacen primero y se borran después. El fondo y el icono no
+        // tienen una imagen propia que desintegrar —son parte del hero y de la
+        // card—, y esperar a una animación que nadie pinta solo los haría
+        // tardar más: esos se quitan al momento, como siempre.
+        if (kind == ArtKind.Cover || kind == ArtKind.Logo) vanishArt(key, kind, clear) else clear()
     }
 
     /* ── imagen propia, elegida en la galería ─────────────────── */
@@ -978,6 +1102,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
                     return@launch
                 }
                 val ok = art.applyLocal(key, kind, image)
+                if (ok) materializeArt(key, kind)
                 showToast(UiText.res(if (ok) R.string.art_applied else R.string.art_local_failed))
             }
         }
@@ -1046,6 +1171,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
         artJob?.cancel()
         artJob = viewModelScope.launch {
             val ok = art.apply(state.key, state.kind, candidate.url)
+            if (ok) materializeArt(state.key, state.kind)
             artPicker = null
             showToast(UiText.res(if (ok) R.string.art_applied else R.string.art_apply_failed))
         }
@@ -1177,6 +1303,20 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
 
     companion object {
         private const val LAUNCH_DELAY_MS = 650L
+
+        /**
+         * Margen máximo que espera un borrado a su animación. Holgado sobre
+         * los ~620 ms del efecto: es la red de seguridad para cuando nadie
+         * está pintando lo que se quita, no el tiempo normal de espera.
+         */
+        private const val VANISH_TIMEOUT_MS = 1_200L
+
+        /**
+         * Margen que espera una marca de "móntate" a que alguien la pinte.
+         * Holgado sobre lo que tarda el efecto (esperar a la imagen + ~0,7 s
+         * de montaje): es limpieza, no el tiempo normal.
+         */
+        private const val MATERIALIZE_TIMEOUT_MS = 2_500L
         private const val MAX_SESSION_MINUTES = 12 * 60
         private const val AUTO_RESCAN_MS = 6L * 60 * 60 * 1000
         private val ART_SERVICES = listOf(Service.ScreenScraper, Service.Igdb, Service.SteamGridDb, Service.RetroAchievements)
