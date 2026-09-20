@@ -309,6 +309,39 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
         searchOpen = !searchOpen
     }
 
+    /* ── abrir con portal ─────────────────────────────────────── */
+
+    /**
+     * Lo que se está abriendo ahora mismo, mientras dura la expansión.
+     *
+     * La card que coincide crece hasta llenar la pantalla (ver
+     * `PortalExpandContainer`) y es ella la que llama a [open] —al empezar a
+     * crecer si es un juego Android, para que el lanzamiento y la animación
+     * corran a la vez; al terminar si es una carpeta, para que la pantalla
+     * nueva aparezca ya tapada—.
+     */
+    var opening by mutableStateOf<LibraryItem?>(null); private set
+
+    fun requestOpen(item: LibraryItem) {
+        if (opening != null) return
+        opening = item
+        viewModelScope.launch {
+            // Red de seguridad: si la card deja de pintarse a media animación
+            // —al cambiar de pantalla, por ejemplo— nadie avisaría de que
+            // terminó, y sin esto no se podría volver a abrir nada.
+            delay(OPENING_TIMEOUT_MS)
+            if (opening === item) {
+                opening = null
+                open(item)
+            }
+        }
+    }
+
+    /** La llama la card cuando el portal ya llena la pantalla. */
+    fun openingFinished() {
+        opening = null
+    }
+
     fun open(item: LibraryItem) {
         when (item) {
             is LibraryItem.Folder -> {
@@ -1310,6 +1343,9 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
          * está pintando lo que se quita, no el tiempo normal de espera.
          */
         private const val VANISH_TIMEOUT_MS = 1_200L
+
+        /** Margen máximo del portal antes de abrir sin animación. */
+        private const val OPENING_TIMEOUT_MS = 1_100L
 
         /**
          * Margen que espera una marca de "móntate" a que alguien la pinte.
