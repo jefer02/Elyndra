@@ -136,7 +136,7 @@ fun metrics(): Metrics {
         w * (if (l) 0.30f else 0.46f),
         h * (if (l) 0.26f else 0.22f),
         ICON_TILE_MAX,
-    ) * (if (l) 0.88f else 0.72f)
+    ) * (if (l) 0.91f else 0.76f)
     val iconHero = free - iconSide
 
     val titleSize = if (l) (hero * 0.34f).coerceIn(50f, 96f) else (hero * 0.20f).coerceIn(56f, 112f)

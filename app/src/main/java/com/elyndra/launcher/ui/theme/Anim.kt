@@ -55,6 +55,24 @@ fun Modifier.animFadeIn(durationMs: Int = 300, key: Any? = Unit): Modifier {
     return this.alpha(p)
 }
 
+/**
+ * Entrada de la app al arrancar: fundido, un ligero acercamiento (scale
+ * 0.96→1) y una subida corta de 18px, todo con la curva [Swift] en vez de
+ * lineal. Sustituye al simple `fadeIn` de la biblioteca para que el primer
+ * fotograma que ve el usuario se sienta pulido y no un simple parpadeo.
+ */
+@Composable
+fun Modifier.animAppEntrance(durationMs: Int = 620, key: Any? = Unit): Modifier {
+    val p by playOnce(durationMs, key = key)
+    val dy = with(LocalDensity.current) { (18.dp * (1f - p)).toPx() }
+    return this.graphicsLayer {
+        alpha = p
+        translationY = dy
+        scaleX = 0.96f + 0.04f * p
+        scaleY = 0.96f + 0.04f * p
+    }
+}
+
 /** `@keyframes fadeUp` — opacidad + 12px de subida. */
 @Composable
 fun Modifier.animFadeUp(durationMs: Int = 400, delayMs: Int = 0, key: Any? = Unit): Modifier {

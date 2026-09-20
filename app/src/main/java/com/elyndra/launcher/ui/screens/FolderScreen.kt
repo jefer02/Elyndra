@@ -57,10 +57,12 @@ import com.elyndra.launcher.ui.components.Hero
 import com.elyndra.launcher.ui.components.LogoImage
 import com.elyndra.launcher.ui.components.OpenButton
 import com.elyndra.launcher.ui.components.metrics
+import com.elyndra.launcher.ui.components.rememberWikipediaSummary
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.theme.HeroTitleShadow
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.animFadeIn
+import com.elyndra.launcher.ui.theme.animFadeUp
 import com.elyndra.launcher.ui.theme.animPopIn
 import com.elyndra.launcher.ui.theme.animTitleIn
 import com.elyndra.launcher.ui.theme.curtainAlpha
@@ -210,19 +212,37 @@ fun FolderScreen(vm: ElyndraViewModel) {
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    ElyText(
-                        stringResource(R.string.hint_gestures),
-                        modifier = Modifier
-                            .padding(top = if (m.landscape) 4.dp else 7.dp)
-                            .alpha(pulseHintAlpha()),
-                        size = 9f,
-                        weight = FontWeight.Medium,
-                        color = Color.White.copy(alpha = 0.8f),
-                        letterSpacing = tracking(0.14f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        uppercase = true,
-                    )
+                    val description = rememberWikipediaSummary(rom?.displayTitle)
+                    if (description != null) {
+                        ElyText(
+                            description,
+                            modifier = Modifier
+                                .padding(top = if (m.landscape) 4.dp else 6.dp)
+                                .fillMaxWidth(0.86f)
+                                .animFadeUp(key = rom?.key ?: "none"),
+                            size = 10f,
+                            weight = FontWeight.Medium,
+                            color = Color.White.copy(alpha = 0.72f),
+                            letterSpacing = tracking(0.02f),
+                            lineHeightRatio = 1.28f,
+                            maxLines = if (m.landscape) 2 else 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    } else {
+                        ElyText(
+                            stringResource(R.string.hint_gestures),
+                            modifier = Modifier
+                                .padding(top = if (m.landscape) 4.dp else 7.dp)
+                                .alpha(pulseHintAlpha()),
+                            size = 9f,
+                            weight = FontWeight.Medium,
+                            color = Color.White.copy(alpha = 0.8f),
+                            letterSpacing = tracking(0.14f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            uppercase = true,
+                        )
+                    }
                 }
             },
         )

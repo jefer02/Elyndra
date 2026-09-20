@@ -1,10 +1,41 @@
-# Elyndra — app Android nativa
+# Elyndra
 
-Implementación nativa (Kotlin + Jetpack Compose) 
+**Lanzador nativo para Android — Kotlin + Jetpack Compose**
 
 Elyndra unifica en una sola biblioteca los juegos Android instalados y las
-carpetas de ROMs de emulador. Solo indexa y lanza títulos; nunca emula nada:
-cada ROM se entrega al emulador que el usuario eligió para su carpeta.
+carpetas de ROMs de emulador, con una interfaz pensada para mando y para
+usarse desde el sofá. La app **solo indexa y lanza títulos: nunca emula
+nada**; cada ROM se entrega al emulador que el usuario eligió para su
+carpeta, a través del intent exacto de ese emulador.
+
+## Características
+
+- **Biblioteca unificada.** Apps Android y carpetas de ROMs conviven en un
+  único carrusel, con filtros por tipo (Todos / Android / Emuladores) y
+  varios criterios de orden.
+- **Metadatos automáticos.** Carátulas, logos, capturas, sinopsis, fechas,
+  géneros y logros de hasta cuatro servicios (ScreenScraper, IGDB,
+  SteamGridDB, RetroAchievements), identificados por hash del archivo y
+  aplicables a toda la biblioteca de una pasada, en segundo plano.
+- **~130 perfiles de emulador** ya configurados (componente, acción, extras),
+  con instalación asistida cuando falta el emulador elegido.
+- **Carpetas de ROMs vía SAF**, sin permisos de almacenamiento: detección
+  automática del sistema por el nombre de carpeta, alta masiva de carpetas
+  raíz con subcarpetas por sistema, y un escaneo que ignora bios/saves/media
+  y agrupa correctamente discos multipista y juegos de PS3.
+- **Pensada para mando.** Toda la app —biblioteca, carpetas, ajustes,
+  diálogos— se maneja con cruceta y sticks; funciona igual con Xbox,
+  PlayStation, Switch Pro, mandos genéricos y el mando a distancia de una
+  tele.
+- **Tiempo de juego real**, medido entre el lanzamiento de cada título y la
+  vuelta a Elyndra.
+- **Multiidioma**: español, inglés, portugués, francés, alemán y japonés,
+  sin reiniciar la app.
+- **Lucy**, un asistente conversacional integrado (opcional) con estadísticas
+  reales de juego.
+- **Interfaz "liquid glass"** hecha a mano en Compose: degradados,
+  desenfoques, auroras y animaciones de entrada calcadas del diseño
+  original.
 
 ## Compilar
 
@@ -90,6 +121,26 @@ emulador, la app ofrece instalarlo o elegir otro.
 
 El tiempo de juego se mide entre el lanzamiento y la vuelta a Elyndra.
 
+## Mando
+
+Elyndra normaliza cualquier mando —Xbox, PlayStation, Switch Pro, clónicos
+genéricos y el mando a distancia de una tele— a un único juego de acciones
+(`input/Gamepad.kt`), así que la app no distingue de qué mando viene la
+pulsación:
+
+- **Cruceta / stick izquierdo**: mover la selección en el carrusel de la
+  biblioteca o de una carpeta, una card a la vez.
+- **L1/R1**: cambiar de categoría en la biblioteca (Todos / Android /
+  Emuladores) o saltar de página dentro de una carpeta.
+- **A**: abrir. **B**: volver. **X**: ficha del juego. **Y**: menú del
+  juego. **Start**: menú de la app. **Select**: buscador.
+
+Los sticks llegan como movimiento continuo, no como pulsaciones discretas:
+`StickRepeater` los convierte en una pulsación por inclinación y, si se
+mantiene, en repeticiones espaciadas, con un umbral e histéresis pensados
+para que un solo gesto mueva un solo elemento, incluso con un mando algo
+gastado.
+
 ## Idiomas
 
 Español, inglés, portugués, francés, alemán y japonés (`res/values-*`). El
@@ -106,6 +157,7 @@ app/src/main/java/com/elyndra/launcher/
   MainActivity.kt              arranque, idioma, ciclo de vida (sesiones de juego)
   data/                        modelos, sistemas, perfiles de emuladores, repositorio
                                JSON de la biblioteca, ajustes, secretos cifrados, idioma
+  input/                       normalización de mandos (botones, sticks, repetición)
   library/                     escáner SAF, hojas de disco, apps instaladas, nombres
   launch/                      planificador de intents, lanzador, RomProvider
   metadata/                    clientes ScreenScraper / IGDB / SteamGridDB /
@@ -115,6 +167,7 @@ app/src/main/java/com/elyndra/launcher/
   ui/
     ElyndraViewModel.kt        estado y navegación; Add/Settings/LucyController
     ElyndraApp.kt              pantallas + capas (diálogos, hojas, ficha, avisos)
+    InputController.kt         traduce el mando a acciones según la capa activa
     theme/                     tipografía, degradados CSS, cristal, animaciones
     components/                texto, controles, hero, carátulas, capas
     screens/                   Library, Folder, Add, Settings (+APIs), Details, Lucy
@@ -139,6 +192,10 @@ Piezas que había que construir a mano porque Compose no las trae:
 - **Aurora**: degradados radiales que caen a transparente en lugar del
   `blur(64px)`.
 - **Slider** e **iconos** dibujados a mano, como en el diseño.
+- **Animación de entrada**: fundido, acercamiento sutil y una pequeña subida
+  con la curva `cubic-bezier(.2,.8,.2,1)` de todo el diseño (`Anim.kt`), para
+  que el primer fotograma al abrir la app se sienta pulido y no un simple
+  parpadeo.
 
 **Tipografía.** Poppins va incluida (`res/font/`, licencia OFL en
 `POPPINS-OFL.txt`). Para japonés Android usa la fuente CJK del sistema.

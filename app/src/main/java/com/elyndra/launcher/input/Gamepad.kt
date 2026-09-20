@@ -170,8 +170,8 @@ object Gamepad {
  * contaría como una pulsación nueva.
  */
 class StickRepeater(
-    private val firstDelayMs: Long = 380,
-    private val repeatMs: Long = 110,
+    private val firstDelayMs: Long = 420,
+    private val repeatMs: Long = 220,
 ) {
     private var direction: Pad? = null
     private var nextFire = 0L
@@ -212,10 +212,17 @@ class StickRepeater(
     }
 
     companion object {
-        /** Desde dónde cuenta como inclinado (la zona muerta típica es 0.25). */
-        const val THRESHOLD = 0.55f
+        /**
+         * Desde dónde cuenta como inclinado (la zona muerta típica es 0.25).
+         *
+         * Con un umbral bajo, el ruido de un stick gastado —o el resto de
+         * recorrido en diagonal— cruza y descruza la marca varias veces
+         * durante un solo gesto, y cada cruce contaba como pulsación nueva:
+         * de ahí que saltase más de un juego con un solo toque del stick.
+         */
+        const val THRESHOLD = 0.65f
 
-        /** Hasta dónde hay que volver para darlo por soltado. */
-        const val RELEASE = 0.35f
+        /** Hasta dónde hay que volver para darlo por soltado (histéresis amplia). */
+        const val RELEASE = 0.30f
     }
 }

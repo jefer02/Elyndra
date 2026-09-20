@@ -74,6 +74,7 @@ import com.elyndra.launcher.ui.Screen
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GameIcon
 import com.elyndra.launcher.ui.components.Hero
+import com.elyndra.launcher.ui.components.rememberWikipediaSummary
 import com.elyndra.launcher.ui.components.LocalScreenSize
 import com.elyndra.launcher.ui.components.LogoImage
 import com.elyndra.launcher.ui.components.OpenButton
@@ -86,12 +87,11 @@ import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.theme.HeroTitleShadow
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.Swift
-import com.elyndra.launcher.ui.theme.WordmarkShadow
 import com.elyndra.launcher.ui.theme.accentGradient
-import com.elyndra.launcher.ui.theme.animFadeIn
+import com.elyndra.launcher.ui.theme.animAppEntrance
+import com.elyndra.launcher.ui.theme.animFadeUp
 import com.elyndra.launcher.ui.theme.animPopIn
 import com.elyndra.launcher.ui.theme.animTitleIn
-import com.elyndra.launcher.ui.theme.bobOffset
 import com.elyndra.launcher.ui.theme.consoleFaceBrush
 import com.elyndra.launcher.ui.theme.curtainAlpha
 import com.elyndra.launcher.ui.theme.darkGlass
@@ -117,10 +117,8 @@ fun LibraryScreen(vm: ElyndraViewModel) {
         val index = items.indexOfFirst { it.key == sel?.key }
         if (index >= 0) runCatching { carousel.animateScrollToItem(index) }
     }
-    val libraryEmpty = vm.loaded && vm.library.folders.isEmpty() && vm.library.apps.isEmpty()
-
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().animFadeIn(key = Screen.Library)) {
+        Column(Modifier.fillMaxSize().animAppEntrance(key = Screen.Library)) {
 
             Hero(
                 pairIndex = sel?.let { vm.pairIndexOf(it) } ?: 0,
@@ -139,24 +137,6 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                             .padding(start = m.pad, end = m.pad, top = if (m.landscape) 8.dp else 16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Box(
-                            Modifier
-                                .offset(y = bobOffset().dp)
-                                .size(9.dp)
-                                .shadow(6.dp, RoundedCornerShape(3.dp), clip = false, ambientColor = skin.a1, spotColor = skin.a1)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(skin.a1),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        ElyText(
-                            "ELYNDRA",
-                            size = if (m.landscape) 17f else 19f,
-                            weight = FontWeight.ExtraBold,
-                            color = Color.White,
-                            letterSpacing = tracking(0.16f),
-                            shadow = WordmarkShadow,
-                            maxLines = 1,
-                        )
                         Spacer(Modifier.weight(1f))
                         // "Abrir" vive aquí, sobre el fondo del juego. Mientras
                         // se busca desaparece: el campo abierto necesita ese
@@ -239,19 +219,37 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        ElyText(
-                            stringResource(if (sel == null) R.string.empty_library_hint else R.string.hint_gestures),
-                            modifier = Modifier
-                                .padding(top = if (m.landscape) 4.dp else 7.dp)
-                                .alpha(pulseHintAlpha()),
-                            size = 9f,
-                            weight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.8f),
-                            letterSpacing = tracking(0.14f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            uppercase = true,
-                        )
+                        val description = rememberWikipediaSummary((sel as? LibraryItem.App)?.name)
+                        if (description != null) {
+                            ElyText(
+                                description,
+                                modifier = Modifier
+                                    .padding(top = if (m.landscape) 4.dp else 6.dp)
+                                    .fillMaxWidth(0.86f)
+                                    .animFadeUp(key = sel?.key ?: "none"),
+                                size = 10f,
+                                weight = FontWeight.Medium,
+                                color = Color.White.copy(alpha = 0.72f),
+                                letterSpacing = tracking(0.02f),
+                                lineHeightRatio = 1.28f,
+                                maxLines = if (m.landscape) 2 else 3,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        } else {
+                            ElyText(
+                                stringResource(if (sel == null) R.string.empty_library_hint else R.string.hint_gestures),
+                                modifier = Modifier
+                                    .padding(top = if (m.landscape) 4.dp else 7.dp)
+                                    .alpha(pulseHintAlpha()),
+                                size = 9f,
+                                weight = FontWeight.Medium,
+                                color = Color.White.copy(alpha = 0.8f),
+                                letterSpacing = tracking(0.14f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                uppercase = true,
+                            )
+                        }
                     }
                 },
             )
@@ -294,11 +292,26 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                     }
                 }
 
-                if (items.isEmpty() && !libraryEmpty && vm.loaded) {
+                val searchEmpty = vm.query.isNotBlank() && items.isEmpty() && vm.loaded
+                if (searchEmpty) {
                     Box(Modifier.fillMaxWidth().weight(1f).padding(horizontal = m.pad), contentAlignment = Alignment.Center) {
                         ElyText(stringResource(R.string.no_results), size = 11f, color = P.ink2, align = TextAlign.Center)
                     }
                 } else {
+                    // Sin resultados por el filtro (no por la búsqueda): la
+                    // sección de Consolas puede estar vacía sin que la
+                    // biblioteca lo esté. La aviso encima, pero la card de
+                    // "Añadir" sigue viviendo en el propio carrusel —a la
+                    // izquierda cuando no hay nada más, empujada al final en
+                    // cuanto entra la primera consola— igual que en Android.
+                    if (items.isEmpty() && vm.loaded && vm.filter != LibraryFilter.All) {
+                        ElyText(
+                            stringResource(emptyFilterHint(vm.filter)),
+                            modifier = Modifier.padding(start = m.pad, end = m.pad, bottom = 4.dp),
+                            size = 11f,
+                            color = P.ink2,
+                        )
+                    }
                     LazyRow(
                         Modifier.fillMaxWidth().weight(1f),
                         state = carousel,
@@ -329,10 +342,11 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                             )
                         }
                         // "Añadir" es una card más y va al final de la fila: con la
-                        // biblioteca vacía es la única que hay, y en cuanto entra
-                        // un juego se corre detrás de todos sin dejar de estar a mano.
-                        // El `loaded` evita que la card asome mientras se lee la
-                        // biblioteca del disco, con el carrusel todavía vacío.
+                        // biblioteca (o el filtro) vacíos es la única que hay, y en
+                        // cuanto entra un juego se corre detrás de todos sin dejar
+                        // de estar a mano. El `loaded` evita que la card asome
+                        // mientras se lee la biblioteca del disco, con el carrusel
+                        // todavía vacío.
                         if (vm.loaded) {
                             item(key = "add") { AddTile(m, items.size) { vm.go(Screen.Add) } }
                         }
@@ -519,8 +533,14 @@ private fun LucyFab(vm: ElyndraViewModel, metrics: Metrics) {
     val homeX = (maxX - metrics.pad.value).coerceAtLeast(0f)
     val homeY = (maxY - LUCY_MARGIN.value).coerceAtLeast(0f)
 
-    var x by remember { mutableStateOf(vm.settings.lucyX ?: homeX) }
-    var y by remember { mutableStateOf(vm.settings.lucyY ?: homeY) }
+    // La Activity no se recrea al girar (configChanges), así que sin la
+    // pantalla como llave el `remember` se quedaba con el sitio calculado en
+    // la primera orientación: al girar, una posición sin mover no volvía a
+    // caer en la esquina de esa orientación. Solo importa mientras no haya
+    // sitio guardado —con uno guardado, la llave no cambia entre giros y el
+    // arrastre en curso no se resetea a medio gesto.
+    var x by remember(vm.settings.lucyX, homeX) { mutableStateOf(vm.settings.lucyX ?: homeX) }
+    var y by remember(vm.settings.lucyY, homeY) { mutableStateOf(vm.settings.lucyY ?: homeY) }
     var dragging by remember { mutableStateOf(false) }
     val left = x.coerceIn(0f, maxX)
     val top = y.coerceIn(0f, maxY)
@@ -587,6 +607,13 @@ private fun LucyFab(vm: ElyndraViewModel, metrics: Metrics) {
             modifier = Modifier.size(LUCY_FAB * 0.86f).clip(shape),
         )
     }
+}
+
+/** Aviso sobre el carrusel cuando el filtro elegido (Consolas, Android) no tiene nada todavía. */
+private fun emptyFilterHint(filter: LibraryFilter): Int = when (filter) {
+    LibraryFilter.Consoles -> R.string.empty_filter_consoles
+    LibraryFilter.Android -> R.string.empty_filter_android
+    LibraryFilter.All -> R.string.empty_library_hint
 }
 
 /**

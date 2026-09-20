@@ -49,9 +49,11 @@ import com.elyndra.launcher.data.P
 import com.elyndra.launcher.data.fmtMinutes
 import com.elyndra.launcher.ui.ChatMessage
 import com.elyndra.launcher.ui.ElyndraViewModel
+import com.elyndra.launcher.ui.LucyGameRef
 import com.elyndra.launcher.ui.Screen
 import com.elyndra.launcher.ui.components.BackChevron
 import com.elyndra.launcher.ui.components.ElyText
+import com.elyndra.launcher.ui.components.GameIcon
 import com.elyndra.launcher.ui.components.GlassIconButton
 import com.elyndra.launcher.ui.components.TypingDots
 import com.elyndra.launcher.ui.components.inputStyle
@@ -381,7 +383,10 @@ private fun MessageBubble(msg: ChatMessage, index: Int, landscape: Boolean) {
                     }
                     .padding(horizontal = 14.dp, vertical = 12.dp),
             ) {
-                ElyText(msg.text, size = 12f, color = P.ink, lineHeightRatio = 1.6f)
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ElyText(msg.text, size = 12f, color = P.ink, lineHeightRatio = 1.6f)
+                    msg.game?.let { GameMentionCard(it) }
+                }
             }
         } else {
             Box(
@@ -401,6 +406,53 @@ private fun MessageBubble(msg: ChatMessage, index: Int, landscape: Boolean) {
             ) {
                 ElyText(msg.text, size = 12f, color = Color.White, lineHeightRatio = 1.5f)
             }
+        }
+    }
+}
+
+/**
+ * El juego al que se refiere Lucy, enganchado bajo su mensaje: carátula (o
+ * icono, si no tiene) y su nombre bien claro, en vez de dejarlo solo en el
+ * texto. Mismo cristal que la burbuja, un pelín más marcado para que se lea
+ * como una tarjeta dentro del mensaje y no como más texto.
+ */
+@Composable
+private fun GameMentionCard(game: LucyGameRef) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.White.copy(alpha = 0.38f))
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(Color.White.copy(alpha = 0.5f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            GameIcon(game.artPath, game.packageName, Modifier.fillMaxSize(), ContentScale.Crop)
+        }
+        Column {
+            ElyText(
+                game.title,
+                size = 11.5f,
+                weight = FontWeight.Bold,
+                color = P.ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            ElyText(
+                game.subtitle,
+                size = 9.5f,
+                weight = FontWeight.Medium,
+                color = P.ink2,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

@@ -144,7 +144,7 @@ class SettingsController(private val vm: ElyndraViewModel) {
 
     val skin: ElyndraSkin
         get() = ElyndraSkin(
-            accent = ACCENTS.firstOrNull { it.id == accentId } ?: ACCENTS[0],
+            accent = ACCENTS.firstOrNull { it.id == accentId } ?: ACCENTS.first { it.id == "lila" },
             tint = TINTS.firstOrNull { it.id == tintId } ?: TINTS[0],
             blur = blur,
             alphaPct = alphaPct,

@@ -1156,7 +1156,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
      * puntero que los alcance, así que Start los junta aquí en una sola hoja.
      */
     fun mainMenu() {
-        showSheet(ActionSheetSpec(UiText.Raw("ELYNDRA"), null, input.mainMenuActions()))
+        showSheet(ActionSheetSpec(UiText.res(R.string.menu_title), null, input.mainMenuActions()))
     }
 
     fun dismissSheet() { sheet = null }

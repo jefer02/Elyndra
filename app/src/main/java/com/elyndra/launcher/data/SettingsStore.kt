@@ -10,7 +10,7 @@ class SettingsStore(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
     var accentId: String
-        get() = prefs.getString("accent", "mandarina") ?: "mandarina"
+        get() = prefs.getString("accent", "lila") ?: "lila"
         set(v) = prefs.edit { putString("accent", v) }
 
     var tintId: String

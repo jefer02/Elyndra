@@ -71,7 +71,20 @@ sealed interface LibraryItem {
     }
 }
 
-data class ChatMessage(val fromLucy: Boolean, val text: String)
+data class ChatMessage(val fromLucy: Boolean, val text: String, val game: LucyGameRef? = null)
+
+/**
+ * El juego de la biblioteca al que se refiere un mensaje de Lucy — para
+ * recomendaciones y menciones, así el nombre no se queda suelto en texto y
+ * se ve la carátula (o el icono, si no hay) junto a él.
+ */
+data class LucyGameRef(
+    val key: String,
+    val title: String,
+    val subtitle: String,
+    val artPath: String?,
+    val packageName: String?,
+)
 
 /** Velo de lanzamiento: carátula (o icono de la app), título y a dónde va. */
 data class Launch(
