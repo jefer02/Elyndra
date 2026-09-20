@@ -26,6 +26,8 @@
     <string name="empty_library_hint">Androidゲームまたは ROM フォルダーを追加</string>
     <string name="hint_gestures">タップで選択 · ダブルタップで起動 · 長押しでオプション</string>
     <string name="no_results">検索に一致する項目はありません</string>
+    <string name="empty_filter_android">まだAndroidゲームがありません</string>
+    <string name="empty_filter_consoles">まだコンソールが追加されていません</string>
     <string name="add_short">追加</string>
     <string name="add_long">ゲームや ROM を追加</string>
     <string name="open">開く</string>
@@ -190,6 +192,7 @@
 
     <!-- 設定 -->
     <string name="settings_title">設定</string>
+    <string name="menu_title">メニュー</string>
     <string name="section_accent">アクセントカラー</string>
     <string name="accent_label">アクセント: %1$s</string>
     <string name="section_glass">リキッドグラス</string>
