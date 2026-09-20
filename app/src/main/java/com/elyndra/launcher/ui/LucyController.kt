@@ -45,7 +45,7 @@ class LucyController(private val vm: ElyndraViewModel) {
         vm.viewModelScope.launch {
             val reply = LucyClient.ask(text, uiLanguage, libraryJson(), history, actions::run)
             typing = false
-            messages.add(ChatMessage(fromLucy = true, text = reply.text))
+            messages.add(ChatMessage(fromLucy = true, text = reply.text, game = findMentionedGame(reply.text)))
             // Con clave puesta, una respuesta que no viene de la API es un fallo
             // de red o de cuota: se dice, en vez de colar el texto de demo a secas.
             if (!reply.ok && online) vm.showToast(UiText.res(R.string.lucy_error))
@@ -93,6 +93,28 @@ class LucyController(private val vm: ElyndraViewModel) {
             )
         }
         return JSONObject().put("games", games).put("folders", folders).toString()
+    }
+
+    /**
+     * Cuando Lucy nombra un juego de la biblioteca —al recomendarlo, al
+     * contar un dato curioso sobre él, etc.— se engancha su carátula (o
+     * icono, si no tiene) al mensaje, en vez de dejar el nombre suelto en
+     * el texto. Se queda con la coincidencia más larga: entre "Mario" y
+     * "Super Mario Bros." en el mismo texto, la segunda es la que de verdad
+     * se está nombrando.
+     */
+    private fun findMentionedGame(text: String): LucyGameRef? {
+        val lib = vm.library
+        val apps = lib.apps.map { a ->
+            LucyGameRef(a.key, a.displayTitle, "Android", a.meta.cover ?: a.meta.icon, a.packageName)
+        }
+        val roms = lib.roms.map { r ->
+            val system = Systems.byId(r.systemId)?.name ?: r.systemId
+            LucyGameRef(r.key, r.displayTitle, system, r.meta.cover ?: r.meta.icon, null)
+        }
+        return (apps + roms)
+            .filter { it.title.length >= 3 && text.contains(it.title, ignoreCase = true) }
+            .maxByOrNull { it.title.length }
     }
 
     data class Stats(
