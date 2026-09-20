@@ -33,12 +33,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -53,6 +55,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalFocusManager
@@ -85,6 +89,8 @@ import com.elyndra.launcher.ui.components.OpenButton
 import com.elyndra.launcher.ui.components.PortalExpandContainer
 import com.elyndra.launcher.ui.components.PortalSpec
 import com.elyndra.launcher.ui.components.Metrics
+import com.elyndra.launcher.ui.components.MAGNETIC_PULL_MS
+import com.elyndra.launcher.ui.components.rememberMagneticPress
 import com.elyndra.launcher.ui.components.SearchGlyph
 import com.elyndra.launcher.ui.components.SettingsGlyph
 import com.elyndra.launcher.ui.components.inputStyle
@@ -109,6 +115,8 @@ import com.elyndra.launcher.ui.theme.selectionLift
 import com.elyndra.launcher.ui.theme.selectionScale
 import com.elyndra.launcher.ui.theme.sheenBrush
 import com.elyndra.launcher.ui.theme.sheenProgress
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Un juego se funde con su velo de carga, que ya está debajo. Una carpeta
@@ -407,8 +415,10 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                                                 portalTap = offset
                                                 vm.requestOpen(item)
                                             },
-                                            onLongPress = {
+                                            onLongPress = { center ->
                                                 vm.select(item.key)
+                                                // De aquí sale el overlay.
+                                                vm.markSheetOrigin(center)
                                                 vm.itemOptions(item)
                                             },
                                         )
@@ -746,7 +756,8 @@ private fun LibraryTile(
     onTap: () -> Unit,
     /** Recibe el punto tocado, en coordenadas de la card: el portal sale de ahí. */
     onOpen: (Offset) -> Unit,
-    onLongPress: () -> Unit,
+    /** Recibe el centro de la card en la ventana: el menú de acciones sale de ahí. */
+    onLongPress: (Offset) -> Unit,
 ) {
     val skin = LocalSkin.current
     // Juegos Android y carpetas de emulador se representan con icono, no con
@@ -756,6 +767,11 @@ private fun LibraryTile(
     val scale = selectionScale(selected)
     val shape = RoundedCornerShape(16.dp)
     val curtain = if (entrance) curtainAlpha(index * 40, key = item.key) else 0f
+    // Tirón magnético: al mantener pulsado, la card se hunde y rebota antes
+    // de que salga el menú (ver `rememberMagneticPress`).
+    val magnetic = rememberMagneticPress()
+    var cardBounds by remember { mutableStateOf(Rect.Zero) }
+    val scope = rememberCoroutineScope()
     val sheen = sheenProgress()
     val dimmed = item is LibraryItem.App && !item.installed
 
@@ -764,12 +780,27 @@ private fun LibraryTile(
             .width(width)
             .offset(y = lift)
             .then(if (entrance) Modifier.animPopIn(delayMs = index * 35, key = item.key) else Modifier)
+            .onGloballyPositioned { cardBounds = it.boundsInWindow() }
+            // La escala del tirón se lee en fase de dibujo: mover la card no
+            // recompone ni la lista ni la pantalla.
+            .graphicsLayer {
+                scaleX = magnetic.value
+                scaleY = magnetic.value
+            }
             .alpha(if (dimmed) 0.5f else 1f)
             .pointerInput(item.key) {
                 detectTapGestures(
                     onTap = { onTap() },
                     onDoubleTap = { offset -> onOpen(offset) },
-                    onLongPress = { onLongPress() },
+                    onLongPress = {
+                        // Primero el tirón —la card se hunde y rebota— y solo
+                        // cuando se ha sentido el agarre sale el menú.
+                        scope.launch {
+                            launch { magnetic.run() }
+                            delay(MAGNETIC_PULL_MS.toLong())
+                            onLongPress(cardBounds.center)
+                        }
+                    },
                 )
             },
         horizontalAlignment = Alignment.CenterHorizontally,
