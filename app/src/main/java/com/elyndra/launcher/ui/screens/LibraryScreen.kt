@@ -66,13 +66,16 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
 import com.elyndra.launcher.data.P
+import com.elyndra.launcher.metadata.ArtKind
 import com.elyndra.launcher.data.fmtMinutes
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.LibraryFilter
 import com.elyndra.launcher.ui.LibraryItem
 import com.elyndra.launcher.ui.Screen
+import com.elyndra.launcher.ui.components.DisintegratableBox
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GameIcon
+import com.elyndra.launcher.ui.components.MaterializableBox
 import com.elyndra.launcher.ui.components.Hero
 import com.elyndra.launcher.ui.components.rememberWikipediaSummary
 import com.elyndra.launcher.ui.components.LocalScreenSize
@@ -193,13 +196,25 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         // El `sel != null` es para el compilador: el `when` de arriba no le
                         // basta para deducir que si hay logo entonces hay elemento.
                         if (sel != null && logo != null) {
-                            LogoImage(
-                                logo,
-                                Modifier
-                                    .animTitleIn(key = sel.key)
-                                    .fillMaxWidth(0.72f)
-                                    .height(m.logoH),
-                            )
+                            // Al quitar el logo se deshace en el sitio donde
+                            // se está viendo, en vez de desaparecer de golpe.
+                            MaterializableBox(
+                                isMaterializing = vm.isMaterializingArt(sel.key, ArtKind.Logo),
+                                onAnimationEnd = { vm.finishMaterializeArt() },
+                            ) {
+                                DisintegratableBox(
+                                    isDisintegrating = vm.isVanishingArt(sel.key, ArtKind.Logo),
+                                    onAnimationEnd = { vm.finishVanish() },
+                                ) {
+                                    LogoImage(
+                                        logo,
+                                        Modifier
+                                            .animTitleIn(key = sel.key)
+                                            .fillMaxWidth(0.72f)
+                                            .height(m.logoH),
+                                    )
+                                }
+                            }
                         } else {
                             ElyText(
                                 when {
@@ -327,19 +342,35 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         verticalAlignment = Alignment.Top,
                     ) {
                         itemsIndexed(items, key = { _, it -> it.key }) { i, item ->
-                            LibraryTile(
-                                item = item,
-                                index = i,
-                                selected = item.key == sel?.key,
-                                metrics = m,
-                                pairIndex = vm.pairIndexOf(item),
-                                onTap = { vm.select(item.key) },
-                                onOpen = { vm.open(item) },
-                                onLongPress = {
-                                    vm.select(item.key)
-                                    vm.itemOptions(item)
-                                },
-                            )
+                            val materializing = item.key in vm.materializing
+                            // Las dos caras de lo mismo: un juego recién
+                            // añadido se monta desde el polvo al entrar, y al
+                            // quitarlo se deshace en polvo antes de salir de
+                            // la lista (`finishVanish` es quien borra).
+                            MaterializableBox(
+                                isMaterializing = materializing,
+                                onAnimationEnd = { vm.finishMaterialize(item.key) },
+                            ) {
+                                DisintegratableBox(
+                                    isDisintegrating = vm.vanishing == item.key,
+                                    onAnimationEnd = { vm.finishVanish() },
+                                ) {
+                                    LibraryTile(
+                                        item = item,
+                                        index = i,
+                                        selected = item.key == sel?.key,
+                                        metrics = m,
+                                        pairIndex = vm.pairIndexOf(item),
+                                        entrance = !materializing,
+                                        onTap = { vm.select(item.key) },
+                                        onOpen = { vm.open(item) },
+                                        onLongPress = {
+                                            vm.select(item.key)
+                                            vm.itemOptions(item)
+                                        },
+                                    )
+                                }
+                            }
                         }
                         // "Añadir" es una card más y va al final de la fila: con la
                         // biblioteca (o el filtro) vacíos es la única que hay, y en
@@ -661,6 +692,13 @@ private fun LibraryTile(
     selected: Boolean,
     metrics: Metrics,
     pairIndex: Int,
+    /**
+     * Entrada propia de la card (aparecer y descorrer el telón). Se apaga
+     * cuando la card se está montando desde el polvo: ese montaje ya es su
+     * entrada, y además lo que se captura para trocear tiene que ser la card
+     * terminada, no a medio aparecer.
+     */
+    entrance: Boolean,
     onTap: () -> Unit,
     onOpen: () -> Unit,
     onLongPress: () -> Unit,
@@ -672,7 +710,7 @@ private fun LibraryTile(
     val lift = selectionLift(selected)
     val scale = selectionScale(selected)
     val shape = RoundedCornerShape(16.dp)
-    val curtain = curtainAlpha(index * 40, key = item.key)
+    val curtain = if (entrance) curtainAlpha(index * 40, key = item.key) else 0f
     val sheen = sheenProgress()
     val dimmed = item is LibraryItem.App && !item.installed
 
@@ -680,7 +718,7 @@ private fun LibraryTile(
         Modifier
             .width(width)
             .offset(y = lift)
-            .animPopIn(delayMs = index * 35, key = item.key)
+            .then(if (entrance) Modifier.animPopIn(delayMs = index * 35, key = item.key) else Modifier)
             .alpha(if (dimmed) 0.5f else 1f)
             .pointerInput(item.key) {
                 detectTapGestures(
