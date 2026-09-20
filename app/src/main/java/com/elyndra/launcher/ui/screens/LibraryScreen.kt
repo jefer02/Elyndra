@@ -74,6 +74,7 @@ import com.elyndra.launcher.ui.Screen
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GameIcon
 import com.elyndra.launcher.ui.components.Hero
+import com.elyndra.launcher.ui.components.rememberWikipediaSummary
 import com.elyndra.launcher.ui.components.LocalScreenSize
 import com.elyndra.launcher.ui.components.LogoImage
 import com.elyndra.launcher.ui.components.OpenButton
@@ -220,7 +221,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        val description = sel?.let { heroDescription(it) }
+                        val description = rememberWikipediaSummary((sel as? LibraryItem.App)?.name)
                         if (description != null) {
                             ElyText(
                                 description,
@@ -300,7 +301,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         // biblioteca lo esté, y ahí "no hay resultados" a secas
                         // deja al usuario sin saber cómo llenarla.
                         if (vm.query.isBlank() && vm.filter != LibraryFilter.All) {
-                            EmptyFilterState(vm.filter) { vm.go(Screen.Add) }
+                            EmptyFilterState(vm.filter, m) { vm.go(Screen.Add) }
                         } else {
                             ElyText(stringResource(R.string.no_results), size = 11f, color = P.ink2, align = TextAlign.Center)
                         }
@@ -369,19 +370,6 @@ private fun heroSubline(sel: LibraryItem): String = when (sel) {
         sel.app.stats.minutes > 0 -> stringResource(R.string.played_time, fmtMinutes(sel.app.stats.minutes))
         else -> stringResource(R.string.never_played)
     }
-}
-
-/**
- * Sinopsis corta sobre el fondo del hero, cuando hay una descargada.
- *
- * Las carpetas agrupan varias ROMs, así que no hay una sinopsis única que
- * enseñar ahí — se queda con la pista de gestos, como hasta ahora. Cada app
- * sí es un solo juego, y su descripción (ScreenScraper/IGDB) es la que se
- * pinta bajo el título.
- */
-private fun heroDescription(sel: LibraryItem): String? = when (sel) {
-    is LibraryItem.App -> sel.app.meta.description?.takeIf { it.isNotBlank() }
-    is LibraryItem.Folder -> null
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -622,8 +610,7 @@ private fun LucyFab(vm: ElyndraViewModel, metrics: Metrics) {
  * sin tener que abrir el menú.
  */
 @Composable
-private fun EmptyFilterState(filter: LibraryFilter, onAdd: () -> Unit) {
-    val skin = LocalSkin.current
+private fun EmptyFilterState(filter: LibraryFilter, metrics: Metrics, onAdd: () -> Unit) {
     val hint = when (filter) {
         LibraryFilter.Consoles -> R.string.empty_filter_consoles
         LibraryFilter.Android -> R.string.empty_filter_android
@@ -632,22 +619,10 @@ private fun EmptyFilterState(filter: LibraryFilter, onAdd: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         ElyText(stringResource(hint), size = 11f, color = P.ink2, align = TextAlign.Center)
         Spacer(Modifier.height(14.dp))
-        Box(
-            Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .drawBehind { drawRect(accentGradient(skin, 145f, size)) }
-                .clickable(onClick = onAdd)
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-        ) {
-            ElyText(
-                stringResource(R.string.add_long),
-                size = 11f,
-                weight = FontWeight.SemiBold,
-                color = Color.White,
-                letterSpacing = tracking(0.06f),
-                maxLines = 1,
-            )
-        }
+        // La misma card de "Añadir" del carrusel, no un botón aparte: un solo
+        // sitio en toda la app para añadir juegos, con la misma pinta lo mires
+        // por donde lo mires.
+        AddTile(metrics, index = 0, onClick = onAdd)
     }
 }
 
