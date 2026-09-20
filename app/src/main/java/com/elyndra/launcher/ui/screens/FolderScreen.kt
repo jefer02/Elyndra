@@ -50,11 +50,14 @@ import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.Screen
 import com.elyndra.launcher.ui.components.ArtImage
 import com.elyndra.launcher.ui.components.BackChevron
+import com.elyndra.launcher.metadata.ArtKind
+import com.elyndra.launcher.ui.components.DisintegratableBox
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GameIcon
 import com.elyndra.launcher.ui.components.GhostButton
 import com.elyndra.launcher.ui.components.Hero
 import com.elyndra.launcher.ui.components.LogoImage
+import com.elyndra.launcher.ui.components.MaterializableBox
 import com.elyndra.launcher.ui.components.OpenButton
 import com.elyndra.launcher.ui.components.metrics
 import com.elyndra.launcher.ui.components.rememberWikipediaSummary
@@ -190,13 +193,23 @@ fun FolderScreen(vm: ElyndraViewModel) {
                     }
                     val logo = rom?.meta?.logo
                     if (logo != null) {
-                        LogoImage(
-                            logo,
-                            Modifier
-                                .animTitleIn(key = rom.key)
-                                .fillMaxWidth(0.72f)
-                                .height(m.logoH),
-                        )
+                        MaterializableBox(
+                            isMaterializing = vm.isMaterializingArt(rom.key, ArtKind.Logo),
+                            onAnimationEnd = { vm.finishMaterializeArt() },
+                        ) {
+                            DisintegratableBox(
+                                isDisintegrating = vm.isVanishingArt(rom.key, ArtKind.Logo),
+                                onAnimationEnd = { vm.finishVanish() },
+                            ) {
+                                LogoImage(
+                                    logo,
+                                    Modifier
+                                        .animTitleIn(key = rom.key)
+                                        .fillMaxWidth(0.72f)
+                                        .height(m.logoH),
+                                )
+                            }
+                        }
                     } else {
                         ElyText(
                             rom?.displayTitle ?: item.system.name,
@@ -291,21 +304,32 @@ fun FolderScreen(vm: ElyndraViewModel) {
                     verticalAlignment = Alignment.Top,
                 ) {
                     itemsIndexed(roms, key = { _, r -> r.id }) { i, r ->
-                        RomTile(
-                            rom = r,
-                            time = playedLabel(r),
-                            index = i,
-                            selected = r.key == rom?.key,
-                            pairIndex = vm.romPairIndex(r),
-                            width = m.romW,
-                            height = m.romTileH,
-                            onTap = { vm.selectRom(r.key) },
-                            onOpen = { vm.openRom(r) },
-                            onLongPress = {
-                                vm.selectRom(r.key)
-                                vm.romOptions(r)
-                            },
-                        )
+                        // Quitar el juego deshace la card entera; quitar solo
+                        // su carátula deshace únicamente la imagen, dentro.
+                        DisintegratableBox(
+                            isDisintegrating = vm.vanishing == r.key,
+                            onAnimationEnd = { vm.finishVanish() },
+                        ) {
+                            RomTile(
+                                rom = r,
+                                time = playedLabel(r),
+                                index = i,
+                                selected = r.key == rom?.key,
+                                pairIndex = vm.romPairIndex(r),
+                                width = m.romW,
+                                height = m.romTileH,
+                                coverVanishing = vm.isVanishingArt(r.key, ArtKind.Cover),
+                                onCoverVanished = { vm.finishVanish() },
+                                coverMaterializing = vm.isMaterializingArt(r.key, ArtKind.Cover),
+                                onCoverMaterialized = { vm.finishMaterializeArt() },
+                                onTap = { vm.selectRom(r.key) },
+                                onOpen = { vm.openRom(r) },
+                                onLongPress = {
+                                    vm.selectRom(r.key)
+                                    vm.romOptions(r)
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -332,6 +356,10 @@ private fun RomTile(
     pairIndex: Int,
     width: Dp,
     height: Dp,
+    coverVanishing: Boolean,
+    onCoverVanished: () -> Unit,
+    coverMaterializing: Boolean,
+    onCoverMaterialized: () -> Unit,
     onTap: () -> Unit,
     onOpen: () -> Unit,
     onLongPress: () -> Unit,
@@ -380,7 +408,19 @@ private fun RomTile(
                     shape,
                 ),
         ) {
-            ArtImage(cover, pairIndex, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+            MaterializableBox(
+                isMaterializing = coverMaterializing,
+                onAnimationEnd = onCoverMaterialized,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                DisintegratableBox(
+                    isDisintegrating = coverVanishing,
+                    onAnimationEnd = onCoverVanished,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    ArtImage(cover, pairIndex, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                }
+            }
 
             if (cover == null) {
                 rom.meta.icon?.let { icon ->
