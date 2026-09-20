@@ -117,8 +117,6 @@ fun LibraryScreen(vm: ElyndraViewModel) {
         val index = items.indexOfFirst { it.key == sel?.key }
         if (index >= 0) runCatching { carousel.animateScrollToItem(index) }
     }
-    val libraryEmpty = vm.loaded && vm.library.folders.isEmpty() && vm.library.apps.isEmpty()
-
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().animAppEntrance(key = Screen.Library)) {
 
@@ -294,19 +292,26 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                     }
                 }
 
-                if (items.isEmpty() && !libraryEmpty && vm.loaded) {
+                val searchEmpty = vm.query.isNotBlank() && items.isEmpty() && vm.loaded
+                if (searchEmpty) {
                     Box(Modifier.fillMaxWidth().weight(1f).padding(horizontal = m.pad), contentAlignment = Alignment.Center) {
-                        // Sin resultados por el filtro (no por la búsqueda): la
-                        // sección de Consolas puede estar vacía sin que la
-                        // biblioteca lo esté, y ahí "no hay resultados" a secas
-                        // deja al usuario sin saber cómo llenarla.
-                        if (vm.query.isBlank() && vm.filter != LibraryFilter.All) {
-                            EmptyFilterState(vm.filter, m) { vm.go(Screen.Add) }
-                        } else {
-                            ElyText(stringResource(R.string.no_results), size = 11f, color = P.ink2, align = TextAlign.Center)
-                        }
+                        ElyText(stringResource(R.string.no_results), size = 11f, color = P.ink2, align = TextAlign.Center)
                     }
                 } else {
+                    // Sin resultados por el filtro (no por la búsqueda): la
+                    // sección de Consolas puede estar vacía sin que la
+                    // biblioteca lo esté. La aviso encima, pero la card de
+                    // "Añadir" sigue viviendo en el propio carrusel —a la
+                    // izquierda cuando no hay nada más, empujada al final en
+                    // cuanto entra la primera consola— igual que en Android.
+                    if (items.isEmpty() && vm.loaded && vm.filter != LibraryFilter.All) {
+                        ElyText(
+                            stringResource(emptyFilterHint(vm.filter)),
+                            modifier = Modifier.padding(start = m.pad, end = m.pad, bottom = 4.dp),
+                            size = 11f,
+                            color = P.ink2,
+                        )
+                    }
                     LazyRow(
                         Modifier.fillMaxWidth().weight(1f),
                         state = carousel,
@@ -337,10 +342,11 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                             )
                         }
                         // "Añadir" es una card más y va al final de la fila: con la
-                        // biblioteca vacía es la única que hay, y en cuanto entra
-                        // un juego se corre detrás de todos sin dejar de estar a mano.
-                        // El `loaded` evita que la card asome mientras se lee la
-                        // biblioteca del disco, con el carrusel todavía vacío.
+                        // biblioteca (o el filtro) vacíos es la única que hay, y en
+                        // cuanto entra un juego se corre detrás de todos sin dejar
+                        // de estar a mano. El `loaded` evita que la card asome
+                        // mientras se lee la biblioteca del disco, con el carrusel
+                        // todavía vacío.
                         if (vm.loaded) {
                             item(key = "add") { AddTile(m, items.size) { vm.go(Screen.Add) } }
                         }
@@ -603,27 +609,11 @@ private fun LucyFab(vm: ElyndraViewModel, metrics: Metrics) {
     }
 }
 
-/**
- * Lo que se ve cuando un filtro (Consolas, Android) no tiene nada todavía:
- * el aviso de esa categoría y el mismo botón de "Añadir" de la card vacía,
- * para que quien entra a Consolas sin haber añadido ninguna sepa a dónde ir
- * sin tener que abrir el menú.
- */
-@Composable
-private fun EmptyFilterState(filter: LibraryFilter, metrics: Metrics, onAdd: () -> Unit) {
-    val hint = when (filter) {
-        LibraryFilter.Consoles -> R.string.empty_filter_consoles
-        LibraryFilter.Android -> R.string.empty_filter_android
-        LibraryFilter.All -> R.string.empty_library_hint
-    }
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        ElyText(stringResource(hint), size = 11f, color = P.ink2, align = TextAlign.Center)
-        Spacer(Modifier.height(14.dp))
-        // La misma card de "Añadir" del carrusel, no un botón aparte: un solo
-        // sitio en toda la app para añadir juegos, con la misma pinta lo mires
-        // por donde lo mires.
-        AddTile(metrics, index = 0, onClick = onAdd)
-    }
+/** Aviso sobre el carrusel cuando el filtro elegido (Consolas, Android) no tiene nada todavía. */
+private fun emptyFilterHint(filter: LibraryFilter): Int = when (filter) {
+    LibraryFilter.Consoles -> R.string.empty_filter_consoles
+    LibraryFilter.Android -> R.string.empty_filter_android
+    LibraryFilter.All -> R.string.empty_library_hint
 }
 
 /**
