@@ -1,4 +1,4 @@
-grigitpackage com.elyndra.launcher.launch
+package com.elyndra.launcher.launch
 
 import com.elyndra.launcher.data.EmulatorProfile
 import com.elyndra.launcher.data.Emulators
