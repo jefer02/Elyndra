@@ -46,24 +46,33 @@ class ArtSources(
         else -> true
     }
 
-    /** ¿Hay imagen de esta clase que se pueda quitar? */
-    fun has(key: String, kind: ArtKind): Boolean {
+    /**
+     * Ruta de la imagen puesta de esta clase, si la hay.
+     *
+     * La usa el menú de acciones para enseñar la miniatura de lo que ya está
+     * puesto, en vez de un icono genérico: se ve de un vistazo qué imagen
+     * tiene cada juego sin abrir nada.
+     */
+    fun path(key: String, kind: ArtKind): String? {
         repo.folderByKey(key)?.let { f ->
             return when (kind) {
                 ArtKind.Cover -> f.cover
                 ArtKind.Background -> f.hero
                 ArtKind.Logo -> f.logo
                 ArtKind.Icon -> f.icon
-            } != null
+            }
         }
-        val meta = repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta ?: return false
+        val meta = repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta ?: return null
         return when (kind) {
             ArtKind.Cover -> meta.cover
             ArtKind.Background -> meta.hero
             ArtKind.Logo -> meta.logo
             ArtKind.Icon -> meta.icon
-        } != null
+        }
     }
+
+    /** ¿Hay imagen de esta clase que se pueda quitar? */
+    fun has(key: String, kind: ArtKind): Boolean = path(key, kind) != null
 
     suspend fun candidates(key: String, kind: ArtKind, service: Service): List<ArtCandidate> = withContext(Dispatchers.IO) {
         val rom = repo.romByKey(key)
