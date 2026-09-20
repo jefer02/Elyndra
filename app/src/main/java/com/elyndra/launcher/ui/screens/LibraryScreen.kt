@@ -88,7 +88,7 @@ import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.Swift
 import com.elyndra.launcher.ui.theme.WordmarkShadow
 import com.elyndra.launcher.ui.theme.accentGradient
-import com.elyndra.launcher.ui.theme.animFadeIn
+import com.elyndra.launcher.ui.theme.animAppEntrance
 import com.elyndra.launcher.ui.theme.animPopIn
 import com.elyndra.launcher.ui.theme.animTitleIn
 import com.elyndra.launcher.ui.theme.bobOffset
@@ -120,7 +120,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
     val libraryEmpty = vm.loaded && vm.library.folders.isEmpty() && vm.library.apps.isEmpty()
 
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().animFadeIn(key = Screen.Library)) {
+        Column(Modifier.fillMaxSize().animAppEntrance(key = Screen.Library)) {
 
             Hero(
                 pairIndex = sel?.let { vm.pairIndexOf(it) } ?: 0,
