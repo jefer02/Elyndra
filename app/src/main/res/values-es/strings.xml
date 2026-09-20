@@ -26,6 +26,8 @@
     <string name="empty_library_hint">Añade juegos Android o una carpeta de ROMs</string>
     <string name="hint_gestures">Un toque selecciona · Doble toque abre · Mantén para opciones</string>
     <string name="no_results">Nada coincide con tu búsqueda</string>
+    <string name="empty_filter_android">Todavía no hay juegos de Android</string>
+    <string name="empty_filter_consoles">Todavía no hay consolas añadidas</string>
     <string name="add_short">Añadir</string>
     <string name="add_long">Añadir juegos o ROMs</string>
     <string name="open">Abrir</string>
@@ -214,6 +216,7 @@
 
     <!-- Ajustes -->
     <string name="settings_title">Ajustes</string>
+    <string name="menu_title">Menú</string>
     <string name="section_accent">Color de acento</string>
     <string name="accent_label">Acento: %1$s</string>
     <string name="section_glass">Liquid glass</string>
