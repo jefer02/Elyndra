@@ -114,7 +114,8 @@ class InputController(private val vm: ElyndraViewModel) {
             Pad.PageNext -> cycleFilter(1)
             Pad.Up -> cycleFilter(-1)
             Pad.Down -> cycleFilter(1)
-            Pad.Confirm -> vm.selected()?.let { vm.open(it); true } ?: false
+            // Con mando se abre igual que con el dedo: el portal sale del centro.
+            Pad.Confirm -> vm.selected()?.let { vm.requestOpen(it); true } ?: false
             Pad.Details -> vm.selected()?.let { vm.showDetails(it.key); true } ?: false
             Pad.Options -> vm.selected()?.let { vm.itemOptions(it); true } ?: false
             Pad.Menu -> { vm.mainMenu(); true }
