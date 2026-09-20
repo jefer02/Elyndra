@@ -200,7 +200,21 @@ enum class SheetIcon {
  * Un bloque de acciones con su rótulo. El menú agrupa por intención —jugar,
  * imágenes, gestionar, quitar— en vez de encadenar quince filas iguales.
  */
-data class SheetGroup(val header: UiText? = null, val actions: List<SheetAction>)
+data class SheetGroup(
+    val header: UiText? = null,
+    val actions: List<SheetAction>,
+    val style: GroupStyle = GroupStyle.Rows,
+)
+
+/**
+ * Cómo se pinta un bloque del menú.
+ *
+ * [Thumbnails] es para las imágenes del juego: en vez de una lista de filas
+ * iguales, cada clase de imagen sale como una tarjeta con su miniatura, que
+ * es lo que de verdad se está eligiendo. Las acciones destructivas del bloque
+ * (quitar esta imagen) siguen saliendo como filas debajo.
+ */
+enum class GroupStyle { Rows, Thumbnails }
 
 data class SheetAction(
     val label: UiText,
@@ -209,6 +223,8 @@ data class SheetAction(
     val dimmed: Boolean = false,
     val destructive: Boolean = false,
     val icon: SheetIcon? = null,
+    /** Imagen ya puesta para esta acción: se enseña como miniatura. */
+    val preview: String? = null,
     /** Fila que abre otra hoja: lleva galón a la derecha en vez de nada. */
     val opensSheet: Boolean = false,
     val action: () -> Unit,
