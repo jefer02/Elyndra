@@ -107,10 +107,11 @@ class InputController(private val vm: ElyndraViewModel) {
         return when (pad) {
             Pad.Left -> moveLibrary(items, index, -1)
             Pad.Right -> moveLibrary(items, index, 1)
-            Pad.PagePrev -> moveLibrary(items, index, -PAGE)
-            Pad.PageNext -> moveLibrary(items, index, PAGE)
-            // Los filtros son la fila de encima del carrusel: arriba y abajo
-            // se mueven por ellos, que es donde el ojo los busca.
+            // L1/R1 son el atajo estándar de mando para saltar de categoría:
+            // Emulación, Android, Todos... Arriba/abajo hacen lo mismo, porque
+            // los filtros son la fila de encima del carrusel y ahí los busca el ojo.
+            Pad.PagePrev -> cycleFilter(-1)
+            Pad.PageNext -> cycleFilter(1)
             Pad.Up -> cycleFilter(-1)
             Pad.Down -> cycleFilter(1)
             Pad.Confirm -> vm.selected()?.let { vm.open(it); true } ?: false
