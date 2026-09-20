@@ -38,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -81,6 +82,8 @@ import com.elyndra.launcher.ui.components.rememberWikipediaSummary
 import com.elyndra.launcher.ui.components.LocalScreenSize
 import com.elyndra.launcher.ui.components.LogoImage
 import com.elyndra.launcher.ui.components.OpenButton
+import com.elyndra.launcher.ui.components.PortalExpandContainer
+import com.elyndra.launcher.ui.components.PortalSpec
 import com.elyndra.launcher.ui.components.Metrics
 import com.elyndra.launcher.ui.components.SearchGlyph
 import com.elyndra.launcher.ui.components.SettingsGlyph
@@ -107,6 +110,14 @@ import com.elyndra.launcher.ui.theme.selectionScale
 import com.elyndra.launcher.ui.theme.sheenBrush
 import com.elyndra.launcher.ui.theme.sheenProgress
 
+/**
+ * Un juego se funde con su velo de carga, que ya está debajo. Una carpeta
+ * navega al terminar, así que hasta ese momento debajo sigue estando la
+ * biblioteca: ahí el portal aguanta opaco para no dejarla asomar.
+ */
+private val GamePortal = PortalSpec()
+private val FolderPortal = PortalSpec(tailFade = 0f)
+
 @Composable
 fun LibraryScreen(vm: ElyndraViewModel) {
     val m = metrics()
@@ -120,6 +131,11 @@ fun LibraryScreen(vm: ElyndraViewModel) {
         val index = items.indexOfFirst { it.key == sel?.key }
         if (index >= 0) runCatching { carousel.animateScrollToItem(index) }
     }
+    // Dónde se tocó la última card que se abrió: es el origen del destello.
+    // Solo se abre una a la vez, así que con un par de valores basta; abrir
+    // con el mando o con "Abrir" no pasa punto y el destello sale del centro.
+    var portalKey by remember { mutableStateOf<String?>(null) }
+    var portalTap by remember { mutableStateOf(Offset.Zero) }
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().animAppEntrance(key = Screen.Library)) {
 
@@ -145,7 +161,12 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         // se busca desaparece: el campo abierto necesita ese
                         // ancho y ahí nadie está lanzando nada.
                         if (!vm.searchOpen) {
-                            OpenButton(enabled = sel != null) { sel?.let { vm.open(it) } }
+                            OpenButton(enabled = sel != null) {
+                                sel?.let {
+                                    portalKey = null
+                                    vm.requestOpen(it)
+                                }
+                            }
                             Spacer(Modifier.width(8.dp))
                         }
                         SearchField(vm, m)
@@ -347,28 +368,51 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                             // añadido se monta desde el polvo al entrar, y al
                             // quitarlo se deshace en polvo antes de salir de
                             // la lista (`finishVanish` es quien borra).
-                            MaterializableBox(
-                                isMaterializing = materializing,
-                                onAnimationEnd = { vm.finishMaterialize(item.key) },
+                            PortalExpandContainer(
+                                isOpening = vm.opening?.key == item.key,
+                                // Una carpeta navega al final, así que debajo
+                                // todavía está la biblioteca: el portal se
+                                // queda opaco hasta el corte en vez de dejarla
+                                // asomar. Un juego sí se funde con su velo.
+                                spec = if (item is LibraryItem.Folder) FolderPortal else GamePortal,
+                                tapOffset = if (portalKey == item.key) portalTap else null,
+                                // Un juego Android arranca al empezar a crecer:
+                                // el lanzamiento y la animación corren a la vez.
+                                // Una carpeta navega al final, cuando el portal
+                                // ya tapa la pantalla y el cambio no se ve.
+                                onExpandStart = { if (item is LibraryItem.App) vm.open(item) },
+                                onLaunchComplete = {
+                                    if (item is LibraryItem.Folder) vm.open(item)
+                                    vm.openingFinished()
+                                },
                             ) {
-                                DisintegratableBox(
-                                    isDisintegrating = vm.vanishing == item.key,
-                                    onAnimationEnd = { vm.finishVanish() },
+                                MaterializableBox(
+                                    isMaterializing = materializing,
+                                    onAnimationEnd = { vm.finishMaterialize(item.key) },
                                 ) {
-                                    LibraryTile(
-                                        item = item,
-                                        index = i,
-                                        selected = item.key == sel?.key,
-                                        metrics = m,
-                                        pairIndex = vm.pairIndexOf(item),
-                                        entrance = !materializing,
-                                        onTap = { vm.select(item.key) },
-                                        onOpen = { vm.open(item) },
-                                        onLongPress = {
-                                            vm.select(item.key)
-                                            vm.itemOptions(item)
-                                        },
-                                    )
+                                    DisintegratableBox(
+                                        isDisintegrating = vm.vanishing == item.key,
+                                        onAnimationEnd = { vm.finishVanish() },
+                                    ) {
+                                        LibraryTile(
+                                            item = item,
+                                            index = i,
+                                            selected = item.key == sel?.key,
+                                            metrics = m,
+                                            pairIndex = vm.pairIndexOf(item),
+                                            entrance = !materializing,
+                                            onTap = { vm.select(item.key) },
+                                            onOpen = { offset ->
+                                                portalKey = item.key
+                                                portalTap = offset
+                                                vm.requestOpen(item)
+                                            },
+                                            onLongPress = {
+                                                vm.select(item.key)
+                                                vm.itemOptions(item)
+                                            },
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -700,7 +744,8 @@ private fun LibraryTile(
      */
     entrance: Boolean,
     onTap: () -> Unit,
-    onOpen: () -> Unit,
+    /** Recibe el punto tocado, en coordenadas de la card: el portal sale de ahí. */
+    onOpen: (Offset) -> Unit,
     onLongPress: () -> Unit,
 ) {
     val skin = LocalSkin.current
@@ -723,7 +768,7 @@ private fun LibraryTile(
             .pointerInput(item.key) {
                 detectTapGestures(
                     onTap = { onTap() },
-                    onDoubleTap = { onOpen() },
+                    onDoubleTap = { offset -> onOpen(offset) },
                     onLongPress = { onLongPress() },
                 )
             },
