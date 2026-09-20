@@ -57,6 +57,7 @@ import com.elyndra.launcher.ui.components.Hero
 import com.elyndra.launcher.ui.components.LogoImage
 import com.elyndra.launcher.ui.components.OpenButton
 import com.elyndra.launcher.ui.components.metrics
+import com.elyndra.launcher.ui.components.rememberWikipediaSummary
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.theme.HeroTitleShadow
 import com.elyndra.launcher.ui.theme.LocalSkin
@@ -211,14 +212,14 @@ fun FolderScreen(vm: ElyndraViewModel) {
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    val description = rom?.meta?.description?.takeIf { it.isNotBlank() }
+                    val description = rememberWikipediaSummary(rom?.displayTitle)
                     if (description != null) {
                         ElyText(
                             description,
                             modifier = Modifier
                                 .padding(top = if (m.landscape) 4.dp else 6.dp)
                                 .fillMaxWidth(0.86f)
-                                .animFadeUp(key = rom.key),
+                                .animFadeUp(key = rom?.key ?: "none"),
                             size = 10f,
                             weight = FontWeight.Medium,
                             color = Color.White.copy(alpha = 0.72f),
