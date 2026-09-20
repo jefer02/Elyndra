@@ -43,7 +43,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.elyndra.launcher.data.P
-import com.elyndra.launcher.ui.components.ActionSheetView
+import com.elyndra.launcher.ui.components.GameActionOverlayContainer
 import com.elyndra.launcher.ui.components.ArtImage
 import com.elyndra.launcher.ui.components.ElyDialogView
 import com.elyndra.launcher.ui.components.ElyText
@@ -117,6 +117,20 @@ fun ElyndraApp(vm: ElyndraViewModel) {
             // Las barras van ocultas (pantalla completa), así que sus insets son 0;
             // se mantiene el del recorte de pantalla para que en un móvil con muesca
             // el contenido no quede debajo.
+            // La pantalla entera va dentro del contenedor del menú de
+            // acciones: es él quien la oscurece y la desenfoca cuando el menú
+            // está abierto, y quien monta el overlay por encima.
+            GameActionOverlayContainer(
+                isOverlayVisible = vm.sheet != null,
+                onOverlayDismissed = vm::dismissSheet,
+                onActionClicked = { action ->
+                    vm.dismissSheet()
+                    action.action()
+                },
+                spec = vm.sheet,
+                origin = vm.sheetOrigin,
+                focus = vm.input.sheetFocus,
+            ) {
             BoxWithConstraints(
                 Modifier
                     .fillMaxSize()
@@ -133,10 +147,10 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                     }
                 }
             }
+            }
 
             vm.detailsKey?.let { DetailsSheet(vm, it) }
             vm.artPicker?.let { ArtPickerSheet(vm, it) }
-            vm.sheet?.let { ActionSheetView(it, onDismiss = vm::dismissSheet, focus = vm.input.sheetFocus) }
             vm.dialog?.let { ElyDialogView(it, onDismiss = vm::dismissDialog, focus = vm.input.dialogFocus) }
             vm.launching?.let { LaunchOverlay(it, landscape) }
             vm.toast?.let {
