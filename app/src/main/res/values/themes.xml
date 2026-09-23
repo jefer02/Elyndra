@@ -9,4 +9,14 @@
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
     </style>
+
+    <!-- Splash oficial (API SplashScreen) sin icono: solo el negro de la
+         consola apagada, del mismo color que el primer fotograma del arranque
+         de Compose (BootSplash), así el paso de uno a otro no se ve. -->
+    <style name="Theme.Elyndra.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#FF05070A</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_blank</item>
+        <item name="windowSplashScreenAnimationDuration">0</item>
+        <item name="postSplashScreenTheme">@style/Theme.Elyndra</item>
+    </style>
 </resources>
