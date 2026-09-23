@@ -27,12 +27,18 @@ carpeta, a través del intent exacto de ese emulador.
   diálogos— se maneja con cruceta y sticks; funciona igual con Xbox,
   PlayStation, Switch Pro, mandos genéricos y el mando a distancia de una
   tele.
-- **Tiempo de juego real**, medido entre el lanzamiento de cada título y la
-  vuelta a Elyndra.
+- **Tiempo de juego real**: con acceso de uso (opcional), el que el emulador
+  estuvo de verdad en primer plano; si no, entre el lanzamiento y la vuelta a
+  Elyndra. Cada sesión recuerda con qué emulador se jugó.
 - **Multiidioma**: español, inglés, portugués, francés, alemán y japonés,
   sin reiniciar la app.
-- **Lucy**, un asistente conversacional integrado (opcional) con estadísticas
-  reales de juego.
+- **Masha**, la inteligencia que orquesta Elyndra (DeepSeek): elige el
+  emulador que mejor va con cada juego *en este dispositivo*, recuerda cómo y
+  cuánto se jugó, revisa la biblioteca (duplicados, discos que faltan, nombres
+  raros, sagas), arma minisesiones ("tengo 30-40 minutos") y arcos, habla desde
+  el carrusel, el velo de lanzamiento, la ficha, el widget y avisos contados, y
+  actúa de verdad desde el chat. Sin clave o sin red sigue funcionando en local.
+  Detalle en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - **Interfaz "liquid glass"** hecha a mano en Compose: degradados,
   desenfoques, auroras y animaciones de entrada calcadas del diseño
   original.
@@ -60,7 +66,9 @@ nativa del APK (`libandroidx.graphics.path.so`, de Compose) ya está alineada a
 No se versiona. Además de `sdk.dir=...`, admite:
 
 ```
-lucy.apiKey=...                  # Lucy (sin clave: modo demo)
+masha.apiKey=...                 # Masha (DeepSeek); sin clave, responde en local
+masha.model=deepseek-chat        # opcional
+masha.baseUrl=https://api.deepseek.com   # opcional (p. ej. un backend propio)
 screenscraper.devId=...          # credenciales de DESARROLLADOR de ScreenScraper
 screenscraper.devPassword=...
 screenscraper.softname=Elyndra   # opcional
@@ -84,10 +92,12 @@ del Android Keystore (`SecretStore`).
 | SteamGridDB | API key | steamgriddb.com → Preferences → API | grids, heroes y logos (sobre todo para apps Android) |
 | RetroAchievements | usuario + Web API Key | retroachievements.org → Settings → Keys | juego y progreso de logros; hash rcheevos o, si no se puede, título |
 
-"Aplicar metadatos a toda la biblioteca" recorre ROMs y apps en este orden:
-hash del archivo → ScreenScraper (`jeuInfos`, y `jeuRecherche` si no hay
-coincidencia) → IGDB para lo que falte → SteamGridDB para el arte que falte →
-RetroAchievements. Respeta los límites de cada API (1 hilo en ScreenScraper,
+"Aplicar metadatos a toda la biblioteca" identifica cada juego por el hash del
+archivo en ScreenScraper (`jeuInfos`, y `jeuRecherche` si no hay coincidencia)
+y completa con IGDB, SteamGridDB y RetroAchievements. **El orden lo elige el
+usuario** (Ajustes → Metadatos → Prioridad de fuentes), por separado para
+textos e imágenes; cada imagen guarda de qué servicio salió. Una vez al día,
+con wifi, se completa sola lo que falte. Respeta los límites de cada API (1 hilo en ScreenScraper,
 4 req/s en IGDB, reintentos ante 429) y deja de usar un servicio en la pasada
 si se queda sin cupo o las credenciales fallan, indicándolo en Ajustes. La
 pasada corre en un servicio en primer plano (`ScrapeService`, tipo dataSync)
@@ -153,24 +163,33 @@ añadir uno: copiar `values/strings.xml` a `values-xx/`, traducir y añadirlo a
 
 ```
 app/src/main/java/com/elyndra/launcher/
-  ElyndraApplication.kt        contenedor de dependencias
+  ElyndraApplication.kt        raíz Hilt (@HiltAndroidApp) y configuración de WorkManager
   MainActivity.kt              arranque, idioma, ciclo de vida (sesiones de juego)
   data/                        modelos, sistemas, perfiles de emuladores, repositorio
-                               JSON de la biblioteca, ajustes, secretos cifrados, idioma
+                               de la biblioteca (instantánea en memoria sobre Room),
+                               ajustes, secretos cifrados, idioma
   input/                       normalización de mandos (botones, sticks, repetición)
   library/                     escáner SAF, hojas de disco, apps instaladas, nombres
   launch/                      planificador de intents, lanzador, RomProvider
   metadata/                    clientes ScreenScraper / IGDB / SteamGridDB /
                                RetroAchievements, hashes, caché de imágenes,
                                motor de metadatos y servicio en primer plano
-  lucy/LucyClient.kt           Lucy (pendiente de rehacer)
+  data/db/                     Room: tablas, DAOs, diferencias instantánea → filas
+  di/                          módulos Hilt
+  domain/                      lógica de Masha en Kotlin puro: perfiles, emuladores,
+                               revisión, listas, minisesiones, arcos, sugerencias
+  masha/                       MashaAI + DeepSeek, prompt, herramientas, contexto,
+                               caché, memoria, Masha sin conexión
+  session/                     sesiones (UsageStatsManager + respaldo)
+  core/device/                 batería, temperatura y red
+  work/ widget/ notify/        WorkManager, widget Glance, avisos de Masha
   ui/
-    ElyndraViewModel.kt        estado y navegación; Add/Settings/LucyController
+    ElyndraViewModel.kt        estado y navegación; Add/Settings/MashaController
     ElyndraApp.kt              pantallas + capas (diálogos, hojas, ficha, avisos)
     InputController.kt         traduce el mando a acciones según la capa activa
     theme/                     tipografía, degradados CSS, cristal, animaciones
     components/                texto, controles, hero, carátulas, capas
-    screens/                   Library, Folder, Add, Settings (+APIs), Details, Lucy
+    screens/                   Library, Folder, Add, Settings (+APIs, Masha), Details, Masha
 ```
 
 ## Cómo se tradujo el diseño
@@ -203,10 +222,14 @@ Piezas que había que construir a mano porque Compose no las trae:
 **Liquid glass.** Compose no tiene backdrop-filter; se replican tinte,
 opacidad, borde, sombra y realce, y el desenfoque se traduce en lechosidad.
 
-## Lucy y la API key
+## Masha y la API key
 
-`LucyClient` lee la clave de `local.properties` (`lucy.apiKey=...`) vía
-`BuildConfig`. Sin clave responde con los textos locales del prototipo y la
-cabecera dice "MODO DEMO". Llamar a la API desde el móvil vale para probar,
-**no** para publicar: en producción la llamada debe salir de un backend propio.
-Las tarjetas de estadísticas de Lucy ya usan el tiempo de juego real.
+`MashaConfig` lee la clave de `local.properties` (`masha.apiKey=...`) vía
+`BuildConfig`, y el usuario puede poner la suya en Ajustes → Masha (se guarda
+cifrada). Sin clave, sin red o con la IA apagada, Masha contesta en local con
+los datos reales. Llamar a la API desde el móvil vale para probar, **no** para
+publicar: cualquier clave dentro de un APK se puede extraer, así que en
+producción la llamada debe salir de un backend propio (`masha.baseUrl`).
+
+Arquitectura, modelo de datos, flujos, privacidad y plan por fases:
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
