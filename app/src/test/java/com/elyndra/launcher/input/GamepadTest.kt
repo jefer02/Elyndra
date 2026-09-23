@@ -18,6 +18,7 @@ class GamepadTest {
         assertEquals(Pad.Options, Gamepad.actionFor(KeyEvent.KEYCODE_BUTTON_Y))
         assertEquals(Pad.Menu, Gamepad.actionFor(KeyEvent.KEYCODE_BUTTON_START))
         assertEquals(Pad.Search, Gamepad.actionFor(KeyEvent.KEYCODE_BUTTON_SELECT))
+        assertEquals(Pad.AppMenu, Gamepad.actionFor(KeyEvent.KEYCODE_BUTTON_THUMBL))
         assertEquals(Pad.PagePrev, Gamepad.actionFor(KeyEvent.KEYCODE_BUTTON_L1))
         assertEquals(Pad.PageNext, Gamepad.actionFor(KeyEvent.KEYCODE_BUTTON_R1))
         // Mando clónico sin perfil: Android le numera los botones.
@@ -44,48 +45,79 @@ class GamepadTest {
     }
 
     @Test
-    fun theTiltedAxisWinsOverTheOnesAtRest() {
-        // Cruceta por el "hat" con los dos sticks quietos.
-        assertEquals(-1f to 0f, Gamepad.axisDirection(-1f, 0f, 0f, 0f, 0f, 0f))
-        // Stick derecho de un mando de PlayStation (Z/RZ), el izquierdo quieto.
-        assertEquals(0f to 0.9f, Gamepad.axisDirection(0f, 0f, 0f, 0f, 0f, 0.9f))
-        // Un stick gastado que no descansa del todo no tapa al que se mueve.
-        assertEquals(0.8f to 0f, Gamepad.axisDirection(0f, 0f, 0.05f, 0f, 0.8f, 0f))
-    }
-
-    @Test
-    fun theStickFiresOnceAndLuegoRepeats() {
-        val stick = StickRepeater(firstDelayMs = 300, repeatMs = 100)
-        // Al inclinar, una pulsación.
-        assertEquals(Pad.Right, stick.update(1f, 0f, 0))
-        // Mientras dura la espera inicial, ninguna más.
-        assertNull(stick.update(1f, 0f, 100))
-        assertNull(stick.update(1f, 0f, 299))
-        // Pasada la espera, repite a su ritmo.
-        assertEquals(Pad.Right, stick.update(1f, 0f, 300))
-        assertNull(stick.update(1f, 0f, 350))
-        assertEquals(Pad.Right, stick.update(1f, 0f, 400))
-    }
-
-    @Test
-    fun aTremblingStickIsNotAPress() {
-        val stick = StickRepeater()
-        assertEquals(Pad.Right, stick.update(1f, 0f, 0))
-        // Vuelve a medias: sigue contando como inclinado, no dispara de nuevo.
-        assertNull(stick.update(StickRepeater.RELEASE + 0.05f, 0f, 10))
-        assertNull(stick.update(1f, 0f, 20))
-        // Soltado del todo, la siguiente inclinación sí es una pulsación nueva.
-        assertNull(stick.update(0f, 0f, 30))
-        assertEquals(Pad.Right, stick.update(1f, 0f, 40))
+    fun theStickNeedsHalfItsTravelAndHasHysteresis() {
+        val gate = AxisGate()
+        // Por debajo de la zona muerta (~0.5) no hay dirección.
+        assertNull(gate.update(0.45f, 0f))
+        assertEquals(Pad.Right, gate.update(0.6f, 0f))
+        // Vuelve a medias: sigue contando como la misma inclinación.
+        assertEquals(Pad.Right, gate.update(AxisGate.RELEASE + 0.05f, 0f))
+        // Soltado del todo.
+        assertNull(gate.update(0.1f, 0f))
     }
 
     @Test
     fun aDiagonalOnlyMovesOneWay() {
-        val stick = StickRepeater()
+        val gate = AxisGate()
         // Empujado en diagonal manda el eje dominante: no se mueve en cruz.
-        assertEquals(Pad.Down, stick.update(0.6f, 0.9f, 0))
-        stick.reset()
-        assertEquals(Pad.Left, stick.update(-0.9f, 0.6f, 100))
+        assertEquals(Pad.Down, gate.update(0.6f, 0.9f))
+        gate.reset()
+        assertEquals(Pad.Left, gate.update(-0.9f, 0.6f))
+    }
+
+    /** Temporizador de mentira: el tiempo avanza cuando la prueba lo dice. */
+    private class FakeTicker : DirectionalRepeater.Ticker {
+        var now = 0L
+        private val pending = mutableListOf<Pair<Long, Runnable>>()
+        override fun postDelayed(block: Runnable, delayMs: Long) {
+            pending += (now + delayMs) to block
+        }
+        override fun removeCallbacks(block: Runnable) {
+            pending.removeAll { it.second === block }
+        }
+        fun advanceTo(t: Long) {
+            while (true) {
+                val next = pending.filter { it.first <= t }.minByOrNull { it.first } ?: break
+                pending.remove(next)
+                now = next.first
+                next.second.run()
+            }
+            now = t
+        }
+    }
+
+    @Test
+    fun oneStepPerPushThenControlledRepeat() {
+        val ticker = FakeTicker()
+        val fired = mutableListOf<Long>()
+        val repeater = DirectionalRepeater({ fired += ticker.now }, firstDelayMs = 350, repeatMs = 150, handler = ticker)
+        repeater.press(DirectionalRepeater.Channel.Stick, Pad.Right)
+        // Un paso al instante…
+        assertEquals(listOf(0L), fired)
+        // …ninguno más durante la espera inicial…
+        ticker.advanceTo(349)
+        assertEquals(1, fired.size)
+        // …y a partir de ahí, uno cada 150 ms.
+        ticker.advanceTo(350 + 150 * 2)
+        assertEquals(listOf(0L, 350L, 500L, 650L), fired)
+        repeater.release(DirectionalRepeater.Channel.Stick)
+        ticker.advanceTo(2_000)
+        assertEquals(4, fired.size)
+    }
+
+    @Test
+    fun theSamePushFromTwoSourcesCountsOnce() {
+        val ticker = FakeTicker()
+        var count = 0
+        val repeater = DirectionalRepeater({ count++ }, handler = ticker)
+        // Hay mandos que mandan la cruceta como tecla y como "hat" a la vez.
+        repeater.press(DirectionalRepeater.Channel.Keys, Pad.Down)
+        repeater.press(DirectionalRepeater.Channel.Hat, Pad.Down)
+        assertEquals(1, count)
+        repeater.release(DirectionalRepeater.Channel.Keys, Pad.Down)
+        repeater.release(DirectionalRepeater.Channel.Hat)
+        repeater.press(DirectionalRepeater.Channel.Keys, Pad.Down)
+        assertEquals(2, count)
     }
 
     @Test
