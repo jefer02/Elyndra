@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Metadatos (ScreenScraper, IGDB, SteamGridDB, RetroAchievements) y Lucy. -->
+    <!-- Metadatos (ScreenScraper, IGDB, SteamGridDB, RetroAchievements) y Masha (DeepSeek). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
@@ -10,6 +11,14 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Tiempo de juego exacto (opcional). No es un permiso que se pida en un
+         diálogo: el usuario lo concede, si quiere, en Ajustes del sistema →
+         Acceso de uso, desde Ajustes → Masha. Sin él, las sesiones se miden
+         entre el lanzamiento y la vuelta a Elyndra. -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
 
     <!-- Mandos. Elyndra se maneja entero con un mando (Xbox, PlayStation,
          Switch Pro, clónicos y los mandos integrados de las portátiles
@@ -108,5 +117,32 @@
             android:authorities="${applicationId}.roms"
             android:exported="false"
             android:grantUriPermissions="true" />
+
+        <!-- Widget de Masha en la pantalla de inicio (Jetpack Glance). -->
+        <receiver
+            android:name=".widget.MashaWidgetReceiver"
+            android:exported="true"
+            android:label="@string/masha">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/masha_widget_info" />
+        </receiver>
+
+        <!-- WorkManager se inicia a demanda con la fábrica de Hilt
+             (ElyndraApplication.workManagerConfiguration): se quita su
+             inicializador automático, que usaría la fábrica por defecto. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
     </application>
 </manifest>
