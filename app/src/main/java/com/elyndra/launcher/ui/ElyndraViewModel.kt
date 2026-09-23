@@ -17,6 +17,7 @@ import com.elyndra.launcher.data.Emulators
 import com.elyndra.launcher.data.Library
 import com.elyndra.launcher.data.LibraryRepository
 import com.elyndra.launcher.data.PAIRS
+import com.elyndra.launcher.data.PlaySession
 import com.elyndra.launcher.data.RomEntry
 import com.elyndra.launcher.data.RomFolder
 import com.elyndra.launcher.data.Systems
@@ -28,21 +29,44 @@ import com.elyndra.launcher.library.PcGames
 import com.elyndra.launcher.metadata.ArtCandidate
 import com.elyndra.launcher.metadata.ArtKind
 import com.elyndra.launcher.metadata.ArtSources
+import com.elyndra.launcher.metadata.MetadataPriorityStore
 import com.elyndra.launcher.metadata.Service
+import com.elyndra.launcher.domain.device.DeviceWarning
+import com.elyndra.launcher.domain.launch.LaunchDecision
+import com.elyndra.launcher.domain.launch.LaunchNote
+import com.elyndra.launcher.domain.profile.LaunchOutcome
+import com.elyndra.launcher.launch.EmulatorInventory
+import com.elyndra.launcher.launch.LaunchOrchestrator
+import com.elyndra.launcher.masha.MashaBrain
+import com.elyndra.launcher.session.SessionTracker
+import com.elyndra.launcher.work.ElyndraWork
 import com.elyndra.launcher.ui.screens.serviceName
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
 
 /**
  * Estado de la app. La biblioteca vive en [LibraryRepository] (persistida);
  * aquí se proyecta para la UI y se orquestan navegación, lanzamientos y
- * avisos. Añadir, Ajustes y Lucy tienen su propio controlador.
+ * avisos. Añadir, Ajustes y Masha tienen su propio controlador.
  */
-class ElyndraViewModel(application: Application) : AndroidViewModel(application) {
+@HiltViewModel
+class ElyndraViewModel @Inject constructor(
+    application: Application,
+    /** Masha: la IA, lo que sabe de la biblioteca, su memoria y el dispositivo. */
+    val brain: MashaBrain,
+    /** Decide con qué emulador va cada ROM y aprende de cómo acaba cada lanzamiento. */
+    val orchestrator: LaunchOrchestrator,
+    val sessions: SessionTracker,
+    private val inventory: EmulatorInventory,
+    private val work: ElyndraWork,
+    val metadataPriority: MetadataPriorityStore,
+) : AndroidViewModel(application) {
 
     val app = application as ElyndraApplication
     private val repo = app.library
@@ -57,7 +81,6 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
     var selectedKey by mutableStateOf<String?>(null); private set
     var folderId by mutableStateOf<String?>(null); private set
     var selectedRomKey by mutableStateOf<String?>(null); private set
-    var launching by mutableStateOf<Launch?>(null); private set
 
     /* ── datos ────────────────────────────────────────────────── */
     var library by mutableStateOf(repo.current); private set
@@ -93,7 +116,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
 
     val add = AddController(this)
     val settings = SettingsController(this)
-    val lucy = LucyController(this)
+    val masha = MashaController(this, brain)
 
     private var launchJob: Job? = null
     private var toastJob: Job? = null
@@ -334,6 +357,12 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
 
     fun requestOpen(item: LibraryItem) {
         if (opening != null) return
+        // Las carpetas de emulador se abren al instante, sin la expansión del
+        // icono: el portal queda solo para lanzar juegos Android.
+        if (item is LibraryItem.Folder) {
+            open(item)
+            return
+        }
         opening = item
         viewModelScope.launch {
             // Red de seguridad: si la card deja de pintarse a media animación
@@ -367,15 +396,13 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
 
     private fun launchApp(item: LibraryItem.App) {
         val entry = item.app
-        // Un juego Android se representa siempre con su icono, no con carátula.
-        showLaunch(Launch(entry.displayTitle, UiText.res(R.string.launch_android), pairIndexFor(entry.packageName), null, entry.packageName, entry.meta.icon))
         launchJob?.cancel()
         launchJob = viewModelScope.launch {
-            delay(LAUNCH_DELAY_MS)
-            when (launcher.launchApp(entry.packageName)) {
-                GameLauncher.Outcome.Started -> startSession(entry.key)
+            val outcome = launcher.launchApp(entry.packageName)
+            orchestrator.record(entry.key, null, null, entry.packageName, outcomeId(outcome))
+            when (outcome) {
+                GameLauncher.Outcome.Started -> startSession(entry.key, null, entry.packageName)
                 else -> {
-                    launching = null
                     showDialog(
                         DialogSpec(
                             title = UiText.res(R.string.dialog_app_missing_title),
@@ -389,20 +416,16 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /**
+     * Lanza una ROM.
+     *
+     * Con qué emulador lo decide el orquestador ([LaunchOrchestrator]): lo que
+     * eligió el usuario manda, pero si no está instalado y otro compatible sí,
+     * o si con este juego viene fallando y otro le ha ido bien, Masha lo dice
+     * antes de lanzar y deja elegir. Nunca cambia de emulador por su cuenta.
+     */
     fun openRom(rom: RomEntry) {
         val folder = repo.folder(rom.folderId) ?: return
-        val emuId = rom.emulatorId ?: folder.emulatorId ?: defaultEmulator(folder.systemId)
-        if (emuId == null) {
-            showDialog(
-                DialogSpec(
-                    title = UiText.res(R.string.dialog_no_emulator_title),
-                    message = UiText.res(R.string.dialog_no_emulator_msg),
-                    confirm = DialogButton(UiText.res(R.string.change_emulator)) { pickFolderEmulator(folder) },
-                    dismiss = DialogButton(UiText.res(R.string.close)) {},
-                ),
-            )
-            return
-        }
         if (!app.files.hasPermission(folder.treeUri)) {
             showDialog(
                 DialogSpec(
@@ -413,75 +436,154 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
             )
             return
         }
-        val emuName = emulatorName(emuId)
-        if (!launcher.isEmulatorInstalled(emuId)) {
-            emulatorMissing(emuId, emuName, folder, rom)
-            return
-        }
-        showLaunch(Launch(rom.displayTitle, UiText.res(R.string.launch_via, emuName.uppercase()), romPairIndex(rom), rom.meta.cover, iconPath = rom.meta.icon))
         launchJob?.cancel()
         launchJob = viewModelScope.launch {
-            val vitaTitle = if (folder.systemId == "psvita") {
-                withContext(Dispatchers.IO) {
-                    app.scanner.readSmallText(Uri.parse(folder.treeUri), rom.docId, 256)?.lineSequence()?.firstOrNull()?.trim()
+            when (val decision = orchestrator.decide(rom, folder)) {
+                is LaunchDecision.Go -> launchRomWith(rom, folder, decision.emulatorId)
+                is LaunchDecision.UseInstead -> offerInstalledEmulator(rom, folder, decision)
+                is LaunchDecision.SuggestSwitch -> offerSwitch(rom, folder, decision)
+                is LaunchDecision.NoneInstalled -> {
+                    val emuId = decision.configured ?: decision.recommended
+                    if (emuId == null) {
+                        showDialog(
+                            DialogSpec(
+                                title = UiText.res(R.string.dialog_no_emulator_title),
+                                message = UiText.res(R.string.dialog_no_emulator_msg),
+                                confirm = DialogButton(UiText.res(R.string.change_emulator)) { pickFolderEmulator(folder) },
+                                dismiss = DialogButton(UiText.res(R.string.close)) {},
+                            ),
+                        )
+                    } else {
+                        emulatorMissing(emuId, emulatorName(emuId), folder, rom)
+                    }
                 }
-            } else null
-            val pcId = pcGameIds.resolve(folder, rom)
-            delay(LAUNCH_DELAY_MS)
-            val ref = launcher.romRef(folder, rom, vitaTitle, pcId.id, pcId.assigned)
-            val outcome = launcher.launchRom(emuId, ref)
-            if (outcome == GameLauncher.Outcome.Started) {
-                startSession(rom.key)
-                return@launch
-            }
-            launching = null
-            when (outcome) {
-                GameLauncher.Outcome.NotInstalled -> emulatorMissing(emuId, emuName, folder, rom)
-                GameLauncher.Outcome.NeedsPath -> showDialog(
-                    DialogSpec(
-                        title = UiText.res(R.string.dialog_needs_path_title),
-                        message = UiText.res(R.string.dialog_needs_path_msg, emuName),
-                        confirm = DialogButton(UiText.res(R.string.choose_other)) { pickFolderEmulator(folder) },
-                        dismiss = DialogButton(UiText.res(R.string.close)) {},
-                    ),
-                )
-                GameLauncher.Outcome.NeedsVitaTitle -> showDialog(
-                    DialogSpec(
-                        title = UiText.res(R.string.dialog_vita_title),
-                        message = UiText.res(R.string.dialog_vita_msg),
-                        confirm = DialogButton(UiText.res(R.string.ok)) {},
-                    ),
-                )
-                // Sin el archivo que exporta el runtime no hay nada que lanzar,
-                // pero abrir el runtime y elegir el juego dentro sigue siendo
-                // una salida: se ofrece, ya explicado, en vez de hacerlo a ciegas.
-                GameLauncher.Outcome.NeedsPcLauncher -> showDialog(
-                    DialogSpec(
-                        title = UiText.res(R.string.dialog_pc_launcher_title, emuName),
-                        message = UiText.res(R.string.dialog_pc_launcher_msg, emuName),
-                        confirm = DialogButton(UiText.res(R.string.open_runtime, emuName)) { openRuntime(emuId) },
-                        dismiss = DialogButton(UiText.res(R.string.close)) {},
-                        // Poner el id a mano es la otra salida, y en un juego de
-                        // PC suele ser la buena: se copia de la ficha del juego
-                        // dentro del runtime y ya se lanza solo.
-                        extra = if (usesGameId(rom)) {
-                            DialogButton(UiText.res(R.string.pc_game_id)) { editPcGameId(rom, launchAfterSave = true) }
-                        } else {
-                            DialogButton(UiText.res(R.string.choose_other)) { pickFolderEmulator(folder) }
-                        },
-                    ),
-                )
-                is GameLauncher.Outcome.Failed -> showDialog(
-                    DialogSpec(
-                        title = UiText.res(R.string.dialog_launch_failed_title),
-                        message = UiText.res(R.string.dialog_launch_failed_msg, emuName, outcome.reason),
-                        confirm = DialogButton(UiText.res(R.string.choose_other)) { pickFolderEmulator(folder) },
-                        dismiss = DialogButton(UiText.res(R.string.close)) {},
-                    ),
-                )
-                GameLauncher.Outcome.Started -> Unit
             }
         }
+    }
+
+    /** El lanzamiento en sí, ya decidido el emulador: directo al juego, sin velo. */
+    private suspend fun launchRomWith(rom: RomEntry, folder: RomFolder, emuId: String) {
+        val emuName = emulatorName(emuId)
+        val vitaTitle = if (folder.systemId == "psvita") {
+            withContext(Dispatchers.IO) {
+                app.scanner.readSmallText(Uri.parse(folder.treeUri), rom.docId, 256)?.lineSequence()?.firstOrNull()?.trim()
+            }
+        } else null
+        val pcId = pcGameIds.resolve(folder, rom)
+        val ref = launcher.romRef(folder, rom, vitaTitle, pcId.id, pcId.assigned)
+        val outcome = launcher.launchRom(emuId, ref)
+        val pkg = orchestrator.packageFor(emuId)
+        orchestrator.record(rom.key, rom.systemId, emuId, pkg, outcomeId(outcome))
+        if (outcome == GameLauncher.Outcome.Started) {
+            startSession(rom.key, emuId, pkg)
+            return
+        }
+        when (outcome) {
+            GameLauncher.Outcome.NotInstalled -> emulatorMissing(emuId, emuName, folder, rom)
+            GameLauncher.Outcome.NeedsPath -> showDialog(
+                DialogSpec(
+                    title = UiText.res(R.string.dialog_needs_path_title),
+                    message = UiText.res(R.string.dialog_needs_path_msg, emuName),
+                    confirm = DialogButton(UiText.res(R.string.choose_other)) { pickFolderEmulator(folder) },
+                    dismiss = DialogButton(UiText.res(R.string.close)) {},
+                ),
+            )
+            GameLauncher.Outcome.NeedsVitaTitle -> showDialog(
+                DialogSpec(
+                    title = UiText.res(R.string.dialog_vita_title),
+                    message = UiText.res(R.string.dialog_vita_msg),
+                    confirm = DialogButton(UiText.res(R.string.ok)) {},
+                ),
+            )
+            // Sin el archivo que exporta el runtime no hay nada que lanzar,
+            // pero abrir el runtime y elegir el juego dentro sigue siendo
+            // una salida: se ofrece, ya explicado, en vez de hacerlo a ciegas.
+            GameLauncher.Outcome.NeedsPcLauncher -> showDialog(
+                DialogSpec(
+                    title = UiText.res(R.string.dialog_pc_launcher_title, emuName),
+                    message = UiText.res(R.string.dialog_pc_launcher_msg, emuName),
+                    confirm = DialogButton(UiText.res(R.string.open_runtime, emuName)) { openRuntime(emuId) },
+                    dismiss = DialogButton(UiText.res(R.string.close)) {},
+                    // Poner el id a mano es la otra salida, y en un juego de
+                    // PC suele ser la buena: se copia de la ficha del juego
+                    // dentro del runtime y ya se lanza solo.
+                    extra = if (usesGameId(rom)) {
+                        DialogButton(UiText.res(R.string.pc_game_id)) { editPcGameId(rom, launchAfterSave = true) }
+                    } else {
+                        DialogButton(UiText.res(R.string.choose_other)) { pickFolderEmulator(folder) }
+                    },
+                ),
+            )
+            is GameLauncher.Outcome.Failed -> showDialog(
+                DialogSpec(
+                    title = UiText.res(R.string.dialog_launch_failed_title),
+                    message = UiText.res(R.string.dialog_launch_failed_msg, emuName, outcome.reason),
+                    confirm = DialogButton(UiText.res(R.string.choose_other)) { pickFolderEmulator(folder) },
+                    dismiss = DialogButton(UiText.res(R.string.close)) {},
+                ),
+            )
+            GameLauncher.Outcome.Started -> Unit
+        }
+    }
+
+    /**
+     * El emulador elegido no está instalado y otro compatible sí: Masha lo
+     * ofrece. Aceptar lo guarda donde estaba la elección (el juego o su
+     * carpeta) y lanza; "Instalar" abre la tienda del que falta.
+     */
+    private fun offerInstalledEmulator(rom: RomEntry, folder: RomFolder, d: LaunchDecision.UseInstead) {
+        val missing = emulatorName(d.configured)
+        val alternative = d.alternative.emulatorId
+        val altName = emulatorName(alternative)
+        showDialog(
+            DialogSpec(
+                title = UiText.res(R.string.masha_dialog_missing_title, missing),
+                message = UiText.res(R.string.masha_dialog_missing_msg, missing, altName),
+                confirm = DialogButton(UiText.res(R.string.masha_use_emulator, altName)) {
+                    if (rom.emulatorId != null) repo.setRomEmulator(rom.id, alternative) else repo.setFolderEmulator(folder.id, alternative)
+                    launchJob = viewModelScope.launch { launchRomWith(rom, folder, alternative) }
+                },
+                dismiss = DialogButton(UiText.res(R.string.close)) {},
+                extra = Emulators.byId(d.configured)?.let { p ->
+                    DialogButton(UiText.res(R.string.install)) { openExternal(launcher.storeIntent(p)) }
+                },
+            ),
+        )
+    }
+
+    /**
+     * Con este juego, el emulador elegido viene saliéndose al instante y otro
+     * instalado le ha ido bien. Masha lo propone para *este* juego; seguir con
+     * el de siempre también lanza, sin más preguntas.
+     */
+    private fun offerSwitch(rom: RomEntry, folder: RomFolder, d: LaunchDecision.SuggestSwitch) {
+        val current = emulatorName(d.configured)
+        val alternative = d.alternative.emulatorId
+        val altName = emulatorName(alternative)
+        val bad = d.struggling.earlyExits + d.struggling.failedLaunches
+        showDialog(
+            DialogSpec(
+                title = UiText.res(R.string.masha_dialog_switch_title),
+                message = UiText.res(R.string.masha_dialog_switch_msg, bad, current, altName),
+                confirm = DialogButton(UiText.res(R.string.masha_use_emulator, altName)) {
+                    repo.setRomEmulator(rom.id, alternative)
+                    launchJob = viewModelScope.launch { launchRomWith(rom, folder, alternative) }
+                },
+                dismiss = DialogButton(UiText.res(R.string.masha_keep_emulator, current)) {
+                    launchJob = viewModelScope.launch { launchRomWith(rom, folder, d.configured) }
+                },
+            ),
+        )
+    }
+
+    /** La línea de Masha en el velo, en palabras. */
+    private fun outcomeId(outcome: GameLauncher.Outcome): String = when (outcome) {
+        GameLauncher.Outcome.Started -> LaunchOutcome.STARTED
+        GameLauncher.Outcome.NotInstalled -> LaunchOutcome.NOT_INSTALLED
+        GameLauncher.Outcome.NeedsPath -> LaunchOutcome.NEEDS_PATH
+        GameLauncher.Outcome.NeedsVitaTitle -> LaunchOutcome.NEEDS_VITA_TITLE
+        GameLauncher.Outcome.NeedsPcLauncher -> LaunchOutcome.NEEDS_PC_LAUNCHER
+        is GameLauncher.Outcome.Failed -> LaunchOutcome.FAILED
     }
 
     /**
@@ -582,16 +684,9 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
         )
     }
 
-    private fun showLaunch(l: Launch) {
-        launching = l
-    }
-
-    private suspend fun startSession(key: String) {
+    private suspend fun startSession(key: String, emulatorId: String?, packageName: String?) {
         repo.recordLaunch(key)
-        app.settings.pendingSessionKey = key
-        app.settings.pendingSessionStart = System.currentTimeMillis()
-        delay(4_000)
-        launching = null
+        sessions.begin(key, emulatorId, packageName)
     }
 
     fun openExternal(intent: Intent) {
@@ -602,18 +697,22 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
 
     /* ── ciclo de vida ────────────────────────────────────────── */
 
-    /** La app vuelve a primer plano: cierra la sesión de juego medida y refresca el estado. */
+    /**
+     * La app vuelve a primer plano: cierra la sesión de juego medida, refresca
+     * lo instalado y le da a Masha la ocasión de decir algo (un paso de arco
+     * cumplido, una salida sospechosamente rápida, la sugerencia del momento).
+     */
     fun onForeground() {
         settings.refreshLanguage()
+        app.settings.lastOpenedAt = System.currentTimeMillis()
+        refreshInventory()
         viewModelScope.launch {
             repo.awaitLoaded()
-            val key = app.settings.pendingSessionKey
-            if (key != null) {
-                val start = app.settings.pendingSessionStart
-                app.settings.pendingSessionKey = null
-                val minutes = ((System.currentTimeMillis() - start) / 60_000L).toInt()
-                if (minutes in 1..MAX_SESSION_MINUTES) repo.addPlaytime(key, minutes, start)
-            }
+            val session = sessions.finish()
+            if (session != null) afterSession(session)
+            // Lo que Masha tenga que decir sale ya, con la sesión recién cerrada:
+            // no espera al inventario de emuladores, que no lo necesita.
+            masha.refreshInsight()
             refreshInstalled()
             if (library.folders.isNotEmpty() && System.currentTimeMillis() - library.lastAutoScan > AUTO_RESCAN_MS) {
                 repo.markAutoScan(System.currentTimeMillis())
@@ -622,11 +721,108 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /**
+     * Inventario de emuladores instalados, aparte: son un par de cientos de
+     * consultas al PackageManager y nada de la pantalla depende de ellas.
+     */
+    private fun refreshInventory() {
+        viewModelScope.launch { runCatching { inventory.refresh() } }
+    }
+
     /** La app pasa a segundo plano (normalmente, porque arrancó el juego). */
     fun onBackground() {
-        launching = null
         launchJob?.cancel()
     }
+
+    /**
+     * Lo que Masha comenta al volver de jugar, en una línea y solo si vale la
+     * pena: un paso de arco cumplido, o una segunda salida seguida en segundos
+     * con el mismo emulador (a la primera puede ser cualquier cosa).
+     */
+    private suspend fun afterSession(session: PlaySession) {
+        val closed = runCatching { brain.syncArcs() }.getOrDefault(emptyList())
+        closed.lastOrNull()?.let { (arcTitle, _) -> showToast(UiText.res(R.string.masha_toast_arc_step, arcTitle)) }
+        val emulator = session.emulatorId
+        if (closed.isEmpty() && session.earlyExit && emulator != null) {
+            val previous = library.sessions.lastOrNull { it.key == session.key && it.start < session.start }
+            if (previous?.earlyExit == true && previous.emulatorId == emulator) {
+                val title = repo.romByKey(session.key)?.displayTitle
+                if (title != null) showToast(UiText.res(R.string.masha_toast_early_exit, emulatorName(emulator), title))
+            }
+        }
+        work.refreshWidgetNow()
+    }
+
+    /* ── lo que Masha necesita saber de la interfaz ───────────── */
+
+    /** Qué pantalla está mirando el usuario, para el contexto de Masha. */
+    fun screenName(): String = when {
+        detailsKey != null -> "details"
+        screen == Screen.Folder -> "folder:" + (currentFolder()?.system?.name ?: "")
+        else -> screen.name.lowercase()
+    }
+
+    /** Lo seleccionado: la ficha abierta, la ROM de la carpeta o la card del carrusel. */
+    fun focusName(): String? {
+        detailsKey?.let { key -> return repo.romByKey(key)?.displayTitle ?: repo.appByKey(key)?.displayTitle }
+        return when (screen) {
+            Screen.Folder -> selectedRom()?.displayTitle
+            Screen.Library -> selected()?.name
+            else -> null
+        }
+    }
+
+    /** "Enséñame mis juegos de X": vuelve a la biblioteca con ese filtro y esa búsqueda. */
+    fun showLibraryFiltered(text: String, category: LibraryFilter) {
+        go(Screen.Library)
+        filter = category
+        if (text.isBlank()) {
+            query = ""
+            searchOpen = false
+        } else {
+            searchOpen = true
+            query = text
+        }
+    }
+
+    /** Desde el widget: lanzar ese juego en cuanto la biblioteca esté cargada (arranque en frío incluido). */
+    fun launchFromShortcut(key: String) {
+        viewModelScope.launch {
+            repo.awaitLoaded()
+            openByKey(key)
+        }
+    }
+
+    /** Desde un aviso de Masha: la ficha del juego, para decidir con calma. */
+    fun showFromShortcut(key: String) {
+        viewModelScope.launch {
+            repo.awaitLoaded()
+            go(Screen.Library)
+            if (repo.romByKey(key) != null || repo.appByKey(key) != null) showDetails(key)
+        }
+    }
+
+    fun setRomEmulatorByKey(key: String, emulatorId: String?) {
+        repo.romByKey(key)?.let { repo.setRomEmulator(it.id, emulatorId) }
+    }
+
+    /**
+     * Metadatos a demanda (Masha, sugerencias): [keys] null = toda la
+     * biblioteca. Sin [force] solo se completa lo que falta.
+     */
+    fun updateMetadata(keys: List<String>?, force: Boolean) {
+        if (!app.credentials.anyConfigured()) {
+            showToast(UiText.res(R.string.configure_a_service))
+            return
+        }
+        if (keys != null && keys.isEmpty()) return
+        engine.start(keys, force)
+        showToast(UiText.res(R.string.toast_metadata_started))
+    }
+
+    /** Servicios de imágenes en el orden de prioridad del usuario (Ajustes → Metadatos). */
+    private fun artServices(): List<Service> = metadataPriority.get().art
+
 
     /* ── carpetas ─────────────────────────────────────────────── */
 
@@ -704,7 +900,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
     /**
      * La card que se está deshaciendo ahora mismo, por su clave.
      *
-     * La card que coincide se desintegra (ver `DisintegratableBox`) y el
+     * La card que coincide se desintegra (ver `DisintegratingContainer`) y el
      * borrado de verdad espera a que termine la animación.
      */
     var vanishing by mutableStateOf<String?>(null); private set
@@ -764,6 +960,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
             DialogSpec(
                 title = UiText.res(R.string.confirm_remove_title),
                 message = UiText.plural(R.plurals.confirm_remove_folder_msg, count, count),
+                destructive = true,
                 confirm = DialogButton(UiText.res(R.string.remove)) {
                     vanishItem(folder.key) {
                         library.roms.filter { it.folderId == folder.id }.forEach { app.media.deleteFor(it.key) }
@@ -789,6 +986,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
             DialogSpec(
                 title = UiText.res(R.string.confirm_remove_title),
                 message = UiText.res(R.string.confirm_remove_game_msg, rom.displayTitle),
+                destructive = true,
                 confirm = DialogButton(UiText.res(R.string.remove)) {
                     vanishItem(rom.key) {
                         app.media.deleteFor(rom.key)
@@ -822,6 +1020,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
             DialogSpec(
                 title = UiText.res(R.string.confirm_remove_title),
                 message = UiText.res(R.string.confirm_remove_app_msg, title),
+                destructive = true,
                 confirm = DialogButton(UiText.res(R.string.remove)) {
                     vanishItem("a:$pkg") {
                         app.media.deleteFor("a:$pkg")
@@ -1023,11 +1222,17 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
             for (key in targets) {
                 for (kind in listOf(ArtKind.Icon, ArtKind.Logo, ArtKind.Background)) {
                     if (art.has(key, kind)) continue
-                    for (service in ART_SERVICES) {
+                    for (service in artServices()) {
                         if (!app.credentials.isConfigured(service) || !art.supports(key, service)) continue
                         val url = runCatching { art.candidates(key, kind, service) }
                             .getOrNull()?.firstOrNull()?.url ?: continue
-                        if (runCatching { art.apply(key, kind, url) }.getOrDefault(false)) break
+                        if (runCatching { art.apply(key, kind, url, service) }.getOrDefault(false)) {
+                            // Si es la carpeta que se está mirando, la imagen
+                            // se monta desde el polvo en cuanto llega; si no,
+                            // entra sin más, que no hay nadie delante.
+                            if (key == selectedKey) materializeArt(key, kind)
+                            break
+                        }
                     }
                 }
             }
@@ -1037,15 +1242,15 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
     /**
      * Pone automáticamente una imagen a un elemento, con el primer candidato
      * que dé algún servicio configurado. Es lo que usan tanto el arte
-     * automático de las carpetas como las acciones de Lucy.
+     * automático de las carpetas como las acciones de Masha.
      */
     suspend fun applyArtAuto(key: String, kind: ArtKind): Boolean {
         if (!app.credentials.anyConfigured()) return false
-        for (service in ART_SERVICES) {
+        for (service in artServices()) {
             if (!app.credentials.isConfigured(service) || !art.supports(key, service)) continue
             val url = runCatching { art.candidates(key, kind, service) }
                 .getOrNull()?.firstOrNull()?.url ?: continue
-            if (runCatching { art.apply(key, kind, url) }.getOrDefault(false)) return true
+            if (runCatching { art.apply(key, kind, url, service) }.getOrDefault(false)) return true
         }
         return false
     }
@@ -1053,7 +1258,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
     /** ¿Hay ya una imagen de esta clase puesta? */
     fun hasArt(key: String, kind: ArtKind): Boolean = art.has(key, kind)
 
-    /* ── acciones que puede ejecutar Lucy ─────────────────── */
+    /* ── acciones que puede ejecutar Masha ────────────────── */
 
     /** Lanza cualquier elemento de la biblioteca por su clave. */
     fun openByKey(key: String): Boolean {
@@ -1083,7 +1288,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
         return false
     }
 
-    /** Apps instaladas en el teléfono, para que Lucy pueda añadir una. */
+    /** Apps instaladas en el teléfono, para que Masha pueda añadir una. */
     suspend fun installedApps(): List<InstalledApp> = withContext(Dispatchers.IO) { app.apps.launchable() }
 
     /** Añade a la biblioteca una app instalada; devuelve su clave. */
@@ -1105,12 +1310,12 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
             }
             Unit
         }
-        // La carátula y el logo se ven como imagen suelta en pantalla, así que
-        // se deshacen primero y se borran después. El fondo y el icono no
-        // tienen una imagen propia que desintegrar —son parte del hero y de la
-        // card—, y esperar a una animación que nadie pinta solo los haría
-        // tardar más: esos se quitan al momento, como siempre.
-        if (kind == ArtKind.Cover || kind == ArtKind.Logo) vanishArt(key, kind, clear) else clear()
+        // Carátula, logo y fondo se ven como imagen suelta en pantalla, así
+        // que se deshacen primero y se borran después. El icono no: vive
+        // dentro de la card y no tiene una imagen propia que desintegrar, así
+        // que esperar a una animación que nadie pinta solo lo haría tardar
+        // más. Ese se quita al momento, como siempre.
+        if (kind == ArtKind.Icon) clear() else vanishArt(key, kind, clear)
     }
 
     /* ── imagen propia, elegida en la galería ─────────────────── */
@@ -1159,7 +1364,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
 
     /** Hoja con los cuatro servicios; los que no están configurados (o no cubren el juego) salen atenuados. */
     private fun chooseArtSource(key: String, title: String, kind: ArtKind) {
-        val actions = ART_SERVICES.map { service ->
+        val actions = artServices().map { service ->
             val supported = art.supports(key, service)
             val configured = app.credentials.isConfigured(service)
             val problem = when {
@@ -1219,7 +1424,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
         artPicker = state.copy(applying = candidate.url)
         artJob?.cancel()
         artJob = viewModelScope.launch {
-            val ok = art.apply(state.key, state.kind, candidate.url)
+            val ok = art.apply(state.key, state.kind, candidate.url, state.service)
             if (ok) materializeArt(state.key, state.kind)
             artPicker = null
             showToast(UiText.res(if (ok) R.string.art_applied else R.string.art_apply_failed))
@@ -1326,7 +1531,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
     /**
      * El menú de la app, para quien juega con mando.
      *
-     * Con el dedo, buscar, ordenar, añadir, Ajustes y Lucy están repartidos
+     * Con el dedo, buscar, ordenar, añadir, Ajustes y Masha están repartidos
      * por la pantalla —cabecera, dock, botón flotante—. Con mando no hay
      * puntero que los alcance, así que Start los junta aquí en una sola hoja.
      */
@@ -1351,8 +1556,6 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
     }
 
     companion object {
-        private const val LAUNCH_DELAY_MS = 650L
-
         /**
          * Margen máximo que espera un borrado a su animación. Holgado sobre
          * los ~620 ms del efecto: es la red de seguridad para cuando nadie
@@ -1369,9 +1572,7 @@ class ElyndraViewModel(application: Application) : AndroidViewModel(application)
          * de montaje): es limpieza, no el tiempo normal.
          */
         private const val MATERIALIZE_TIMEOUT_MS = 2_500L
-        private const val MAX_SESSION_MINUTES = 12 * 60
         private const val AUTO_RESCAN_MS = 6L * 60 * 60 * 1000
-        private val ART_SERVICES = listOf(Service.ScreenScraper, Service.Igdb, Service.SteamGridDb, Service.RetroAchievements)
 
         /**
          * Lo que acepta el selector de "Elegir de la galería": cualquier
