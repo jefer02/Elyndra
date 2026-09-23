@@ -62,6 +62,18 @@ class SettingsStore(context: Context) {
         get() = prefs.getLong("igdb.tokenExpiry", 0L)
         set(v) = prefs.edit { putLong("igdb.tokenExpiry", v) }
 
+    /**
+     * Orden de fuentes para textos e imágenes ("ss,igdb,ra,sgdb"). Null = el de
+     * siempre (ver MetadataPriority.DEFAULT).
+     */
+    var metaPriorityText: String?
+        get() = prefs.getString("meta.priority.text", null)
+        set(v) = prefs.edit { if (v == null) remove("meta.priority.text") else putString("meta.priority.text", v) }
+
+    var metaPriorityArt: String?
+        get() = prefs.getString("meta.priority.art", null)
+        set(v) = prefs.edit { if (v == null) remove("meta.priority.art") else putString("meta.priority.art", v) }
+
     /** Juego lanzado cuyo tiempo se mide al volver a Elyndra. */
     var pendingSessionKey: String?
         get() = prefs.getString("session.key", null)
@@ -70,6 +82,57 @@ class SettingsStore(context: Context) {
     var pendingSessionStart: Long
         get() = prefs.getLong("session.start", 0L)
         set(v) = prefs.edit { putLong("session.start", v) }
+
+    /** Emulador de la sesión pendiente (null en apps Android). */
+    var pendingSessionEmulator: String?
+        get() = prefs.getString("session.emulator", null)
+        set(v) = prefs.edit { if (v == null) remove("session.emulator") else putString("session.emulator", v) }
+
+    /** Paquete que se lanzó: es el que se busca en UsageStatsManager para medir el tiempo real. */
+    var pendingSessionPackage: String?
+        get() = prefs.getString("session.package", null)
+        set(v) = prefs.edit { if (v == null) remove("session.package") else putString("session.package", v) }
+
+    /* ── Masha ────────────────────────────────────────────────── */
+
+    /**
+     * Masha habla con la IA en línea (DeepSeek). Apagado, sigue funcionando
+     * entera sin conexión: planes, listas, lanzamientos y estadísticas salen
+     * de los datos locales; solo se pierde la conversación libre.
+     */
+    var mashaOnline: Boolean
+        get() = prefs.getBoolean("masha.online", true)
+        set(v) = prefs.edit { putBoolean("masha.online", v) }
+
+    /** La línea de Masha sobre el carrusel (sugerencias ambientales). */
+    var mashaAmbient: Boolean
+        get() = prefs.getBoolean("masha.ambient", true)
+        set(v) = prefs.edit { putBoolean("masha.ambient", v) }
+
+    /** Avisos de Masha fuera de la app (como mucho uno cada pocos días, nunca de noche). */
+    var mashaNudges: Boolean
+        get() = prefs.getBoolean("masha.nudges", true)
+        set(v) = prefs.edit { putBoolean("masha.nudges", v) }
+
+    /** Último aviso enviado (epoch ms), para no repetirse. */
+    var mashaLastNudgeAt: Long
+        get() = prefs.getLong("masha.lastNudgeAt", 0L)
+        set(v) = prefs.edit { putLong("masha.lastNudgeAt", v) }
+
+    /** Huella del último aviso: el mismo consejo no se manda dos veces seguidas. */
+    var mashaLastNudgeId: String?
+        get() = prefs.getString("masha.lastNudgeId", null)
+        set(v) = prefs.edit { if (v == null) remove("masha.lastNudgeId") else putString("masha.lastNudgeId", v) }
+
+    /** Sugerencias descartadas ("día|id"): solo valen las de hoy, las viejas se limpian solas. */
+    var mashaDismissed: Set<String>
+        get() = prefs.getStringSet("masha.dismissed", emptySet()).orEmpty().toSet()
+        set(v) = prefs.edit { putStringSet("masha.dismissed", v) }
+
+    /** Última vez que se abrió Elyndra: quien acaba de estar dentro no necesita un aviso. */
+    var lastOpenedAt: Long
+        get() = prefs.getLong("app.lastOpenedAt", 0L)
+        set(v) = prefs.edit { putLong("app.lastOpenedAt", v) }
 
     /* ── tema y fondo ─────────────────────────────────────────── */
 
@@ -109,10 +172,10 @@ class SettingsStore(context: Context) {
         get() = prefs.getInt("videoBg.opacity", 45)
         set(v) = prefs.edit { putInt("videoBg.opacity", v) }
 
-    /* ── botón de Lucy ────────────────────────────────────────── */
+    /* ── botón de Masha ───────────────────────────────────────── */
 
     /**
-     * Dónde dejó el usuario el botón de Lucy: dp desde la esquina superior
+     * Dónde dejó el usuario el botón de Masha: dp desde la esquina superior
      * izquierda del espacio útil. Sin valor = su esquina de siempre (abajo a
      * la derecha), así que se guarda como par y se lee como par.
      *
@@ -120,13 +183,13 @@ class SettingsStore(context: Context) {
      * al girar el móvil se recorta contra el nuevo tamaño (ver LibraryScreen)
      * y así conserva la distancia al borde en vez de saltar.
      */
-    var lucyX: Float?
-        get() = if (prefs.contains(LUCY_X)) prefs.getFloat(LUCY_X, 0f) else null
-        set(v) = prefs.edit { if (v == null) remove(LUCY_X) else putFloat(LUCY_X, v) }
+    var mashaX: Float?
+        get() = if (prefs.contains(MASHA_X)) prefs.getFloat(MASHA_X, 0f) else null
+        set(v) = prefs.edit { if (v == null) remove(MASHA_X) else putFloat(MASHA_X, v) }
 
-    var lucyY: Float?
-        get() = if (prefs.contains(LUCY_Y)) prefs.getFloat(LUCY_Y, 0f) else null
-        set(v) = prefs.edit { if (v == null) remove(LUCY_Y) else putFloat(LUCY_Y, v) }
+    var mashaY: Float?
+        get() = if (prefs.contains(MASHA_Y)) prefs.getFloat(MASHA_Y, 0f) else null
+        set(v) = prefs.edit { if (v == null) remove(MASHA_Y) else putFloat(MASHA_Y, v) }
 
     /** Criterio de orden de la biblioteca (id de [com.elyndra.launcher.ui.SortMode]). */
     var sortMode: String
@@ -146,7 +209,12 @@ class SettingsStore(context: Context) {
         set(v) = prefs.edit { putBoolean("perm.notificationsAsked", v) }
 
     private companion object {
-        const val LUCY_X = "lucy.x"
-        const val LUCY_Y = "lucy.y"
+        /*
+         * Las claves siguen diciendo "lucy" a propósito, como las de "videoBg":
+         * la asistente se llamaba así, y renombrarlas devolvería el botón a su
+         * esquina a quien ya lo había movido. Cambia el nombre, no dónde se guarda.
+         */
+        const val MASHA_X = "lucy.x"
+        const val MASHA_Y = "lucy.y"
     }
 }
