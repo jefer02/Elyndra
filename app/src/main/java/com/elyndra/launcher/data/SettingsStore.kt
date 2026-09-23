@@ -138,7 +138,7 @@ class SettingsStore(context: Context) {
 
     /** Modo oscuro de la interfaz (independiente del tema del sistema). */
     var darkMode: Boolean
-        get() = prefs.getBoolean("darkMode", false)
+        get() = prefs.getBoolean("darkMode", true)
         set(v) = prefs.edit { putBoolean("darkMode", v) }
 
     /**
@@ -191,6 +191,24 @@ class SettingsStore(context: Context) {
         get() = if (prefs.contains(MASHA_Y)) prefs.getFloat(MASHA_Y, 0f) else null
         set(v) = prefs.edit { if (v == null) remove(MASHA_Y) else putFloat(MASHA_Y, v) }
 
+    /**
+     * Color de las partículas fosforescentes que deja Masha al arrastrarla
+     * (ARGB). Por omisión, un cian de fósforo de monitor CRT.
+     */
+    var mashaParticleColor: Int
+        get() = prefs.getInt("masha.particleColor", DEFAULT_PARTICLE_COLOR)
+        set(v) = prefs.edit { putInt("masha.particleColor", v) }
+
+    /* ── pantalla ─────────────────────────────────────────────── */
+
+    /**
+     * Fotogramas por segundo pedidos a la pantalla: 120, 60 o 0 = automático
+     * (120 si la pantalla lo admite). Ver [com.elyndra.launcher.display.FrameRate].
+     */
+    var frameRate: Int
+        get() = prefs.getInt("display.fps", 0)
+        set(v) = prefs.edit { putInt("display.fps", v) }
+
     /** Criterio de orden de la biblioteca (id de [com.elyndra.launcher.ui.SortMode]). */
     var sortMode: String
         get() = prefs.getString("sortMode", "name") ?: "name"
@@ -208,13 +226,16 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("perm.notificationsAsked", false)
         set(v) = prefs.edit { putBoolean("perm.notificationsAsked", v) }
 
-    private companion object {
+    companion object {
+        /** Cian de fósforo: se ve bien sobre el tema claro y sobre el oscuro. */
+        const val DEFAULT_PARTICLE_COLOR = 0xFF5CF2FF.toInt()
+
         /*
          * Las claves siguen diciendo "lucy" a propósito, como las de "videoBg":
          * la asistente se llamaba así, y renombrarlas devolvería el botón a su
          * esquina a quien ya lo había movido. Cambia el nombre, no dónde se guarda.
          */
-        const val MASHA_X = "lucy.x"
-        const val MASHA_Y = "lucy.y"
+        private const val MASHA_X = "lucy.x"
+        private const val MASHA_Y = "lucy.y"
     }
 }
