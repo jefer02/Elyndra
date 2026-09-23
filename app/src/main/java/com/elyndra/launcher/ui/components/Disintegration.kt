@@ -149,7 +149,7 @@ data class DisintegrationSpec(
  *   entero.
  */
 @Composable
-fun DisintegratableBox(
+fun DisintegratingContainer(
     isDisintegrating: Boolean,
     onAnimationEnd: () -> Unit,
     modifier: Modifier = Modifier,
