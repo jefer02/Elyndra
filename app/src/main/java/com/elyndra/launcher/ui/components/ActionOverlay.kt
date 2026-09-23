@@ -1,5 +1,7 @@
 package com.elyndra.launcher.ui.components
 
+import com.elyndra.launcher.ui.theme.Springs
+import com.elyndra.launcher.ui.theme.motion
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -109,14 +111,27 @@ fun GameActionOverlayContainer(
     modifier: Modifier = Modifier,
     origin: Offset? = null,
     focus: Int = -1,
+    /**
+     * Hay otra capa modal encima (un diálogo). El fondo se aparta igual
+     * —desenfoque y retroceso— pero sin velo ni panel: de eso se encarga la
+     * capa que esté delante, y dos velos encima del mismo fondo lo dejarían
+     * negro.
+     */
+    dimForOtherLayer: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     // Un solo progreso 0→1 gobierna fondo y panel: así el desenfoque, el
     // oscurecido y la escala del panel entran y salen acompasados.
     val open by animateFloatAsState(
         targetValue = if (isOverlayVisible) 1f else 0f,
-        animationSpec = tween(durationMillis = if (isOverlayVisible) 260 else 180, easing = Swift),
+        animationSpec = motion(Springs.enter()),
         label = "overlay",
+    )
+    // El fondo se aparta si manda este overlay o si lo hace otra capa modal.
+    val backdrop by animateFloatAsState(
+        targetValue = if (isOverlayVisible || dimForOtherLayer) 1f else 0f,
+        animationSpec = motion(Springs.fade()),
+        label = "backdrop",
     )
 
     Box(modifier.fillMaxSize()) {
@@ -127,11 +142,11 @@ fun GameActionOverlayContainer(
                 // es el gesto de "esto pasa a segundo plano", y es lo único
                 // que se nota por debajo de Android 12.
                 .graphicsLayer {
-                    val back = 1f - BACKGROUND_PULL * open
+                    val back = 1f - BACKGROUND_PULL * backdrop
                     scaleX = back
                     scaleY = back
                 }
-                .blur(radius = (BACKGROUND_BLUR * open).dp),
+                .blur(radius = (BACKGROUND_BLUR * backdrop).dp),
         ) {
             content()
         }
@@ -615,7 +630,7 @@ fun rememberMagneticPress(): MagneticPress {
         MagneticPress(
             scale = scale,
             pull = {
-                scale.animateTo(PULL_SCALE, tween(durationMillis = MAGNETIC_PULL_MS, easing = Swift))
+                scale.animateTo(PULL_SCALE, Springs.snappy())
                 scale.animateTo(
                     targetValue = 1f,
                     animationSpec = spring(
