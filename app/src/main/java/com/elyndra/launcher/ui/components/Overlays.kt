@@ -108,17 +108,22 @@ fun ScrimLayer(
 @Composable
 fun ElyDialogView(spec: DialogSpec, onDismiss: () -> Unit, focus: Int = -1) {
     ScrimLayer(onDismiss = onDismiss, alignment = Alignment.Center, key = spec) {
-        Column(
-            Modifier
+        // Lámina de cristal: en un borrado, el filo y el halo van en rojo, así
+        // que el aviso se reconoce por el color antes de leer una palabra.
+        GlassCard(
+            modifier = Modifier
                 .padding(horizontal = 26.dp)
                 .widthIn(max = 400.dp)
-                .fillMaxWidth()
                 .animPopIn(320, key = spec)
-                .glass(RoundedCornerShape(22.dp), solid = true)
-                .consumeClicks()
-                .padding(18.dp),
+                .consumeClicks(),
+            cornerRadius = 24.dp,
+            frost = 0.82f,
+            glowColor = if (spec.destructive) P.red else null,
+            glow = if (spec.destructive) 1f else 0.35f,
+            elevation = 24.dp,
+            padding = PaddingValues(18.dp),
         ) {
-            ElyText(spec.title.resolve(), size = 15f, weight = FontWeight.SemiBold, color = P.ink)
+            ElyText(spec.title.resolve(), size = 15.5f, weight = FontWeight.Bold, color = P.ink)
             Spacer(Modifier.height(8.dp))
             ElyText(spec.message.resolve(), size = 12f, color = P.ink2, lineHeightRatio = 1.5f)
             // Lo escrito vive aquí, no en el spec: el diálogo se repinta con
@@ -142,18 +147,19 @@ fun ElyDialogView(spec: DialogSpec, onDismiss: () -> Unit, focus: Int = -1) {
                     Box(Modifier.padFocus(focus == 1)) { GhostButton(b.label.resolve(), { onDismiss(); b.action() }) }
                 }
                 val input = spec.input
+                val confirm = {
+                    // El valor se lee al pulsar, no al componer: si no, se
+                    // guardaría lo que hubiese antes de escribir.
+                    val written = typed.value
+                    onDismiss()
+                    if (input != null) input.onConfirm(written) else spec.confirm.action()
+                }
                 Box(Modifier.padFocus(focus == 0)) {
-                AccentButton(
-                    spec.confirm.label.resolve(),
-                    {
-                        // El valor se lee al pulsar, no al componer: si no, se
-                        // guardaría lo que hubiese antes de escribir.
-                        val written = typed.value
-                        onDismiss()
-                        if (input != null) input.onConfirm(written) else spec.confirm.action()
-                    },
-                    fontSize = 12f,
-                )
+                    if (spec.destructive) {
+                        DangerButton(spec.confirm.label.resolve(), confirm, fontSize = 12f)
+                    } else {
+                        AccentButton(spec.confirm.label.resolve(), confirm, fontSize = 12f)
+                    }
                 }
             }
         }

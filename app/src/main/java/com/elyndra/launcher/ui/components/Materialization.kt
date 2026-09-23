@@ -36,7 +36,7 @@ import kotlin.random.Random
 /* ─────────────────────────────────────────────────────────────
    Materialización: el elemento se monta desde el polvo.
 
-   Es la [DisintegratableBox] al revés, y se usa cuando algo
+   Es la [DisintegratingContainer] al revés, y se usa cuando algo
    entra: un juego recién añadido a la biblioteca, una carátula
    o un logo que se acaban de poner. En vez de aparecer de
    golpe, las motas llegan de fuera, se juntan en su sitio y
@@ -131,7 +131,7 @@ data class MaterializationSpec(
  * avisa: el efecto nunca puede dejar algo invisible.
  */
 @Composable
-fun MaterializableBox(
+fun MaterializingContainer(
     isMaterializing: Boolean,
     onAnimationEnd: () -> Unit,
     modifier: Modifier = Modifier,
