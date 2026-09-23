@@ -1,6 +1,13 @@
 package com.elyndra.launcher.ui
 
-import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import com.elyndra.launcher.ui.theme.LocalReducedMotion
+import com.elyndra.launcher.ui.theme.Springs
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -28,7 +35,13 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.snap
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -58,6 +71,7 @@ import com.elyndra.launcher.R
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.components.GameActionOverlayContainer
 import com.elyndra.launcher.ui.components.ArtImage
+import com.elyndra.launcher.ui.components.BootSplash
 import com.elyndra.launcher.ui.components.ElyDialogView
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GameIcon
@@ -106,7 +120,23 @@ fun ElyndraApp(vm: ElyndraViewModel) {
 
     ElyndraTheme(skin = vm.settings.skin, landscape = landscape) {
         // Atrás cierra, por orden: diálogo, hoja, ficha, pantalla y buscador.
-        BackHandler(enabled = vm.canGoBack) { vm.back() }
+        // Atrás predictivo (Android 13+): mientras el gesto dura, la pantalla
+        // que se abandona se encoge y se apaga siguiendo al dedo; si el gesto
+        // se cancela, vuelve a su sitio con un muelle.
+        val backProgress = remember { Animatable(0f) }
+        val backScope = rememberCoroutineScope()
+        val reduced = LocalReducedMotion.current
+        PredictiveBackHandler(enabled = vm.canGoBack) { events ->
+            try {
+                events.collect { e -> if (!reduced) backProgress.snapTo(e.progress) }
+                vm.back()
+                backScope.launch { backProgress.snapTo(0f) }
+            } catch (c: CancellationException) {
+                backScope.launch { backProgress.animateTo(0f, Springs.snappy()) }
+                throw c
+            }
+        }
+        val screenBack = vm.screen != Screen.Library && vm.dialog == null && vm.detailsKey == null && vm.sheet == null
 
         Box(Modifier.fillMaxSize().background(P.paper)) {
             // Fondo de la app (solo de Elyndra, no del sistema), debajo de todo:
@@ -160,16 +190,31 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                     // confunden.
                     AnimatedContent(
                         targetState = vm.screen,
+                        modifier = Modifier.graphicsLayer {
+                            val p = if (screenBack) backProgress.value else 0f
+                            val k = 1f - 0.08f * p
+                            scaleX = k
+                            scaleY = k
+                            alpha = 1f - 0.35f * p
+                        },
                         transitionSpec = {
-                            val back = targetState == Screen.Library
-                            val dir = if (back) -1 else 1
-                            (
-                                slideInHorizontally(tween(300, easing = Swift)) { w -> dir * w / 7 } +
-                                    fadeIn(tween(220, easing = Swift))
-                                ).togetherWith(
-                                slideOutHorizontally(tween(300, easing = Swift)) { w -> -dir * w / 7 } +
-                                    fadeOut(tween(180, easing = Swift)),
-                            )
+                            // Eje compartido con muelles: la que entra llega
+                            // desde el lado al que se va con un leve zoom; volver
+                            // invierte el sentido. Interrumpible a mitad.
+                            val dir = if (targetState == Screen.Library) -1 else 1
+                            if (reduced) {
+                                fadeIn(snap()).togetherWith(fadeOut(snap()))
+                            } else {
+                                (
+                                    slideInHorizontally(Springs.enter()) { w -> dir * w / 10 } +
+                                        fadeIn(Springs.fade()) +
+                                        scaleIn(Springs.enter(), initialScale = 0.96f)
+                                    ).togetherWith(
+                                    slideOutHorizontally(Springs.enter()) { w -> -dir * w / 10 } +
+                                        fadeOut(Springs.fade()) +
+                                        scaleOut(Springs.enter(), targetScale = 1.02f),
+                                )
+                            }
                         },
                         label = "screen",
                     ) { screen ->
@@ -188,7 +233,6 @@ fun ElyndraApp(vm: ElyndraViewModel) {
             vm.detailsKey?.let { DetailsSheet(vm, it) }
             vm.artPicker?.let { ArtPickerSheet(vm, it) }
             vm.dialog?.let { ElyDialogView(it, onDismiss = vm::dismissDialog, focus = vm.input.dialogFocus) }
-            vm.launching?.let { LaunchOverlay(it, landscape) }
             vm.toast?.let {
                 ToastView(
                     it,
@@ -198,106 +242,13 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                         .padding(bottom = 76.dp),
                 )
             }
+
+            // Arranque de consola, encima de todo y solo una vez por arranque
+            // (sobrevive a la recreación por cambio de idioma). La biblioteca
+            // ya se compone debajo, así que al irse no hay espera.
+            var booted by rememberSaveable { mutableStateOf(false) }
+            if (!booted) BootSplash(onFinished = { booted = true })
         }
     }
 }
 
-/**
- * Velo de lanzamiento: carátula grande con destello, título, vía y spinner.
- * Elyndra no ejecuta nada — solo enseña a dónde va el título antes de ceder.
- */
-@Composable
-private fun LaunchOverlay(launch: Launch, landscape: Boolean) {
-    val skin = LocalSkin.current
-    val sheen = sheenProgress()
-    val angle = spinAngle(1000)
-
-    Column(
-        Modifier
-            .fillMaxSize()
-            .animFadeIn(280, key = launch.title)
-            .background(P.shade.copy(alpha = 0.72f))
-            .windowInsetsPadding(WindowInsets.systemBars),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            Modifier
-                .size(
-                    width = if (landscape) 92.dp else 124.dp,
-                    height = if (landscape) 122.dp else 164.dp,
-                )
-                .animPopIn(500, key = launch.title)
-                .shadow(24.dp, RoundedCornerShape(16.dp), clip = false, ambientColor = Color.Black.copy(alpha = 0.4f), spotColor = Color.Black.copy(alpha = 0.4f))
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(16.dp)),
-        ) {
-            ArtImage(launch.coverPath, launch.pairIndex, Modifier.fillMaxSize())
-            if (launch.coverPath == null && (launch.packageName != null || launch.iconPath != null)) {
-                GameIcon(launch.iconPath, launch.packageName, Modifier.fillMaxSize(), ContentScale.Crop)
-            }
-            Box(
-                Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(0.44f)
-                    .graphicsLayer { translationX = size.width / 0.44f * sheen }
-                    .drawBehind { drawRect(sheenBrush(size)) },
-            )
-        }
-
-        Spacer(Modifier.height(16.dp))
-        ElyText(
-            launch.title,
-            size = 17f,
-            weight = FontWeight.SemiBold,
-            color = Color.White,
-            align = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-        )
-        Spacer(Modifier.height(7.dp))
-        ElyText(
-            launch.via.resolve(),
-            size = 9.5f,
-            weight = FontWeight.SemiBold,
-            color = skin.a1,
-            letterSpacing = tracking(0.18f),
-            align = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        // La línea de Masha: por qué va con ese emulador, cuándo se jugó por
-        // última vez o qué tener en cuenta (batería, calor). Solo si hay algo que decir.
-        launch.note?.let { note ->
-            Spacer(Modifier.height(14.dp))
-            Row(
-                Modifier
-                    .padding(horizontal = 28.dp)
-                    .animFadeIn(420, key = "note-" + launch.title)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color.White.copy(alpha = 0.12f))
-                    .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
-                    .padding(horizontal = 12.dp, vertical = 9.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Image(
-                    painterResource(R.drawable.masha),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(22.dp).clip(CircleShape),
-                )
-                Spacer(Modifier.width(9.dp))
-                ElyText(note.resolve(), size = 11f, color = Color.White, lineHeightRatio = 1.4f)
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-        Box(
-            Modifier
-                .size(26.dp)
-                .rotate(angle)
-                .drawBehind {
-                    drawArcSpinner(skin.a1, 2.dp, 45f)
-                },
-        )
-    }
-}
