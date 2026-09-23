@@ -1,6 +1,13 @@
 package com.elyndra.launcher.input
 
+import android.os.Handler
+import android.os.Looper
+import android.view.InputDevice
 import android.view.KeyEvent
+import android.view.MotionEvent
+import java.util.EnumMap
+import kotlin.math.abs
+import kotlin.math.max
 
 /* ─────────────────────────────────────────────────────────────
    Mandos.
@@ -38,15 +45,21 @@ enum class Pad {
     /** Y / △: el menú del juego (lo mismo que mantener pulsado). */
     Options,
 
-    /** Start: el menú de la app. */
+    /** Start: Ajustes. */
     Menu,
 
     /** Select: el buscador. */
     Search,
 
-    /** L1 / R1: saltar de grupo (filtro, página del carrusel). */
+    /** L3 / R3: el menú de la app (ordenar, añadir, Masha…). */
+    AppMenu,
+
+    /** L1 / R1: saltar de sección (filtro, página del carrusel). */
     PagePrev,
     PageNext,
+    ;
+
+    val isDirection: Boolean get() = this == Up || this == Down || this == Left || this == Right
 }
 
 object Gamepad {
@@ -95,6 +108,10 @@ object Gamepad {
         KeyEvent.KEYCODE_SEARCH,
         -> Pad.Search
 
+        KeyEvent.KEYCODE_BUTTON_THUMBL,
+        KeyEvent.KEYCODE_BUTTON_THUMBR,
+        -> Pad.AppMenu
+
         KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_L2 -> Pad.PagePrev
         KeyEvent.KEYCODE_BUTTON_R1, KeyEvent.KEYCODE_BUTTON_R2 -> Pad.PageNext
 
@@ -104,7 +121,7 @@ object Gamepad {
     /**
      * La tecla del sistema equivalente a un botón de mando.
      *
-     * Las pantallas de formulario (Ajustes, Añadir, Lucy) se mueven con el
+     * Las pantallas de formulario (Ajustes, Añadir, Masha) se mueven con el
      * foco de Compose, que entiende de cruceta y de "aceptar", no de botones
      * de mando. Cuando Elyndra no consume la pulsación se reenvía traducida,
      * y así esas pantallas se manejan con el mando sin tener que reescribirlas.
@@ -125,104 +142,178 @@ object Gamepad {
 
     /** Lo que llega de un mando o un joystick, no del táctil. */
     fun isGamepadSource(source: Int): Boolean =
-        source and SOURCE_GAMEPAD == SOURCE_GAMEPAD ||
-            source and SOURCE_JOYSTICK == SOURCE_JOYSTICK ||
-            source and SOURCE_DPAD == SOURCE_DPAD
-
-    private const val SOURCE_GAMEPAD = 0x00000401
-    private const val SOURCE_JOYSTICK = 0x01000010
-    private const val SOURCE_DPAD = 0x00000201
+        source and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD ||
+            source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK ||
+            source and InputDevice.SOURCE_DPAD == InputDevice.SOURCE_DPAD
 
     /**
-     * Una sola dirección a partir de todos los ejes del mando.
-     *
-     * Se miran los tres a la vez porque cada mando manda la cruceta por donde
-     * quiere: los de Xbox y muchos clónicos por el "hat", los de PlayStation
-     * por el stick derecho en Z/RZ, y el stick izquierdo siempre en X/Y. Gana
-     * el eje que más lejos esté del centro, así que mover un stick no se pisa
-     * con el reposo de otro.
+     * Un dispositivo que es un mando de verdad (Xbox, PlayStation, Switch,
+     * clónicos por Bluetooth o USB), no el teclado virtual ni el táctil.
      */
-    fun axisDirection(
-        hatX: Float,
-        hatY: Float,
-        leftX: Float,
-        leftY: Float,
-        rightX: Float,
-        rightY: Float,
-    ): Pair<Float, Float> {
-        val x = listOf(hatX, leftX, rightX).maxBy { kotlin.math.abs(it) }
-        val y = listOf(hatY, leftY, rightY).maxBy { kotlin.math.abs(it) }
-        return x to y
+    fun isGamepad(device: InputDevice?): Boolean {
+        if (device == null || device.isVirtual) return false
+        val sources = device.sources
+        return sources and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD ||
+            sources and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
     }
+
+    /** Un eje, sin el temblor que el propio mando declara como "plano" (zona muerta de fábrica). */
+    private fun axis(event: MotionEvent, axis: Int): Float {
+        val value = event.getAxisValue(axis)
+        val flat = event.device?.getMotionRange(axis, event.source)?.flat ?: 0f
+        return if (abs(value) <= flat) 0f else value
+    }
+
+    /**
+     * Dirección de la cruceta analógica ("hat"), que muchos mandos Xbox y
+     * clónicos mandan como eje en vez de como tecla. Siempre vale -1, 0 o 1.
+     */
+    fun hat(event: MotionEvent): Pair<Float, Float> =
+        axis(event, MotionEvent.AXIS_HAT_X) to axis(event, MotionEvent.AXIS_HAT_Y)
+
+    /**
+     * El stick izquierdo. El derecho no navega a propósito: en bastantes mandos
+     * genéricos los gatillos analógicos se publican por Z/RZ y reposan en -1,
+     * con lo que "el stick derecho" empujaría hacia arriba para siempre.
+     */
+    fun leftStick(event: MotionEvent): Pair<Float, Float> =
+        axis(event, MotionEvent.AXIS_X) to axis(event, MotionEvent.AXIS_Y)
 }
 
 /**
- * Convierte la posición de un stick en pulsaciones.
+ * Convierte una posición analógica (stick o hat) en una dirección, con zona
+ * muerta e histéresis.
  *
- * Un stick no se suelta: mientras está inclinado el mando manda su posición
- * sesenta veces por segundo. Sin esto, empujar a la derecha recorrería la
- * biblioteca entera en un suspiro. Funciona como la repetición de una tecla:
- * dispara al inclinar, espera [firstDelayMs] y a partir de ahí repite cada
- * [repeatMs] mientras siga inclinado.
- *
- * [RELEASE] es más bajo que [THRESHOLD] a propósito (histéresis): un stick
- * gastado tiembla alrededor de su umbral, y sin esa holgura cada temblor
- * contaría como una pulsación nueva.
+ * [PRESS] (~0.5) es cuánto hay que inclinar para que cuente; [RELEASE] es
+ * más bajo a propósito: un stick gastado tiembla alrededor de su umbral, y sin
+ * esa holgura cada temblor contaría como una pulsación nueva.
  */
-class StickRepeater(
-    private val firstDelayMs: Long = 420,
-    private val repeatMs: Long = 220,
-) {
-    private var direction: Pad? = null
-    private var nextFire = 0L
+class AxisGate {
+    private var current: Pad? = null
 
-    /** La dirección que toca disparar ahora, o null si no toca ninguna. */
-    fun update(x: Float, y: Float, now: Long): Pad? {
-        val pad = directionOf(x, y)
-        if (pad == null) {
-            direction = null
+    fun update(x: Float, y: Float): Pad? {
+        val limit = if (current == null) PRESS else RELEASE
+        val ax = abs(x)
+        val ay = abs(y)
+        if (max(ax, ay) < limit) {
+            current = null
             return null
         }
-        if (pad != direction) {
-            direction = pad
-            nextFire = now + firstDelayMs
-            return pad
-        }
-        if (now < nextFire) return null
-        nextFire = now + repeatMs
-        return pad
-    }
-
-    /** Se olvida de la inclinación en curso (al cambiar de pantalla o de capa). */
-    fun reset() {
-        direction = null
-    }
-
-    private fun directionOf(x: Float, y: Float): Pad? {
-        val limit = if (direction == null) THRESHOLD else RELEASE
-        val ax = kotlin.math.abs(x)
-        val ay = kotlin.math.abs(y)
-        if (ax < limit && ay < limit) return null
         // El eje dominante manda: en diagonal no se disparan dos direcciones.
-        return if (ax >= ay) {
+        // Un eje que ya estaba elegido conserva la preferencia hasta que el
+        // otro le saque ventaja clara, para que una diagonal no alterne.
+        val horizontal = when (current) {
+            Pad.Left, Pad.Right -> ax >= ay * 0.8f
+            Pad.Up, Pad.Down -> ax > ay * 1.25f
+            else -> ax >= ay
+        }
+        current = if (horizontal) {
             if (x > 0) Pad.Right else Pad.Left
         } else {
             if (y > 0) Pad.Down else Pad.Up
         }
+        return current
+    }
+
+    fun reset() {
+        current = null
     }
 
     companion object {
-        /**
-         * Desde dónde cuenta como inclinado (la zona muerta típica es 0.25).
-         *
-         * Con un umbral bajo, el ruido de un stick gastado —o el resto de
-         * recorrido en diagonal— cruza y descruza la marca varias veces
-         * durante un solo gesto, y cada cruce contaba como pulsación nueva:
-         * de ahí que saltase más de un juego con un solo toque del stick.
-         */
-        const val THRESHOLD = 0.65f
+        /** Desde dónde cuenta como inclinado: la mitad del recorrido. */
+        const val PRESS = 0.5f
 
-        /** Hasta dónde hay que volver para darlo por soltado (histéresis amplia). */
-        const val RELEASE = 0.30f
+        /** Hasta dónde hay que volver para darlo por soltado. */
+        const val RELEASE = 0.35f
+    }
+}
+
+/**
+ * La repetición de las direcciones, igual para el stick, el hat y la cruceta.
+ *
+ * **El fallo de "va demasiado rápido" venía de aquí**: la cruceta digital
+ * repetía al ritmo del sistema (~20 pulsaciones/s en cuanto se mantenía), y el
+ * stick, cuando no se consumía su evento, lo convertía *además* el propio
+ * Android en pulsaciones de cruceta sintéticas (SyntheticJoystickHandler), así
+ * que un solo empujón podía mover varias casillas. Ahora:
+ *
+ *  - la primera pulsación dispara **un solo paso** al instante,
+ *  - si se mantiene, espera [firstDelayMs] (~350 ms)
+ *  - y a partir de ahí repite cada [repeatMs] (~150 ms),
+ *
+ * con un temporizador propio: un stick quieto a tope no manda eventos, así que
+ * no se puede depender de ellos para repetir. Las repeticiones del sistema se
+ * ignoran por completo.
+ *
+ * Cada fuente ([Channel]) sostiene su dirección por separado: hay mandos que
+ * mandan la cruceta a la vez como tecla y como eje "hat", y así una misma
+ * pulsación física no dispara dos veces.
+ */
+class DirectionalRepeater(
+    private val fire: (Pad) -> Unit,
+    private val firstDelayMs: Long = 350,
+    private val repeatMs: Long = 150,
+    private val handler: Ticker = MainThreadTicker,
+) {
+    enum class Channel { Keys, Hat, Stick }
+
+    /** El temporizador de las repeticiones; en las pruebas se sustituye por uno de mentira. */
+    interface Ticker {
+        fun postDelayed(block: Runnable, delayMs: Long)
+        fun removeCallbacks(block: Runnable)
+    }
+
+    /** El de verdad: el hilo principal, que es donde llegan los eventos de entrada. */
+    object MainThreadTicker : Ticker {
+        private val handler by lazy { Handler(Looper.getMainLooper()) }
+        override fun postDelayed(block: Runnable, delayMs: Long) {
+            handler.postDelayed(block, delayMs)
+        }
+        override fun removeCallbacks(block: Runnable) {
+            handler.removeCallbacks(block)
+        }
+    }
+
+    private val held = EnumMap<Channel, Pad>(Channel::class.java)
+    private var active: Pad? = null
+
+    private val tick = object : Runnable {
+        override fun run() {
+            val pad = active ?: return
+            fire(pad)
+            handler.postDelayed(this, repeatMs)
+        }
+    }
+
+    /** [channel] empieza a sostener [pad] (o lo sigue haciendo: entonces no pasa nada). */
+    fun press(channel: Channel, pad: Pad) {
+        if (held[channel] == pad) return
+        held[channel] = pad
+        // Otra fuente ya sostiene esa misma dirección: es la misma pulsación física.
+        if (active == pad) return
+        handler.removeCallbacks(tick)
+        active = pad
+        fire(pad)
+        handler.postDelayed(tick, firstDelayMs)
+    }
+
+    /** [channel] suelta [pad]; con null suelta lo que tuviera. */
+    fun release(channel: Channel, pad: Pad? = null) {
+        val old = held[channel] ?: return
+        if (pad != null && pad != old) return
+        held.remove(channel)
+        if (old != active) return
+        handler.removeCallbacks(tick)
+        // Si otra fuente sigue empujando, toma el relevo sin disparar de nuevo.
+        val next = held.values.lastOrNull()
+        active = next
+        if (next != null) handler.postDelayed(tick, firstDelayMs)
+    }
+
+    /** Suelta todo: al perder el foco la ventana o desconectarse un mando. */
+    fun releaseAll() {
+        held.clear()
+        active = null
+        handler.removeCallbacks(tick)
     }
 }
