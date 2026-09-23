@@ -3,6 +3,7 @@ package com.elyndra.launcher.ui
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.aspectRatio
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
@@ -21,7 +23,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -44,11 +48,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.elyndra.launcher.R
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.components.GameActionOverlayContainer
 import com.elyndra.launcher.ui.components.ArtImage
@@ -64,7 +70,7 @@ import com.elyndra.launcher.ui.screens.ArtPickerSheet
 import com.elyndra.launcher.ui.screens.DetailsSheet
 import com.elyndra.launcher.ui.screens.FolderScreen
 import com.elyndra.launcher.ui.screens.LibraryScreen
-import com.elyndra.launcher.ui.screens.LucyScreen
+import com.elyndra.launcher.ui.screens.MashaScreen
 import com.elyndra.launcher.ui.screens.SettingsScreen
 import com.elyndra.launcher.ui.theme.ElyndraTheme
 import com.elyndra.launcher.ui.theme.LocalSkin
@@ -138,6 +144,7 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                 spec = vm.sheet,
                 origin = vm.sheetOrigin,
                 focus = vm.input.sheetFocus,
+                dimForOtherLayer = vm.dialog != null,
             ) {
             BoxWithConstraints(
                 Modifier
@@ -171,7 +178,7 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                             Screen.Folder -> FolderScreen(vm)
                             Screen.Add -> AddScreen(vm)
                             Screen.Settings -> SettingsScreen(vm)
-                            Screen.Lucy -> LucyScreen(vm)
+                            Screen.Masha -> MashaScreen(vm)
                         }
                     }
                 }
@@ -257,6 +264,31 @@ private fun LaunchOverlay(launch: Launch, landscape: Boolean) {
             align = TextAlign.Center,
             modifier = Modifier.fillMaxWidth(),
         )
+
+        // La línea de Masha: por qué va con ese emulador, cuándo se jugó por
+        // última vez o qué tener en cuenta (batería, calor). Solo si hay algo que decir.
+        launch.note?.let { note ->
+            Spacer(Modifier.height(14.dp))
+            Row(
+                Modifier
+                    .padding(horizontal = 28.dp)
+                    .animFadeIn(420, key = "note-" + launch.title)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.White.copy(alpha = 0.12f))
+                    .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
+                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Image(
+                    painterResource(R.drawable.masha),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(22.dp).clip(CircleShape),
+                )
+                Spacer(Modifier.width(9.dp))
+                ElyText(note.resolve(), size = 11f, color = Color.White, lineHeightRatio = 1.4f)
+            }
+        }
 
         Spacer(Modifier.height(16.dp))
         Box(
