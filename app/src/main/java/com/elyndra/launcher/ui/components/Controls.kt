@@ -1,5 +1,7 @@
 package com.elyndra.launcher.ui.components
 
+import com.elyndra.launcher.ui.theme.Springs
+import com.elyndra.launcher.ui.theme.motion
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -30,12 +32,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -47,6 +55,7 @@ import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.Swift
 import com.elyndra.launcher.ui.theme.accentGradient
+import com.elyndra.launcher.ui.theme.consoleFocus
 import com.elyndra.launcher.ui.theme.darkGlass
 import com.elyndra.launcher.ui.theme.drawArcSpinner
 import com.elyndra.launcher.ui.theme.glass
@@ -68,11 +77,13 @@ fun Pill(
     horizontalPadding: Dp = 13.dp,
     verticalPadding: Dp = 7.dp,
     cornerRadius: Dp = 12.dp,
+    enabled: Boolean = true,
 ) {
     val skin = LocalSkin.current
     val shape = RoundedCornerShape(cornerRadius)
     var m = modifier
         .then(if (height != null) Modifier.height(height) else Modifier)
+        .alpha(if (enabled) 1f else 0.4f)
     if (active) {
         m = m
             .shadow(8.dp, shape, clip = false, ambientColor = P.shade.copy(alpha = 0.22f), spotColor = P.shade.copy(alpha = 0.22f))
@@ -85,7 +96,7 @@ fun Pill(
             .border(1.dp, P.ink.copy(alpha = 0.14f), shape)
     }
     Box(
-        m.clickable(onClick = onClick)
+        m.clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = horizontalPadding, vertical = if (height != null) 0.dp else verticalPadding),
         contentAlignment = Alignment.Center,
     ) {
@@ -107,9 +118,48 @@ fun GlassPanel(
     cornerRadius: Dp = 18.dp,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
-    androidx.compose.foundation.layout.Column(
-        modifier.fillMaxWidth().glass(RoundedCornerShape(cornerRadius)).padding(padding),
+    // Cada módulo de ajustes es una lámina de [GlassCard]: mismo material que
+    // el resto de la interfaz nueva, y así los tres bloques —Tema, Fondo,
+    // Metadatos— se leen como piezas separadas y no como una lista larga.
+    GlassCard(
+        modifier = modifier,
+        cornerRadius = cornerRadius,
+        padding = androidx.compose.foundation.layout.PaddingValues(padding),
         content = content,
+    )
+}
+
+/**
+ * Bloque de Ajustes **sin contenedor**: sin tarjeta, sin fondo y sin borde.
+ * Las opciones van directamente sobre el fondo de la pantalla y se separan
+ * solo por aire y un filo muy tenue debajo. Acepta los mismos parámetros que
+ * [GlassPanel] para poder sustituirlo sin tocar cada llamada; [cornerRadius]
+ * ya no se usa.
+ */
+@Composable
+fun SettingsGroup(
+    modifier: Modifier = Modifier,
+    padding: Dp = 14.dp,
+    @Suppress("UNUSED_PARAMETER") cornerRadius: Dp = 0.dp,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
+    androidx.compose.foundation.layout.Column(modifier.fillMaxWidth()) {
+        androidx.compose.foundation.layout.Column(
+            Modifier.fillMaxWidth().padding(vertical = (padding * 0.72f).coerceAtLeast(0.dp)),
+            content = content,
+        )
+        SettingsDivider()
+    }
+}
+
+/** El filo que separa las opciones de Ajustes: una línea de pelo, casi invisible. */
+@Composable
+fun SettingsDivider(modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(P.ink.copy(alpha = 0.07f)),
     )
 }
 
@@ -212,20 +262,27 @@ val HeroBarHeight = 34.dp
  * cristal oscuro de sus vecinos, el alto de la barra y ni rastro del degradado
  * de acento que llevaba en el dock. Ahí arriba lo que se tiene que ver es el
  * fondo del juego, y abrir se hace además con doble toque sobre la card o con
- * el mando.
+ * el mando. [focused] es el foco del mando (ver `InputController.barFocus`).
  */
 @Composable
-fun OpenButton(enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+fun OpenButton(
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    focused: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val glyph by animateFloatAsState(if (focused) 1.14f else 1f, motion(Springs.snappy()), label = "openGlyph")
     Row(
         modifier
             .height(HeroBarHeight)
             .alpha(if (enabled) 1f else 0.45f)
             .darkGlass(RoundedCornerShape(12.dp))
+            .consoleFocus(focused)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 11.dp),
+            .padding(start = 8.dp, end = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        PlayGlyph(size = 8.dp)
+        OpenGlyph(Modifier.graphicsLayer { scaleX = glyph; scaleY = glyph })
         Spacer(Modifier.width(6.dp))
         ElyText(
             stringResource(R.string.open),
@@ -234,6 +291,32 @@ fun OpenButton(enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> U
             color = Color.White,
             maxLines = 1,
         )
+    }
+}
+
+/**
+ * Botón cuadrado de icono de la barra del hero (buscar, Ajustes, volver…),
+ * con el realce de consola cuando lo señala el mando y el icono que crece un
+ * poco al recibirlo.
+ */
+@Composable
+fun ConsoleIconButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    focused: Boolean = false,
+    glass: Boolean = true,
+    content: @Composable (Modifier) -> Unit,
+) {
+    val glyph by animateFloatAsState(if (focused) 1.14f else 1f, motion(Springs.snappy()), label = "iconGlyph")
+    Box(
+        modifier
+            .size(HeroBarHeight)
+            .then(if (glass) Modifier.darkGlass(RoundedCornerShape(12.dp)) else Modifier)
+            .consoleFocus(focused)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        content(Modifier.graphicsLayer { scaleX = glyph; scaleY = glyph })
     }
 }
 
@@ -258,7 +341,7 @@ fun AccentSwitch(checked: Boolean, onToggle: () -> Unit, modifier: Modifier = Mo
     val shape = RoundedCornerShape(14.dp)
     val knobX by animateFloatAsState(
         targetValue = if (checked) 20f else 0f,
-        animationSpec = tween(300, easing = Swift),
+        animationSpec = motion(Springs.snappy()),
         label = "knob",
     )
     Box(
@@ -420,30 +503,107 @@ fun BackChevron(color: Color = P.ink, size: Dp = 15.dp, thickness: Dp = 1.8.dp) 
     )
 }
 
-/** Lupa de la barra superior: círculo + mango a 45°. */
+/* ── Iconos de consola ─────────────────────────────────────────
+   Buscar, Ajustes y Abrir comparten familia: vectoriales, trazo de
+   1,8 dp con remates redondos, geometría limpia y un detalle de luz
+   en el color de acento (el "LED" de los menús de consola). Se
+   construyen una vez por tamaño con drawWithCache: repintarlos al
+   animar el foco no crea objetos nuevos.
+   ───────────────────────────────────────────────────────────── */
+
+/** Buscar: lente con reflejo y mango de agarre, con un punto de luz de acento. */
 @Composable
-fun SearchGlyph(color: Color = Color.White) {
+fun SearchGlyph(modifier: Modifier = Modifier, color: Color = Color.White) {
+    val accent = LocalSkin.current.a2
     Box(
-        Modifier.size(16.dp).drawBehind {
+        modifier.size(18.dp).drawWithCache {
             val t = 1.8.dp.toPx()
-            val r = 5.5.dp.toPx()
+            val r = 5.4.dp.toPx()
             val c = Offset(size.width * 0.42f, size.height * 0.42f)
-            drawCircle(color, radius = r, center = c, style = androidx.compose.ui.graphics.drawscope.Stroke(width = t))
-            val start = Offset(c.x + r * 0.7f, c.y + r * 0.7f)
-            drawLine(color, start, Offset(start.x + 4.dp.toPx(), start.y + 4.dp.toPx()), t, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            val handleStart = Offset(c.x + r * 0.72f, c.y + r * 0.72f)
+            val handleEnd = Offset(size.width * 0.9f, size.height * 0.9f)
+            val glint = Path().apply {
+                // Reflejo: un arco corto arriba a la izquierda de la lente.
+                arcTo(
+                    androidx.compose.ui.geometry.Rect(c, r * 0.58f),
+                    startAngleDegrees = 200f,
+                    sweepAngleDegrees = 70f,
+                    forceMoveTo = true,
+                )
+            }
+            val stroke = Stroke(width = t, cap = StrokeCap.Round)
+            val thin = Stroke(width = t * 0.7f, cap = StrokeCap.Round)
+            onDrawBehind {
+                drawCircle(color, radius = r, center = c, style = stroke)
+                drawPath(glint, color.copy(alpha = 0.7f), style = thin)
+                drawLine(color, handleStart, handleEnd, t * 1.45f, cap = StrokeCap.Round)
+                drawCircle(accent, radius = t * 0.62f, center = c)
+            }
         },
     )
 }
 
-/** Icono de ajustes: dos círculos concéntricos, como en el diseño. */
+/** Ajustes: engranaje de ocho dientes con eje; el eje lleva el punto de acento. */
 @Composable
-fun SettingsGlyph(color: Color = Color.White) {
+fun SettingsGlyph(modifier: Modifier = Modifier, color: Color = Color.White) {
+    val accent = LocalSkin.current.a2
     Box(
-        Modifier.size(16.dp).drawBehind {
-            val t = 1.8.dp.toPx()
-            val c = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
-            drawCircle(color, radius = 6.5.dp.toPx(), center = c, style = androidx.compose.ui.graphics.drawscope.Stroke(width = t))
-            drawCircle(color, radius = 3.dp.toPx(), center = c, style = androidx.compose.ui.graphics.drawscope.Stroke(width = t))
+        modifier.size(18.dp).drawWithCache {
+            val t = 1.7.dp.toPx()
+            val c = Offset(size.width / 2f, size.height / 2f)
+            val outer = size.minDimension * 0.46f
+            val inner = size.minDimension * 0.34f
+            val gear = Path()
+            val teeth = 8
+            val step = 360f / teeth
+            for (i in 0 until teeth) {
+                val a = i * step
+                val points = listOf(inner to a - step * 0.30f, outer to a - step * 0.17f, outer to a + step * 0.17f, inner to a + step * 0.30f)
+                points.forEachIndexed { j, (radius, deg) ->
+                    val rad = Math.toRadians(deg.toDouble())
+                    val x = c.x + radius * kotlin.math.cos(rad).toFloat()
+                    val y = c.y + radius * kotlin.math.sin(rad).toFloat()
+                    if (i == 0 && j == 0) gear.moveTo(x, y) else gear.lineTo(x, y)
+                }
+            }
+            gear.close()
+            val stroke = Stroke(width = t, join = StrokeJoin.Round, cap = StrokeCap.Round)
+            onDrawBehind {
+                drawPath(gear, color, style = stroke)
+                drawCircle(color, radius = inner * 0.42f, center = c, style = Stroke(width = t))
+                drawCircle(accent, radius = t * 0.6f, center = c)
+            }
+        },
+    )
+}
+
+/** Abrir: el botón de "jugar" de una consola — anillo con el triángulo dentro. */
+@Composable
+fun OpenGlyph(modifier: Modifier = Modifier, color: Color = Color.White) {
+    val accent = LocalSkin.current.a2
+    Box(
+        modifier.size(18.dp).drawWithCache {
+            val t = 1.6.dp.toPx()
+            val c = Offset(size.width / 2f, size.height / 2f)
+            val r = size.minDimension / 2f - t
+            val tri = size.minDimension * 0.2f
+            val play = Path().apply {
+                // Centrado óptico: el triángulo se corre un poco a la derecha.
+                moveTo(c.x - tri * 0.7f, c.y - tri)
+                lineTo(c.x + tri * 1.05f, c.y)
+                lineTo(c.x - tri * 0.7f, c.y + tri)
+                close()
+            }
+            val ring = Stroke(width = t, cap = StrokeCap.Round)
+            val soften = Stroke(width = t * 0.8f, join = StrokeJoin.Round)
+            onDrawBehind {
+                // El anillo, abierto arriba a la derecha con el punto de acento.
+                drawArc(color, startAngle = -30f, sweepAngle = 320f, useCenter = false, topLeft = Offset(c.x - r, c.y - r), size = androidx.compose.ui.geometry.Size(r * 2, r * 2), style = ring)
+                val dot = Math.toRadians(-45.0)
+                drawCircle(accent, radius = t * 0.7f, center = Offset(c.x + r * kotlin.math.cos(dot).toFloat(), c.y + r * kotlin.math.sin(dot).toFloat()))
+                drawPath(play, color)
+                drawPath(play, color, style = soften)
+            }
         },
     )
 }
