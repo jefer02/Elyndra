@@ -1,5 +1,7 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.theme.rememberPress
+import com.elyndra.launcher.ui.theme.pressScale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -48,19 +50,27 @@ import com.elyndra.launcher.data.RomEntry
 import com.elyndra.launcher.data.fmtMinutes
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.Screen
+import com.elyndra.launcher.ui.BarItem
+import com.elyndra.launcher.ui.components.ConsoleIconButton
+import com.elyndra.launcher.ui.components.HeroBarHeight
+import com.elyndra.launcher.ui.theme.FloatClock
+import com.elyndra.launcher.ui.theme.consoleFocus
+import com.elyndra.launcher.ui.theme.floatPhaseOf
+import com.elyndra.launcher.ui.theme.floating
+import com.elyndra.launcher.ui.theme.rememberFloatClock
 import com.elyndra.launcher.ui.components.ArtImage
 import com.elyndra.launcher.ui.components.BackChevron
 import com.elyndra.launcher.metadata.ArtKind
-import com.elyndra.launcher.ui.components.DisintegratableBox
+import com.elyndra.launcher.ui.components.DisintegratingContainer
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GameIcon
 import com.elyndra.launcher.ui.components.GhostButton
 import com.elyndra.launcher.ui.components.Hero
 import com.elyndra.launcher.ui.components.LogoImage
-import com.elyndra.launcher.ui.components.MaterializableBox
+import com.elyndra.launcher.ui.components.MaterializingContainer
 import com.elyndra.launcher.ui.components.OpenButton
 import com.elyndra.launcher.ui.components.metrics
-import com.elyndra.launcher.ui.components.rememberWikipediaSummary
+import com.elyndra.launcher.ui.components.rememberGameDescription
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.theme.HeroTitleShadow
 import com.elyndra.launcher.ui.theme.LocalSkin
@@ -95,11 +105,17 @@ fun FolderScreen(vm: ElyndraViewModel) {
         if (index >= 0) runCatching { carousel.animateScrollToItem(index) }
     }
 
+    // Un solo reloj para la flotación de todos los logos de juego de la pantalla.
+    val floatClock = rememberFloatClock()
+
     Column(Modifier.fillMaxSize().animFadeIn(key = Screen.Folder)) {
 
         Hero(
             pairIndex = rom?.let { vm.romPairIndex(it) } ?: item.system.pair,
             heroKey = rom?.key ?: item.key,
+            // Quitar el fondo lo deshace en polvo antes de borrarlo.
+            backgroundVanishing = rom?.let { vm.isVanishingArt(it.key, ArtKind.Background) } == true,
+            onBackgroundVanished = { vm.finishVanish() },
             height = m.heroH,
             imagePath = rom?.let { it.meta.hero ?: it.meta.screenshot },
             topBar = {
@@ -110,42 +126,29 @@ fun FolderScreen(vm: ElyndraViewModel) {
                         .padding(start = m.pad, end = m.pad, top = if (m.landscape) 8.dp else 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Box(
-                        Modifier
-                            .size(34.dp)
-                            .darkGlass(RoundedCornerShape(12.dp))
-                            .clickable { vm.go(Screen.Library) },
-                        contentAlignment = Alignment.Center,
-                    ) { BackChevron(color = Color.White) }
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        ElyText(item.system.name, size = 12.5f, weight = FontWeight.SemiBold, color = Color.White, maxLines = 1)
-                        Spacer(Modifier.height(2.dp))
-                        ElyText(
-                            item.folder.displayPath,
-                            size = 8.5f,
-                            color = Color.White.copy(alpha = 0.72f),
-                            letterSpacing = tracking(0.1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    // Arriba a la izquierda, a la misma altura que la barra de la
+                    // biblioteca (donde está Ajustes): volver, "Abrir" y el
+                    // selector de emulador, juntos. El nombre de la carpeta pasa
+                    // a la derecha y cede el ancho que haga falta.
+                    ConsoleIconButton(
+                        onClick = { vm.go(Screen.Library) },
+                        focused = vm.input.isBarFocused(BarItem.Back),
+                    ) { glyph -> Box(glyph) { BackChevron(color = Color.White) } }
                     Spacer(Modifier.width(8.dp))
-                    // "Abrir" vive aquí, sobre el fondo del juego y con la misma
-                    // pinta que en la biblioteca: el dock de abajo ya no existe.
-                    // Con qué emulador se abre lo dice el botón de al lado.
-                    OpenButton(enabled = rom != null) { rom?.let { vm.openRom(it) } }
+                    OpenButton(enabled = rom != null, focused = vm.input.isBarFocused(BarItem.Open)) { rom?.let { vm.openRom(it) } }
                     Spacer(Modifier.width(8.dp))
-                    // Con "Abrir" en medio la barra va justa, así que el nombre del
-                    // emulador —que puede ser larguísimo— no se queda con más de la
-                    // mitad de lo que sobra: el resto es para el título de la carpeta.
+                    // El nombre del emulador puede ser larguísimo: se queda como
+                    // mucho con la mitad de lo que sobra, el resto es para el título.
                     Box(
                         Modifier
                             .weight(1f, fill = false)
+                            .height(HeroBarHeight)
                             .alpha(if (item.emulatorInstalled) 1f else 0.6f)
                             .darkGlass(RoundedCornerShape(11.dp))
+                            .consoleFocus(vm.input.isBarFocused(BarItem.Emulator), cornerRadius = 11.dp)
                             .clickable { vm.pickFolderEmulator(item.folder) }
-                            .padding(horizontal = 11.dp, vertical = 6.dp),
+                            .padding(horizontal = 11.dp),
+                        contentAlignment = Alignment.CenterStart,
                     ) {
                         ElyText(
                             emulatorLabel,
@@ -154,6 +157,20 @@ fun FolderScreen(vm: ElyndraViewModel) {
                             color = Color.White,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                        ElyText(item.system.name, size = 12.5f, weight = FontWeight.SemiBold, color = Color.White, maxLines = 1, align = TextAlign.End)
+                        Spacer(Modifier.height(2.dp))
+                        ElyText(
+                            item.folder.displayPath,
+                            size = 8.5f,
+                            color = Color.White.copy(alpha = 0.72f),
+                            letterSpacing = tracking(0.1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            align = TextAlign.End,
                         )
                     }
                 }
@@ -193,11 +210,11 @@ fun FolderScreen(vm: ElyndraViewModel) {
                     }
                     val logo = rom?.meta?.logo
                     if (logo != null) {
-                        MaterializableBox(
+                        MaterializingContainer(
                             isMaterializing = vm.isMaterializingArt(rom.key, ArtKind.Logo),
                             onAnimationEnd = { vm.finishMaterializeArt() },
                         ) {
-                            DisintegratableBox(
+                            DisintegratingContainer(
                                 isDisintegrating = vm.isVanishingArt(rom.key, ArtKind.Logo),
                                 onAnimationEnd = { vm.finishVanish() },
                             ) {
@@ -205,6 +222,7 @@ fun FolderScreen(vm: ElyndraViewModel) {
                                     logo,
                                     Modifier
                                         .animTitleIn(key = rom.key)
+                                        .floating(floatClock, floatPhaseOf(rom.key), amplitude = 3.dp, periodSeconds = 4.2f)
                                         .fillMaxWidth(0.72f)
                                         .height(m.logoH),
                                 )
@@ -225,7 +243,12 @@ fun FolderScreen(vm: ElyndraViewModel) {
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    val description = rememberWikipediaSummary(rom?.displayTitle)
+                    val description = rememberGameDescription(
+                        title = rom?.displayTitle,
+                        stored = rom?.meta?.description,
+                        lang = vm.settings.lang,
+                        short = true,
+                    )
                     if (description != null) {
                         ElyText(
                             description,
@@ -306,12 +329,13 @@ fun FolderScreen(vm: ElyndraViewModel) {
                     itemsIndexed(roms, key = { _, r -> r.id }) { i, r ->
                         // Quitar el juego deshace la card entera; quitar solo
                         // su carátula deshace únicamente la imagen, dentro.
-                        DisintegratableBox(
+                        DisintegratingContainer(
                             isDisintegrating = vm.vanishing == r.key,
                             onAnimationEnd = { vm.finishVanish() },
                         ) {
                             RomTile(
                                 rom = r,
+                                floatClock = floatClock,
                                 time = playedLabel(r),
                                 index = i,
                                 selected = r.key == rom?.key,
@@ -350,6 +374,8 @@ private fun playedLabel(rom: RomEntry): String =
 @Composable
 private fun RomTile(
     rom: RomEntry,
+    /** Reloj compartido de la flotación del logo del juego (cuando no hay carátula). */
+    floatClock: FloatClock,
     time: String,
     index: Int,
     selected: Boolean,
@@ -368,6 +394,8 @@ private fun RomTile(
     val shape = RoundedCornerShape(12.dp)
     val lift = selectionLift(selected)
     val scale = selectionScale(selected)
+    val press = rememberPress()
+    val pressed = pressScale(press)
     val curtain = curtainAlpha(minOf(index, 12) * 40, key = rom.id)
     val sheen = sheenProgress()
     val cover = rom.meta.cover
@@ -379,6 +407,7 @@ private fun RomTile(
             .animPopIn(delayMs = minOf(index, 12) * 35, key = rom.id)
             .pointerInput(rom.id) {
                 detectTapGestures(
+                    onPress = { press.track(this) },
                     onTap = { onTap() },
                     onDoubleTap = { onOpen() },
                     onLongPress = { onLongPress() },
@@ -391,11 +420,11 @@ private fun RomTile(
                 .fillMaxWidth()
                 .height(height)
                 .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
+                    scaleX = scale * pressed.value
+                    scaleY = scale * pressed.value
                 }
                 .shadow(
-                    if (selected) 16.dp else 8.dp,
+                    if (press.pressed) 4.dp else if (selected) 16.dp else 8.dp,
                     shape,
                     clip = false,
                     ambientColor = P.shade.copy(alpha = if (selected) 0.32f else 0.2f),
@@ -408,12 +437,12 @@ private fun RomTile(
                     shape,
                 ),
         ) {
-            MaterializableBox(
+            MaterializingContainer(
                 isMaterializing = coverMaterializing,
                 onAnimationEnd = onCoverMaterialized,
                 modifier = Modifier.fillMaxSize(),
             ) {
-                DisintegratableBox(
+                DisintegratingContainer(
                     isDisintegrating = coverVanishing,
                     onAnimationEnd = onCoverVanished,
                     modifier = Modifier.fillMaxSize(),
@@ -431,7 +460,8 @@ private fun RomTile(
                             .align(Alignment.Center)
                             .padding(bottom = height * 0.2f, start = width * 0.1f, end = width * 0.1f)
                             .fillMaxWidth()
-                            .aspectRatio(1f),
+                            .aspectRatio(1f)
+                            .floating(floatClock, floatPhaseOf(rom.id)),
                     )
                 }
                 Box(Modifier.fillMaxSize().drawBehind { drawRect(romScrimBrush(size)) })
