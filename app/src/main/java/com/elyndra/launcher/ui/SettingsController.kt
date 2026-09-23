@@ -13,6 +13,8 @@ import com.elyndra.launcher.data.Emulators
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.data.SecretKeys
 import com.elyndra.launcher.data.TINTS
+import com.elyndra.launcher.display.FrameRate
+import com.elyndra.launcher.masha.MashaError
 import com.elyndra.launcher.metadata.ApiException
 import com.elyndra.launcher.metadata.FailureKind
 import com.elyndra.launcher.metadata.Service
@@ -115,22 +117,154 @@ class SettingsController(private val vm: ElyndraViewModel) {
         return ext in VIDEO_EXTENSIONS
     }
 
-    /* ── botón de Lucy ────────────────────────────────────────── */
+    /* ── botón de Masha ───────────────────────────────────────── */
 
     /**
-     * Dónde está el botón de Lucy, en dp desde la esquina superior izquierda.
+     * Dónde está el botón de Masha, en dp desde la esquina superior izquierda.
      * `null` en cualquiera de los dos = nunca se ha movido, y entonces manda
      * su esquina de siempre.
      */
-    var lucyX by mutableStateOf(store.lucyX); private set
-    var lucyY by mutableStateOf(store.lucyY); private set
+    var mashaX by mutableStateOf(store.mashaX); private set
+    var mashaY by mutableStateOf(store.mashaY); private set
 
-    /** Lucy se queda donde se la suelte, también al volver a abrir la app. */
-    fun moveLucy(x: Float, y: Float) {
-        lucyX = x
-        lucyY = y
-        store.lucyX = x
-        store.lucyY = y
+    /** Masha se queda donde se la suelte, también al volver a abrir la app. */
+    fun moveMasha(x: Float, y: Float) {
+        mashaX = x
+        mashaY = y
+        store.mashaX = x
+        store.mashaY = y
+    }
+
+    /** Color (ARGB) de la estela de partículas de Masha al arrastrarla. */
+    var mashaParticleColor by mutableStateOf(store.mashaParticleColor); private set
+
+    fun updateMashaParticleColor(argb: Int) {
+        mashaParticleColor = argb
+        store.mashaParticleColor = argb
+    }
+
+    /* ── pantalla: 120 / 60 fps ───────────────────────────────── */
+
+    /** La pantalla llega a 120 Hz (o más). Si no, la opción de 120 fps sale desactivada. */
+    val supportsHighRefresh: Boolean = FrameRate.supportsHigh(vm.app)
+
+    /** Lo guardado: 120, 60 o [FrameRate.AUTO]. */
+    private var storedFrameRate by mutableStateOf(store.frameRate)
+
+    /** Los fps que se piden de verdad a la pantalla; la Activity los aplica al cambiar. */
+    val frameRate: Int get() = FrameRate.effective(storedFrameRate, supportsHighRefresh)
+
+    fun updateFrameRate(fps: Int) {
+        if (fps == FrameRate.HIGH && !supportsHighRefresh) return
+        storedFrameRate = fps
+        store.frameRate = fps
+    }
+
+    /* ── Masha ────────────────────────────────────────────────── */
+
+    var mashaOnline by mutableStateOf(store.mashaOnline); private set
+    var mashaAmbient by mutableStateOf(store.mashaAmbient); private set
+    var mashaNudges by mutableStateOf(store.mashaNudges); private set
+    var mashaKey by mutableStateOf(vm.brain.config.userKey); private set
+    var mashaTest by mutableStateOf<MashaTest>(MashaTest.Idle); private set
+
+    /** El usuario ha dado acceso de uso (tiempo de juego exacto). Se relee al abrir Ajustes. */
+    var usageAccess by mutableStateOf(false); private set
+
+    sealed interface MashaTest {
+        data object Idle : MashaTest
+        data object Checking : MashaTest
+        data class Ok(val balance: String?) : MashaTest
+        data class Failed(val message: UiText) : MashaTest
+    }
+
+    val mashaHasKey: Boolean get() = vm.brain.config.hasKey
+    val mashaBuiltInKey: Boolean get() = vm.brain.config.usesBuiltInKey
+
+    fun toggleMashaOnline() {
+        mashaOnline = !mashaOnline
+        store.mashaOnline = mashaOnline
+    }
+
+    fun toggleMashaAmbient() {
+        mashaAmbient = !mashaAmbient
+        store.mashaAmbient = mashaAmbient
+        vm.masha.refreshInsight()
+    }
+
+    fun toggleMashaNudges() {
+        mashaNudges = !mashaNudges
+        store.mashaNudges = mashaNudges
+    }
+
+    fun updateMashaKey(value: String) {
+        mashaKey = value
+        vm.brain.config.setUserKey(value)
+        mashaTest = MashaTest.Idle
+    }
+
+    /** "Probar conexión": consulta el saldo de la cuenta (no gasta tokens). */
+    fun testMasha() {
+        if (!vm.brain.config.hasKey) {
+            mashaTest = MashaTest.Failed(UiText.res(R.string.masha_err_no_key))
+            return
+        }
+        mashaTest = MashaTest.Checking
+        vm.viewModelScope.launch {
+            mashaTest = vm.brain.ai.ping().fold(
+                onSuccess = { MashaTest.Ok(it) },
+                onFailure = { e -> MashaTest.Failed((e as? MashaError)?.let { vm.masha.errorText(it) } ?: UiText.Raw(e.message ?: "?")) },
+            )
+        }
+    }
+
+    fun refreshUsageAccess() {
+        usageAccess = vm.sessions.hasUsageAccess()
+    }
+
+    /** Lleva a Ajustes del sistema → Acceso de uso (con Elyndra señalada si el sistema lo admite). */
+    fun openUsageAccess() {
+        val opened = runCatching { vm.app.startActivity(vm.sessions.usageAccessIntent()) }.isSuccess
+        if (!opened) runCatching { vm.app.startActivity(vm.sessions.usageAccessFallbackIntent()) }
+    }
+
+    fun forgetMasha() {
+        vm.showDialog(
+            DialogSpec(
+                title = UiText.res(R.string.settings_masha_forget),
+                message = UiText.res(R.string.settings_masha_forget_msg),
+                destructive = true,
+                confirm = DialogButton(UiText.res(R.string.remove)) {
+                    vm.viewModelScope.launch {
+                        vm.brain.forgetEverything()
+                        vm.masha.clearConversation(null)
+                        vm.showToast(UiText.res(R.string.toast_masha_forgot))
+                    }
+                },
+                dismiss = DialogButton(UiText.res(R.string.close)) {},
+            ),
+        )
+    }
+
+    /* ── prioridad de fuentes de metadatos ────────────────────── */
+
+    var priority by mutableStateOf(vm.metadataPriority.get()); private set
+
+    /** Mueve un servicio una posición en el orden de textos o de imágenes. */
+    fun movePriority(art: Boolean, service: Service, delta: Int) {
+        val list = (if (art) priority.art else priority.text).toMutableList()
+        val from = list.indexOf(service)
+        val to = (from + delta).coerceIn(0, list.lastIndex)
+        if (from < 0 || from == to) return
+        list.removeAt(from)
+        list.add(to, service)
+        priority = if (art) priority.copy(art = list) else priority.copy(text = list)
+        vm.metadataPriority.set(priority)
+    }
+
+    fun resetPriority() {
+        vm.metadataPriority.reset()
+        priority = vm.metadataPriority.get()
     }
 
     /* ── orden de la biblioteca ───────────────────────────────── */
@@ -308,6 +442,7 @@ class SettingsController(private val vm: ElyndraViewModel) {
     var mediaBytes by mutableStateOf(-1L); private set
 
     fun onOpen() {
+        refreshUsageAccess()
         Service.entries.forEach { s ->
             if (states[s]?.status != ServiceState.Status.Checking && states[s]?.status != ServiceState.Status.Connected) {
                 states[s] = idleState(s)
