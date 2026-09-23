@@ -1,46 +1,71 @@
-# Gradle
+# ─── Gradle ───────────────────────────────────────────────
 .gradle/
 .kotlin/
 **/build/
+build/
+out/
+gradle-app.setting
+!gradle/wrapper/gradle-wrapper.jar
 
-# Android Studio / IntelliJ
+# ─── Android Studio / IntelliJ ────────────────────────────
 .idea/
 *.iml
 *.ipr
 *.iws
-
-# Android local configuration and generated output
-local.properties
+.navigation/
 captures/
-.cxx/
 .externalNativeBuild/
+.cxx/
 
-# Kotlin / Java generated files
-*.class
-out/
-*.hprof
-*.log
+# ─── Configuración local y secretos (NUNCA subir) ─────────
+# local.properties guarda sdk.dir y las claves (masha.apiKey de DeepSeek,
+# screenscraper.devId/devPassword…).
+local.properties
+secrets.properties
+*.secrets.properties
+.env
+.env.*
+google-services.json
+*.pem
+*.p12
+*.key
 
-# Packaged artifacts
-*.apk
-*.aab
-*.apks
-
-# Signing files and private credentials
+# ─── Firma ────────────────────────────────────────────────
 *.jks
 *.keystore
 keystore.properties
+signing.properties
 
-# OS and editor files
+# ─── Artefactos empaquetados ──────────────────────────────
+*.apk
+*.aab
+*.apks
+*.ap_
+*.dex
+output-metadata.json
+app/release/
+app/debug/
+
+# ─── Kotlin / Java generados ──────────────────────────────
+*.class
+*.hprof
+*.log
+proguard/
+lint/intermediates/
+lint/generated/
+lint/outputs/
+lint/tmp/
+
+# ─── Sistema y editores ───────────────────────────────────
 .DS_Store
 Thumbs.db
+desktop.ini
 *.swp
 *.swo
+*~
+.vscode/
 
+# ─── Herramientas locales ─────────────────────────────────
+.github/modernize/
 
-# KeyStore y firmas de seguridad
-*.jks
-*.keystore
-
-# Ignorar builds y releases compilados
-app/release/
+# Nota: app/schemas/ (esquemas de Room) SÍ se versiona: hace falta para las migraciones.
