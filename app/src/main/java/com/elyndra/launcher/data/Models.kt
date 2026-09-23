@@ -3,12 +3,17 @@ package com.elyndra.launcher.data
 import kotlinx.serialization.Serializable
 
 /* ─────────────────────────────────────────────────────────────
-   Modelo persistido de la biblioteca (files/library.json).
+   Modelo de la biblioteca: la instantánea en memoria que pinta la UI.
 
    Todo lo que el usuario añade vive aquí: carpetas de ROMs (una por
    sistema y emulador), las ROMs encontradas en cada carpeta, los
    juegos Android elegidos, los metadatos descargados y el tiempo de
    juego. Las rutas de imágenes son relativas a filesDir.
+
+   Se persiste en Room (ver data/db): cada cambio de la instantánea se
+   traduce en las filas que cambian. Las clases siguen siendo
+   @Serializable porque la primera vez se importa el antiguo
+   files/library.json (ver LegacyLibraryJson).
    ───────────────────────────────────────────────────────────── */
 
 @Serializable
@@ -88,6 +93,8 @@ data class RomEntry(
      * manda en el intent (ver [BannerHub]).
      */
     val pcGameId: String? = null,
+    /** Cuándo entró en la biblioteca (0 en las ROMs de antes de guardarlo: vale la fecha de su carpeta). */
+    val addedAt: Long = 0,
 ) {
     val key: String get() = "r:$id"
     val displayTitle: String get() = meta.name?.takeIf { it.isNotBlank() } ?: title
@@ -154,7 +161,33 @@ data class GameMeta(
     val igdbId: Long? = null,
     val sgdbId: Long? = null,
     val ra: RaInfo? = null,
+    /**
+     * De dónde salió cada imagen, por su clase ("cover", "hero", "logo",
+     * "icon", "shot"): el servicio y la URL original. Permite volver a
+     * descargarla sin preguntar a nadie y que Masha sepa qué falta y de dónde.
+     */
+    val artOrigins: Map<String, ArtOrigin> = emptyMap(),
+    /** Cómo se identificó el juego (ver [MatchMethod]); null = sin identificar. */
+    val matchedBy: String? = null,
+    /** Confianza de esa identificación, 0…1. */
+    val matchConfidence: Float? = null,
 )
+
+/** Origen de una imagen: [source] es el id del servicio (`ss`, `igdb`…) o `local` (galería). */
+@Serializable
+data class ArtOrigin(val source: String, val url: String? = null)
+
+/** Cómo se reconoció un juego, de más a menos fiable. */
+object MatchMethod {
+    /** Hash del archivo (CRC/MD5/SHA-1 o rcheevos): es ese volcado y no otro. */
+    const val HASH = "hash"
+    /** Nombre casi idéntico al del servicio. */
+    const val NAME = "name"
+    /** Nombre parecido, por encima del umbral pero lejos de ser exacto. */
+    const val FUZZY = "fuzzy"
+    /** Elegido o corregido por el usuario. */
+    const val MANUAL = "manual"
+}
 
 @Serializable
 data class RaInfo(
@@ -170,6 +203,34 @@ data class RaInfo(
     val updatedAt: Long = 0,
 )
 
-/** Una sesión medida entre el lanzamiento y la vuelta a Elyndra. */
+/**
+ * Una sesión de juego.
+ *
+ * Se mide con UsageStatsManager si el usuario lo ha permitido (tiempo real en
+ * primer plano del emulador) y, si no, entre el lanzamiento y la vuelta a
+ * Elyndra. Los campos nuevos tienen valor por omisión: las sesiones antiguas
+ * solo sabían juego, inicio y minutos.
+ */
 @Serializable
-data class PlaySession(val key: String, val start: Long, val minutes: Int)
+data class PlaySession(
+    val key: String,
+    val start: Long,
+    val minutes: Int,
+    /** Emulador con el que se jugó; null en apps Android y en sesiones antiguas. */
+    val emulatorId: String? = null,
+    /** Fin de la sesión; 0 en las guardadas antes de medirlo. */
+    val end: Long = 0,
+    /** Cómo se midió: [SOURCE_USAGE] o [SOURCE_LIFECYCLE]. */
+    val source: String = SOURCE_LIFECYCLE,
+    /**
+     * Se salió casi al entrar. Es la mejor pista que tiene un lanzador de que
+     * algo fue mal —el emulador falló, rindió mal o no era el adecuado— o de
+     * que el juego no enganchó. Pesa en la elección de emulador y en "abandonados".
+     */
+    val earlyExit: Boolean = false,
+) {
+    companion object {
+        const val SOURCE_USAGE = "usage"
+        const val SOURCE_LIFECYCLE = "lifecycle"
+    }
+}
