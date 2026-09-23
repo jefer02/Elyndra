@@ -5,6 +5,11 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.SpringSpec
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -12,6 +17,13 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.gestures.PressGestureScope
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.ReadOnlyComposable
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -35,13 +47,45 @@ val Swift: Easing = CubicBezierEasing(0.2f, 0.8f, 0.2f, 1f)
 /** `ease-in-out` de CSS. */
 val EaseInOut: Easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
 
-/** Progreso 0→1 que se reproduce una vez al entrar en composición. */
+/* ── Movimiento: muelles y "reducir movimiento" ─────────────── */
+
+/**
+ * `true` si el sistema pide menos movimiento (escala de animaciones a 0 en
+ * Opciones de desarrollo / Accesibilidad → "Quitar animaciones"). Lo provee
+ * MainActivity leyendo `Settings.Global.ANIMATOR_DURATION_SCALE`.
+ */
+val LocalReducedMotion = staticCompositionLocalOf { false }
+
+/** Muelles de la interfaz: amortiguados (sin rebote exagerado) y cortos. */
+object Springs {
+    /** Entradas y cambios de pantalla: firme, sin rebote. */
+    fun <T> enter(): SpringSpec<T> = spring(dampingRatio = 0.9f, stiffness = 500f)
+    /** Selección y micro-interacciones: rápido, con un pelín de vida. */
+    fun <T> snappy(): SpringSpec<T> = spring(dampingRatio = 0.8f, stiffness = 700f)
+    /** Fundidos: críticamente amortiguado. */
+    fun <T> fade(): SpringSpec<T> = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 600f)
+}
+
+/** El muelle pedido, o un salto instantáneo si el usuario quiere menos movimiento. */
+@Composable
+@ReadOnlyComposable
+fun <T> motion(spec: FiniteAnimationSpec<T>): FiniteAnimationSpec<T> = if (LocalReducedMotion.current) snap() else spec
+
+/**
+ * Progreso 0→1 que se reproduce una vez al entrar en composición, con muelle.
+ * [durationMs] y [easing] se conservan por compatibilidad de firma: el muelle
+ * decide su propio tiempo (interrumpible, sin curva fija).
+ */
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun playOnce(durationMs: Int, delayMs: Int = 0, easing: Easing = Swift, key: Any? = Unit): State<Float> {
-    val p = remember(key) { Animatable(0f) }
+    val reduced = LocalReducedMotion.current
+    val p = remember(key) { Animatable(if (reduced) 1f else 0f) }
     LaunchedEffect(key) {
+        if (reduced) { p.snapTo(1f); return@LaunchedEffect }
         p.snapTo(0f)
-        p.animateTo(1f, tween(durationMs, delayMs, easing))
+        if (delayMs > 0) delay(delayMs.toLong())
+        p.animateTo(1f, spring(dampingRatio = 0.9f, stiffness = 500f))
     }
     return p.asState()
 }
@@ -210,7 +254,7 @@ fun pulseHintAlpha(): Float {
     return v
 }
 
-/** `@keyframes livePulse` — el punto de estado de Lucy. */
+/** `@keyframes livePulse` — el punto de estado de Masha. */
 @Composable
 fun livePulseScale(): Float {
     val t = rememberInfiniteTransition(label = "live")
@@ -235,7 +279,7 @@ fun barPlayScale(index: Int): Float {
     return v
 }
 
-/** `@keyframes dots` — los tres puntos de "Lucy está escribiendo". */
+/** `@keyframes dots` — los tres puntos de "Masha está escribiendo". */
 @Composable
 fun typingDotAlpha(index: Int): Pair<Float, Float> {
     val t = rememberInfiniteTransition(label = "dot$index")
@@ -255,7 +299,7 @@ fun typingDotAlpha(index: Int): Pair<Float, Float> {
     return alpha to dy
 }
 
-/** `@keyframes auraSpin` — el halo cónico del avatar de Lucy. */
+/** `@keyframes auraSpin` — el halo cónico del avatar de Masha. */
 @Composable
 fun auraAngle(): Float = spinAngle(6000)
 
@@ -289,7 +333,7 @@ const val SelectionScale = 1.14f
 fun selectionLift(selected: Boolean): Dp {
     val t = androidx.compose.animation.core.animateDpAsState(
         targetValue = if (selected) -SelectionLift else 0.dp,
-        animationSpec = tween(300, easing = Swift),
+        animationSpec = motion(Springs.snappy()),
         label = "lift",
     )
     return t.value
@@ -300,8 +344,35 @@ fun selectionLift(selected: Boolean): Dp {
 fun selectionScale(selected: Boolean): Float {
     val t = androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (selected) SelectionScale else 1f,
-        animationSpec = tween(300, easing = Swift),
+        animationSpec = motion(Springs.snappy()),
         label = "scale",
     )
     return t.value
 }
+
+/* ── Micro-interacciones ───────────────────────────────────── */
+
+/** Estado de "dedo encima" de una card o botón. */
+class PressState {
+    var pressed by mutableStateOf(false)
+
+    /** Para `detectTapGestures(onPress = press::track)`. */
+    suspend fun track(scope: PressGestureScope) {
+        pressed = true
+        try { scope.tryAwaitRelease() } finally { pressed = false }
+    }
+}
+
+@Composable
+fun rememberPress(): PressState = remember { PressState() }
+
+/**
+ * Escala al pulsar (0.95) que vuelve con muelle al soltar. Devuelve el State
+ * para leerlo dentro de `graphicsLayer {}`: pulsar no recompone.
+ */
+@Composable
+fun pressScale(press: PressState): State<Float> = animateFloatAsState(
+    targetValue = if (press.pressed) 0.95f else 1f,
+    animationSpec = motion(Springs.snappy()),
+    label = "press",
+)
