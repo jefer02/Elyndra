@@ -7,12 +7,13 @@ import com.elyndra.launcher.data.AppEntry
 import com.elyndra.launcher.data.GameSystem
 import com.elyndra.launcher.data.RomFolder
 import com.elyndra.launcher.library.RomScanner
+import com.elyndra.launcher.masha.MashaAttachment
 import com.elyndra.launcher.metadata.ArtCandidate
 import com.elyndra.launcher.metadata.ArtKind
 import com.elyndra.launcher.metadata.RaGameProgress
 import com.elyndra.launcher.metadata.Service
 
-enum class Screen { Library, Folder, Add, Settings, Lucy }
+enum class Screen { Library, Folder, Add, Settings, Masha }
 
 enum class LibraryFilter(@StringRes val label: Int) {
     All(R.string.filter_all),
@@ -71,29 +72,44 @@ sealed interface LibraryItem {
     }
 }
 
-data class ChatMessage(val fromLucy: Boolean, val text: String, val game: LucyGameRef? = null)
+/**
+ * Un mensaje del chat con Masha.
+ *
+ * [attachment] es lo que va debajo del texto (juegos, un plan, un arco) y
+ * [done] las fichas de lo que Masha hizo en ese turno ("▶ Okami"). [pending]
+ * marca el que se está escribiendo en streaming.
+ */
+data class ChatMessage(
+    val fromMasha: Boolean,
+    val text: String,
+    val game: MashaGameRef? = null,
+    val attachment: MashaAttachment? = null,
+    val done: List<String> = emptyList(),
+    val pending: Boolean = false,
+    /** Contestado sin IA (sin clave, sin red o con la IA apagada). */
+    val offline: Boolean = false,
+    /** Viene del hilo guardado (no se anima al entrar). */
+    val restored: Boolean = false,
+    /** El saludo de cortesía: se enseña, pero no se le manda al modelo. */
+    val greeting: Boolean = false,
+    val id: Long = nextMessageId(),
+)
+
+private var messageSeq = 0L
+
+private fun nextMessageId(): Long = ++messageSeq
 
 /**
- * El juego de la biblioteca al que se refiere un mensaje de Lucy — para
+ * El juego de la biblioteca al que se refiere un mensaje de Masha — para
  * recomendaciones y menciones, así el nombre no se queda suelto en texto y
  * se ve la carátula (o el icono, si no hay) junto a él.
  */
-data class LucyGameRef(
+data class MashaGameRef(
     val key: String,
     val title: String,
     val subtitle: String,
     val artPath: String?,
     val packageName: String?,
-)
-
-/** Velo de lanzamiento: carátula (o icono de la app), título y a dónde va. */
-data class Launch(
-    val title: String,
-    val via: UiText,
-    val pairIndex: Int,
-    val coverPath: String?,
-    val packageName: String? = null,
-    val iconPath: String? = null,
 )
 
 /** Selector de "Personalizar carátula / fondo / icono" con las imágenes de un servicio. */
@@ -165,6 +181,8 @@ data class DialogSpec(
     val title: UiText,
     val message: UiText,
     val confirm: DialogButton,
+    /** Lo que confirma no se deshace: el botón sale en rojo (ver `DangerButton`). */
+    val destructive: Boolean = false,
     val dismiss: DialogButton? = null,
     val extra: DialogButton? = null,
     val input: DialogInput? = null,
