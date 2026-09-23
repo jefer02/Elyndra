@@ -2,12 +2,16 @@ package com.elyndra.launcher.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -21,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -51,6 +56,9 @@ import com.elyndra.launcher.ui.components.CssGrid
 import com.elyndra.launcher.ui.components.CtaButton
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GhostButton
+import com.elyndra.launcher.ui.components.GlassCard
+import com.elyndra.launcher.ui.components.GlassTabBar
+import com.elyndra.launcher.ui.components.GlowCheck
 import com.elyndra.launcher.ui.components.GlassIconButton
 import com.elyndra.launcher.ui.components.GlassPanel
 import com.elyndra.launcher.ui.components.Pill
@@ -70,7 +78,7 @@ fun AddScreen(vm: ElyndraViewModel) {
     val m = metrics()
     val add = vm.add
 
-    Box(Modifier.fillMaxSize().animRiseSheet(key = Screen.Add)) {
+    Box(Modifier.fillMaxSize()) {
         AuroraBackdrop()
 
         Column(
@@ -85,29 +93,14 @@ fun AddScreen(vm: ElyndraViewModel) {
                 ElyText(stringResource(R.string.add_title), size = 19f, weight = FontWeight.SemiBold, color = P.ink)
             }
 
-            Row(
-                Modifier.fillMaxWidth().padding(top = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Pill(
-                    stringResource(R.string.tab_android),
-                    add.tab == AddTab.Android,
-                    { add.updateTab(AddTab.Android) },
-                    modifier = Modifier.weight(1f),
-                    height = 40.dp,
-                    fontSize = 12f,
-                    cornerRadius = 14.dp,
-                )
-                Pill(
-                    stringResource(R.string.tab_roms),
-                    add.tab == AddTab.Roms,
-                    { add.updateTab(AddTab.Roms) },
-                    modifier = Modifier.weight(1f),
-                    height = 40.dp,
-                    fontSize = 12f,
-                    cornerRadius = 14.dp,
-                )
-            }
+            // Las dos pestañas viven dentro de una sola cápsula: lo que se
+            // mueve es la pastilla de acento, no el fondo de cada una.
+            GlassTabBar(
+                tabs = listOf(stringResource(R.string.tab_android), stringResource(R.string.tab_roms)),
+                selected = if (add.tab == AddTab.Android) 0 else 1,
+                onSelect = { add.updateTab(if (it == 0) AddTab.Android else AddTab.Roms) },
+                modifier = Modifier.padding(top = 16.dp),
+            )
 
             when (add.tab) {
                 AddTab.Android -> AndroidTab(vm, m.landscape)
@@ -185,14 +178,31 @@ private fun AndroidTab(vm: ElyndraViewModel, landscape: Boolean) {
 @Composable
 private fun DetectedRow(app: InstalledApp, checked: Boolean, inLibrary: Boolean, index: Int, onToggle: () -> Unit) {
     val skin = LocalSkin.current
-    Row(
-        Modifier
-            .fillMaxWidth()
+    // Marcar una app la hace crecer un pelo con un muelle: el "sí" se siente
+    // en el tamaño antes de leerse en la casilla.
+    val lift by animateFloatAsState(
+        targetValue = if (checked) 1.02f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "tileLift",
+    )
+    GlassCard(
+        modifier = Modifier
             .animFadeUp(delayMs = minOf(index, 14) * 40, key = app.packageName)
             .alpha(if (inLibrary) 0.6f else 1f)
-            .glass(RoundedCornerShape(15.dp), borderColor = if (checked) skin.a1 else Color.White.copy(alpha = 0.72f))
-            .clickable(enabled = !inLibrary, onClick = onToggle)
-            .padding(10.dp),
+            // La escala se lee en fase de dibujo: marcar no remide la lista.
+            .graphicsLayer {
+                scaleX = lift
+                scaleY = lift
+            }
+            .clickable(enabled = !inLibrary, onClick = onToggle),
+        cornerRadius = 16.dp,
+        // El halo morado solo se enciende en lo elegido: es el estado, no el adorno.
+        glow = if (checked) 1f else 0f,
+        frost = if (checked) 0.8f else 0.66f,
+        padding = PaddingValues(10.dp),
+    ) {
+    Row(
+        Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -218,19 +228,8 @@ private fun DetectedRow(app: InstalledApp, checked: Boolean, inLibrary: Boolean,
             )
         }
         Spacer(Modifier.width(8.dp))
-        Box(
-            Modifier
-                .size(23.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .then(
-                    if (checked || inLibrary) Modifier.drawBehind { drawRect(accentGradient(skin, 145f, size)) }
-                    else Modifier.background(P.ink.copy(alpha = 0.07f)),
-                )
-                .border(1.dp, P.ink.copy(alpha = 0.1f), RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (checked || inLibrary) ElyText("✓", size = 12f, color = Color.White)
-        }
+        GlowCheck(checked = checked || inLibrary)
+    }
     }
 }
 

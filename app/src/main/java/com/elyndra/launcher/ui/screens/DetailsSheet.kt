@@ -54,8 +54,10 @@ import com.elyndra.launcher.ui.components.ArtImage
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GhostButton
 import com.elyndra.launcher.ui.components.GlassIconButton
+import com.elyndra.launcher.ui.components.MashaMemoryBlock
 import com.elyndra.launcher.ui.components.ScrimLayer
 import com.elyndra.launcher.ui.components.consumeClicks
+import com.elyndra.launcher.ui.components.rememberGameDescription
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.accentGradient
@@ -85,6 +87,7 @@ fun DetailsSheet(vm: ElyndraViewModel, key: String) {
     val emulator = rom?.let { it.emulatorId ?: folder?.emulatorId }?.let { vm.emulatorName(it) }
     val dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.forLanguageTag(vm.settings.lang))
     val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.88f).dp
+    val description = rememberGameDescription(title, meta.description, vm.settings.lang, short = false)
 
     ScrimLayer(onDismiss = vm::closeDetails, alignment = Alignment.BottomCenter, key = key) {
         Column(
@@ -150,6 +153,9 @@ fun DetailsSheet(vm: ElyndraViewModel, key: String) {
                     .verticalScroll(body)
                     .padding(start = 16.dp, end = 16.dp, bottom = 18.dp),
             ) {
+                // Lo que Masha recuerda de este juego: la última sesión, el emulador, cómo se identificó.
+                MashaMemoryBlock(vm, key, meta)
+
                 if (!meta.matched && meta.description == null) {
                     ElyText(stringResource(R.string.details_no_metadata), size = 10.5f, color = P.ink2, lineHeightRatio = 1.5f)
                     Spacer(Modifier.height(10.dp))
@@ -187,7 +193,9 @@ fun DetailsSheet(vm: ElyndraViewModel, key: String) {
                     }
                 }
 
-                meta.description?.let {
+                // La sinopsis, en el idioma de la app (o en el de por defecto si
+                // no hay traducción): ver GameDescriptions.
+                description?.let {
                     Spacer(Modifier.height(10.dp))
                     ElyText(it, size = 11f, color = P.ink, lineHeightRatio = 1.6f)
                 }
