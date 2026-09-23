@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget de Masha: su línea del momento y uno o dos juegos para ahora.
+     Sin updatePeriodMillis: lo refresca WorkManager (ElyndraWork) cada pocas
+     horas y al volver de jugar, en vez de despertar al sistema por su cuenta. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_masha_desc"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="150dp"
+    android:minResizeHeight="90dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />
