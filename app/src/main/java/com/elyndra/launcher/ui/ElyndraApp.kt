@@ -23,6 +23,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -61,6 +68,7 @@ import com.elyndra.launcher.ui.screens.LucyScreen
 import com.elyndra.launcher.ui.screens.SettingsScreen
 import com.elyndra.launcher.ui.theme.ElyndraTheme
 import com.elyndra.launcher.ui.theme.LocalSkin
+import com.elyndra.launcher.ui.theme.Swift
 import com.elyndra.launcher.ui.theme.animFadeIn
 import com.elyndra.launcher.ui.theme.animPopIn
 import com.elyndra.launcher.ui.theme.drawArcSpinner
@@ -138,12 +146,33 @@ fun ElyndraApp(vm: ElyndraViewModel) {
             ) {
                 // Las métricas reparten este alto entre hero y cards (móvil y tableta).
                 CompositionLocalProvider(LocalScreenSize provides DpSize(maxWidth, maxHeight)) {
-                    when (vm.screen) {
-                        Screen.Library -> LibraryScreen(vm)
-                        Screen.Folder -> FolderScreen(vm)
-                        Screen.Add -> AddScreen(vm)
-                        Screen.Settings -> SettingsScreen(vm)
-                        Screen.Lucy -> LucyScreen(vm)
+                    // Cambiar de pantalla se ve: la que entra llega deslizando
+                    // desde el lado al que se va, y la que sale se aparta por
+                    // el contrario. Volver a la biblioteca invierte el sentido,
+                    // así que el gesto de "entrar" y el de "volver" no se
+                    // confunden.
+                    AnimatedContent(
+                        targetState = vm.screen,
+                        transitionSpec = {
+                            val back = targetState == Screen.Library
+                            val dir = if (back) -1 else 1
+                            (
+                                slideInHorizontally(tween(300, easing = Swift)) { w -> dir * w / 7 } +
+                                    fadeIn(tween(220, easing = Swift))
+                                ).togetherWith(
+                                slideOutHorizontally(tween(300, easing = Swift)) { w -> -dir * w / 7 } +
+                                    fadeOut(tween(180, easing = Swift)),
+                            )
+                        },
+                        label = "screen",
+                    ) { screen ->
+                        when (screen) {
+                            Screen.Library -> LibraryScreen(vm)
+                            Screen.Folder -> FolderScreen(vm)
+                            Screen.Add -> AddScreen(vm)
+                            Screen.Settings -> SettingsScreen(vm)
+                            Screen.Lucy -> LucyScreen(vm)
+                        }
                     }
                 }
             }
