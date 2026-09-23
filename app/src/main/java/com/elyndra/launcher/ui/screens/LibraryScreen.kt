@@ -1,5 +1,10 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.components.DynamicBackdrop
+import com.elyndra.launcher.ui.theme.rememberPress
+import com.elyndra.launcher.ui.theme.pressScale
+import com.elyndra.launcher.ui.theme.Springs
+import com.elyndra.launcher.ui.theme.motion
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -7,7 +12,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -76,19 +82,26 @@ import com.elyndra.launcher.data.fmtMinutes
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.LibraryFilter
 import com.elyndra.launcher.ui.LibraryItem
+import com.elyndra.launcher.ui.BarItem
 import com.elyndra.launcher.ui.Screen
-import com.elyndra.launcher.ui.components.DisintegratableBox
+import com.elyndra.launcher.ui.components.DisintegratingContainer
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GameIcon
-import com.elyndra.launcher.ui.components.MaterializableBox
+import com.elyndra.launcher.ui.components.MaterializingContainer
 import com.elyndra.launcher.ui.components.Hero
-import com.elyndra.launcher.ui.components.rememberWikipediaSummary
+import com.elyndra.launcher.ui.components.rememberGameDescription
+import com.elyndra.launcher.ui.components.ConsoleIconButton
+import com.elyndra.launcher.ui.components.HeroBarHeight
+import com.elyndra.launcher.ui.components.ParticleLayer
+import com.elyndra.launcher.ui.components.rememberParticleField
 import com.elyndra.launcher.ui.components.LocalScreenSize
+import com.elyndra.launcher.ui.components.MashaInsightBubble
 import com.elyndra.launcher.ui.components.LogoImage
 import com.elyndra.launcher.ui.components.OpenButton
 import com.elyndra.launcher.ui.components.PortalExpandContainer
 import com.elyndra.launcher.ui.components.PortalSpec
 import com.elyndra.launcher.ui.components.Metrics
+import com.elyndra.launcher.ui.resolve
 import com.elyndra.launcher.ui.components.MAGNETIC_PULL_MS
 import com.elyndra.launcher.ui.components.rememberMagneticPress
 import com.elyndra.launcher.ui.components.SearchGlyph
@@ -115,16 +128,21 @@ import com.elyndra.launcher.ui.theme.selectionLift
 import com.elyndra.launcher.ui.theme.selectionScale
 import com.elyndra.launcher.ui.theme.sheenBrush
 import com.elyndra.launcher.ui.theme.sheenProgress
+import com.elyndra.launcher.ui.theme.FloatClock
+import com.elyndra.launcher.ui.theme.LocalReducedMotion
+import com.elyndra.launcher.ui.theme.consoleFocus
+import com.elyndra.launcher.ui.theme.floatPhaseOf
+import com.elyndra.launcher.ui.theme.floating
+import com.elyndra.launcher.ui.theme.rememberFloatClock
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Un juego se funde con su velo de carga, que ya está debajo. Una carpeta
- * navega al terminar, así que hasta ese momento debajo sigue estando la
- * biblioteca: ahí el portal aguanta opaco para no dejarla asomar.
+ * El portal de lanzamiento de un juego Android: la card crece y se funde con
+ * su velo de carga. Las carpetas de emulador ya no lo usan —se abren al
+ * instante, sin expansión (ver `ElyndraViewModel.requestOpen`)—.
  */
 private val GamePortal = PortalSpec()
-private val FolderPortal = PortalSpec(tailFade = 0f)
 
 @Composable
 fun LibraryScreen(vm: ElyndraViewModel) {
@@ -144,12 +162,25 @@ fun LibraryScreen(vm: ElyndraViewModel) {
     // con el mando o con "Abrir" no pasa punto y el destello sale del centro.
     var portalKey by remember { mutableStateOf<String?>(null) }
     var portalTap by remember { mutableStateOf(Offset.Zero) }
+    // Un solo reloj para la flotación de todos los logos de juego de la pantalla.
+    val floatClock = rememberFloatClock()
     Box(Modifier.fillMaxSize()) {
+        // Fondo vivo: el arte de la selección, desenfocado y teñido con su color.
+        DynamicBackdrop(
+            when (sel) {
+                is LibraryItem.App -> sel.app.meta.hero ?: sel.app.meta.screenshot ?: sel.app.meta.icon
+                is LibraryItem.Folder -> sel.heroPath ?: sel.iconPath
+                null -> null
+            },
+        )
         Column(Modifier.fillMaxSize().animAppEntrance(key = Screen.Library)) {
 
             Hero(
                 pairIndex = sel?.let { vm.pairIndexOf(it) } ?: 0,
                 heroKey = sel?.key ?: "none",
+                // Quitar el fondo lo deshace en polvo antes de borrarlo.
+                backgroundVanishing = sel?.let { vm.isVanishingArt(it.key, ArtKind.Background) } == true,
+                onBackgroundVanished = { vm.finishVanish() },
                 height = m.iconHeroH,
                 imagePath = when (sel) {
                     is LibraryItem.App -> sel.app.meta.hero ?: sel.app.meta.screenshot
@@ -169,7 +200,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         // se busca desaparece: el campo abierto necesita ese
                         // ancho y ahí nadie está lanzando nada.
                         if (!vm.searchOpen) {
-                            OpenButton(enabled = sel != null) {
+                            OpenButton(enabled = sel != null, focused = vm.input.isBarFocused(BarItem.Open)) {
                                 sel?.let {
                                     portalKey = null
                                     vm.requestOpen(it)
@@ -179,13 +210,10 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         }
                         SearchField(vm, m)
                         Spacer(Modifier.width(8.dp))
-                        Box(
-                            Modifier
-                                .size(34.dp)
-                                .darkGlass(RoundedCornerShape(12.dp))
-                                .clickable { vm.go(Screen.Settings) },
-                            contentAlignment = Alignment.Center,
-                        ) { SettingsGlyph() }
+                        ConsoleIconButton(
+                            onClick = { vm.go(Screen.Settings) },
+                            focused = vm.input.isBarFocused(BarItem.Settings),
+                        ) { glyph -> SettingsGlyph(glyph) }
                     }
                 },
                 info = {
@@ -227,11 +255,11 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         if (sel != null && logo != null) {
                             // Al quitar el logo se deshace en el sitio donde
                             // se está viendo, en vez de desaparecer de golpe.
-                            MaterializableBox(
+                            MaterializingContainer(
                                 isMaterializing = vm.isMaterializingArt(sel.key, ArtKind.Logo),
                                 onAnimationEnd = { vm.finishMaterializeArt() },
                             ) {
-                                DisintegratableBox(
+                                DisintegratingContainer(
                                     isDisintegrating = vm.isVanishingArt(sel.key, ArtKind.Logo),
                                     onAnimationEnd = { vm.finishVanish() },
                                 ) {
@@ -239,6 +267,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                                         logo,
                                         Modifier
                                             .animTitleIn(key = sel.key)
+                                            .floating(floatClock, floatPhaseOf(sel.key), amplitude = 3.dp, periodSeconds = 4.2f)
                                             .fillMaxWidth(0.72f)
                                             .height(m.logoH),
                                     )
@@ -263,7 +292,12 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        val description = rememberWikipediaSummary((sel as? LibraryItem.App)?.name)
+                        val description = rememberGameDescription(
+                            title = (sel as? LibraryItem.App)?.name,
+                            stored = (sel as? LibraryItem.App)?.app?.meta?.description,
+                            lang = vm.settings.lang,
+                            short = true,
+                        )
                         if (description != null) {
                             ElyText(
                                 description,
@@ -377,34 +411,28 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                             // quitarlo se deshace en polvo antes de salir de
                             // la lista (`finishVanish` es quien borra).
                             PortalExpandContainer(
+                                // Solo un juego Android llega a "abrirse" con
+                                // portal; una carpeta nunca activa esto.
                                 isOpening = vm.opening?.key == item.key,
-                                // Una carpeta navega al final, así que debajo
-                                // todavía está la biblioteca: el portal se
-                                // queda opaco hasta el corte en vez de dejarla
-                                // asomar. Un juego sí se funde con su velo.
-                                spec = if (item is LibraryItem.Folder) FolderPortal else GamePortal,
+                                spec = GamePortal,
                                 tapOffset = if (portalKey == item.key) portalTap else null,
                                 // Un juego Android arranca al empezar a crecer:
                                 // el lanzamiento y la animación corren a la vez.
-                                // Una carpeta navega al final, cuando el portal
-                                // ya tapa la pantalla y el cambio no se ve.
                                 onExpandStart = { if (item is LibraryItem.App) vm.open(item) },
-                                onLaunchComplete = {
-                                    if (item is LibraryItem.Folder) vm.open(item)
-                                    vm.openingFinished()
-                                },
+                                onLaunchComplete = { vm.openingFinished() },
                             ) {
-                                MaterializableBox(
+                                MaterializingContainer(
                                     isMaterializing = materializing,
                                     onAnimationEnd = { vm.finishMaterialize(item.key) },
                                 ) {
-                                    DisintegratableBox(
+                                    DisintegratingContainer(
                                         isDisintegrating = vm.vanishing == item.key,
                                         onAnimationEnd = { vm.finishVanish() },
                                     ) {
                                         LibraryTile(
                                             item = item,
                                             index = i,
+                                            floatClock = floatClock,
                                             selected = item.key == sel?.key,
                                             metrics = m,
                                             pairIndex = vm.pairIndexOf(item),
@@ -444,7 +472,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
             // lo reparten hero y cards (ver `libFree` en Metrics).
         }
 
-        LucyFab(vm, m)
+        MashaFab(vm, m)
     }
 }
 
@@ -543,12 +571,12 @@ private fun SearchField(vm: ElyndraViewModel, m: Metrics) {
     }
     val fieldWidth by animateDpAsState(
         targetValue = if (open) (if (m.landscape) 190.dp else 96.dp) else 0.dp,
-        animationSpec = tween(300, easing = Swift),
+        animationSpec = motion(Springs.enter()),
         label = "searchW",
     )
     val fieldAlpha by animateFloatAsState(
         targetValue = if (open) 1f else 0f,
-        animationSpec = tween(250),
+        animationSpec = motion(Springs.fade()),
         label = "searchA",
     )
 
@@ -576,98 +604,147 @@ private fun SearchField(vm: ElyndraViewModel, m: Metrics) {
                 },
             )
         }
-        Box(
-            Modifier
-                .size(34.dp)
-                .then(if (open) Modifier else Modifier.darkGlass(RoundedCornerShape(12.dp)))
-                .clickable { vm.toggleSearch() },
-            contentAlignment = Alignment.Center,
-        ) { SearchGlyph() }
+        ConsoleIconButton(
+            onClick = { vm.toggleSearch() },
+            focused = vm.input.isBarFocused(BarItem.Search),
+            glass = !open,
+        ) { glyph -> SearchGlyph(glyph) }
     }
 }
 
-/** Lado del botón de Lucy: flota sobre el carrusel, así que no se ata a nada. */
-private val LUCY_FAB = 58.dp
-
-/** Margen del botón de Lucy en la esquina donde nace. */
-private val LUCY_MARGIN = 16.dp
+/** Lado del botón de Masha: flota sobre el hero, así que no se ata a nada. */
+private val MASHA_FAB = 58.dp
 
 /**
- * Botón de Lucy, con el aro que late.
+ * Botón de Masha, con el aro que late.
  *
- * Flota sobre el carrusel: dentro del dock quedaba del tamaño de un icono más
- * y pasaba desapercibido. Nace abajo a la derecha, pero se puede mantener
- * pulsado —vibra y se agranda: ya está cogido— y arrastrar a cualquier punto
- * de la pantalla, y ahí se queda, también al volver a abrir la app
- * ([com.elyndra.launcher.ui.SettingsController.moveLucy]).
+ * Nace **arriba a la izquierda**, a la altura de la barra del hero, y flota
+ * con un vaivén vertical muy suave. Se arrastra directamente con el dedo a
+ * cualquier punto de la pantalla —soltando partículas fosforescentes del
+ * color elegido en Ajustes— y ahí se queda, también al volver a abrir la app
+ * ([com.elyndra.launcher.ui.SettingsController.moveMasha]).
+ *
+ * **El fallo del arrastre "pesado" que se quedaba quieto y luego saltaba**
+ * venía de cómo se guardaba la posición: el estado local se creaba con
+ * `remember(vm.settings.mashaX, …)`, así que al soltar la primera vez (y
+ * guardar la posición) se creaba un estado *nuevo*, mientras que el detector
+ * de gestos —`pointerInput(maxX, maxY)`, con llaves que no cambiaban— seguía
+ * vivo con la lambda del primer arrastre y escribía en el estado *viejo*. En
+ * el segundo arrastre el dedo movía un estado que ya no se pintaba (el botón
+ * no se movía) y al soltar se guardaba ese valor viejo (el salto). Además el
+ * arrastre pedía mantener pulsado y cada píxel recomponía la pantalla.
+ *
+ * Ahora: un único estado que nunca se recrea ([dragDp], solo durante el
+ * gesto), un detector con llave fija que lee siempre los límites actuales
+ * (`rememberUpdatedState`), arrastre directo sin espera, y posición, escala
+ * y flotación leídas en las fases de layout/capa: arrastrar no recompone.
  *
  * La posición se guarda en dp desde la esquina superior izquierda y se recorta
  * al pintar, no al guardar: así girar el móvil lo devuelve a la pantalla sin
  * perder el sitio que tenía en la otra orientación.
  */
 @Composable
-private fun LucyFab(vm: ElyndraViewModel, metrics: Metrics) {
+private fun MashaFab(vm: ElyndraViewModel, metrics: Metrics) {
     val skin = LocalSkin.current
     val screen = LocalScreenSize.current
     val haptics = LocalHapticFeedback.current
     val ring = ringProgress()
     val shape = CircleShape
 
-    val maxX = (screen.width - LUCY_FAB).value.coerceAtLeast(0f)
-    val maxY = (screen.height - LUCY_FAB).value.coerceAtLeast(0f)
-    val homeX = (maxX - metrics.pad.value).coerceAtLeast(0f)
-    val homeY = (maxY - LUCY_MARGIN.value).coerceAtLeast(0f)
+    val maxX = (screen.width - MASHA_FAB).value.coerceAtLeast(0f)
+    val maxY = (screen.height - MASHA_FAB).value.coerceAtLeast(0f)
+    // Arriba a la izquierda, centrado en la altura de la barra del hero.
+    val barTop = if (metrics.landscape) 8f else 16f
+    val homeX = metrics.pad.value.coerceAtMost(maxX)
+    val homeY = (barTop + HeroBarHeight.value / 2f - MASHA_FAB.value / 2f).coerceIn(4f, maxY.coerceAtLeast(4f))
 
-    // La Activity no se recrea al girar (configChanges), así que sin la
-    // pantalla como llave el `remember` se quedaba con el sitio calculado en
-    // la primera orientación: al girar, una posición sin mover no volvía a
-    // caer en la esquina de esa orientación. Solo importa mientras no haya
-    // sitio guardado —con uno guardado, la llave no cambia entre giros y el
-    // arrastre en curso no se resetea a medio gesto.
-    var x by remember(vm.settings.lucyX, homeX) { mutableStateOf(vm.settings.lucyX ?: homeX) }
-    var y by remember(vm.settings.lucyY, homeY) { mutableStateOf(vm.settings.lucyY ?: homeY) }
-    var dragging by remember { mutableStateOf(false) }
-    val left = x.coerceIn(0f, maxX)
-    val top = y.coerceIn(0f, maxY)
+    // Límites y posición de reposo, siempre al día para el detector de gestos
+    // (que no se reinicia al cambiar: ver el comentario de arriba).
+    val bounds by rememberUpdatedState(Offset(maxX, maxY))
+    val rest by rememberUpdatedState(Offset(vm.settings.mashaX ?: homeX, vm.settings.mashaY ?: homeY))
+    // Posición mientras se arrastra (dp); null = en reposo, manda lo guardado.
+    val dragDp = remember { mutableStateOf<Offset?>(null) }
+    val dragging = dragDp.value != null
+
+    val particles = rememberParticleField()
+    val particleColor = Color(vm.settings.mashaParticleColor)
+
     // Mientras se arrastra crece un poco y levanta más sombra: es lo que
-    // distingue "lo llevo en el dedo" de "lo he pulsado".
-    val lift by animateFloatAsState(if (dragging) 1.12f else 1f, tween(160), label = "lucyLift")
+    // distingue "lo llevo en el dedo" de "lo he pulsado". La flotación se
+    // apaga en el dedo y vuelve al soltar.
+    val lift = animateFloatAsState(if (dragging) 1.12f else 1f, motion(Springs.snappy()), label = "mashaLift")
+    val bob = animateFloatAsState(if (dragging) 0f else 1f, motion(Springs.fade()), label = "mashaBob")
+    val reduced = LocalReducedMotion.current
+    val bobClock = rememberFloatClock()
+
+    fun current(): Offset {
+        val p = dragDp.value ?: rest
+        return Offset(p.x.coerceIn(0f, bounds.x), p.y.coerceIn(0f, bounds.y))
+    }
+
+    // La estela, debajo del botón.
+    ParticleLayer(particles, particleColor, Modifier.fillMaxSize())
 
     Box(
         Modifier
-            .offset { IntOffset(left.dp.roundToPx(), top.dp.roundToPx()) }
-            .size(LUCY_FAB)
+            // Posición leída en la fase de layout: moverlo no recompone.
+            .offset {
+                val p = current()
+                IntOffset(p.x.dp.roundToPx(), p.y.dp.roundToPx())
+            }
+            .size(MASHA_FAB)
             .graphicsLayer {
-                scaleX = lift
-                scaleY = lift
+                scaleX = lift.value
+                scaleY = lift.value
+                // Vaivén vertical muy sutil y continuo (±3 dp, ~4 s).
+                if (!reduced) {
+                    translationY = kotlin.math.sin(bobClock.seconds / 4f * 2f * Math.PI.toFloat()) * 3.dp.toPx() * bob.value
+                }
             }
             .shadow(
                 if (dragging) 22.dp else 14.dp,
                 shape,
                 clip = false,
-                ambientColor = P.shade.copy(alpha = 0.3f),
-                spotColor = P.shade.copy(alpha = 0.3f),
+                ambientColor = if (dragging) particleColor else P.shade.copy(alpha = 0.3f),
+                spotColor = if (dragging) particleColor else P.shade.copy(alpha = 0.3f),
             )
             .glass(shape)
-            .clickable { vm.go(Screen.Lucy) }
-            .pointerInput(maxX, maxY) {
-                detectDragGesturesAfterLongPress(
+            .consoleFocus(vm.input.isBarFocused(BarItem.Masha), cornerRadius = MASHA_FAB / 2)
+            .clickable { vm.go(Screen.Masha) }
+            .pointerInput(Unit) {
+                detectDragGestures(
                     onDragStart = {
-                        dragging = true
+                        dragDp.value = current()
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     },
                     onDragEnd = {
-                        dragging = false
-                        vm.settings.moveLucy(x.coerceIn(0f, maxX), y.coerceIn(0f, maxY))
+                        val p = current()
+                        vm.settings.moveMasha(p.x, p.y)
+                        dragDp.value = null
                     },
                     onDragCancel = {
-                        dragging = false
-                        vm.settings.moveLucy(x.coerceIn(0f, maxX), y.coerceIn(0f, maxY))
+                        val p = current()
+                        vm.settings.moveMasha(p.x, p.y)
+                        dragDp.value = null
                     },
                     onDrag = { change, delta ->
                         change.consume()
-                        x = (x + delta.x.toDp().value).coerceIn(0f, maxX)
-                        y = (y + delta.y.toDp().value).coerceIn(0f, maxY)
+                        val from = dragDp.value ?: current()
+                        val to = Offset(
+                            (from.x + delta.x.toDp().value).coerceIn(0f, bounds.x),
+                            (from.y + delta.y.toDp().value).coerceIn(0f, bounds.y),
+                        )
+                        dragDp.value = to
+                        // Chispas alrededor del centro, más cuanto más se mueve.
+                        val half = MASHA_FAB.toPx() / 2f
+                        particles.emit(
+                            cx = to.x.dp.toPx() + half,
+                            cy = to.y.dp.toPx() + half,
+                            dx = delta.x,
+                            dy = delta.y,
+                            spread = half,
+                            density = density,
+                        )
                     },
                 )
             },
@@ -682,17 +759,45 @@ private fun LucyFab(vm: ElyndraViewModel, metrics: Metrics) {
                     scaleY = k
                     alpha = 0.5f * (1f - ring)
                 }
-                .border(1.5.dp, skin.a1, shape),
+                .border(1.5.dp, if (dragging) particleColor else skin.a1, shape),
         )
         // El logo, llenando el botón: es lo que tiene que verse.
         Image(
-            painterResource(R.drawable.lucy),
-            contentDescription = null,
+            painterResource(R.drawable.masha),
+            contentDescription = stringResource(R.string.masha),
             contentScale = ContentScale.Crop,
-            modifier = Modifier.size(LUCY_FAB * 0.86f).clip(shape),
+            modifier = Modifier.size(MASHA_FAB * 0.86f).clip(shape),
+        )
+    }
+
+    // La línea ambiental de Masha, junto a su botón. Se recoge sola al rato:
+    // está para enterarse de un vistazo, no para quedarse tapando el carrusel.
+    val insight = vm.masha.insight
+    val revision = vm.masha.insightRevision
+    var bubble by remember(insight?.id, revision) { mutableStateOf(insight != null) }
+    LaunchedEffect(insight?.id, revision) {
+        if (insight != null) {
+            delay(MASHA_BUBBLE_MS)
+            bubble = false
+        }
+    }
+    if (insight != null && bubble && !dragging) {
+        val anchor = current()
+        MashaInsightBubble(
+            text = vm.masha.insightText(insight).resolve(),
+            anchorX = anchor.x.dp,
+            anchorY = anchor.y.dp,
+            anchorSize = MASHA_FAB,
+            screen = screen,
+            onTap = { vm.masha.actOnInsight(vm.settings.lang) },
+            onDismiss = { vm.masha.dismissInsight() },
+            key = insight.id,
         )
     }
 }
+
+/** Cuánto se queda a la vista la línea de Masha antes de recogerse. */
+private const val MASHA_BUBBLE_MS = 14_000L
 
 /** Aviso sobre el carrusel cuando el filtro elegido (Consolas, Android) no tiene nada todavía. */
 private fun emptyFilterHint(filter: LibraryFilter): Int = when (filter) {
@@ -743,6 +848,8 @@ private fun AddTile(metrics: Metrics, index: Int, onClick: () -> Unit) {
 private fun LibraryTile(
     item: LibraryItem,
     index: Int,
+    /** Reloj compartido de la flotación: solo flotan los iconos de juegos. */
+    floatClock: FloatClock,
     selected: Boolean,
     metrics: Metrics,
     pairIndex: Int,
@@ -765,6 +872,8 @@ private fun LibraryTile(
     val width: Dp = metrics.iconTile
     val lift = selectionLift(selected)
     val scale = selectionScale(selected)
+    val press = rememberPress()
+    val pressed = pressScale(press)
     val shape = RoundedCornerShape(16.dp)
     val curtain = if (entrance) curtainAlpha(index * 40, key = item.key) else 0f
     // Tirón magnético: al mantener pulsado, la card se hunde y rebota antes
@@ -790,6 +899,7 @@ private fun LibraryTile(
             .alpha(if (dimmed) 0.5f else 1f)
             .pointerInput(item.key) {
                 detectTapGestures(
+                    onPress = { press.track(this) },
                     onTap = { onTap() },
                     onDoubleTap = { offset -> onOpen(offset) },
                     onLongPress = {
@@ -810,11 +920,11 @@ private fun LibraryTile(
                 .fillMaxWidth()
                 .height(metrics.iconTile)
                 .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
+                    scaleX = scale * pressed.value
+                    scaleY = scale * pressed.value
                 }
                 .shadow(
-                    if (selected) 16.dp else 8.dp,
+                    if (press.pressed) 4.dp else if (selected) 16.dp else 8.dp,
                     shape,
                     clip = false,
                     ambientColor = P.shade.copy(alpha = if (selected) 0.32f else 0.2f),
@@ -842,7 +952,16 @@ private fun LibraryTile(
             // Contenedor e icono son cuadrados: el icono lo llena entero,
             // centrado, sin dejar huecos y sin deformarse.
             if (icon != null || autoIconPackage != null) {
-                GameIcon(icon, autoIconPackage, Modifier.fillMaxSize(), ContentScale.Fit)
+                // Un juego flota; una carpeta de emulador (icono de la app
+                // del emulador, no de un juego) se queda quieta.
+                GameIcon(
+                    icon,
+                    autoIconPackage,
+                    Modifier
+                        .fillMaxSize()
+                        .then(if (item is LibraryItem.App) Modifier.floating(floatClock, floatPhaseOf(item.key)) else Modifier),
+                    ContentScale.Fit,
+                )
             } else if (item is LibraryItem.Folder) {
                 // Carpeta sin icono y sin emulador instalado: rótulo de consola.
                 Column(
