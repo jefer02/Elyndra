@@ -6,7 +6,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -29,6 +34,49 @@ import com.elyndra.launcher.ui.theme.heroEdgeScrimBrush
 import com.elyndra.launcher.ui.theme.heroScrimBrush
 import com.elyndra.launcher.ui.theme.liquidGlass
 import java.io.File
+
+/**
+ * Detecta que a *este mismo* juego le acaba de llegar una imagen.
+ *
+ * El hero cambia de imagen por dos motivos muy distintos: porque se ha
+ * seleccionado otro juego (ahí no hay novedad que celebrar) o porque al juego
+ * que ya se estaba mirando le ha entrado arte —del motor de metadatos, de una
+ * descarga automática o de una asignación a mano—. Solo el segundo caso monta
+ * partículas, y por eso se compara contra [owner]: si el dueño cambia, la
+ * ruta anterior se olvida sin animar nada.
+ */
+@Composable
+fun rememberArtArrival(path: String?, owner: Any): ArtArrival {
+    val arrival = remember { ArtArrival() }
+    LaunchedEffect(owner, path) {
+        arrival.onChanged(owner, path)
+    }
+    return arrival
+}
+
+/** Estado de [rememberArtArrival]: si toca montar y cómo cerrarlo. */
+@Stable
+class ArtArrival {
+    private var owner: Any? = null
+    private var path: String? = null
+
+    /** Cierto mientras haya que montar la imagen recién llegada. */
+    var active by mutableStateOf(false)
+        private set
+
+    internal fun onChanged(newOwner: Any, newPath: String?) {
+        // Mismo juego y antes no había imagen: ha llegado ahora. Todo lo
+        // demás —cambio de juego, primera composición, imagen que se va— solo
+        // actualiza la referencia.
+        active = owner == newOwner && path == null && newPath != null
+        owner = newOwner
+        path = newPath
+    }
+
+    fun done() {
+        active = false
+    }
+}
 
 /* ─────────────────────────────────────────────────────────────
      Escalan igual en móvil y en tableta:
@@ -178,6 +226,9 @@ fun Hero(
     modifier: Modifier = Modifier,
     height: Dp,
     imagePath: String? = null,
+    /** El fondo se está quitando: se deshace en polvo antes de irse. */
+    backgroundVanishing: Boolean = false,
+    onBackgroundVanished: () -> Unit = {},
     topBar: @Composable BoxScope.() -> Unit,
     info: @Composable BoxScope.() -> Unit,
 ) {
@@ -191,14 +242,32 @@ fun Hero(
     ) {
         if (imagePath != null) {
             val file = remember(imagePath) { File(context.filesDir, imagePath) }
-            AsyncImage(
-                model = file,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .animHeroIn(key = heroKey),
-            )
+            // Un fondo que *acaba de llegar* —lo ha bajado el motor de
+            // metadatos, o lo acaba de poner el usuario— se monta desde el
+            // polvo. Uno que solo cambia porque se ha seleccionado otro juego
+            // no: ahí el fondo no es una novedad, es otro juego (ver
+            // [rememberArtArrival]).
+            val arriving = rememberArtArrival(imagePath, heroKey)
+            MaterializingContainer(
+                isMaterializing = arriving.active,
+                onAnimationEnd = arriving::done,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                DisintegratingContainer(
+                    isDisintegrating = backgroundVanishing,
+                    onAnimationEnd = onBackgroundVanished,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    AsyncImage(
+                        model = file,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .animHeroIn(key = heroKey),
+                    )
+                }
+            }
             Box(Modifier.fillMaxSize().drawBehind { drawRect(heroEdgeScrimBrush(skin.scrim, size)) })
         } else {
             // Sin animar: el cristal es material de la pantalla, no del juego,
