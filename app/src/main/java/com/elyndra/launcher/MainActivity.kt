@@ -2,7 +2,9 @@ package com.elyndra.launcher
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
@@ -24,7 +26,10 @@ import com.elyndra.launcher.input.Gamepad
 import com.elyndra.launcher.input.StickRepeater
 import com.elyndra.launcher.ui.ElyndraApp
 import com.elyndra.launcher.ui.ElyndraViewModel
+import com.elyndra.launcher.ui.Screen
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val vm: ElyndraViewModel by viewModels()
@@ -74,6 +79,23 @@ class MainActivity : ComponentActivity() {
         )
 
         setContent { ElyndraApp(vm) }
+
+        // Llegando desde el widget o un aviso de Masha (y no al recrearse por un giro).
+        if (savedInstanceState == null) handleShortcut(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleShortcut(intent)
+    }
+
+    /** Lo que piden el widget y los avisos: lanzar un juego, abrir su ficha o hablar con Masha. */
+    private fun handleShortcut(intent: Intent?) {
+        when (intent?.action) {
+            ACTION_LAUNCH_GAME -> intent.getStringExtra(EXTRA_GAME_KEY)?.let { vm.launchFromShortcut(it) }
+            ACTION_SHOW_GAME -> intent.getStringExtra(EXTRA_GAME_KEY)?.let { vm.showFromShortcut(it) }
+            ACTION_OPEN_MASHA -> vm.go(Screen.Masha)
+        }
     }
 
     /**
@@ -114,7 +136,7 @@ class MainActivity : ComponentActivity() {
      * Primero lo intenta Elyndra ([ElyndraViewModel.input]), que sabe qué capa
      * está arriba. Lo que no consuma se reenvía traducido a la tecla
      * equivalente del sistema, para que el foco de Compose mueva por las
-     * pantallas de formulario: así Ajustes, Añadir y Lucy se manejan con el
+     * pantallas de formulario: así Ajustes, Añadir y Masha se manejan con el
      * mando sin navegación propia.
      */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -160,5 +182,27 @@ class MainActivity : ComponentActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) hideSystemBars()
+    }
+
+    companion object {
+        const val ACTION_LAUNCH_GAME = "com.elyndra.launcher.LAUNCH_GAME"
+        const val ACTION_SHOW_GAME = "com.elyndra.launcher.SHOW_GAME"
+        const val ACTION_OPEN_MASHA = "com.elyndra.launcher.OPEN_MASHA"
+        const val EXTRA_GAME_KEY = "gameKey"
+
+        private fun base(context: Context, action: String) = Intent(context, MainActivity::class.java)
+            .setAction(action)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+
+        fun launchGameIntent(context: Context, gameKey: String): Intent =
+            base(context, ACTION_LAUNCH_GAME).putExtra(EXTRA_GAME_KEY, gameKey)
+                // Cada juego con su propio intent: si no, el sistema reutilizaría el primero para todos.
+                .setData(Uri.parse("elyndra://game/" + Uri.encode(gameKey)))
+
+        fun showGameIntent(context: Context, gameKey: String): Intent =
+            base(context, ACTION_SHOW_GAME).putExtra(EXTRA_GAME_KEY, gameKey)
+                .setData(Uri.parse("elyndra://details/" + Uri.encode(gameKey)))
+
+        fun openMashaIntent(context: Context): Intent = base(context, ACTION_OPEN_MASHA)
     }
 }
