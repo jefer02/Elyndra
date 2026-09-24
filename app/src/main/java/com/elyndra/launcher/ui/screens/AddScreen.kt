@@ -10,6 +10,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -246,215 +247,225 @@ private fun RomsTab(vm: ElyndraViewModel, landscape: Boolean) {
     val emuInstalled = vm.isEmulatorInstalled(emuId)
     val scan = add.scan
 
-    val panels = buildList<@Composable () -> Unit> {
-        add {
-            GlassPanel(Modifier.padding(top = 10.dp)) {
-                StepLabel(stringResource(R.string.step_folder))
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    ElyText(
-                        add.folder?.displayPath ?: stringResource(R.string.no_folder),
-                        modifier = Modifier.weight(1f),
-                        size = 11f,
-                        color = if (add.folder != null) P.ink else P.ink2,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    GhostButton(stringResource(R.string.browse), { picker.launch(null) })
-                }
-                val detected = add.folder?.detected.orEmpty()
-                if (detected.isNotEmpty()) {
-                    Spacer(Modifier.height(10.dp))
-                    ElyText(
-                        pluralStringResource(R.plurals.detected_systems, detected.size, detected.size),
-                        size = 10.5f,
-                        weight = FontWeight.SemiBold,
-                        color = P.ink,
-                    )
-                    Spacer(Modifier.height(3.dp))
-                    ElyText(
-                        detected.joinToString(" · ") { it.system.short },
-                        size = 9.5f,
-                        color = P.ink2,
-                        lineHeightRatio = 1.4f,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    val bulk = add.bulkProgress
-                    if (bulk != null) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            ArcSpinner(size = 16.dp)
-                            Spacer(Modifier.width(8.dp))
-                            ElyText(bulk.resolve(), size = 10f, color = P.ink2, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    } else {
-                        GhostButton(stringResource(R.string.add_all_detected), add::addAllDetected)
-                    }
-                }
+    val folderPanel: @Composable (Modifier) -> Unit = { modifier ->
+        GlassPanel(modifier.padding(top = 10.dp)) {
+            StepLabel(stringResource(R.string.step_folder))
+            Row(
+                Modifier.fillMaxWidth().padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ElyText(
+                    add.folder?.displayPath ?: stringResource(R.string.no_folder),
+                    modifier = Modifier.weight(1f),
+                    size = 11f,
+                    color = if (add.folder != null) P.ink else P.ink2,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.width(10.dp))
+                GhostButton(stringResource(R.string.browse), { picker.launch(null) })
             }
-        }
-        add {
-            GlassPanel(Modifier.padding(top = 10.dp)) {
-                StepLabel(stringResource(R.string.step_system))
-                Spacer(Modifier.height(9.dp))
-                WrapRow(gap = 7.dp) {
-                    Systems.ALL.forEach { s ->
-                        Pill(s.short, add.systemId == s.id, { add.setSystem(s.id) }, fontSize = 10.5f, horizontalPadding = 11.dp)
+            val detected = add.folder?.detected.orEmpty()
+            if (detected.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                ElyText(
+                    pluralStringResource(R.plurals.detected_systems, detected.size, detected.size),
+                    size = 10.5f,
+                    weight = FontWeight.SemiBold,
+                    color = P.ink,
+                )
+                Spacer(Modifier.height(3.dp))
+                ElyText(
+                    detected.joinToString(" · ") { it.system.short },
+                    size = 9.5f,
+                    color = P.ink2,
+                    lineHeightRatio = 1.4f,
+                )
+                Spacer(Modifier.height(8.dp))
+                val bulk = add.bulkProgress
+                if (bulk != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ArcSpinner(size = 16.dp)
+                        Spacer(Modifier.width(8.dp))
+                        ElyText(bulk.resolve(), size = 10f, color = P.ink2, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                }
-                // El PC se da de alta distinto y conviene decirlo aquí: lo que
-                // se elige no es una carpeta de ROMs, es la raíz que tiene
-                // dentro una carpeta por juego.
-                if (system?.folderGames == true) {
-                    Spacer(Modifier.height(10.dp))
-                    ElyText(
-                        stringResource(R.string.folder_games_hint),
-                        size = 10f,
-                        color = P.ink2,
-                        lineHeightRatio = 1.5f,
-                    )
-                }
-            }
-        }
-        add {
-            GlassPanel(Modifier.padding(top = 10.dp)) {
-                StepLabel(stringResource(R.string.step_emulator))
-                Spacer(Modifier.height(9.dp))
-                if (system == null) {
-                    ElyText(stringResource(R.string.choose_system_first), size = 10.5f, color = P.ink2)
                 } else {
-                    WrapRow(gap = 7.dp) {
-                        vm.emulatorOptions(system.id).forEach { opt ->
-                            Pill(
-                                opt.name,
-                                emuId == opt.id,
-                                { add.setEmulator(opt.id) },
-                                modifier = Modifier.alpha(if (opt.installed) 1f else 0.5f),
-                                fontSize = 10.5f,
-                                horizontalPadding = 11.dp,
-                            )
-                        }
-                        Pill(
-                            stringResource(R.string.other_app),
-                            emuId?.startsWith(Emulators.CUSTOM_PREFIX) == true,
-                            add::chooseOtherApp,
-                            fontSize = 10.5f,
-                            horizontalPadding = 11.dp,
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    ElyText(stringResource(R.string.emulator_legend), size = 9f, color = P.ink2.copy(alpha = 0.8f))
-                    Spacer(Modifier.height(8.dp))
-                    if (emuName != null) {
-                        // Un runtime de Windows no recibe el .exe: o se le da el
-                        // acceso directo que exporta, o ni eso y solo se abre.
-                        // Mejor decirlo antes de añadir la carpeta que dejar que
-                        // parezca que Elyndra falla.
-                        val launchOnly = Emulators.byId(emuId)?.launchOnly == true
-                        ElyText(
-                            when {
-                                launchOnly -> stringResource(R.string.pc_runtime_explainer, emuName)
-                                system.folderGames -> stringResource(R.string.pc_shortcut_explainer, emuName)
-                                else -> stringResource(R.string.emulator_explainer, emuName)
-                            },
-                            size = 10.5f,
-                            color = P.ink2,
-                            lineHeightRatio = 1.5f,
-                        )
-                        if (!emuInstalled) {
-                            Spacer(Modifier.height(8.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                ElyText(
-                                    stringResource(R.string.emulator_not_installed, emuName),
-                                    size = 10f,
-                                    weight = FontWeight.SemiBold,
-                                    color = P.red,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                Emulators.byId(emuId)?.let { profile ->
-                                    Spacer(Modifier.width(8.dp))
-                                    GhostButton(stringResource(R.string.install), { vm.openExternal(vm.app.launcher.storeIntent(profile)) })
-                                }
-                            }
-                        }
-                    }
+                    GhostButton(stringResource(R.string.add_all_detected), add::addAllDetected)
                 }
             }
         }
-        if (scan !is ScanState.Idle) {
-            add {
-                GlassPanel(Modifier.padding(top = 10.dp)) {
-                    when (scan) {
-                        is ScanState.Scanning -> {
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                ElyText(stringResource(R.string.reading_folder), size = 11.5f, weight = FontWeight.SemiBold, color = P.ink)
-                                Spacer(Modifier.weight(1f))
-                                ElyText(
-                                    pluralStringResource(R.plurals.scan_progress, scan.found, scan.found, scan.scanned),
-                                    size = 10f,
-                                    weight = FontWeight.SemiBold,
-                                    color = skin.a2,
-                                )
-                            }
-                            Spacer(Modifier.height(9.dp))
-                            IndeterminateBar()
-                            Spacer(Modifier.height(8.dp))
-                            ElyText(scan.current, size = 9f, color = P.ink2, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                        is ScanState.Done -> {
-                            ElyText(stringResource(R.string.analysis_done), size = 11.5f, weight = FontWeight.SemiBold, color = P.ink)
-                            Spacer(Modifier.height(6.dp))
-                            ElyText(
-                                if (scan.found.isNotEmpty()) {
-                                    pluralStringResource(R.plurals.scan_found, scan.found.size, scan.found.size, system?.name ?: "")
-                                } else if (system?.folderGames == true) {
-                                    stringResource(R.string.scan_none_folder_games)
-                                } else {
-                                    stringResource(
-                                        R.string.scan_none,
-                                        system?.name ?: "",
-                                        system?.extensions?.sorted()?.joinToString(", ") { ".$it" } ?: "",
-                                    )
-                                },
-                                size = 10.5f,
-                                color = P.ink2,
-                                lineHeightRatio = 1.5f,
-                            )
-                        }
-                        is ScanState.Failed -> ElyText(scan.message.resolve(), size = 10.5f, color = P.red, lineHeightRatio = 1.5f)
-                        ScanState.Idle -> Unit
-                    }
+    }
+    val systemPanel: @Composable (Modifier) -> Unit = { modifier ->
+        GlassPanel(modifier.padding(top = 10.dp)) {
+            StepLabel(stringResource(R.string.step_system))
+            Spacer(Modifier.height(9.dp))
+            WrapRow(gap = 7.dp) {
+                Systems.ALL.forEach { s ->
+                    Pill(s.short, add.systemId == s.id, { add.setSystem(s.id) }, fontSize = 10.5f, horizontalPadding = 11.dp)
                 }
             }
-        }
-        add {
-            Box(Modifier.padding(top = 14.dp)) {
-                val label = when {
-                    add.folder == null -> stringResource(R.string.no_folder_cta)
-                    system == null -> stringResource(R.string.choose_system_first)
-                    scan is ScanState.Scanning -> stringResource(R.string.scanning_cta)
-                    scan is ScanState.Done && scan.found.isNotEmpty() -> stringResource(R.string.add_folder_to_library)
-                    scan is ScanState.Done -> stringResource(R.string.scan_again)
-                    else -> stringResource(R.string.analyze_folder)
-                }
-                CtaButton(
-                    label = label,
-                    onClick = add::primaryAction,
-                    enabled = add.folder != null && system != null && scan !is ScanState.Scanning && add.bulkProgress == null,
+            // El PC se da de alta distinto y conviene decirlo aquí: lo que
+            // se elige no es una carpeta de ROMs, es la raíz que tiene
+            // dentro una carpeta por juego.
+            if (system?.folderGames == true) {
+                Spacer(Modifier.height(10.dp))
+                ElyText(
+                    stringResource(R.string.folder_games_hint),
+                    size = 10f,
+                    color = P.ink2,
+                    lineHeightRatio = 1.5f,
                 )
             }
         }
     }
+    val emulatorPanel: @Composable (Modifier) -> Unit = { modifier ->
+        GlassPanel(modifier.padding(top = 10.dp)) {
+            StepLabel(stringResource(R.string.step_emulator))
+            Spacer(Modifier.height(9.dp))
+            if (system == null) {
+                ElyText(stringResource(R.string.choose_system_first), size = 10.5f, color = P.ink2)
+            } else {
+                WrapRow(gap = 7.dp) {
+                    vm.emulatorOptions(system.id).forEach { opt ->
+                        Pill(
+                            opt.name,
+                            emuId == opt.id,
+                            { add.setEmulator(opt.id) },
+                            modifier = Modifier.alpha(if (opt.installed) 1f else 0.5f),
+                            fontSize = 10.5f,
+                            horizontalPadding = 11.dp,
+                        )
+                    }
+                    Pill(
+                        stringResource(R.string.other_app),
+                        emuId?.startsWith(Emulators.CUSTOM_PREFIX) == true,
+                        add::chooseOtherApp,
+                        fontSize = 10.5f,
+                        horizontalPadding = 11.dp,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                ElyText(stringResource(R.string.emulator_legend), size = 9f, color = P.ink2.copy(alpha = 0.8f))
+                Spacer(Modifier.height(8.dp))
+                if (emuName != null) {
+                    // Un runtime de Windows no recibe el .exe: o se le da el
+                    // acceso directo que exporta, o ni eso y solo se abre.
+                    // Mejor decirlo antes de añadir la carpeta que dejar que
+                    // parezca que Elyndra falla.
+                    val launchOnly = Emulators.byId(emuId)?.launchOnly == true
+                    ElyText(
+                        when {
+                            launchOnly -> stringResource(R.string.pc_runtime_explainer, emuName)
+                            system.folderGames -> stringResource(R.string.pc_shortcut_explainer, emuName)
+                            else -> stringResource(R.string.emulator_explainer, emuName)
+                        },
+                        size = 10.5f,
+                        color = P.ink2,
+                        lineHeightRatio = 1.5f,
+                    )
+                    if (!emuInstalled) {
+                        Spacer(Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            ElyText(
+                                stringResource(R.string.emulator_not_installed, emuName),
+                                size = 10f,
+                                weight = FontWeight.SemiBold,
+                                color = P.red,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Emulators.byId(emuId)?.let { profile ->
+                                Spacer(Modifier.width(8.dp))
+                                GhostButton(stringResource(R.string.install), { vm.openExternal(vm.app.launcher.storeIntent(profile)) })
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    val scanPanel: @Composable () -> Unit = {
+        GlassPanel(Modifier.padding(top = 10.dp)) {
+            when (scan) {
+                is ScanState.Scanning -> {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        ElyText(stringResource(R.string.reading_folder), size = 11.5f, weight = FontWeight.SemiBold, color = P.ink)
+                        Spacer(Modifier.weight(1f))
+                        ElyText(
+                            pluralStringResource(R.plurals.scan_progress, scan.found, scan.found, scan.scanned),
+                            size = 10f,
+                            weight = FontWeight.SemiBold,
+                            color = skin.a2,
+                        )
+                    }
+                    Spacer(Modifier.height(9.dp))
+                    IndeterminateBar()
+                    Spacer(Modifier.height(8.dp))
+                    ElyText(scan.current, size = 9f, color = P.ink2, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                is ScanState.Done -> {
+                    ElyText(stringResource(R.string.analysis_done), size = 11.5f, weight = FontWeight.SemiBold, color = P.ink)
+                    Spacer(Modifier.height(6.dp))
+                    ElyText(
+                        if (scan.found.isNotEmpty()) {
+                            pluralStringResource(R.plurals.scan_found, scan.found.size, scan.found.size, system?.name ?: "")
+                        } else if (system?.folderGames == true) {
+                            stringResource(R.string.scan_none_folder_games)
+                        } else {
+                            stringResource(
+                                R.string.scan_none,
+                                system?.name ?: "",
+                                system?.extensions?.sorted()?.joinToString(", ") { ".$it" } ?: "",
+                            )
+                        },
+                        size = 10.5f,
+                        color = P.ink2,
+                        lineHeightRatio = 1.5f,
+                    )
+                }
+                is ScanState.Failed -> ElyText(scan.message.resolve(), size = 10.5f, color = P.red, lineHeightRatio = 1.5f)
+                ScanState.Idle -> Unit
+            }
+        }
+    }
+    val cta: @Composable () -> Unit = {
+        Box(Modifier.padding(top = 14.dp)) {
+            val label = when {
+                add.folder == null -> stringResource(R.string.no_folder_cta)
+                system == null -> stringResource(R.string.choose_system_first)
+                scan is ScanState.Scanning -> stringResource(R.string.scanning_cta)
+                scan is ScanState.Done && scan.found.isNotEmpty() -> stringResource(R.string.add_folder_to_library)
+                scan is ScanState.Done -> stringResource(R.string.scan_again)
+                else -> stringResource(R.string.analyze_folder)
+            }
+            CtaButton(
+                label = label,
+                onClick = add::primaryAction,
+                enabled = add.folder != null && system != null && scan !is ScanState.Scanning && add.bulkProgress == null,
+            )
+        }
+    }
 
     Column(Modifier.fillMaxWidth().padding(top = 6.dp).animFadeUp(key = AddTab.Roms)) {
-        CssGrid(
-            columns = if (landscape) 2 else 1,
-            horizontalGap = 14.dp,
-            verticalGap = 0.dp,
-            items = panels,
-        )
+        if (landscape) {
+            Row(
+                Modifier.fillMaxWidth().height(IntrinsicSize.Max),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    folderPanel(Modifier)
+                    emulatorPanel(Modifier.weight(1f))
+                }
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    systemPanel(Modifier.weight(1f))
+                }
+            }
+        } else {
+            folderPanel(Modifier)
+            systemPanel(Modifier)
+            emulatorPanel(Modifier)
+        }
+        if (scan !is ScanState.Idle) scanPanel()
+        cta()
     }
 }
 
