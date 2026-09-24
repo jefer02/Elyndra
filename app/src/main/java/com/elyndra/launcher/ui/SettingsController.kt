@@ -4,6 +4,8 @@ import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewModelScope
 import com.elyndra.launcher.R
@@ -42,9 +44,9 @@ class SettingsController(private val vm: ElyndraViewModel) {
 
     var accentId by mutableStateOf(store.accentId); private set
     var tintId by mutableStateOf(store.tintId); private set
-    var blur by mutableStateOf(store.blur); private set
-    var alphaPct by mutableStateOf(store.alphaPct); private set
-    var scrimPct by mutableStateOf(store.scrimPct); private set
+    var blur by mutableIntStateOf(store.blur); private set
+    var alphaPct by mutableIntStateOf(store.alphaPct); private set
+    var scrimPct by mutableIntStateOf(store.scrimPct); private set
     var autoMeta by mutableStateOf(store.autoMeta); private set
     var lang by mutableStateOf(AppLocale.current(vm.app)); private set
 
@@ -69,7 +71,7 @@ class SettingsController(private val vm: ElyndraViewModel) {
     var backgroundEnabled by mutableStateOf(store.backgroundEnabled); private set
     var backgroundUri by mutableStateOf(store.backgroundUri); private set
     var backgroundIsVideo by mutableStateOf(store.backgroundIsVideo); private set
-    var backgroundOpacity by mutableStateOf(store.backgroundOpacity); private set
+    var backgroundOpacity by mutableIntStateOf(store.backgroundOpacity); private set
 
     fun toggleBackground() {
         backgroundEnabled = !backgroundEnabled
@@ -136,7 +138,7 @@ class SettingsController(private val vm: ElyndraViewModel) {
     }
 
     /** Color (ARGB) de la estela de partículas de Masha al arrastrarla. */
-    var mashaParticleColor by mutableStateOf(store.mashaParticleColor); private set
+    var mashaParticleColor by mutableIntStateOf(store.mashaParticleColor); private set
 
     fun updateMashaParticleColor(argb: Int) {
         mashaParticleColor = argb
@@ -149,7 +151,7 @@ class SettingsController(private val vm: ElyndraViewModel) {
     val supportsHighRefresh: Boolean = FrameRate.supportsHigh(vm.app)
 
     /** Lo guardado: 120, 60 o [FrameRate.AUTO]. */
-    private var storedFrameRate by mutableStateOf(store.frameRate)
+    private var storedFrameRate by mutableIntStateOf(store.frameRate)
 
     /** Los fps que se piden de verdad a la pantalla; la Activity los aplica al cambiar. */
     val frameRate: Int get() = FrameRate.effective(storedFrameRate, supportsHighRefresh)
@@ -439,7 +441,7 @@ class SettingsController(private val vm: ElyndraViewModel) {
     /* ── biblioteca ───────────────────────────────────────────── */
 
     var rescanning by mutableStateOf(false); private set
-    var mediaBytes by mutableStateOf(-1L); private set
+    var mediaBytes by mutableLongStateOf(-1L); private set
 
     fun onOpen() {
         refreshUsageAccess()
