@@ -364,43 +364,28 @@ class ElyndraViewModel @Inject constructor(
         searchOpen = !searchOpen
     }
 
-    /* ── abrir con portal ─────────────────────────────────────── */
+    /* ── abrir ────────────────────────────────────────────────── */
 
     /**
-     * Lo que se está abriendo ahora mismo, mientras dura la expansión.
-     *
-     * La card que coincide crece hasta llenar la pantalla (ver
-     * `PortalExpandContainer`) y es ella la que llama a [open] —al empezar a
-     * crecer si es un juego Android, para que el lanzamiento y la animación
-     * corran a la vez; al terminar si es una carpeta, para que la pantalla
-     * nueva aparezca ya tapada—.
+     * Juego Android que se está lanzando. Mientras no es null la pantalla sale
+     * con la misma transición que al abrir una carpeta (ver `ElyndraApp`), y
+     * el lanzamiento corre a la vez. Se vuelve a null al rato o si falla, y la
+     * pantalla regresa sola.
      */
     var opening by mutableStateOf<LibraryItem?>(null); private set
 
     fun requestOpen(item: LibraryItem) {
         if (opening != null) return
-        // Las carpetas de emulador se abren al instante, sin la expansión del
-        // icono: el portal queda solo para lanzar juegos Android.
         if (item is LibraryItem.Folder) {
             open(item)
             return
         }
         opening = item
+        open(item)
         viewModelScope.launch {
-            // Red de seguridad: si la card deja de pintarse a media animación
-            // —al cambiar de pantalla, por ejemplo— nadie avisaría de que
-            // terminó, y sin esto no se podría volver a abrir nada.
             delay(OPENING_TIMEOUT_MS)
-            if (opening === item) {
-                opening = null
-                open(item)
-            }
+            if (opening === item) opening = null
         }
-    }
-
-    /** La llama la card cuando el portal ya llena la pantalla. */
-    fun openingFinished() {
-        opening = null
     }
 
     fun open(item: LibraryItem) {
@@ -425,6 +410,7 @@ class ElyndraViewModel @Inject constructor(
             when (outcome) {
                 GameLauncher.Outcome.Started -> startSession(entry.key, null, entry.packageName)
                 else -> {
+                    opening = null
                     showDialog(
                         DialogSpec(
                             title = UiText.res(R.string.dialog_app_missing_title),
@@ -1579,7 +1565,7 @@ class ElyndraViewModel @Inject constructor(
          */
         private const val VANISH_TIMEOUT_MS = 1_200L
 
-        /** Margen máximo del portal antes de abrir sin animación. */
+        /** Lo que dura la pantalla fuera tras lanzar un juego, antes de volver sola. */
         private const val OPENING_TIMEOUT_MS = 1_100L
 
         /**
