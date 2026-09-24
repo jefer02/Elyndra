@@ -26,8 +26,6 @@
     <string name="empty_library_hint">Androidゲームまたは ROM フォルダーを追加</string>
     <string name="hint_gestures">タップで選択 · ダブルタップで起動 · 長押しでオプション</string>
     <string name="no_results">検索に一致する項目はありません</string>
-    <string name="empty_filter_android">まだAndroidゲームがありません</string>
-    <string name="empty_filter_consoles">まだコンソールが追加されていません</string>
     <string name="add_long">ゲームや ROM を追加</string>
     <string name="open">開く</string>
     <plurals name="items_count">
@@ -336,7 +334,6 @@
 
     <!-- Masha -->
     <string name="masha">Masha</string>
-    <string name="masha_online">オンライン · DeepSeek</string>
     <string name="masha_offline_mode">オフライン · ローカル応答</string>
     <string name="masha_placeholder">Masha に質問、または指示…</string>
     <string name="masha_greeting">Masha です。あなたのライブラリ、遊び方、端末の余力まで把握しています。何でも聞いてください。時間だけ教えてくれても大丈夫です。</string>
