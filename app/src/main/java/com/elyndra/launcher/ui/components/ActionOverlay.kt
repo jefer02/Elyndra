@@ -6,7 +6,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -58,7 +57,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.ActionSheetSpec
@@ -67,7 +65,6 @@ import com.elyndra.launcher.ui.SheetAction
 import com.elyndra.launcher.ui.SheetThumb
 import com.elyndra.launcher.ui.resolve
 import com.elyndra.launcher.ui.theme.LocalSkin
-import com.elyndra.launcher.ui.theme.Swift
 import com.elyndra.launcher.ui.theme.accentGradient
 
 /* ─────────────────────────────────────────────────────────────
@@ -205,7 +202,7 @@ private fun ActionOverlayPanel(
     val rowStarts = groups.runningFold(0) { acc, group -> acc + group.actions.size }
     val listState = rememberLazyListState()
     LaunchedEffect(focus) {
-        if (focus < 0) return@LaunchedEffect
+        if (focus < 0 || groups.isEmpty()) return@LaunchedEffect
         val group = rowStarts.indexOfLast { it <= focus }.coerceIn(0, groups.lastIndex)
         runCatching { listState.animateScrollToItem(group) }
     }
