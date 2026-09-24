@@ -79,7 +79,6 @@ import com.elyndra.launcher.ui.theme.animRiseSheet
 import com.elyndra.launcher.ui.theme.auraAngle
 import com.elyndra.launcher.ui.theme.barPlayScale
 import com.elyndra.launcher.ui.theme.glass
-import com.elyndra.launcher.ui.theme.livePulseScale
 import com.elyndra.launcher.ui.theme.ringProgress
 import kotlin.math.abs
 
@@ -151,32 +150,6 @@ fun MashaScreen(vm: ElyndraViewModel) {
                 Spacer(Modifier.width(11.dp))
                 Column(Modifier.weight(1f)) {
                     ElyText("Masha", size = 19f, weight = FontWeight.Bold, color = P.ink, letterSpacing = tracking(-0.01f))
-                    Spacer(Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val pulse = livePulseScale()
-                        Box(
-                            Modifier
-                                .size(6.dp)
-                                .graphicsLayer {
-                                    scaleX = pulse
-                                    scaleY = pulse
-                                    alpha = 1f - (pulse - 1f) * 1.3f
-                                }
-                                .clip(CircleShape)
-                                .background(if (masha.online) P.green else skin.a2),
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        ElyText(
-                            stringResource(if (masha.online) R.string.masha_online else R.string.masha_offline_mode),
-                            size = 9f,
-                            weight = FontWeight.SemiBold,
-                            color = skin.a2,
-                            letterSpacing = tracking(0.14f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            uppercase = true,
-                        )
-                    }
                 }
                 Spacer(Modifier.width(8.dp))
                 Equalizer(active = masha.busy)
