@@ -31,9 +31,7 @@ import com.elyndra.launcher.metadata.ArtKind
 import com.elyndra.launcher.metadata.ArtSources
 import com.elyndra.launcher.metadata.MetadataPriorityStore
 import com.elyndra.launcher.metadata.Service
-import com.elyndra.launcher.domain.device.DeviceWarning
 import com.elyndra.launcher.domain.launch.LaunchDecision
-import com.elyndra.launcher.domain.launch.LaunchNote
 import com.elyndra.launcher.domain.profile.LaunchOutcome
 import com.elyndra.launcher.launch.EmulatorInventory
 import com.elyndra.launcher.launch.LaunchOrchestrator
@@ -169,9 +167,33 @@ class ElyndraViewModel @Inject constructor(
         return Derived(lib, inst, folders, roms).also { derivedCache = it }
     }
 
-    /** Carpetas y apps mezcladas por nombre, con filtro y búsqueda (también dentro de las carpetas). */
+    private class ItemsKey(
+        val derived: Derived,
+        val apps: List<AppEntry>,
+        val sort: SortMode,
+        val filter: LibraryFilter,
+        val query: String,
+    ) {
+        fun sameAs(o: ItemsKey) =
+            derived === o.derived && apps === o.apps && sort == o.sort && filter == o.filter && query == o.query
+    }
+
+    private var itemsCache: Pair<ItemsKey, List<LibraryItem>>? = null
+
+    /**
+     * Carpetas y apps mezcladas por nombre, con filtro y búsqueda (también dentro de las carpetas).
+     *
+     * Se llama varias veces por recomposición; con las mismas entradas devuelve
+     * la misma lista (y los mismos elementos), así las cards pueden saltarse la
+     * recomposición. Las entradas se leen siempre, para que Compose las siga.
+     */
     fun items(): List<LibraryItem> {
-        val d = derived()
+        val key = ItemsKey(derived(), library.apps, settings.sortMode, filter, query)
+        itemsCache?.let { (k, list) -> if (k.sameAs(key)) return list }
+        return buildItems(key.derived).also { itemsCache = key to it }
+    }
+
+    private fun buildItems(d: Derived): List<LibraryItem> {
         val q = query.trim().lowercase()
         var list: List<LibraryItem> = d.folders + library.apps.map {
             LibraryItem.App(it, installedPackages.isEmpty() || it.packageName in installedPackages)
@@ -1255,9 +1277,6 @@ class ElyndraViewModel @Inject constructor(
         return false
     }
 
-    /** ¿Hay ya una imagen de esta clase puesta? */
-    fun hasArt(key: String, kind: ArtKind): Boolean = art.has(key, kind)
-
     /* ── acciones que puede ejecutar Masha ────────────────── */
 
     /** Lanza cualquier elemento de la biblioteca por su clave. */
@@ -1334,11 +1353,6 @@ class ElyndraViewModel @Inject constructor(
         val request = mediaRequest ?: return
         mediaRequest = null
         request.onPicked(uri)
-    }
-
-    /** Se cerró el selector sin elegir nada. */
-    fun cancelMediaRequest() {
-        mediaRequest = null
     }
 
     /**
@@ -1532,8 +1546,8 @@ class ElyndraViewModel @Inject constructor(
      * El menú de la app, para quien juega con mando.
      *
      * Con el dedo, buscar, ordenar, añadir, Ajustes y Masha están repartidos
-     * por la pantalla —cabecera, dock, botón flotante—. Con mando no hay
-     * puntero que los alcance, así que Start los junta aquí en una sola hoja.
+     * por la pantalla —cabecera, carrusel, botón flotante—. Con mando no hay
+     * puntero que los alcance, así que L3/R3 los junta aquí en una sola hoja.
      */
     fun mainMenu() {
         showSheet(ActionSheetSpec(UiText.res(R.string.menu_title), null, input.mainMenuActions()))
@@ -1551,7 +1565,9 @@ class ElyndraViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        viewModelScope.launch { repo.flush() }
+        // `viewModelScope` ya está cancelado cuando se llama a onCleared: el
+        // guardado pendiente va en el ámbito de la aplicación.
+        app.scope.launch { repo.flush() }
         super.onCleared()
     }
 
