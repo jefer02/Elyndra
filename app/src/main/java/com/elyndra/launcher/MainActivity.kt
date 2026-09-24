@@ -1,6 +1,7 @@
 package com.elyndra.launcher
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -226,6 +227,9 @@ class MainActivity : ComponentActivity() {
      * las pantallas de formulario: así Ajustes, Añadir y Masha se manejan con
      * el mando sin navegación propia.
      */
+    // `super.dispatchKeyEvent` está marcado como restringido en ComponentActivity
+    // (androidx.core), pero llamarlo desde el propio override es lo previsto.
+    @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val pad = Gamepad.actionFor(event.keyCode) ?: return super.dispatchKeyEvent(event)
         if (pad.isDirection) {
@@ -276,6 +280,7 @@ class MainActivity : ComponentActivity() {
      * Un paso en una dirección: primero Elyndra (carrusel, barra, menús); si
      * no lo quiere, la tecla de cruceta equivalente para el foco de Compose.
      */
+    @SuppressLint("RestrictedApi")
     private fun deliverDirection(pad: Pad) {
         if (vm.input.handle(pad)) return
         val key = Gamepad.systemKeyFor(pad) ?: return
