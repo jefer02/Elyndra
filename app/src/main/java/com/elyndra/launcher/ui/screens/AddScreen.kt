@@ -69,8 +69,6 @@ import com.elyndra.launcher.ui.theme.AuroraBackdrop
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.accentGradient
 import com.elyndra.launcher.ui.theme.animFadeUp
-import com.elyndra.launcher.ui.theme.animRiseSheet
-import com.elyndra.launcher.ui.theme.glass
 import com.elyndra.launcher.ui.theme.sheenProgress
 
 @Composable
