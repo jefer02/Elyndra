@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui.components
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.AdaptiveIconDrawable
@@ -92,6 +93,8 @@ fun GameIcon(
 private val iconCache = LruCache<String, ImageBitmap>(96)
 
 /** Icono real de una app instalada (PackageManager), cacheado en memoria. */
+// Falso positivo del detector: `value` sí se asigna en el productor.
+@SuppressLint("ProduceStateDoesNotAssignValue")
 @Composable
 fun AppIconImage(
     packageName: String,
@@ -99,12 +102,13 @@ fun AppIconImage(
     contentScale: ContentScale = ContentScale.Fit,
 ) {
     val context = LocalContext.current
-    val bitmap by produceState(initialValue = iconCache.get(packageName), packageName) {
-        if (value == null) {
-            value = withContext(Dispatchers.IO) {
-                runCatching { loadAppIcon(context, packageName) }.getOrNull()
-            }?.also { iconCache.put(packageName, it) }
-        }
+    // La caché se consulta dentro del productor: `initialValue` solo vale en la
+    // primera composición, y al cambiar de paquete se quedaría el icono anterior.
+    val bitmap by produceState<ImageBitmap?>(iconCache.get(packageName), packageName) {
+        val icon = iconCache.get(packageName) ?: withContext(Dispatchers.IO) {
+            runCatching { loadAppIcon(context, packageName) }.getOrNull()
+        }?.also { iconCache.put(packageName, it) }
+        value = icon
     }
     bitmap?.let { Image(it, contentDescription = null, modifier = modifier, contentScale = contentScale) }
 }
