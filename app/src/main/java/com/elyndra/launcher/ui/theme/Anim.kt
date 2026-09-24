@@ -242,18 +242,6 @@ fun pulseHintAlpha(): Float {
     return v
 }
 
-/** `@keyframes livePulse` — el punto de estado de Masha. */
-@Composable
-fun livePulseScale(): Float {
-    val t = rememberInfiniteTransition(label = "live")
-    val v by t.animateFloat(
-        1f, 1.5f,
-        infiniteRepeatable(tween(900, easing = EaseInOut), RepeatMode.Reverse),
-        label = "live",
-    )
-    return v
-}
-
 /** `@keyframes barPlay` — cada barra del ecualizador, escala .35→1. */
 @Composable
 fun barPlayScale(index: Int): Float {
