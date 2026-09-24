@@ -36,17 +36,12 @@ object Wikipedia {
         val clean = title.trim()
         if (clean.isEmpty()) return null
         val key = "$lang|${clean.lowercase()}"
-        val full = mutex.withLock { if (cache.containsKey(key)) cache[key] else MISSING }
-        val text = if (full !== MISSING) full else {
-            val fetched = runCatching { fetch(clean, lang) }.getOrNull()
-            mutex.withLock { cache[key] = fetched }
-            fetched
-        }
-        return text?.let { if (short) shorten(it) else it }
+        fun fit(text: String?) = text?.let { if (short) shorten(it) else it }
+        mutex.withLock { if (cache.containsKey(key)) return fit(cache[key]) }
+        val fetched = runCatching { fetch(clean, lang) }.getOrNull()
+        mutex.withLock { cache[key] = fetched }
+        return fit(fetched)
     }
-
-    /** Compatibilidad: la sinopsis corta en inglés. */
-    suspend fun shortSummary(title: String): String? = summary(title, "en", short = true)
 
     private suspend fun fetch(title: String, lang: String): String? {
         val resolved = resolveTitle(title, lang) ?: return null
@@ -83,7 +78,4 @@ object Wikipedia {
         val lastSpace = cut.lastIndexOf(' ')
         return (if (lastSpace > 0) cut.take(lastSpace) else cut).trimEnd() + "…"
     }
-
-    /** Marca de "no está en caché" (distinta de un null ya cacheado). */
-    private val MISSING: String? = String(charArrayOf('\u0000'))
 }
