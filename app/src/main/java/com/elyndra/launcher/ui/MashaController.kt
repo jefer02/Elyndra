@@ -69,9 +69,6 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     private var job: Job? = null
     private var historyLoaded = false
 
-    /** La IA en línea está disponible (clave + permiso del usuario). La red se mira al enviar. */
-    val online: Boolean get() = brain.ai.isAvailable
-
     val hasKey: Boolean get() = brain.config.hasKey
 
     fun updateDraft(v: String) {
