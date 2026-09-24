@@ -103,6 +103,22 @@ fun ElyndraApp(vm: ElyndraViewModel) {
         }
         val screenBack = vm.screen != Screen.Library && vm.dialog == null && vm.detailsKey == null && vm.sheet == null
 
+        // Lanzar un juego saca la pantalla igual que abrir una carpeta: se
+        // desliza una décima del ancho, se funde y crece hasta 1.02.
+        val launchSlide = remember { Animatable(0f) }
+        val launchFade = remember { Animatable(0f) }
+        val launching = vm.opening != null
+        LaunchedEffect(launching) {
+            val target = if (launching) 1f else 0f
+            if (reduced) {
+                launchSlide.snapTo(target)
+                launchFade.snapTo(target)
+            } else {
+                launch { launchSlide.animateTo(target, Springs.enter()) }
+                launchFade.animateTo(target, Springs.fade())
+            }
+        }
+
         Box(Modifier.fillMaxSize().background(P.paper)) {
             // Fondo de la app (solo de Elyndra, no del sistema), debajo de todo:
             // el vídeo en bucle o la imagen fija que el usuario haya elegido.
@@ -157,10 +173,11 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                         targetState = vm.screen,
                         modifier = Modifier.graphicsLayer {
                             val p = if (screenBack) backProgress.value else 0f
-                            val k = 1f - 0.08f * p
+                            val k = (1f - 0.08f * p) * (1f + 0.02f * launchSlide.value)
                             scaleX = k
                             scaleY = k
-                            alpha = 1f - 0.35f * p
+                            translationX = -size.width / 10f * launchSlide.value
+                            alpha = (1f - 0.35f * p) * (1f - launchFade.value)
                         },
                         transitionSpec = {
                             // Eje compartido con muelles: la que entra llega
