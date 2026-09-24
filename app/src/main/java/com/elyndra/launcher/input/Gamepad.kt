@@ -231,11 +231,8 @@ class AxisGate {
 /**
  * La repetición de las direcciones, igual para el stick, el hat y la cruceta.
  *
- * **El fallo de "va demasiado rápido" venía de aquí**: la cruceta digital
- * repetía al ritmo del sistema (~20 pulsaciones/s en cuanto se mantenía), y el
- * stick, cuando no se consumía su evento, lo convertía *además* el propio
- * Android en pulsaciones de cruceta sintéticas (SyntheticJoystickHandler), así
- * que un solo empujón podía mover varias casillas. Ahora:
+ * No se usa la repetición del sistema (~20 pulsaciones/s): con ella, mantener
+ * la cruceta recorría la lista demasiado deprisa. En su lugar:
  *
  *  - la primera pulsación dispara **un solo paso** al instante,
  *  - si se mantiene, espera [firstDelayMs] (~350 ms)

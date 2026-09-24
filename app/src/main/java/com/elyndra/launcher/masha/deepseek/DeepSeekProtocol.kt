@@ -148,7 +148,6 @@ object DeepSeekProtocol {
             private set
 
         val content: String get() = text.toString()
-        val hasToolCalls: Boolean get() = calls.isNotEmpty()
 
         private class PartialCall(var id: String? = null, var name: String = "", val arguments: StringBuilder = StringBuilder())
 
