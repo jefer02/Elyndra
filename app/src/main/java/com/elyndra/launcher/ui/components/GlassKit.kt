@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -164,7 +165,7 @@ fun GlowingSwitch(
     val skin = LocalSkin.current
     val shape = RoundedCornerShape(15.dp)
     // Un muelle medio: llega rápido y se asienta sin rebotar de más.
-    val knob by animateDpAsState(
+    val knob = animateDpAsState(
         targetValue = if (checked) 21.dp else 0.dp,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "knob",
@@ -203,7 +204,7 @@ fun GlowingSwitch(
     ) {
         Box(
             Modifier
-                .offset(x = knob)
+                .offset { IntOffset(knob.value.roundToPx(), 0) }
                 .size(23.dp)
                 .shadow(3.dp, CircleShape, clip = false, ambientColor = P.shade, spotColor = P.shade)
                 .clip(CircleShape)
@@ -336,7 +337,7 @@ fun GlassTabBar(
         val inset = 4.dp
         val slot = (maxWidth - inset * 2) / tabs.size
         // Un solo valor animado gobierna la pastilla: su posición en "slots".
-        val position by animateFloatAsState(
+        val position = animateFloatAsState(
             targetValue = selected.toFloat(),
             animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow),
             label = "tabPill",
@@ -345,7 +346,7 @@ fun GlassTabBar(
         Box(
             Modifier
                 .padding(inset)
-                .offset(x = slot * position)
+                .offset { IntOffset((slot * position.value).roundToPx(), 0) }
                 .width(slot)
                 .fillMaxSize()
                 .shadow(10.dp, shape, clip = false, ambientColor = skin.a1, spotColor = skin.a1)

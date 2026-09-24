@@ -3,7 +3,6 @@ package com.elyndra.launcher.ui.components
 import com.elyndra.launcher.ui.theme.Springs
 import com.elyndra.launcher.ui.theme.motion
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -53,7 +53,6 @@ import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.theme.LocalSkin
-import com.elyndra.launcher.ui.theme.Swift
 import com.elyndra.launcher.ui.theme.accentGradient
 import com.elyndra.launcher.ui.theme.consoleFocus
 import com.elyndra.launcher.ui.theme.darkGlass
@@ -132,15 +131,12 @@ fun GlassPanel(
 /**
  * Bloque de Ajustes **sin contenedor**: sin tarjeta, sin fondo y sin borde.
  * Las opciones van directamente sobre el fondo de la pantalla y se separan
- * solo por aire y un filo muy tenue debajo. Acepta los mismos parámetros que
- * [GlassPanel] para poder sustituirlo sin tocar cada llamada; [cornerRadius]
- * ya no se usa.
+ * solo por aire y un filo muy tenue debajo.
  */
 @Composable
 fun SettingsGroup(
     modifier: Modifier = Modifier,
     padding: Dp = 14.dp,
-    @Suppress("UNUSED_PARAMETER") cornerRadius: Dp = 0.dp,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
     androidx.compose.foundation.layout.Column(modifier.fillMaxWidth()) {
@@ -192,7 +188,7 @@ fun CtaButton(
     }
 }
 
-/** Botón de acción principal del dock (`playBtn`): 42dp de alto, degradado y sombra. */
+/** Botón de acción principal (`playBtn`): 42dp de alto, degradado y sombra. */
 @Composable
 fun AccentButton(
     label: String,
@@ -258,11 +254,10 @@ val HeroBarHeight = 34.dp
 /**
  * "Abrir", en la barra de arriba del hero y sobre el fondo del juego.
  *
- * El mismo botón en Biblioteca y en Carpeta, y discreto a propósito: el
- * cristal oscuro de sus vecinos, el alto de la barra y ni rastro del degradado
- * de acento que llevaba en el dock. Ahí arriba lo que se tiene que ver es el
- * fondo del juego, y abrir se hace además con doble toque sobre la card o con
- * el mando. [focused] es el foco del mando (ver `InputController.barFocus`).
+ * El mismo botón en Biblioteca y en Carpeta, y discreto a propósito (el
+ * cristal oscuro de sus vecinos, sin degradado de acento): ahí arriba lo que
+ * se tiene que ver es el fondo del juego. [focused] es el foco del mando
+ * (ver `InputController.barFocus`).
  */
 @Composable
 fun OpenButton(
@@ -334,39 +329,6 @@ fun ArcSpinner(size: Dp = 24.dp, stroke: Dp = 2.dp, color: Color? = null, period
     )
 }
 
-/** El interruptor de "aplicar metadatos automáticamente" (48×28, pomo de 22). */
-@Composable
-fun AccentSwitch(checked: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
-    val skin = LocalSkin.current
-    val shape = RoundedCornerShape(14.dp)
-    val knobX by animateFloatAsState(
-        targetValue = if (checked) 20f else 0f,
-        animationSpec = motion(Springs.snappy()),
-        label = "knob",
-    )
-    Box(
-        modifier
-            .size(48.dp, 28.dp)
-            .clip(shape)
-            .then(
-                if (checked) Modifier.drawBehind { drawRect(accentGradient(skin, 145f, size)) }
-                else Modifier.background(P.ink.copy(alpha = 0.15f)),
-            )
-            .clickable(onClick = onToggle)
-            .padding(3.dp),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Box(
-            Modifier
-                .offset(x = knobX.dp)
-                .size(22.dp)
-                .shadow(2.dp, CircleShape, clip = false, ambientColor = P.shade.copy(alpha = 0.3f), spotColor = P.shade.copy(alpha = 0.3f))
-                .clip(CircleShape)
-                .background(Color.White),
-        )
-    }
-}
-
 /**
  * Deslizador de los ajustes. Compose trae `Slider` de Material 3, pero arrastra
  * su propio pomo, sus ripples y su altura; aquí hace falta la pista fina y el
@@ -382,6 +344,7 @@ fun AccentSlider(
     val skin = LocalSkin.current
     val density = LocalDensity.current
     val interaction = remember { MutableInteractionSource() }
+    val latest by rememberUpdatedState(onChange)
 
     BoxWithConstraints(
         modifier
@@ -397,7 +360,7 @@ fun AccentSlider(
 
         fun report(x: Float) {
             val f = ((x - knob / 2f) / travel).coerceIn(0f, 1f)
-            onChange(range.first + (f * span).roundToInt())
+            latest(range.first + (f * span).roundToInt())
         }
 
         Box(

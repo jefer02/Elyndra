@@ -22,7 +22,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.elyndra.launcher.data.P
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import com.elyndra.launcher.ui.theme.LocalLandscape
@@ -137,8 +136,7 @@ fun metrics(): Metrics {
     val w = screen.width.value
     val h = screen.height.value
     // Alto fijo que no es ni hero ni card: la fila de filtros, el nombre bajo la
-    // card y el aire entre medias. Ninguna pantalla lleva ya dock —"Abrir" está
-    // en la barra del hero—, así que esos dp vuelven al reparto.
+    // card y el aire entre medias.
     val fixed = if (l) 62f else 74f
     val bottom = if (l) 6f else 10f
     // La card seleccionada sube [SelectionLift] y se amplía [SelectionScale]
