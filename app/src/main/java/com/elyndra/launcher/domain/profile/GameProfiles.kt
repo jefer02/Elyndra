@@ -36,9 +36,7 @@ data class EmulatorUsage(
     val launches: Int,
     val failedLaunches: Int,
     val lastUsed: Long,
-) {
-    val totalEvidence: Int get() = sessions + failedLaunches
-}
+)
 
 /** En qué punto está el usuario con un juego. */
 enum class PlayState {

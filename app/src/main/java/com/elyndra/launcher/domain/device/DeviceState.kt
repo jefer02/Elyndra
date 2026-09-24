@@ -23,9 +23,6 @@ data class DeviceState(
     val isHot: Boolean
         get() = thermal >= Thermal.Severe || (batteryTempC ?: 0f) >= HOT_BATTERY_C
 
-    val isWarm: Boolean
-        get() = thermal >= Thermal.Moderate || (batteryTempC ?: 0f) >= WARM_BATTERY_C
-
     val isLowBattery: Boolean
         get() = !charging && (batteryPct ?: 100) <= LOW_BATTERY_PCT
 
@@ -46,7 +43,6 @@ data class DeviceState(
         const val LOW_BATTERY_PCT = 20
         const val CRITICAL_BATTERY_PCT = 8
         const val HOT_BATTERY_C = 44f
-        const val WARM_BATTERY_C = 40f
     }
 }
 

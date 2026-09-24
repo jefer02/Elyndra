@@ -63,8 +63,6 @@ data class CurationReport(
     val naming: List<NamingIssue> = emptyList(),
     val series: List<Series> = emptyList(),
 ) {
-    val issueCount: Int get() = duplicates.size + incomplete.size + naming.size
-
     fun seriesOf(key: String): Series? = series.firstOrNull { key in it.keys }
 }
 
