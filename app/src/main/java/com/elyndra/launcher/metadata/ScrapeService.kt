@@ -78,7 +78,6 @@ class ScrapeService : Service() {
     private fun localized(): Context = AppLocale.wrap(this)
 
     private fun ensureChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = getSystemService(NotificationManager::class.java) ?: return
         if (nm.getNotificationChannel(CHANNEL_ID) != null) return
         nm.createNotificationChannel(
