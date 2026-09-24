@@ -2,7 +2,6 @@ package com.elyndra.launcher.ui.screens
 
 import android.text.format.Formatter
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -85,9 +85,10 @@ fun DetailsSheet(vm: ElyndraViewModel, key: String) {
     val system = rom?.let { Systems.byId(it.systemId) }
     val folder = rom?.let { r -> vm.library.folders.firstOrNull { it.id == r.folderId } }
     val emulator = rom?.let { it.emulatorId ?: folder?.emulatorId }?.let { vm.emulatorName(it) }
-    val dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.forLanguageTag(vm.settings.lang))
+    val lang = vm.settings.lang
+    val dateFormat = remember(lang) { DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.forLanguageTag(lang)) }
     val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.88f).dp
-    val description = rememberGameDescription(title, meta.description, vm.settings.lang, short = false)
+    val description = rememberGameDescription(title, meta.description, lang, short = false)
 
     ScrimLayer(onDismiss = vm::closeDetails, alignment = Alignment.BottomCenter, key = key) {
         Column(
