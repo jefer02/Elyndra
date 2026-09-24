@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewModelScope
 import com.elyndra.launcher.R
@@ -43,19 +44,16 @@ enum class BarItem { Masha, Open, Search, Settings, Back, Emulator }
 class InputController(private val vm: ElyndraViewModel) {
 
     /** Fila señalada del menú, cuando se abrió con el mando. */
-    var sheetFocus by mutableStateOf(-1); private set
+    var sheetFocus by mutableIntStateOf(-1); private set
 
     /** Botón señalado del diálogo: 0 aceptar, 1 descartar, 2 el tercero. */
-    var dialogFocus by mutableStateOf(-1); private set
+    var dialogFocus by mutableIntStateOf(-1); private set
 
     /** El mando ha entrado en juego: la interfaz enseña lo que está señalado. */
     var active by mutableStateOf(false); private set
 
     /** Botón de la barra superior señalado; null = el mando está en el carrusel. */
     var barFocus by mutableStateOf<BarItem?>(null); private set
-
-    /** Hay al menos un mando conectado ahora mismo. */
-    var gamepadConnected by mutableStateOf(false); private set
 
     /** Pantalla en la que se eligió [barFocus]: al cambiar de pantalla se olvida. */
     private var barScreen: Screen? = null
@@ -94,12 +92,10 @@ class InputController(private val vm: ElyndraViewModel) {
     /* ── conexión de mandos ───────────────────────────────────── */
 
     fun onGamepadConnected(name: String, announce: Boolean) {
-        gamepadConnected = true
         if (announce) vm.showToast(UiText.res(R.string.gamepad_connected, name))
     }
 
     fun onGamepadDisconnected(anyLeft: Boolean) {
-        gamepadConnected = anyLeft
         if (!anyLeft) {
             // Sin mando no hay a quién enseñarle la marca del foco.
             active = false
@@ -233,7 +229,9 @@ class InputController(private val vm: ElyndraViewModel) {
     }
 
     private fun moveLibrary(items: List<LibraryItem>, from: Int, delta: Int): Boolean {
-        val item = items.getOrNull((from + delta).coerceIn(0, items.lastIndex)) ?: return false
+        // Con la lista vacía `coerceIn(0, -1)` lanzaría una excepción.
+        if (items.isEmpty()) return false
+        val item = items[(from + delta).coerceIn(0, items.lastIndex)]
         vm.select(item.key)
         return true
     }
@@ -251,7 +249,8 @@ class InputController(private val vm: ElyndraViewModel) {
         val roms = vm.folderRoms(vm.folderId)
         val index = roms.indexOfFirst { it.key == vm.selectedRom()?.key }.coerceAtLeast(0)
         fun move(delta: Int): Boolean {
-            val rom = roms.getOrNull((index + delta).coerceIn(0, roms.lastIndex)) ?: return false
+            if (roms.isEmpty()) return false
+            val rom = roms[(index + delta).coerceIn(0, roms.lastIndex)]
             vm.selectRom(rom.key)
             return true
         }
