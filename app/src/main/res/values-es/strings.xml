@@ -26,8 +26,6 @@
     <string name="empty_library_hint">Añade juegos Android o una carpeta de ROMs</string>
     <string name="hint_gestures">Un toque selecciona · Doble toque abre · Mantén para opciones</string>
     <string name="no_results">Nada coincide con tu búsqueda</string>
-    <string name="empty_filter_android">Todavía no hay juegos de Android</string>
-    <string name="empty_filter_consoles">Todavía no hay consolas añadidas</string>
     <string name="add_long">Añadir juegos o ROMs</string>
     <string name="open">Abrir</string>
     <plurals name="items_count">
@@ -365,7 +363,6 @@
 
     <!-- Masha -->
     <string name="masha">Masha</string>
-    <string name="masha_online">En línea · DeepSeek</string>
     <string name="masha_offline_mode">Sin conexión · respuestas locales</string>
     <string name="masha_placeholder">Pregúntale a Masha o dile qué hacer…</string>
     <string name="masha_greeting">Aquí Masha. Conozco tu biblioteca, cómo juegas y lo que aguanta tu móvil. Pregúntame lo que quieras, o dime cuánto tiempo tienes.</string>
