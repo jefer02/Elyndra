@@ -192,18 +192,6 @@ fun curtainAlpha(delayMs: Int, key: Any? = Unit): Float {
 
 /* ── Bucles ─────────────────────────────────────────────────── */
 
-/** `@keyframes bob` — el punto del wordmark, ±3px. */
-@Composable
-fun bobOffset(): Float {
-    val t = rememberInfiniteTransition(label = "bob")
-    val v by t.animateFloat(
-        0f, 1f,
-        infiniteRepeatable(tween(3400, easing = EaseInOut), RepeatMode.Reverse),
-        label = "bob",
-    )
-    return -3f * v
-}
-
 /** `@keyframes sheen` — banda de brillo, de -120% a 240% del ancho. */
 @Composable
 fun sheenProgress(): Float {

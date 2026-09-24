@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Fondo "papel" del diseño detrás de la ventana, para que no haya
          destello blanco/negro entre el arranque y el primer frame de Compose. -->
     <style name="Theme.Elyndra" parent="android:Theme.Material.Light.NoActionBar">
@@ -7,7 +7,7 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
     </style>
 
     <!-- Splash oficial (API SplashScreen) sin icono: solo el negro de la

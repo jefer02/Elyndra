@@ -28,11 +28,8 @@
     <string name="no_results">Nada corresponde à sua busca</string>
     <string name="empty_filter_android">Ainda não há jogos de Android</string>
     <string name="empty_filter_consoles">Ainda não há consoles adicionados</string>
-    <string name="add_short">Adicionar</string>
     <string name="add_long">Adicionar jogos ou ROMs</string>
     <string name="open">Abrir</string>
-    <string name="launch_android">Abrindo app Android</string>
-    <string name="launch_via">Abrindo no %1$s</string>
     <plurals name="items_count">
         <item quantity="one">%d item</item>
         <item quantity="many">%d itens</item>
@@ -372,8 +369,6 @@
     <string name="masha_offline_mode">Offline · respostas locais</string>
     <string name="masha_placeholder">Pergunte à Masha ou diga o que fazer…</string>
     <string name="masha_greeting">Aqui é a Masha. Conheço sua biblioteca, como você joga e o que seu celular aguenta. Pergunte o que quiser — ou diga quanto tempo você tem.</string>
-    <string name="masha_stop">Parar</string>
-    <string name="masha_clear">Nova conversa</string>
     <string name="masha_stat_week">Esta semana</string>
     <string name="masha_stat_top">Mais jogado</string>
     <string name="masha_stat_sessions">Sessões</string>
@@ -440,10 +435,6 @@
     <string name="masha_insight_dismiss">Agora não</string>
     <string name="masha_today">hoje</string>
     <string name="masha_yesterday">ontem</string>
-    <plurals name="masha_days">
-        <item quantity="one">%d dia</item>
-        <item quantity="other">%d dias</item>
-    </plurals>
     <plurals name="masha_days_ago">
         <item quantity="one">há %d dia</item>
         <item quantity="other">há %d dias</item>
@@ -507,7 +498,6 @@
     <string name="widget_masha_desc">A sugestão da Masha para agora</string>
     <string name="widget_empty">Adicione jogos ao Elyndra e terei sugestões.</string>
     <string name="widget_play">Jogar</string>
-    <string name="widget_ask">Falar com a Masha</string>
     <string name="notif_channel_masha">Masha</string>
     <string name="notif_channel_masha_desc">Sugestões ocasionais. No máximo uma a cada poucos dias.</string>
 

@@ -53,7 +53,7 @@ internal fun MashaColumn(vm: ElyndraViewModel) {
         SectionLabel(stringResource(R.string.settings_masha))
 
         // IA en línea y su clave.
-        SettingsGroup(padding = 0.dp, cornerRadius = 16.dp) {
+        SettingsGroup(padding = 0.dp) {
             Column(Modifier.padding(vertical = 12.dp)) {
                 ToggleRow(
                     title = stringResource(R.string.settings_masha_ai),
@@ -95,7 +95,7 @@ internal fun MashaColumn(vm: ElyndraViewModel) {
         }
 
         // Presencia: la línea sobre el carrusel y los avisos.
-        SettingsGroup(padding = 0.dp, cornerRadius = 16.dp) {
+        SettingsGroup(padding = 0.dp) {
             Column(Modifier.padding(vertical = 12.dp)) {
                 ToggleRow(
                     title = stringResource(R.string.settings_masha_ambient),
@@ -117,7 +117,7 @@ internal fun MashaColumn(vm: ElyndraViewModel) {
         ParticleColorGroup(vm)
 
         // Tiempo de juego exacto (acceso de uso, opcional).
-        SettingsGroup(padding = 0.dp, cornerRadius = 16.dp) {
+        SettingsGroup(padding = 0.dp) {
             Row(
                 Modifier.fillMaxWidth().padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -204,7 +204,7 @@ private fun KeyField(vm: ElyndraViewModel) {
 @Composable
 internal fun MetadataPriorityPanel(vm: ElyndraViewModel) {
     val s = vm.settings
-    SettingsGroup(padding = 0.dp, cornerRadius = 16.dp) {
+    SettingsGroup(padding = 0.dp) {
         Column(Modifier.padding(vertical = 12.dp)) {
             ElyText(stringResource(R.string.settings_priority), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
             Spacer(Modifier.height(4.dp))

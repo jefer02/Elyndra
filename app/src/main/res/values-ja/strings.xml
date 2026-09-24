@@ -28,11 +28,8 @@
     <string name="no_results">検索に一致する項目はありません</string>
     <string name="empty_filter_android">まだAndroidゲームがありません</string>
     <string name="empty_filter_consoles">まだコンソールが追加されていません</string>
-    <string name="add_short">追加</string>
     <string name="add_long">ゲームや ROM を追加</string>
     <string name="open">開く</string>
-    <string name="launch_android">Androidアプリを起動中</string>
-    <string name="launch_via">%1$s で起動中</string>
     <plurals name="items_count">
         <item quantity="other">%d 件</item>
     </plurals>
@@ -343,8 +340,6 @@
     <string name="masha_offline_mode">オフライン · ローカル応答</string>
     <string name="masha_placeholder">Masha に質問、または指示…</string>
     <string name="masha_greeting">Masha です。あなたのライブラリ、遊び方、端末の余力まで把握しています。何でも聞いてください。時間だけ教えてくれても大丈夫です。</string>
-    <string name="masha_stop">停止</string>
-    <string name="masha_clear">新しい会話</string>
     <string name="masha_stat_week">今週</string>
     <string name="masha_stat_top">最も遊んだ</string>
     <string name="masha_stat_sessions">セッション</string>
@@ -386,7 +381,6 @@
     <string name="masha_off_stats">今週：%2$d セッションで %1$s（先週 %3$s）。最も遊んだのは %4$s。</string>
     <string name="masha_off_stats_empty">今週はまだプレイしていません。先週は %1$s でした。</string>
     <plurals name="masha_off_list">
-        <item quantity="one">%d 本。</item>
         <item quantity="other">%d 本。</item>
     </plurals>
     <string name="masha_off_list_empty">今は該当なし。きれいなものです。</string>
@@ -411,12 +405,7 @@
     <string name="masha_insight_dismiss">今はいい</string>
     <string name="masha_today">今日</string>
     <string name="masha_yesterday">昨日</string>
-    <plurals name="masha_days">
-        <item quantity="one">%d 日</item>
-        <item quantity="other">%d 日</item>
-    </plurals>
     <plurals name="masha_days_ago">
-        <item quantity="one">%d 日前</item>
         <item quantity="other">%d 日前</item>
     </plurals>
     <string name="masha_note_battery">バッテリー残量 %1$d%%、充電なし。これは電力を食います。</string>
@@ -478,7 +467,6 @@
     <string name="widget_masha_desc">Masha の今のおすすめ</string>
     <string name="widget_empty">Elyndra にゲームを追加すれば提案します。</string>
     <string name="widget_play">プレイ</string>
-    <string name="widget_ask">Masha に聞く</string>
     <string name="notif_channel_masha">Masha</string>
     <string name="notif_channel_masha_desc">ときどきの提案。数日に一度まで。</string>
 

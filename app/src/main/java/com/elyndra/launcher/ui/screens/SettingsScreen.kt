@@ -75,7 +75,6 @@ import com.elyndra.launcher.ui.resolve
 import com.elyndra.launcher.ui.theme.AuroraBackdrop
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.accentGradient
-import com.elyndra.launcher.ui.theme.animRiseSheet
 import com.elyndra.launcher.ui.theme.cssLinearGradient
 import com.elyndra.launcher.ui.theme.glass
 
@@ -403,7 +402,7 @@ private fun MetadataColumn(vm: ElyndraViewModel) {
         ApiPanels(vm)
         MetadataPriorityPanel(vm)
 
-        SettingsGroup(padding = 0.dp, cornerRadius = 16.dp) {
+        SettingsGroup(padding = 0.dp) {
             Row(
                 Modifier.fillMaxWidth().padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,

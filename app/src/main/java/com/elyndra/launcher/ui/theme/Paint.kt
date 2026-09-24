@@ -174,5 +174,3 @@ fun sheenBrush(size: Size): Brush = cssLinearGradient(
 /** Sombra de texto del hero, equivalente a `text-shadow: 0 6px 30px rgba(0,0,0,.55)`. */
 val HeroTitleShadow = Shadow(color = Color.Black.copy(alpha = 0.55f), offset = Offset(0f, 6f), blurRadius = 30f)
 
-/** `text-shadow: 0 2px 12px rgba(0,0,0,.5)` del wordmark. */
-val WordmarkShadow = Shadow(color = Color.Black.copy(alpha = 0.5f), offset = Offset(0f, 2f), blurRadius = 12f)

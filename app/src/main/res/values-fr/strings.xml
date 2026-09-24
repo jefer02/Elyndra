@@ -28,11 +28,8 @@
     <string name="no_results">Aucun résultat pour cette recherche</string>
     <string name="empty_filter_android">Aucun jeu Android pour l\'instant</string>
     <string name="empty_filter_consoles">Aucune console ajoutée pour l\'instant</string>
-    <string name="add_short">Ajouter</string>
     <string name="add_long">Ajouter des jeux ou des ROMs</string>
     <string name="open">Ouvrir</string>
-    <string name="launch_android">Ouverture de l\'app Android</string>
-    <string name="launch_via">Ouverture dans %1$s</string>
     <plurals name="items_count">
         <item quantity="one">%d élément</item>
         <item quantity="many">%d éléments</item>
@@ -372,8 +369,6 @@
     <string name="masha_offline_mode">Hors ligne · réponses locales</string>
     <string name="masha_placeholder">Demandez à Masha ou dites-lui quoi faire…</string>
     <string name="masha_greeting">Ici Masha. Je connais votre bibliothèque, votre façon de jouer et ce que votre téléphone encaisse. Demandez-moi ce que vous voulez — ou dites-moi combien de temps vous avez.</string>
-    <string name="masha_stop">Arrêter</string>
-    <string name="masha_clear">Nouvelle discussion</string>
     <string name="masha_stat_week">Cette semaine</string>
     <string name="masha_stat_top">Le plus joué</string>
     <string name="masha_stat_sessions">Sessions</string>
@@ -440,10 +435,6 @@
     <string name="masha_insight_dismiss">Pas maintenant</string>
     <string name="masha_today">aujourd’hui</string>
     <string name="masha_yesterday">hier</string>
-    <plurals name="masha_days">
-        <item quantity="one">%d jour</item>
-        <item quantity="other">%d jours</item>
-    </plurals>
     <plurals name="masha_days_ago">
         <item quantity="one">il y a %d jour</item>
         <item quantity="other">il y a %d jours</item>
@@ -507,7 +498,6 @@
     <string name="widget_masha_desc">Le choix de Masha pour maintenant</string>
     <string name="widget_empty">Ajoutez des jeux à Elyndra et j’aurai des suggestions.</string>
     <string name="widget_play">Jouer</string>
-    <string name="widget_ask">Parler à Masha</string>
     <string name="notif_channel_masha">Masha</string>
     <string name="notif_channel_masha_desc">Suggestions occasionnelles. Au plus une tous les quelques jours.</string>
 
