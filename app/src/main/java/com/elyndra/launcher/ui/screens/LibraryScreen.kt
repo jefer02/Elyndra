@@ -7,14 +7,12 @@ import com.elyndra.launcher.ui.theme.Springs
 import com.elyndra.launcher.ui.theme.motion
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -111,7 +109,6 @@ import com.elyndra.launcher.ui.components.metrics
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.theme.HeroTitleShadow
 import com.elyndra.launcher.ui.theme.LocalSkin
-import com.elyndra.launcher.ui.theme.Swift
 import com.elyndra.launcher.ui.theme.accentGradient
 import com.elyndra.launcher.ui.theme.animAppEntrance
 import com.elyndra.launcher.ui.theme.animFadeUp
@@ -467,12 +464,9 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                 }
             }
 
-            // Sin dock: "Abrir" está arriba, sobre el fondo del juego, y
-            // "Añadir" es la última card del carrusel. El alto que ocupaba se
-            // lo reparten hero y cards (ver `libFree` en Metrics).
         }
 
-        MashaFab(vm, m)
+        MashaFab(vm, m, floatClock)
     }
 }
 
@@ -624,27 +618,19 @@ private val MASHA_FAB = 58.dp
  * color elegido en Ajustes— y ahí se queda, también al volver a abrir la app
  * ([com.elyndra.launcher.ui.SettingsController.moveMasha]).
  *
- * **El fallo del arrastre "pesado" que se quedaba quieto y luego saltaba**
- * venía de cómo se guardaba la posición: el estado local se creaba con
- * `remember(vm.settings.mashaX, …)`, así que al soltar la primera vez (y
- * guardar la posición) se creaba un estado *nuevo*, mientras que el detector
- * de gestos —`pointerInput(maxX, maxY)`, con llaves que no cambiaban— seguía
- * vivo con la lambda del primer arrastre y escribía en el estado *viejo*. En
- * el segundo arrastre el dedo movía un estado que ya no se pintaba (el botón
- * no se movía) y al soltar se guardaba ese valor viejo (el salto). Además el
- * arrastre pedía mantener pulsado y cada píxel recomponía la pantalla.
- *
- * Ahora: un único estado que nunca se recrea ([dragDp], solo durante el
- * gesto), un detector con llave fija que lee siempre los límites actuales
- * (`rememberUpdatedState`), arrastre directo sin espera, y posición, escala
- * y flotación leídas en las fases de layout/capa: arrastrar no recompone.
+ * El estado del arrastre ([dragDp]) no se recrea nunca y el detector tiene
+ * llave fija y lee los límites actuales con `rememberUpdatedState`: si el
+ * estado dependiera de la posición guardada, tras el primer arrastre el
+ * detector seguiría escribiendo en el estado viejo (el botón se quedaba
+ * quieto y luego saltaba). Posición, escala y flotación se leen en las fases
+ * de layout/capa, así que arrastrar no recompone.
  *
  * La posición se guarda en dp desde la esquina superior izquierda y se recorta
  * al pintar, no al guardar: así girar el móvil lo devuelve a la pantalla sin
  * perder el sitio que tenía en la otra orientación.
  */
 @Composable
-private fun MashaFab(vm: ElyndraViewModel, metrics: Metrics) {
+private fun MashaFab(vm: ElyndraViewModel, metrics: Metrics, bobClock: FloatClock) {
     val skin = LocalSkin.current
     val screen = LocalScreenSize.current
     val haptics = LocalHapticFeedback.current
@@ -675,7 +661,6 @@ private fun MashaFab(vm: ElyndraViewModel, metrics: Metrics) {
     val lift = animateFloatAsState(if (dragging) 1.12f else 1f, motion(Springs.snappy()), label = "mashaLift")
     val bob = animateFloatAsState(if (dragging) 0f else 1f, motion(Springs.fade()), label = "mashaBob")
     val reduced = LocalReducedMotion.current
-    val bobClock = rememberFloatClock()
 
     fun current(): Offset {
         val p = dragDp.value ?: rest
@@ -883,6 +868,10 @@ private fun LibraryTile(
     val scope = rememberCoroutineScope()
     val sheen = sheenProgress()
     val dimmed = item is LibraryItem.App && !item.installed
+    // Mismo motivo que en RomTile: el detector vive más que una composición.
+    val tap by rememberUpdatedState(onTap)
+    val open by rememberUpdatedState(onOpen)
+    val longPress by rememberUpdatedState(onLongPress)
 
     Column(
         Modifier
@@ -900,15 +889,15 @@ private fun LibraryTile(
             .pointerInput(item.key) {
                 detectTapGestures(
                     onPress = { press.track(this) },
-                    onTap = { onTap() },
-                    onDoubleTap = { offset -> onOpen(offset) },
+                    onTap = { tap() },
+                    onDoubleTap = { offset -> open(offset) },
                     onLongPress = {
                         // Primero el tirón —la card se hunde y rebota— y solo
                         // cuando se ha sentido el agarre sale el menú.
                         scope.launch {
                             launch { magnetic.run() }
                             delay(MAGNETIC_PULL_MS.toLong())
-                            onLongPress(cardBounds.center)
+                            longPress(cardBounds.center)
                         }
                     },
                 )
