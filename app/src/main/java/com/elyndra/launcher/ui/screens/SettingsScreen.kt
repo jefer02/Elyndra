@@ -98,16 +98,21 @@ fun SettingsScreen(vm: ElyndraViewModel) {
                 ElyText(stringResource(R.string.settings_title), size = 19f, weight = FontWeight.SemiBold, color = P.ink)
             }
 
-            CssGrid(
-                columns = if (m.landscape) 2 else 1,
-                horizontalGap = 16.dp,
-                verticalGap = 0.dp,
-                items = listOf(
-                    { AppearanceColumn(vm) },
-                    { MetadataColumn(vm) },
-                    { MashaColumn(vm) },
-                ),
-            )
+            if (m.landscape) {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        AppearanceColumn(vm)
+                        MashaColumn(vm)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        MetadataColumn(vm)
+                    }
+                }
+            } else {
+                AppearanceColumn(vm)
+                MashaColumn(vm)
+                MetadataColumn(vm)
+            }
         }
     }
 }
