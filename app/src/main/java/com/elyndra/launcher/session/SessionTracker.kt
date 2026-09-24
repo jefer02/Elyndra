@@ -62,7 +62,6 @@ class SessionTracker @Inject constructor(
     fun usageAccessFallbackIntent(): Intent =
         Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-    val hasPending: Boolean get() = settings.pendingSessionKey != null
 
     fun begin(key: String, emulatorId: String?, packageName: String?, now: Long = System.currentTimeMillis()) {
         settings.pendingSessionKey = key
