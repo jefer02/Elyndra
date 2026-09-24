@@ -25,6 +25,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -359,9 +361,6 @@ fun FolderScreen(vm: ElyndraViewModel) {
             }
         }
 
-        // Sin dock: "Abrir" está arriba, sobre el fondo del juego, junto al
-        // botón de emulador, y para volver está la flecha de la misma barra.
-        // El alto que ocupaba se lo reparten hero y cards (ver Metrics).
     }
 }
 
@@ -399,6 +398,11 @@ private fun RomTile(
     val curtain = curtainAlpha(minOf(index, 12) * 40, key = rom.id)
     val sheen = sheenProgress()
     val cover = rom.meta.cover
+    // El detector de gestos sobrevive a las recomposiciones (llave = id): tiene
+    // que llamar a las lambdas actuales, que llevan la ROM con sus datos al día.
+    val tap by rememberUpdatedState(onTap)
+    val open by rememberUpdatedState(onOpen)
+    val longPress by rememberUpdatedState(onLongPress)
 
     Column(
         Modifier
@@ -408,9 +412,9 @@ private fun RomTile(
             .pointerInput(rom.id) {
                 detectTapGestures(
                     onPress = { press.track(this) },
-                    onTap = { onTap() },
-                    onDoubleTap = { onOpen() },
-                    onLongPress = { onLongPress() },
+                    onTap = { tap() },
+                    onDoubleTap = { open() },
+                    onLongPress = { longPress() },
                 )
             },
         horizontalAlignment = Alignment.CenterHorizontally,
