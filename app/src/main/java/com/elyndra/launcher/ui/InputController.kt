@@ -58,6 +58,12 @@ class InputController(private val vm: ElyndraViewModel) {
     /** Pantalla en la que se eligió [barFocus]: al cambiar de pantalla se olvida. */
     private var barScreen: Screen? = null
 
+    /**
+     * El mando está en la card de "Añadir", la última del carrusel. No es un
+     * juego, así que no puede ser la selección: se señala aparte.
+     */
+    private var addFocus by mutableStateOf(false)
+
     /** Panel desplazable de la capa de arriba, mientras esté en pantalla. */
     private var scroll: ScrollState? = null
 
@@ -67,6 +73,9 @@ class InputController(private val vm: ElyndraViewModel) {
 
     /** ¿Se pinta resaltado [item]? Solo mientras se usa el mando. */
     fun isBarFocused(item: BarItem): Boolean = active && barFocus == item
+
+    /** ¿Se pinta señalada la card de "Añadir"? Solo con el mando y en el carrusel. */
+    fun isAddFocused(): Boolean = active && addFocus && barFocus == null && vm.screen == Screen.Library
 
     /**
      * Menú recién abierto.
@@ -87,6 +96,7 @@ class InputController(private val vm: ElyndraViewModel) {
     fun onTouch() {
         if (active) active = false
         if (barFocus != null) barFocus = null
+        if (addFocus) addFocus = false
     }
 
     /* ── conexión de mandos ───────────────────────────────────── */
@@ -100,6 +110,7 @@ class InputController(private val vm: ElyndraViewModel) {
             // Sin mando no hay a quién enseñarle la marca del foco.
             active = false
             barFocus = null
+            addFocus = false
         }
         vm.showToast(UiText.res(R.string.gamepad_disconnected))
     }
@@ -109,6 +120,7 @@ class InputController(private val vm: ElyndraViewModel) {
         if (vm.screen != barScreen) {
             barScreen = vm.screen
             barFocus = null
+            addFocus = false
         }
         return when {
             // Mientras se lanza un juego no se toca nada: el velo se va solo.
@@ -207,9 +219,29 @@ class InputController(private val vm: ElyndraViewModel) {
     private fun library(pad: Pad): Boolean = bar(pad, libraryBar()) { p ->
         val items = vm.items()
         val index = items.indexOfFirst { it.key == vm.selected()?.key }.coerceAtLeast(0)
+        // Sin juegos en la sección, "Añadir" es lo único que hay: ya está señalada.
+        // Una búsqueda sin resultados no enseña la card, así que ahí no.
+        if (items.isEmpty()) addFocus = vm.loaded && vm.query.isBlank()
+        if (addFocus) {
+            when (p) {
+                Pad.Left -> {
+                    if (items.isNotEmpty()) {
+                        addFocus = false
+                        vm.select(items.last().key)
+                    }
+                    return@bar true
+                }
+                Pad.Right, Pad.Down -> return@bar true
+                Pad.Confirm -> { vm.go(Screen.Add); return@bar true }
+                // No es un juego: ni ficha ni opciones.
+                Pad.Details, Pad.Options -> return@bar true
+                else -> Unit
+            }
+        }
         when (p) {
             Pad.Left -> moveLibrary(items, index, -1)
-            Pad.Right -> moveLibrary(items, index, 1)
+            // Pasado el último juego, la card de "Añadir".
+            Pad.Right -> if (items.isNotEmpty() && index >= items.lastIndex && vm.loaded) { addFocus = true; true } else moveLibrary(items, index, 1)
             // L1/R1 son el atajo estándar de mando para cambiar de sección:
             // Todos, Android, Consolas.
             Pad.PagePrev -> cycleFilter(-1)
@@ -239,6 +271,7 @@ class InputController(private val vm: ElyndraViewModel) {
     private fun cycleFilter(delta: Int): Boolean {
         val all = LibraryFilter.entries
         val next = all[(all.indexOf(vm.filter) + delta + all.size) % all.size]
+        addFocus = false
         vm.updateFilter(next)
         return true
     }

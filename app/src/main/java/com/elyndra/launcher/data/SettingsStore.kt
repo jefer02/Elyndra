@@ -199,6 +199,33 @@ class SettingsStore(context: Context) {
         get() = prefs.getInt("masha.particleColor", DEFAULT_PARTICLE_COLOR)
         set(v) = prefs.edit { putInt("masha.particleColor", v) }
 
+    /** Partículas de neón que caen alrededor del icono o la carátula seleccionados. */
+    var selectionParticles: Boolean
+        get() = prefs.getBoolean("selection.particles", true)
+        set(v) = prefs.edit { putBoolean("selection.particles", v) }
+
+    /** Color (ARGB) de esas partículas. Por omisión, un magenta de neón. */
+    var selectionParticleColor: Int
+        get() = prefs.getInt("selection.particleColor", DEFAULT_SELECTION_PARTICLE_COLOR)
+        set(v) = prefs.edit { putInt("selection.particleColor", v) }
+
+    /* ── Masha: voz y ambiente sonoro ─────────────────────────── */
+
+    /** Masha lee sus respuestas en voz alta en su pantalla. */
+    var mashaVoice: Boolean
+        get() = prefs.getBoolean("masha.voice", true)
+        set(v) = prefs.edit { putBoolean("masha.voice", v) }
+
+    /** El ambiente sonoro del holotanque (zumbido, pads, datos) en la pantalla de Masha. */
+    var mashaSoundscape: Boolean
+        get() = prefs.getBoolean("masha.soundscape", true)
+        set(v) = prefs.edit { putBoolean("masha.soundscape", v) }
+
+    /** Volumen del ambiente (0–100), siempre por debajo de la voz. */
+    var mashaSoundscapeVolume: Int
+        get() = prefs.getInt("masha.soundscapeVolume", 45)
+        set(v) = prefs.edit { putInt("masha.soundscapeVolume", v) }
+
     /* ── pantalla ─────────────────────────────────────────────── */
 
     /**
@@ -229,6 +256,9 @@ class SettingsStore(context: Context) {
     companion object {
         /** Cian de fósforo: se ve bien sobre el tema claro y sobre el oscuro. */
         const val DEFAULT_PARTICLE_COLOR = 0xFF5CF2FF.toInt()
+
+        /** Magenta de neón: se distingue del cian de Masha y del acento del marco. */
+        const val DEFAULT_SELECTION_PARTICLE_COLOR = 0xFFFF5CD6.toInt()
 
         /*
          * Las claves siguen diciendo "lucy" a propósito, como las de "videoBg":
