@@ -294,18 +294,30 @@ internal object GazeConfig {
     const val NECK_SHARE = 0.4f
     /** Velocidad de sacada (°/s). */
     const val SACCADE_SPEED = 400f
-    /** Microsacadas: 0,3–0,8° cada 0,4–1,2 s. */
-    const val MICRO_MIN = 0.3f
-    const val MICRO_MAX = 0.8f
-    /** Refijación: pequeño salto dentro de la cara del usuario cada 0,8–2,5 s. */
+    /** Sacada balística (secuencia principal): 21 ms + 2,2 ms por grado. */
+    const val SACCADE_BASE = 0.021f
+    const val SACCADE_PER_DEG = 0.0022f
+    /** Microsacadas: 0,2–0,5° cada 0,6–1,4 s (≈ 1 por segundo). */
+    const val MICRO_MIN = 0.2f
+    const val MICRO_MAX = 0.5f
+    const val MICRO_INTERVAL_MIN = 0.6f
+    const val MICRO_INTERVAL_MAX = 1.4f
+    /** Refijación: salto de 1–3° dentro de la cara del usuario cada 0,8–2,5 s. */
     const val FIXATION_MIN = 0.8f
     const val FIXATION_MAX = 2.5f
+    const val REFIX_MIN = 1f
+    const val REFIX_MAX = 3f
     const val REFIX_YAW = 1.5f
     const val REFIX_PITCH = 1f
-    /** Pensando: mira a otro lado (±15°, 5–12° arriba) durante 0,8–2 s. */
+    /** Pensando: cada 4–8 s mira a otro lado (5–15° de lado, 5–12° arriba) durante 0,8–2 s. */
+    const val AWAY_MIN = 5f
     const val AWAY_YAW = 15f
     const val AWAY_PITCH_MIN = 5f
     const val AWAY_PITCH_MAX = 12f
+    const val AWAY_INTERVAL_MIN = 4f
+    const val AWAY_INTERVAL_MAX = 8f
+    const val AWAY_HOLD_MIN = 0.8f
+    const val AWAY_HOLD_MAX = 2f
     /** Acoplamiento de párpados: mirar abajo cierra, arriba abre. */
     const val LID_DOWN = 0.45f
     const val LID_UP = 0.35f

@@ -1,12 +1,12 @@
 package com.elyndra.launcher.ui.masha
 
+import android.util.Log
 import com.google.android.filament.Engine
 import com.google.android.filament.MaterialInstance
 import io.github.sceneview.node.ModelNode
 import kotlin.math.PI
 import kotlin.math.exp
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.random.Random
@@ -14,9 +14,12 @@ import kotlin.random.Random
 /**
  * Masha viva, fotograma a fotograma, sobre el modelo de `build_masha.py`.
  *
- * - **Cuerpo:** una máquina de estados con fundido entre clips (Idle, Talk,
- *   Listen) y gestos puntuales encima (Wave, Explain, Think). Filament aplica
- *   el fundido con `applyCrossFade`.
+ * - **Cuerpo:** [MashaAnimatorFilament]: pila de fundidos de N clips con
+ *   inercialización, máquina de estados (reposo y sus variaciones, escuchar,
+ *   pensar, hablar con gestos al ritmo de la voz, gestos pedidos), respiración
+ *   y balanceo procedurales, mirada a la cámara con sacadas e IK de los pies.
+ *   Orden por fotograma: clips → capas → mirada → pies → giros y muelles
+ *   ([SpringBonesFilament]) → `updateBoneMatrices` → cara.
  * - **Cara:** morph targets mezclados en vivo — visemas de la voz, parpadeo
  *   con doble parpadeo ocasional, sonrisa y cejas según el ánimo y pequeñas
  *   microexpresiones al azar.
@@ -39,6 +42,8 @@ internal class HoloRig(
     private val presence: MashaPresence,
     engine: Engine,
     private val shader: HoloShader? = null,
+    /** Entidad de la cámara: Masha la mira (0 = una posición por defecto delante de ella). */
+    private val cameraEntity: Int = 0,
 ) {
 
     private val animator = node.animator
@@ -59,6 +64,13 @@ internal class HoloRig(
     private val springs = runCatching {
         SpringBonesFilament(engine, node.modelInstance.asset, node.modelInstance).takeIf { it.active }
     }.getOrNull()
+
+    /* ── cuerpo: después de los muelles (que guardan el reposo) y antes del primer clip ── */
+
+    private val motion = runCatching {
+        MashaAnimatorFilament(engine, node.modelInstance.asset, node.modelInstance, animator)
+    }.onFailure { Log.w(TAG, "sin animador del cuerpo; solo reposo", it) }.getOrNull()
+    private val input = MotionInput()
 
     /* ── materiales ───────────────────────────────────────────── */
 
@@ -124,14 +136,9 @@ internal class HoloRig(
     private var start = -1L
     private var last = 0L
 
-    private var current = idle
-    private var currentAt = 0f
-    private var previous = -1
-    private var previousAt = 0f
-    private var fadeAt = 0f
-    private var oneShot = -1
-    private var cueSeen = 0
-    private var wasThinking = false
+    // Desde que se crea el rig (no desde el primer fotograma): el saludo que se
+    // pide justo al estar lista la escena llega a veces antes de ese fotograma.
+    private var cueSeen = presence.cueSeq
 
     private val skin = FloatArray(3)
     private val glow = FloatArray(3)
@@ -193,91 +200,62 @@ internal class HoloRig(
         if (start < 0) {
             start = frameTimeNanos
             last = frameTimeNanos
-            cueSeen = presence.cueSeq
         }
         val t = (frameTimeNanos - start) / 1e9f
         val dt = ((frameTimeNanos - last) / 1e9f).coerceIn(0f, 0.1f)
         last = frameTimeNanos
 
-        body(t, frameTimeNanos)
-        faceFrame(t, dt, frameTimeNanos)
+        // La boca de este fotograma: la usan el cuerpo (gestos al ritmo), la cara y el brillo.
+        presence.lipSync.sample(frameTimeNanos, mouth)
+        body(t, dt, frameTimeNanos)
+        faceFrame(t, dt)
         hologram(t, dt)
     }
 
     /* ── cuerpo ───────────────────────────────────────────────── */
 
-    private fun base(): Int = when {
-        presence.speaking -> clips["Talk"]
-        presence.listening -> clips["Listen"]
-        else -> null
-    } ?: idle
-
-    private fun switchTo(clip: Int, t: Float) {
-        if (clip == current) return
-        previous = current
-        previousAt = currentAt
-        fadeAt = t
-        current = clip
-        currentAt = t
-    }
-
-    private fun body(t: Float, now: Long) {
-        // Gestos: los pedidos por la interfaz y "pensar" al empezar a esperar.
+    private fun body(t: Float, dt: Float, now: Long) {
+        val m = motion
         if (presence.cueSeq != cueSeen) {
             cueSeen = presence.cueSeq
-            val clip = when (presence.cue) {
-                MashaPresence.Cue.Wave -> clips["Wave"]
-                MashaPresence.Cue.Explain -> clips["Explain"]
-                MashaPresence.Cue.None -> null
-            }
-            if (clip != null) {
-                oneShot = clip
-                switchTo(clip, t)
-            }
+            actionOf(presence.cue)?.let { m?.core?.cue(it) }
         }
-        val thinking = presence.thinking
-        if (thinking && !wasThinking && oneShot < 0) {
-            clips["Think"]?.let {
-                oneShot = it
-                switchTo(it, t)
-            }
-        }
-        wasThinking = thinking
-
-        if (oneShot >= 0) {
-            val d = animator.getAnimationDuration(oneShot)
-            if (t - currentAt >= d - FADE) {
-                oneShot = -1
-                switchTo(base(), t)
-            }
+        if (m != null) {
+            input.speaking = presence.speaking
+            input.listening = presence.listening
+            input.thinking = presence.thinking
+            input.mood = presence.mood
+            input.voice = mouth.v[LipSync.V.Open.ordinal]
+            // Clips → capas → mirada → pies (y escribe las locales).
+            m.frame(t, dt, input, cameraEntity)
         } else {
-            switchTo(base(), t)
-        }
-
-        animator.applyAnimation(current, clipTime(current, t - currentAt, loop = oneShot < 0))
-        val fade = (t - fadeAt) / FADE
-        if (previous >= 0 && fade < 1f) {
-            animator.applyCrossFade(previous, clipTime(previous, t - previousAt, loop = true), smooth(fade))
+            val d = animator.getAnimationDuration(idle)
+            animator.applyAnimation(idle, if (d > 0f) t % d else 0f)
         }
         for (r in rings) animator.applyAnimation(r, t % animator.getAnimationDuration(r))
-        // Giros y muelles leen lo que acaban de escribir los clips; después, las matrices.
+        // Giros y muelles leen lo que acaba de quedar en los huesos; después, las matrices.
         springs?.frame(now)
         animator.updateBoneMatrices()
     }
 
-    private fun clipTime(clip: Int, elapsed: Float, loop: Boolean): Float {
-        val d = animator.getAnimationDuration(clip)
-        if (d <= 0f) return 0f
-        return if (loop) elapsed % d else min(elapsed, d)
+    private fun actionOf(cue: MashaPresence.Cue): Action? = when (cue) {
+        MashaPresence.Cue.None -> null
+        MashaPresence.Cue.Wave -> Action.Wave
+        MashaPresence.Cue.Explain -> Action.Explain
+        MashaPresence.Cue.Point -> Action.Point
+        MashaPresence.Cue.Nod -> Action.Nod
+        MashaPresence.Cue.Shrug -> Action.Shrug
+        MashaPresence.Cue.Happy -> Action.ReactHappy
+        MashaPresence.Cue.Surprised -> Action.ReactSurprised
     }
 
     /* ── cara ─────────────────────────────────────────────────── */
 
-    private fun faceFrame(t: Float, dt: Float, now: Long) {
+    private fun faceFrame(t: Float, dt: Float) {
         if (face == null || !morphs.usable) return
         val c = channels
         val mood = presence.visibleMood
-        presence.lipSync.sample(now, mouth)
+        val body = motion?.core
 
         // La boca sigue a los visemas con algo de inercia (no salta).
         val k = 1f - exp(-dt * 28f)
@@ -292,7 +270,9 @@ internal class HoloRig(
         val micro = if (t < microUntil) sin(((microUntil - t) / 0.8f).coerceIn(0f, 1f) * PI.toFloat()) else 0f
 
         val slow = 1f - exp(-dt * 4f)
-        c.smile += (mood.smile + (if (microKind == 1) 0.18f * micro else 0f) - c.smile) * slow
+        // Clips alegres (Var_GlanceSmile, React_Happy) suman su sonrisa.
+        val clipSmile = body?.smile ?: 0f
+        c.smile += (mood.smile + (if (microKind == 1) 0.18f * micro else 0f) + clipSmile - c.smile) * slow
         c.browUp += ((if (microKind == 0) 0.35f * micro else 0f) - c.browUp) * slow
         c.squint += ((if (microKind == 2) 0.5f * micro else 0f) - c.squint) * slow
         c.listen += ((if (presence.listening) 1f else 0f) - c.listen) * slow
@@ -303,10 +283,22 @@ internal class HoloRig(
             else -> 0f
         }) - c.frown) * slow
 
-        // Parpadeo del contrato (más espaciado pensando; el derecho, un pelo detrás).
+        // Parpadeo del contrato (más espaciado pensando; el derecho, un pelo detrás),
+        // y uno más en los cambios grandes de mirada y al final de cada frase.
+        if (body != null && body.blinkRequest) {
+            body.blinkRequest = false
+            blink.trigger(t)
+        }
         blink.update(t, slow = presence.thinking)
-        c.blinkL = blink.left(t)
-        c.blinkR = blink.right(t)
+        // Párpados acoplados a la mirada: mirar abajo los baja, mirar arriba los abre.
+        val pitch = body?.eyePitch ?: 0f
+        val lid = GazeConfig.lidDown(pitch)
+        val bl = blink.left(t)
+        val br = blink.right(t)
+        c.blinkL = bl + (1f - bl) * lid
+        c.blinkR = br + (1f - br) * lid
+        c.wideL = GazeConfig.lidUp(pitch)
+        c.wideR = c.wideL
 
         morphs.write(c, weights)
         face.setMorphWeights(weights, 0)
@@ -402,13 +394,7 @@ internal class HoloRig(
         fun isV2(node: ModelNode): Boolean =
             FaceMorphs.forNames(node.renderableNodes.firstOrNull { it.name == HEAD }?.morphTargetNames.orEmpty()) is FaceMorphs.V2
 
-        /** Segundos de fundido entre clips. */
-        private const val FADE = 0.45f
-
-        private fun smooth(x: Float): Float {
-            val c = x.coerceIn(0f, 1f)
-            return c * c * (3 - 2 * c)
-        }
+        private const val TAG = "HoloRig"
 
         /** ARGB sRGB → RGB lineal. */
         private fun linear(argb: Long, out: FloatArray) {
