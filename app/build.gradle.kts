@@ -74,6 +74,12 @@ android {
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
+
+    // El modelo y el entorno de Masha se leen enteros a memoria: sin comprimir
+    // en el APK se cargan sin descomprimir (y el Ogg ya viene comprimido).
+    androidResources {
+        noCompress += listOf("glb", "hdr")
+    }
 }
 
 ksp {
@@ -103,9 +109,12 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.coil.compose)
 
-    // Fondo animado de la interfaz (Ajustes → "Vídeo de fondo").
+    // Fondo animado de la interfaz (Ajustes → "Vídeo de fondo") y ambiente sonoro de Masha.
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
+
+    // Masha en 3D: SceneView (Compose) sobre Filament.
+    implementation(libs.sceneview)
 
     // Inyección de dependencias.
     implementation(libs.hilt.android)
