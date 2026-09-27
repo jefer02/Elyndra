@@ -41,7 +41,7 @@ class MashaPresence {
     /** Sincronía de labios de la frase en curso. */
     val lipSync = LipSync()
 
-    /** Gesto puntual pedido (saludar, explicar). Cada petición sube la secuencia. */
+    /** Gesto puntual pedido (saludar, explicar…). Cada petición sube la secuencia. */
     var cue by mutableStateOf(Cue.None)
         private set
     var cueSeq by mutableIntStateOf(0)
@@ -68,5 +68,9 @@ class MashaPresence {
             else -> visibleMood.energy * 0.6f
         }
 
-    enum class Cue { None, Wave, Explain }
+    /**
+     * Gestos que se pueden pedir. Si el modelo no trae el clip, no pasa nada
+     * (Point y Explain se sustituyen entre sí).
+     */
+    enum class Cue { None, Wave, Explain, Point, Nod, Shrug, Happy, Surprised }
 }
