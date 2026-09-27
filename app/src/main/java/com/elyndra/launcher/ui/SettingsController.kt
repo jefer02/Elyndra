@@ -145,6 +145,45 @@ class SettingsController(private val vm: ElyndraViewModel) {
         store.mashaParticleColor = argb
     }
 
+    /** Partículas de neón alrededor del icono o la carátula seleccionados. */
+    var selectionParticles by mutableStateOf(store.selectionParticles); private set
+
+    fun toggleSelectionParticles() {
+        selectionParticles = !selectionParticles
+        store.selectionParticles = selectionParticles
+    }
+
+    /** Color (ARGB) de las partículas de la selección. */
+    var selectionParticleColor by mutableIntStateOf(store.selectionParticleColor); private set
+
+    fun updateSelectionParticleColor(argb: Int) {
+        selectionParticleColor = argb
+        store.selectionParticleColor = argb
+    }
+
+    /* ── Masha: voz y ambiente sonoro ─────────────────────────── */
+
+    var mashaVoice by mutableStateOf(store.mashaVoice); private set
+
+    fun toggleMashaVoice() {
+        mashaVoice = !mashaVoice
+        store.mashaVoice = mashaVoice
+    }
+
+    var mashaSoundscape by mutableStateOf(store.mashaSoundscape); private set
+
+    fun toggleMashaSoundscape() {
+        mashaSoundscape = !mashaSoundscape
+        store.mashaSoundscape = mashaSoundscape
+    }
+
+    var mashaSoundscapeVolume by mutableIntStateOf(store.mashaSoundscapeVolume); private set
+
+    fun updateMashaSoundscapeVolume(v: Int) {
+        mashaSoundscapeVolume = v.coerceIn(0, 100)
+        store.mashaSoundscapeVolume = mashaSoundscapeVolume
+    }
+
     /* ── pantalla: 120 / 60 fps ───────────────────────────────── */
 
     /** La pantalla llega a 120 Hz (o más). Si no, la opción de 120 fps sale desactivada. */

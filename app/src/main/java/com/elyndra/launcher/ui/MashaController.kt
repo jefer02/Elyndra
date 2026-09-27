@@ -27,6 +27,7 @@ import com.elyndra.launcher.masha.StoredMessage
 import com.elyndra.launcher.masha.ToolCall
 import com.elyndra.launcher.masha.offline.OfflineIntent
 import com.elyndra.launcher.masha.offline.OfflineIntents
+import com.elyndra.launcher.ui.masha.MashaMood
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -54,6 +55,12 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     var working by mutableStateOf<UiText?>(null); private set
 
     val messages = mutableStateListOf<ChatMessage>()
+
+    /**
+     * El ánimo de la última respuesta (frío al analizar, lavanda al bromear o
+     * al consolar). Lo pinta el holograma; se deduce en local, sin tocar la IA.
+     */
+    var mood by mutableStateOf(MashaMood.Neutral); private set
 
     /** La sugerencia ambiental del momento (null = nada que decir). */
     var insight by mutableStateOf<Insight?>(null); private set
@@ -153,6 +160,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
         val buffer = StringBuilder()
         var attachment: MashaAttachment? = null
         val done = ArrayList<String>()
+        val tools = ArrayList<String>()
 
         fun render(final: Boolean) {
             if (index !in messages.indices) return
@@ -173,7 +181,10 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                     buffer.append(event.text)
                     render(final = false)
                 }
-                is MashaEvent.ToolStarted -> working = workingLabel(event.call)
+                is MashaEvent.ToolStarted -> {
+                    tools += event.call.name
+                    working = workingLabel(event.call)
+                }
                 is MashaEvent.ToolFinished -> {
                     working = null
                     when (val a = event.result.attachment) {
@@ -187,6 +198,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                     buffer.setLength(0)
                     buffer.append(event.text)
                     render(final = true)
+                    mood = MashaMood.read(event.text, tools, failed = false)
                     val game = if (attachment == null) findMentionedGame(event.text) else null
                     if (game != null && index in messages.indices) messages[index] = messages[index].copy(game = game)
                     persist(StoredMessage(MashaTurn.Role.Masha, event.text, game?.key, attachment, System.currentTimeMillis()))
@@ -198,6 +210,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                         offlineReply(text, failure = event.error)
                     } else {
                         render(final = true)
+                        mood = MashaMood.Concerned
                         persist(StoredMessage(MashaTurn.Role.Masha, event.partial, null, attachment, System.currentTimeMillis()))
                         vm.showToast(errorText(event.error))
                     }
@@ -273,6 +286,8 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
         }
         val prefix = failure?.let { ctx.getString(failureLine(it)) + "\n\n" }.orEmpty()
         val full = prefix + reply
+        // Sin IA no hay herramientas que mirar: una tarjeta de datos cuenta como análisis.
+        mood = MashaMood.read(reply, if (attachment != null) listOf(MashaTools.GET_STATS) else emptyList(), failed = failure != null)
         messages += ChatMessage(fromMasha = true, text = full, game = game, attachment = attachment, offline = true)
         persist(StoredMessage(MashaTurn.Role.Masha, full, game?.key, attachment, System.currentTimeMillis()))
     }
