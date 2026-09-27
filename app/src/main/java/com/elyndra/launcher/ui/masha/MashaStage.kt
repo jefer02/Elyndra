@@ -192,7 +192,8 @@ fun MashaStage(
             null
         }
         childNodes += node
-        rig = HoloRig(node, presence, gpu.engine, shader)
+        // Masha mira a la cámara: el rig lee su posición en cada fotograma.
+        rig = HoloRig(node, presence, gpu.engine, shader, cameraEntity = cameraNode.entity)
         status(StageStatus.Ready)
     }
 
