@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -58,7 +59,10 @@ import com.elyndra.launcher.R
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.components.ElyText
+import com.elyndra.launcher.ui.components.GlowingSwitch
 import com.elyndra.launcher.ui.components.SettingsGroup
+import com.elyndra.launcher.ui.components.neonParticles
+import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.LocalReducedMotion
 import com.elyndra.launcher.ui.theme.consoleFocus
 import kotlin.math.PI
@@ -93,35 +97,79 @@ private const val PICK_VALUE = 1f
 @Composable
 internal fun ParticleColorGroup(vm: ElyndraViewModel) {
     val s = vm.settings
-    val color = Color(s.mashaParticleColor)
+    ParticleColorPicker(
+        title = stringResource(R.string.masha_particles_title),
+        desc = stringResource(R.string.masha_particles_desc),
+        argb = s.mashaParticleColor,
+        onPick = s::updateMashaParticleColor,
+    ) { color -> ParticlePreview(color) }
+}
+
+/**
+ * Ajustes → Masha → partículas de la selección: las chispas de neón que caen
+ * alrededor del icono o la carátula seleccionados. Mismo selector de color que
+ * la estela de Masha, más un interruptor para apagarlas.
+ */
+@Composable
+internal fun SelectionParticlesGroup(vm: ElyndraViewModel) {
+    val s = vm.settings
+    ParticleColorPicker(
+        title = stringResource(R.string.selection_particles_title),
+        desc = stringResource(R.string.selection_particles_desc),
+        argb = s.selectionParticleColor,
+        onPick = s::updateSelectionParticleColor,
+        enabled = s.selectionParticles,
+        onToggle = s::toggleSelectionParticles,
+    ) { color -> SelectionPreview(color, s.selectionParticles) }
+}
+
+/**
+ * El bloque común de color de partículas: título con su vista previa (y su
+ * interruptor, si lo tiene), colores de partida y deslizador de tono. Apagado,
+ * el color se sigue pudiendo elegir, pero se lee como en reposo.
+ */
+@Composable
+private fun ParticleColorPicker(
+    title: String,
+    desc: String,
+    argb: Int,
+    onPick: (Int) -> Unit,
+    enabled: Boolean = true,
+    onToggle: (() -> Unit)? = null,
+    preview: @Composable (Color) -> Unit,
+) {
     SettingsGroup(padding = 0.dp) {
         Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                ElyText(stringResource(R.string.masha_particles_title), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
+                ElyText(title, size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
                 Spacer(Modifier.height(4.dp))
-                ElyText(stringResource(R.string.masha_particles_desc), size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
+                ElyText(desc, size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
             }
             Spacer(Modifier.width(12.dp))
-            ParticlePreview(color)
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PRESETS.forEach { argb ->
-                ColorDot(Color(argb), selected = argb == s.mashaParticleColor, modifier = Modifier.weight(1f)) {
-                    s.updateMashaParticleColor(argb)
-                }
+            preview(Color(argb))
+            if (onToggle != null) {
+                Spacer(Modifier.width(12.dp))
+                GlowingSwitch(enabled, onToggle)
             }
         }
-        Spacer(Modifier.height(12.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ElyText(stringResource(R.string.masha_particles_hue), size = 11.5f, weight = FontWeight.Medium, color = P.ink)
-            Spacer(Modifier.weight(1f))
-            ElyText("${hueOf(s.mashaParticleColor).roundToInt()}°", size = 11.5f, weight = FontWeight.Medium, color = P.ink2)
+        Column(Modifier.alpha(if (enabled) 1f else 0.45f)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PRESETS.forEach { preset ->
+                    ColorDot(Color(preset), selected = preset == argb, modifier = Modifier.weight(1f)) { onPick(preset) }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ElyText(stringResource(R.string.masha_particles_hue), size = 11.5f, weight = FontWeight.Medium, color = P.ink)
+                Spacer(Modifier.weight(1f))
+                ElyText("${hueOf(argb).roundToInt()}°", size = 11.5f, weight = FontWeight.Medium, color = P.ink2)
+            }
+            Spacer(Modifier.height(7.dp))
+            HueSlider(hueOf(argb)) { hue ->
+                onPick(Color.hsv(hue, PICK_SATURATION, PICK_VALUE).toArgb())
+            }
+            Spacer(Modifier.height(12.dp))
         }
-        Spacer(Modifier.height(7.dp))
-        HueSlider(hueOf(s.mashaParticleColor)) { hue ->
-            s.updateMashaParticleColor(Color.hsv(hue, PICK_SATURATION, PICK_VALUE).toArgb())
-        }
-        Spacer(Modifier.height(12.dp))
     }
 }
 
@@ -185,6 +233,32 @@ private fun ParticlePreview(color: Color) {
             contentDescription = stringResource(R.string.masha_particles_preview),
             contentScale = ContentScale.Crop,
             modifier = Modifier.size(26.dp).clip(CircleShape).border(1.5.dp, color, CircleShape),
+        )
+    }
+}
+
+/**
+ * Vista previa de la selección: una card en miniatura con su marco de acento
+ * y las mismas chispas de neón que la card seleccionada de verdad.
+ */
+@Composable
+private fun SelectionPreview(color: Color, enabled: Boolean) {
+    val skin = LocalSkin.current
+    val shape = RoundedCornerShape(8.dp)
+    Box(
+        Modifier
+            .size(64.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF0B0E13)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .size(26.dp)
+                .neonParticles(enabled, color, frame = 2.5.dp, sparkScale = 0.6f)
+                .clip(shape)
+                .background(Brush.linearGradient(listOf(skin.a1, skin.a2)))
+                .border(2.5.dp, if (enabled) color else skin.a1, shape),
         )
     }
 }

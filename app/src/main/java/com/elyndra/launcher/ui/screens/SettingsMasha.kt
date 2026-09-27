@@ -116,6 +116,9 @@ internal fun MashaColumn(vm: ElyndraViewModel) {
         // La estela de partículas del botón de Masha: su color.
         ParticleColorGroup(vm)
 
+        // Las chispas de neón de la selección: encendidas o no, y su color.
+        SelectionParticlesGroup(vm)
+
         // Tiempo de juego exacto (acceso de uso, opcional).
         SettingsGroup(padding = 0.dp) {
             Row(
