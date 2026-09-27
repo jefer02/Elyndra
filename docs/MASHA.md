@@ -11,7 +11,8 @@ cambiado de sitio**: la conversación, las herramientas, la memoria y DeepSeek s
 en MPFB2 (MakeHuman para Blender). Sustituye al personaje procedural de `tools/masha/`, del
 que solo se reutiliza el holotanque.
 
-    blender -b --factory-startup -P tools/masha_v2/build.py -- --stages body,face,hands,export --qa 0 --out out/masha_v2
+    blender -b -P tools/masha_v2/build.py -- --stages body,face,hands,shoulders,export --qa 0 --out out/masha_v2
+    # sin --factory-startup: desactivaría la extensión MPFB
     # copiar out/masha_v2/masha*.glb a app/src/main/assets/masha/
     # y out/masha_v2/runtime_textures/*.png a app/src/main/assets/masha/textures/
 

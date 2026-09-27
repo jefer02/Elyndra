@@ -1,6 +1,6 @@
 """Masha v2 build entry point.
 
-  blender -b -P build.py -- --stages body,face,hands,export --qa 1 --out <dir> --quality high [--bodymod body_frozen]
+  blender -b -P build.py -- --stages body,face,hands,shoulders,export --qa 1 --out <dir> --quality high [--bodymod body_frozen]
 
 Stages run in order; each module exposes build(ctx). A stage can be skipped for iteration,
 but later stages assume earlier ones ran. Saves <out>/masha_v2_<last stage>.blend.
@@ -16,11 +16,11 @@ if HERE not in sys.path:
 import bpy  # noqa: E402
 import common  # noqa: E402
 
-ORDER = ["body", "face", "hands", "export"]
+ORDER = ["body", "face", "hands", "shoulders", "export"]
 
 
 def main():
-    args = common.parse_args({"stages": "body,face,hands,export", "qa": "1",
+    args = common.parse_args({"stages": "body,face,hands,shoulders,export", "qa": "1",
                               "out": os.path.join(HERE, "out"), "quality": "high",
                               "bodymod": "body"})
     stages = [s for s in ORDER if s in args["stages"].split(",")]
