@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -71,6 +73,7 @@ import com.elyndra.launcher.ui.components.Hero
 import com.elyndra.launcher.ui.components.LogoImage
 import com.elyndra.launcher.ui.components.MaterializingContainer
 import com.elyndra.launcher.ui.components.OpenButton
+import com.elyndra.launcher.ui.components.neonParticles
 import com.elyndra.launcher.ui.components.metrics
 import com.elyndra.launcher.ui.components.rememberGameDescription
 import com.elyndra.launcher.ui.components.tracking
@@ -109,6 +112,8 @@ fun FolderScreen(vm: ElyndraViewModel) {
 
     // Un solo reloj para la flotación de todos los logos de juego de la pantalla.
     val floatClock = rememberFloatClock()
+    // Chispas de neón de la carátula seleccionada (Ajustes → Masha); null = apagadas.
+    val sparkColor = if (vm.settings.selectionParticles) Color(vm.settings.selectionParticleColor) else null
 
     Column(Modifier.fillMaxSize().animFadeIn(key = Screen.Folder)) {
 
@@ -121,59 +126,76 @@ fun FolderScreen(vm: ElyndraViewModel) {
             height = m.heroH,
             imagePath = rom?.let { it.meta.hero ?: it.meta.screenshot },
             topBar = {
-                Row(
+                BoxWithConstraints(
                     Modifier
                         .align(Alignment.TopStart)
                         .fillMaxWidth()
                         .padding(start = m.pad, end = m.pad, top = if (m.landscape) 8.dp else 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // Arriba a la izquierda, a la misma altura que la barra de la
-                    // biblioteca (donde está Ajustes): volver, "Abrir" y el
-                    // selector de emulador, juntos. El nombre de la carpeta pasa
-                    // a la derecha y cede el ancho que haga falta.
-                    ConsoleIconButton(
-                        onClick = { vm.go(Screen.Library) },
-                        focused = vm.input.isBarFocused(BarItem.Back),
-                    ) { glyph -> Box(glyph) { BackChevron(color = Color.White) } }
-                    Spacer(Modifier.width(8.dp))
-                    OpenButton(enabled = rom != null, focused = vm.input.isBarFocused(BarItem.Open)) { rom?.let { vm.openRom(it) } }
-                    Spacer(Modifier.width(8.dp))
-                    // El nombre del emulador puede ser larguísimo: se queda como
-                    // mucho con la mitad de lo que sobra, el resto es para el título.
-                    Box(
-                        Modifier
-                            .weight(1f, fill = false)
-                            .height(HeroBarHeight)
-                            .alpha(if (item.emulatorInstalled) 1f else 0.6f)
-                            .darkGlass(RoundedCornerShape(11.dp))
-                            .consoleFocus(vm.input.isBarFocused(BarItem.Emulator), cornerRadius = 11.dp)
-                            .clickable { vm.pickFolderEmulator(item.folder) }
-                            .padding(horizontal = 11.dp),
-                        contentAlignment = Alignment.CenterStart,
+                    // Tope del selector de emulador: su nombre puede ser larguísimo.
+                    val emulatorMax = maxWidth * 0.32f
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        ElyText(
-                            emulatorLabel,
-                            size = 10f,
-                            weight = FontWeight.SemiBold,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                        ElyText(item.system.name, size = 12.5f, weight = FontWeight.SemiBold, color = Color.White, maxLines = 1, align = TextAlign.End)
-                        Spacer(Modifier.height(2.dp))
-                        ElyText(
-                            item.folder.displayPath,
-                            size = 8.5f,
-                            color = Color.White.copy(alpha = 0.72f),
-                            letterSpacing = tracking(0.1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            align = TextAlign.End,
-                        )
+                        // Arriba a la izquierda, a la misma altura que la barra de la
+                        // biblioteca (donde está Ajustes): volver, "Abrir" y el
+                        // selector de emulador, juntos. El nombre de la carpeta pasa
+                        // a la derecha, pegado al borde, y cede el ancho que haga falta.
+                        ConsoleIconButton(
+                            onClick = { vm.go(Screen.Library) },
+                            focused = vm.input.isBarFocused(BarItem.Back),
+                        ) { glyph -> Box(glyph) { BackChevron(color = Color.White) } }
+                        Spacer(Modifier.width(8.dp))
+                        OpenButton(enabled = rom != null, focused = vm.input.isBarFocused(BarItem.Open)) { rom?.let { vm.openRom(it) } }
+                        Spacer(Modifier.width(8.dp))
+                        // El selector lleva un tope fijo y no un peso: con
+                        // `weight(fill = false)` la parte que no usaba se quedaba sin
+                        // repartir y el bloque de la derecha no llegaba al borde.
+                        Box(
+                            Modifier
+                                .widthIn(max = emulatorMax)
+                                .height(HeroBarHeight)
+                                .alpha(if (item.emulatorInstalled) 1f else 0.6f)
+                                .darkGlass(RoundedCornerShape(11.dp))
+                                .consoleFocus(vm.input.isBarFocused(BarItem.Emulator), cornerRadius = 11.dp)
+                                .clickable { vm.pickFolderEmulator(item.folder) }
+                                .padding(horizontal = 11.dp),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            ElyText(
+                                emulatorLabel,
+                                size = 10f,
+                                weight = FontWeight.SemiBold,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                            ElyText(
+                                item.system.name,
+                                modifier = Modifier.fillMaxWidth(),
+                                size = 12.5f,
+                                weight = FontWeight.SemiBold,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                align = TextAlign.End,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            ElyText(
+                                item.folder.displayPath,
+                                modifier = Modifier.fillMaxWidth(),
+                                size = 8.5f,
+                                color = Color.White.copy(alpha = 0.72f),
+                                letterSpacing = tracking(0.1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                align = TextAlign.End,
+                            )
+                        }
                     }
                 }
             },
@@ -341,6 +363,7 @@ fun FolderScreen(vm: ElyndraViewModel) {
                                 time = playedLabel(r),
                                 index = i,
                                 selected = r.key == rom?.key,
+                                sparkColor = sparkColor,
                                 pairIndex = vm.romPairIndex(r),
                                 width = m.romW,
                                 height = m.romTileH,
@@ -378,6 +401,8 @@ private fun RomTile(
     time: String,
     index: Int,
     selected: Boolean,
+    /** Color de las chispas de neón de la selección; null = sin chispas. */
+    sparkColor: Color?,
     pairIndex: Int,
     width: Dp,
     height: Dp,
@@ -398,6 +423,11 @@ private fun RomTile(
     val curtain = curtainAlpha(minOf(index, 12) * 40, key = rom.id)
     val sheen = sheenProgress()
     val cover = rom.meta.cover
+    // Con las chispas encendidas, el marco (y su resplandor) toman su color.
+    val sparkFrame = sparkColor?.takeIf { selected }
+    val sparks = sparkFrame != null
+    val frameColor = sparkFrame ?: skin.a1
+    val glowColor = if (sparks) frameColor.copy(alpha = 0.6f) else P.shade.copy(alpha = if (selected) 0.32f else 0.2f)
     // El detector de gestos sobrevive a las recomposiciones (llave = id): tiene
     // que llamar a las lambdas actuales, que llevan la ROM con sus datos al día.
     val tap by rememberUpdatedState(onTap)
@@ -427,17 +457,20 @@ private fun RomTile(
                     scaleX = scale * pressed.value
                     scaleY = scale * pressed.value
                 }
+                // Tras la escala (la acompañan) y antes del recorte: las chispas
+                // caen por el marco, encima de la card, y su halo asoma fuera.
+                .neonParticles(sparks, frameColor)
                 .shadow(
                     if (press.pressed) 4.dp else if (selected) 16.dp else 8.dp,
                     shape,
                     clip = false,
-                    ambientColor = P.shade.copy(alpha = if (selected) 0.32f else 0.2f),
-                    spotColor = P.shade.copy(alpha = if (selected) 0.32f else 0.2f),
+                    ambientColor = glowColor,
+                    spotColor = glowColor,
                 )
                 .clip(shape)
                 .border(
                     if (selected) 6.dp else 1.dp,
-                    if (selected) skin.a1 else P.hairline,
+                    if (selected) frameColor else P.hairline,
                     shape,
                 ),
         ) {
