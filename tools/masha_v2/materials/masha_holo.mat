@@ -1,0 +1,269 @@
+// =============================================================================
+// masha_holo.mat — Masha's holographic body / head skin ("holo suit").
+//
+// Filament 1.56.0 material. Compile ONLY with the matching matc (see
+// tools/masha_v2/compile_materials.ps1); a version mismatch aborts at runtime.
+//
+// Look: a translucent, *lit* hologram. The base color is dark and desaturated so
+// the key/rim/fill lights and the IBL still model the volumes (face, breasts,
+// arms) instead of a flat emissive silhouette. On top of the lighting, added
+// after lighting (postLightingColor, additive), come the hologram effects:
+// Fresnel rim, flowing circuit pulses, panel seams, world-space scanlines, a
+// slow scan sweep and the signal glitch.
+//
+// Transparency: `transparent` + `twoPassesOneSide` = depth pre-pass, so only
+// the nearest surface is shaded (no arm-through-torso, no far eye through the
+// head). Output is premultiplied alpha.
+//
+// UV0 is the glTF UV (flipUV false): textures are uploaded top row first,
+// exactly like gltfio does, so the Blender-painted masks line up.
+//
+// -----------------------------------------------------------------------------
+// Samplers (2)
+//   suitMask    RGBA8 linear, body UV0 space.  R = panel seams, G = circuit
+//               traces, B = flow phase 0..1 along the traces, A = suit coverage.
+//               Bind a 1x1 texture and set useSuitMask = 0 to use the built-in
+//               procedural pattern (works on any UV-mapped mesh).
+//   suitNormal  RGB8 linear tangent-space normal map (seams/panels). Bind a 1x1
+//               (128,128,255) texture when there is none.
+//
+// Parameters (default / range — effect). Filament has no parameter defaults:
+// the Kotlin side (HoloShader.kt) always sets every one of them.
+//   time              0 / [0, 1e4) s   — animation clock (wrap it on the CPU).
+//   baseColor         mood skin, linear RGB — hologram body color.
+//   glowColor         mood glow, linear RGB — circuits, seams, scanlines.
+//   rimColor          linear RGB — Fresnel rim color (≈ glowColor, a bit whiter).
+//   albedo            0.30 / [0, 1]    — base color scale (keep low: volumes read by light).
+//   desaturate        0.45 / [0, 1]    — pulls the base color towards grey.
+//   roughness         0.42 / [0.05, 1] — skin roughness.
+//   suitRoughness     0.30 / [0.05, 1] — roughness where the suit covers (A).
+//   suitDarken        0.35 / [0, 1]    — suit panels darker than skin (reads as clothing).
+//   specular          0.45 / [0, 1]    — Filament reflectance (IBL + highlights).
+//   normalStrength    1.0 / [0, 2]     — scales the normal map XY.
+//   rimPower          3.0 / [0.5, 8]   — Fresnel exponent (higher = thinner rim).
+//   rimIntensity      0.9 / [0, 4]     — Fresnel rim emission.
+//   rimAlpha          0.45 / [0, 1]    — how much the rim also becomes opaque.
+//   circuitIntensity  3.0 / [0, 8]     — emission of the traveling pulses.
+//   circuitBase       0.18 / [0, 1]    — steady glow of the traces between pulses.
+//   circuitSpeed      0.30 / [0, 2]    — phase units per second (pulse speed).
+//   pulseWidth        0.14 / [0.02, 0.6] — pulse length as a fraction of the period.
+//   pulseCount        3.0 / [1, 8]     — pulses per phase 0..1 (per circuit).
+//   seamIntensity     0.35 / [0, 2]    — faint emission of the panel seams.
+//   scanlineDensity   110 / [20, 400]  — lines per world metre (vertical axis).
+//   scanlineIntensity 0.08 / [0, 1]    — scanline emission + alpha interlace (x emissiveDamp).
+//   scanlineSpeed     0.04 / [-1, 1]   — metres per second.
+//   sweepIntensity    0.30 / [0, 2]    — slow bright scan band moving up the body.
+//   sweepSpeed        0.18 / [0, 2]    — sweeps per second (band repeats every 4 m).
+//   glitch            0 / [0, 1]       — signal glitch amount (CPU drives it in bursts).
+//   glitchSeed        0 / any          — changes the glitch pattern per burst.
+//   alpha             0.86 / [0, 1]    — global opacity (face instance: 1.0; see HoloShader.kt).
+//   energy            0.5 / [0, 1]     — mood energy: speeds up/brightens circuits.
+//   pulse             0 / [0, 1.5]     — voice/mic pulse: brightens rim + circuits.
+//   selfIllum         0.04 / [0, 0.3]  — uniform glow (x glowColor): the hologram emits a
+//                                        little light of its own; lifts the shadow side.
+//   emissiveDamp      1.0 / [0, 1]     — scales circuits/seams/scanlines/sweep and the
+//                                        scanline alpha interlace. Face instance: 0.3.
+//   useSuitMask       0 / {0, 1}       — 1 = sample suitMask, 0 = procedural pattern.
+//   proceduralScale   24 / [4, 64]     — cells per UV unit of the procedural pattern.
+// =============================================================================
+
+material {
+    name : masha_holo,
+    shadingModel : lit,
+    blending : transparent,
+    transparency : twoPassesOneSide,
+    doubleSided : false,
+    flipUV : false,
+    specularAntiAliasing : true,
+    specularAntiAliasingVariance : 0.15,
+    specularAntiAliasingThreshold : 0.2,
+    postLightingBlending : add,
+    requires : [ uv0 ],
+    variables : [
+        holoFx
+    ],
+    parameters : [
+        { type : sampler2d, name : suitMask, format : float, precision : medium },
+        { type : sampler2d, name : suitNormal, format : float, precision : medium },
+        { type : float, name : time, precision : high },
+        { type : float3, name : baseColor },
+        { type : float3, name : glowColor },
+        { type : float3, name : rimColor },
+        { type : float, name : albedo },
+        { type : float, name : desaturate },
+        { type : float, name : roughness },
+        { type : float, name : suitRoughness },
+        { type : float, name : suitDarken },
+        { type : float, name : specular },
+        { type : float, name : normalStrength },
+        { type : float, name : rimPower },
+        { type : float, name : rimIntensity },
+        { type : float, name : rimAlpha },
+        { type : float, name : circuitIntensity },
+        { type : float, name : circuitBase },
+        { type : float, name : circuitSpeed },
+        { type : float, name : pulseWidth },
+        { type : float, name : pulseCount },
+        { type : float, name : seamIntensity },
+        { type : float, name : scanlineDensity },
+        { type : float, name : scanlineIntensity },
+        { type : float, name : scanlineSpeed },
+        { type : float, name : sweepIntensity },
+        { type : float, name : sweepSpeed },
+        { type : float, name : glitch },
+        { type : float, name : glitchSeed },
+        { type : float, name : alpha },
+        { type : float, name : energy },
+        { type : float, name : pulse },
+        { type : float, name : emissiveDamp },
+        { type : float, name : selfIllum },
+        { type : float, name : useSuitMask },
+        { type : float, name : proceduralScale }
+    ],
+    // No shadows are cast on Masha, no SSR, no stereo: fewer variants, smaller
+    // package. Skinning/morphing and fog variants stay (both are used).
+    variantFilter : [ shadowReceiver, vsm, ssr, stereo ]
+}
+
+vertex {
+    highp float holoHash(highp float n) {
+        return fract(sin(n) * 43758.5453);
+    }
+
+    void materialVertex(inout MaterialVertexInputs material) {
+        // holoFx.x = glitch band strength for this vertex, .y = user-world Y
+        // (interpolated: scanlines and sweep use it, stable under camera motion).
+        highp vec4 userPos = getUserWorldFromWorldMatrix() * vec4(material.worldPosition.xyz, 1.0);
+        material.holoFx = vec4(0.0, userPos.y, 0.0, 0.0);
+
+        float g = materialParams.glitch;
+        if (g > 0.001) {
+            // Horizontal tearing: the body is cut into bands along Y; a random
+            // subset jumps sideways (camera right), re-rolled 20 times a second.
+            highp float step20 = floor(materialParams.time * 20.0) + materialParams.glitchSeed * 17.0;
+            highp float bands = 9.0 + 14.0 * holoHash(step20 * 1.31);
+            highp float band = floor(userPos.y * bands + holoHash(step20) * 3.0);
+            highp float r = holoHash(band * 7.13 + step20 * 3.7);
+            float on = step(1.0 - 0.45 * g, r);
+            highp float shift = (holoHash(band * 1.91 + step20 * 0.77) - 0.5) * 0.07 * g * on;
+            highp vec3 camRight = getWorldFromViewMatrix()[0].xyz;
+            material.worldPosition.xyz += camRight * shift;
+            material.holoFx.x = on * g;
+        }
+    }
+}
+
+fragment {
+    highp float holoHash12(highp vec2 p) {
+        highp vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+        p3 += dot(p3, p3.yzx + 33.33);
+        return fract((p3.x + p3.y) * p3.z);
+    }
+
+    // Fallback when no suit mask is bound: a Manhattan circuit board in UV
+    // space. R = seams, G = traces, B = phase along the trace, A = coverage.
+    vec4 proceduralSuitMask(highp vec2 uv) {
+        highp float scale = materialParams.proceduralScale;
+        highp vec2 g = uv * scale;
+        highp vec2 cell = floor(g);
+        highp vec2 f = g - cell;
+        highp float h = holoHash12(cell);
+        bool horizontal = h < 0.5;
+        highp float d = horizontal ? abs(f.y - 0.5) : abs(f.x - 0.5);
+        highp float aa = max(fwidth(horizontal ? g.y : g.x), 1e-4);
+        float onCell = step(0.18, h) * (1.0 - step(0.86, h));
+        float trace = onCell * (1.0 - smoothstep(0.04, 0.04 + aa * 1.5, d));
+        // Phase runs along the trace direction, continuous across cells.
+        highp float along = horizontal ? g.x : g.y;
+        float phase = fract(along * 0.125 + h * 0.37);
+        highp vec2 s = abs(fract(uv * scale * 0.25) - 0.5);
+        highp float saa = max(fwidth(uv.x * scale * 0.25), 1e-4);
+        float seam = smoothstep(0.5 - saa * 1.5, 0.5, max(s.x, s.y));
+        return vec4(seam, trace, phase, 1.0);
+    }
+
+    void material(inout MaterialInputs material) {
+        highp vec2 uv = getUV0();
+        highp float t = materialParams.time;
+
+        vec4 mask = materialParams.useSuitMask > 0.5
+                ? texture(materialParams_suitMask, uv)
+                : proceduralSuitMask(uv);
+        float seam = mask.r;
+        float trace = mask.g;
+        float phase = mask.b;
+        float suit = mask.a;
+
+        // Tangent-space normal (seams/panels). A flat 1x1 map = no change.
+        vec3 n = texture(materialParams_suitNormal, uv).xyz * 2.0 - 1.0;
+        n.xy *= materialParams.normalStrength * suit;
+        material.normal = normalize(vec3(n.xy, max(n.z, 1e-3)));
+
+        prepareMaterial(material);
+
+        float NoV = saturate(dot(getWorldNormalVector(), getWorldViewVector()));
+        float fresnel = pow(1.0 - NoV, materialParams.rimPower);
+        float energy = materialParams.energy;
+        float pulse = materialParams.pulse;
+        float damp = materialParams.emissiveDamp;
+        float glitchBand = variable_holoFx.x;
+        highp float worldY = variable_holoFx.y;
+
+        // ---- surface (lit): dark, desaturated, suit a bit darker and glossier
+        vec3 tint = materialParams.baseColor;
+        float luma = dot(tint, vec3(0.2126, 0.7152, 0.0722));
+        vec3 base = mix(tint, vec3(luma), materialParams.desaturate) * materialParams.albedo;
+        base *= 1.0 - materialParams.suitDarken * suit;
+
+        // ---- world-space scanlines (anti-aliased: they fade out when they get
+        // denser than the pixel grid, no moiré at full-body distance)
+        highp float sy = worldY * materialParams.scanlineDensity - t * materialParams.scanlineSpeed * materialParams.scanlineDensity;
+        float scanFade = saturate(1.5 - fwidth(sy) * 2.5);
+        float scan = 1.0 - abs(fract(sy) - 0.5) * 2.0;          // triangle 0..1
+        scan = scan * scan * scan * scanFade;
+
+        // ---- slow scan sweep band moving upwards
+        highp float sw = fract(worldY * 0.25 - t * materialParams.sweepSpeed) - 0.5;
+        float sweep = exp(-sw * sw * 900.0);
+
+        // ---- alpha: global, rim more opaque, scanline interlace, glitch flicker
+        float a = materialParams.alpha;
+        a = mix(a, 1.0, saturate(fresnel * materialParams.rimAlpha));
+        a *= 1.0 - materialParams.scanlineIntensity * 0.6 * (1.0 - scan) * scanFade * damp;
+        highp float gt = floor(t * 30.0);
+        float flicker = 1.0 - materialParams.glitch * 0.55 * holoHash12(vec2(gt, floor(worldY * 40.0)));
+        a *= flicker;
+        a = saturate(a);
+
+        material.baseColor = vec4(base * a, a);   // premultiplied
+        material.roughness = mix(materialParams.roughness, materialParams.suitRoughness, suit);
+        material.metallic = 0.0;
+        material.reflectance = materialParams.specular;
+
+        // ---- hologram emission (added after lighting)
+        vec3 glow = materialParams.glowColor;
+
+        // Circuit pulses: comet-shaped (sharp head, soft tail) traveling along B.
+        highp float speed = materialParams.circuitSpeed * (0.6 + 0.8 * energy);
+        highp float p = fract(phase * materialParams.pulseCount - t * speed);
+        float w = max(materialParams.pulseWidth, 0.01);
+        float head = saturate((p - (1.0 - w)) / w);
+        float comet = head * head * head;
+        float circuit = trace * (materialParams.circuitBase + comet) * materialParams.circuitIntensity
+                * (0.75 + 0.5 * energy + 0.6 * pulse);
+
+        float seams = seam * materialParams.seamIntensity * (0.8 + 0.4 * pulse);
+        float scanEmit = scan * materialParams.scanlineIntensity;
+        float sweepEmit = sweep * materialParams.sweepIntensity * (0.3 + 0.7 * suit + 0.5 * energy);
+
+        vec3 emit = glow * ((circuit + seams + scanEmit + sweepEmit) * damp + materialParams.selfIllum);
+        emit += materialParams.rimColor * (fresnel * materialParams.rimIntensity * (0.85 + 0.5 * pulse));
+
+        // Glitch: displaced bands flash with a chromatic split.
+        emit += vec3(glow.r * 0.6 + 0.3, glow.g * 0.2, glow.b + 0.2) * glitchBand * 0.9;
+        emit *= flicker;
+
+        // Emission fades with transparency a little (keeps glitches readable).
+        material.postLightingColor = vec4(emit * mix(1.0, a, 0.4), 0.0);
+    }
+}
