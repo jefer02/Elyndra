@@ -1,0 +1,537 @@
+{
+ "version": 1,
+ "mesh": "Masha_Head",
+ "head_vertices": 7047,
+ "head_triangles": 13471,
+ "morph_targets": [
+  "eyeBlinkLeft",
+  "eyeBlinkRight",
+  "eyeSquintLeft",
+  "eyeSquintRight",
+  "eyeWideLeft",
+  "eyeWideRight",
+  "browInnerUp",
+  "browDownLeft",
+  "browDownRight",
+  "browOuterUpLeft",
+  "browOuterUpRight",
+  "cheekSquintLeft",
+  "cheekSquintRight",
+  "mouthSmileLeft",
+  "mouthSmileRight",
+  "mouthFrownLeft",
+  "mouthFrownRight",
+  "jawOpen",
+  "mouthPucker",
+  "mouthPress",
+  "mouthLeft",
+  "viseme_aa",
+  "viseme_E",
+  "viseme_I",
+  "viseme_O",
+  "viseme_U",
+  "viseme_PP",
+  "viseme_FF",
+  "viseme_SS",
+  "viseme_DD",
+  "viseme_CH"
+ ],
+ "morph_vram_bytes_estimate": 5242968,
+ "notes": [
+  "Masha_Body carries no morph targets; all face morphs live on Masha_Head (brows, lashes, teeth, tongue joined in). Masha_Eyes carries no morphs; it is skinned to the eye bones.",
+  "Rest pose has closed lips. Visemes and jaw/lip shapes are absolute poses: weight 1.0 = full pose. jawOpen is pre-scaled (x0.6): 1.0 is the natural maximum, speech uses 0.15-0.5.",
+  "Weights of mouth shapes should sum to <= ~1.1 at any instant (normalise viseme blend)."
+ ],
+ "eye_bones": {
+  "left": "masha:eye.L",
+  "right": "masha:eye.R",
+  "parent": "mixamorig:Head",
+  "rest": "head at eyeball centre, bone points forward (-Y Blender / +Z glTF)",
+  "yaw": "rotate about bone-local Z (positive = eye looks to character's left)",
+  "pitch": "rotate about bone-local X (positive = eye looks up)",
+  "limits_deg": {
+   "yaw": 25,
+   "pitch_up": 15,
+   "pitch_down": 20
+  },
+  "lid_follow": {
+   "doc": "upper lids follow vertical gaze via morphs (skinning lids to eye bones was rejected: it exposes the lid margin on look-up and drags inner-corner lashes on yaw)",
+   "look_down": "eyeBlinkX += 0.45 * clamp(-pitch_deg / 20, 0, 1)   (added before the blink curve, final weight = max(blink, coupling + blink))",
+   "look_up": "eyeWideX += 0.35 * clamp(pitch_deg / 15, 0, 1)"
+  },
+  "centres_m": {
+   "L": [
+    [
+     0.0294,
+     -0.11671,
+     1.65896
+    ],
+    0.0152
+   ],
+   "R": [
+    [
+     -0.0294,
+     -0.11671,
+     1.65896
+    ],
+    0.0152
+   ]
+  }
+ },
+ "old_to_new": {
+  "MouthOpen": {
+   "jawOpen": 0.55
+  },
+  "V_AA": {
+   "viseme_aa": 1.0
+  },
+  "V_O": {
+   "viseme_O": 1.0
+  },
+  "V_EE": {
+   "viseme_E": 0.6,
+   "viseme_I": 0.4
+  },
+  "V_FV": {
+   "viseme_FF": 1.0
+  },
+  "V_MBP": {
+   "viseme_PP": 1.0
+  },
+  "Smile": {
+   "mouthSmileLeft": 0.6,
+   "mouthSmileRight": 0.6,
+   "cheekSquintLeft": 0.35,
+   "cheekSquintRight": 0.35,
+   "eyeSquintLeft": 0.2,
+   "eyeSquintRight": 0.2
+  },
+  "BrowUp": {
+   "browInnerUp": 0.7,
+   "browOuterUpLeft": 0.5,
+   "browOuterUpRight": 0.5
+  },
+  "BrowFrown": {
+   "browDownLeft": 0.8,
+   "browDownRight": 0.8,
+   "mouthFrownLeft": 0.2,
+   "mouthFrownRight": 0.2
+  },
+  "Blink_L": {
+   "eyeBlinkLeft": 1.0
+  },
+  "Blink_R": {
+   "eyeBlinkRight": 1.0
+  }
+ },
+ "grapheme_to_viseme": {
+  "_doc": "Spanish/English letters -> viseme (weight). Digraphs first. Vowels carry the jaw; consonants are short (40-70 ms) and blend 60% into the next vowel.",
+  "a": {
+   "viseme_aa": 1.0
+  },
+  "e": {
+   "viseme_E": 1.0
+  },
+  "i": {
+   "viseme_I": 1.0
+  },
+  "y": {
+   "viseme_I": 0.8
+  },
+  "o": {
+   "viseme_O": 1.0
+  },
+  "u": {
+   "viseme_U": 1.0
+  },
+  "w": {
+   "viseme_U": 0.9
+  },
+  "m": {
+   "viseme_PP": 1.0
+  },
+  "b": {
+   "viseme_PP": 1.0
+  },
+  "p": {
+   "viseme_PP": 1.0
+  },
+  "v": {
+   "viseme_PP": 0.7
+  },
+  "f": {
+   "viseme_FF": 1.0
+  },
+  "s": {
+   "viseme_SS": 1.0
+  },
+  "z": {
+   "viseme_SS": 0.9
+  },
+  "c": {
+   "viseme_SS": 0.8
+  },
+  "x": {
+   "viseme_SS": 0.7
+  },
+  "ch": {
+   "viseme_CH": 1.0
+  },
+  "sh": {
+   "viseme_CH": 1.0
+  },
+  "j": {
+   "viseme_CH": 0.6
+  },
+  "ll": {
+   "viseme_CH": 0.7
+  },
+  "g": {
+   "viseme_DD": 0.6
+  },
+  "k": {
+   "viseme_DD": 0.6
+  },
+  "q": {
+   "viseme_DD": 0.6
+  },
+  "t": {
+   "viseme_DD": 1.0
+  },
+  "d": {
+   "viseme_DD": 1.0
+  },
+  "n": {
+   "viseme_DD": 0.8
+  },
+  "l": {
+   "viseme_DD": 0.8
+  },
+  "ñ": {
+   "viseme_DD": 0.8
+  },
+  "r": {
+   "viseme_DD": 0.6
+  },
+  "rr": {
+   "viseme_DD": 0.8
+  },
+  "th": {
+   "viseme_DD": 0.7,
+   "viseme_FF": 0.2
+  },
+  "h": {},
+  "_note_es": "Spanish 'v' is bilabial -> PP; English 'v' -> FF. 'c' before e/i and 'z' are /s/ or /θ/ -> SS; 'c' before a/o/u, 'qu', 'k' -> DD."
+ },
+ "recipes": {
+  "blink": {
+   "morphs": {
+    "eyeBlinkLeft": 1.0,
+    "eyeBlinkRight": 1.0
+   },
+   "gaze": null
+  },
+  "smile": {
+   "morphs": {
+    "mouthSmileLeft": 0.6,
+    "mouthSmileRight": 0.6,
+    "cheekSquintLeft": 0.35,
+    "cheekSquintRight": 0.35,
+    "eyeSquintLeft": 0.2,
+    "eyeSquintRight": 0.2
+   },
+   "gaze": null
+  },
+  "surprise": {
+   "morphs": {
+    "browInnerUp": 0.55,
+    "browOuterUpLeft": 0.5,
+    "browOuterUpRight": 0.5,
+    "eyeWideLeft": 0.35,
+    "eyeWideRight": 0.35,
+    "jawOpen": 0.2
+   },
+   "gaze": null
+  },
+  "thoughtful": {
+   "morphs": {
+    "browDownLeft": 0.3,
+    "browInnerUp": 0.25,
+    "mouthPress": 0.35,
+    "mouthLeft": 0.3,
+    "eyeSquintLeft": 0.25,
+    "eyeSquintRight": 0.15
+   },
+   "gaze": {
+    "yaw_deg": -12,
+    "pitch_deg": 10
+   }
+  },
+  "listening": {
+   "morphs": {
+    "browInnerUp": 0.3,
+    "browOuterUpLeft": 0.12,
+    "browOuterUpRight": 0.12,
+    "mouthSmileLeft": 0.18,
+    "mouthSmileRight": 0.18,
+    "eyeWideLeft": 0.1,
+    "eyeWideRight": 0.1
+   },
+   "gaze": {
+    "yaw_deg": 0,
+    "pitch_deg": 0
+   }
+  }
+ },
+ "blink": {
+  "shape": [
+   "eyeBlinkLeft",
+   "eyeBlinkRight"
+  ],
+  "curve": "close 70 ms (ease-in), hold 20-30 ms at 1.0, open 110-150 ms (ease-out); total ~210 ms",
+  "interval_s": [
+   2.5,
+   6.0
+  ],
+  "double_blink_probability": 0.15,
+  "double_gap_ms": 120,
+  "extra": "blink on large gaze shifts (>15 deg) and at the end of an utterance; while thinking lower rate (5-9 s); asymmetric offset L/R 0-15 ms"
+ },
+ "idle": {
+  "breathing": {
+   "period_s": [
+    3.6,
+    4.4
+   ],
+   "chest_spine2_pitch_deg": 0.8,
+   "shoulders_up_mm": 2,
+   "head_counter_pitch_deg": 0.3,
+   "note": "body clip or procedural on Spine1/2"
+  },
+  "micro_expressions": {
+   "interval_s": [
+    4,
+    9
+   ],
+   "duration_s": [
+    0.6,
+    1.2
+   ],
+   "envelope": "sin(pi*t/d)",
+   "choices": {
+    "half_smile": {
+     "mouthSmileLeft": 0.15,
+     "mouthSmileRight": 0.12
+    },
+    "brow_flash": {
+     "browInnerUp": 0.25,
+     "browOuterUpLeft": 0.2,
+     "browOuterUpRight": 0.2
+    },
+    "soft_squint": {
+     "eyeSquintLeft": 0.15,
+     "eyeSquintRight": 0.15,
+     "cheekSquintLeft": 0.1,
+     "cheekSquintRight": 0.1
+    }
+   },
+   "resting_bias": {
+    "mouthSmileLeft": 0.08,
+    "mouthSmileRight": 0.08
+   }
+  },
+  "gaze": {
+   "follow_user": "aim eye bones at the camera/user point; head (mixamorig:Head/Neck) takes 30-40% of large offsets with 250 ms lag, eyes take the rest immediately",
+   "fixation_s": [
+    0.8,
+    2.5
+   ],
+   "micro_saccade": {
+    "amplitude_deg": [
+     0.3,
+     0.8
+    ],
+    "interval_s": [
+     0.4,
+     1.2
+    ],
+    "duration_ms": 25
+   },
+   "saccade": {
+    "speed_deg_per_s": 400,
+    "duration_ms": "20 + 2.5*amplitude_deg"
+   },
+   "look_away_while_thinking": {
+    "yaw_deg": [
+     -15,
+     15
+    ],
+    "pitch_deg": [
+     5,
+     12
+    ],
+    "hold_s": [
+     0.8,
+     2.0
+    ]
+   },
+   "vergence": "both eyes aim at the same 3D point (user ~0.5-0.7 m) -> slight convergence"
+  },
+  "speaking": {
+   "smoothing": "critically damped, 25-30 1/s for mouth, 4 1/s for expressions",
+   "brow_accent_on_stressed_syllable": {
+    "browInnerUp": 0.15,
+    "duration_ms": 250
+   }
+  }
+ },
+ "materials": {
+  "Masha_Eye": {
+   "baseColor": "textures/masha_eye_basecolor.png",
+   "emissive": "textures/masha_eye_emissive.png",
+   "emissiveStrength": 0.35,
+   "roughness": 0.18,
+   "note": "only the iris emits; keep eye emission <= 1 and exclude eyes from strong bloom (old avatar used emissive 6 on whole eyeballs -> glowing balls)"
+  },
+  "Masha_Teeth": {
+   "baseColor": "textures/masha_teeth_basecolor.png",
+   "roughness": 0.35,
+   "note": "re-graded CC0 texture: off-white enamel, muted dark-pink gums"
+  },
+  "Masha_Tongue": {
+   "baseColor": "textures/masha_tongue_basecolor.png",
+   "roughness": 0.55
+  },
+  "Masha_MouthInterior": {
+   "baseColor_linear": [
+    0.3,
+    0.15,
+    0.17
+   ],
+   "roughness": 0.6,
+   "note": "mouth cavity faces of the skin (flat colour, no texture); keep it non-emissive / dim in the hologram shader"
+  }
+ },
+ "head_breakdown": {
+  "skin": {
+   "verts": 5054,
+   "tris": 10064
+  },
+  "brows": {
+   "verts": 124,
+   "tris": 192
+  },
+  "lashes": {
+   "verts": 250,
+   "tris": 368
+  },
+  "teeth": {
+   "verts": 1393,
+   "tris": 2399
+  },
+  "tongue": {
+   "verts": 226,
+   "tris": 448
+  }
+ },
+ "eyes_mesh": {
+  "name": "Masha_Eyes",
+  "verts": 552,
+  "tris": 1060,
+  "morphs": 0
+ },
+ "qa_grids": {
+  "grid_expressions.png": "rows of 4: blink(front,3/4) smile(front,3/4) / surprise thoughtful / listening",
+  "grid_visemes_*.png": "rows of 5: aa E I O U / PP FF SS DD CH / jawOpen jawOpen@0.5 rest",
+  "grid_eyes.png": "rows of 2: centre, yaw+20 (her left) / yaw-20, pitch+15 / pitch-15, pitch-20+blink0.5 / blink, blink0.5",
+  "grid_shapes.png": "rows of 6, every non-viseme kept morph at 1.0 in KEEP order"
+ },
+ "neck_seam": {
+  "z_front": 1.4867,
+  "z_min": 1.4867,
+  "z_max": 1.5201,
+  "vert_count": 42,
+  "basemesh_vertex_indices": [
+   759,
+   760,
+   773,
+   774,
+   779,
+   796,
+   811,
+   812,
+   813,
+   815,
+   816,
+   822,
+   828,
+   834,
+   840,
+   846,
+   852,
+   858,
+   931,
+   1017,
+   1045,
+   3688,
+   7478,
+   7479,
+   7492,
+   7493,
+   7498,
+   7511,
+   7523,
+   7524,
+   7525,
+   7527,
+   7533,
+   7539,
+   7545,
+   7551,
+   7557,
+   7563,
+   7633,
+   7709,
+   7737,
+   10356
+  ]
+ },
+ "seam_max_morph_delta_m": 0.0,
+ "assets": {
+  "eyes": "high-poly",
+  "iris": "blue",
+  "eyebrows": "eyebrow008",
+  "eyelashes": "eyelashes03",
+  "teeth": "teeth_base",
+  "tongue": "tongue01",
+  "targets": [
+   "head-oval",
+   "head-scale-horiz-decr",
+   "chin-width-decr",
+   "chin-bones-decr",
+   "chin-prominent-incr",
+   "l-cheek-bones-incr",
+   "r-cheek-bones-incr",
+   "l-cheek-volume-decr",
+   "r-cheek-volume-decr",
+   "nose-scale-horiz-decr",
+   "nose-point-width-decr",
+   "nose-flaring-decr",
+   "nose-nostrils-width-decr",
+   "nose-hump-decr",
+   "nose-point-up",
+   "mouth-scale-horiz-decr",
+   "mouth-upperlip-volume-incr",
+   "mouth-lowerlip-volume-incr",
+   "mouth-cupidsbow-incr",
+   "mouth-angles-up",
+   "l-eye-scale-incr",
+   "r-eye-scale-incr",
+   "l-eye-height2-incr",
+   "r-eye-height2-incr",
+   "l-eye-corner2-up",
+   "r-eye-corner2-up"
+  ],
+  "license": "CC0 (MakeHuman system assets, faceunits01, visemes02 packs)"
+ }
+}
