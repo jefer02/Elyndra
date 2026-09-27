@@ -94,6 +94,7 @@ import com.elyndra.launcher.ui.components.LocalScreenSize
 import com.elyndra.launcher.ui.components.MashaInsightBubble
 import com.elyndra.launcher.ui.components.LogoImage
 import com.elyndra.launcher.ui.components.OpenButton
+import com.elyndra.launcher.ui.components.neonParticles
 import com.elyndra.launcher.ui.components.Metrics
 import com.elyndra.launcher.ui.resolve
 import com.elyndra.launcher.ui.components.MAGNETIC_PULL_MS
@@ -135,12 +136,16 @@ fun LibraryScreen(vm: ElyndraViewModel) {
     // Con mando la selección se mueve sin tocar el carrusel, así que el
     // carrusel va detrás de ella: si no, se estaría eligiendo a ciegas.
     val carousel = rememberLazyListState()
-    LaunchedEffect(sel?.key, items.size) {
-        val index = items.indexOfFirst { it.key == sel?.key }
+    // La card de "Añadir" también se alcanza con el mando: va la última, detrás de los juegos.
+    val addFocused = vm.input.isAddFocused()
+    LaunchedEffect(sel?.key, items.size, addFocused) {
+        val index = if (addFocused) items.size else items.indexOfFirst { it.key == sel?.key }
         if (index >= 0) runCatching { carousel.animateScrollToItem(index) }
     }
     // Un solo reloj para la flotación de todos los logos de juego de la pantalla.
     val floatClock = rememberFloatClock()
+    // Chispas de neón del icono seleccionado (Ajustes → Masha); null = apagadas.
+    val sparkColor = if (vm.settings.selectionParticles) Color(vm.settings.selectionParticleColor) else null
     Box(Modifier.fillMaxSize()) {
         // Fondo vivo: el arte de la selección, desenfocado y teñido con su color.
         DynamicBackdrop(
@@ -382,7 +387,9 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                                 ) {
                                     LibraryTile(
                                         item = item,
-                                        selected = item.key == sel?.key,
+                                        // Con la card de "Añadir" señalada, la selección es ella.
+                                        selected = item.key == sel?.key && !addFocused,
+                                        sparkColor = sparkColor,
                                         metrics = m,
                                         pairIndex = vm.pairIndexOf(item),
                                         onTap = { vm.select(item.key) },
@@ -404,7 +411,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         // mientras se lee la biblioteca del disco, con el carrusel
                         // todavía vacío.
                         if (vm.loaded) {
-                            item(key = "add") { AddTile(m) { vm.go(Screen.Add) } }
+                            item(key = "add") { AddTile(m, addFocused, sparkColor) { vm.go(Screen.Add) } }
                         }
                     }
                 }
@@ -731,14 +738,22 @@ private const val MASHA_BUBBLE_MS = 14_000L
 
 /**
  * La card de "Añadir": la única del carrusel cuando la biblioteca está vacía
- * y, en cuanto hay juegos, la última de la fila.
+ * y, en cuanto hay juegos, la última de la fila. Con el mando se llega a ella
+ * pasando del último juego ([focused]) y se abre con A, como cualquier otra.
  */
 @Composable
-private fun AddTile(metrics: Metrics, onClick: () -> Unit) {
+private fun AddTile(metrics: Metrics, focused: Boolean, sparkColor: Color?, onClick: () -> Unit) {
     val skin = LocalSkin.current
+    val lift = selectionLift(focused)
+    val scale = selectionScale(focused)
+    val shape = RoundedCornerShape(16.dp)
+    val sparkFrame = sparkColor?.takeIf { focused }
+    val sparks = sparkFrame != null
+    val frameColor = sparkFrame ?: skin.a1
     Column(
         Modifier
             .width(metrics.iconTile)
+            .offset(y = lift)
             .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -746,7 +761,13 @@ private fun AddTile(metrics: Metrics, onClick: () -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .height(metrics.iconTile)
-                .glass(RoundedCornerShape(16.dp), borderColor = skin.a1.copy(alpha = 0.6f)),
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .neonParticles(sparks, frameColor)
+                .glass(shape, borderColor = skin.a1.copy(alpha = 0.6f))
+                .then(if (focused) Modifier.border(6.dp, frameColor, shape) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
             ElyText("+", size = 28f, weight = FontWeight.SemiBold, color = skin.a2)
@@ -770,6 +791,8 @@ private fun AddTile(metrics: Metrics, onClick: () -> Unit) {
 private fun LibraryTile(
     item: LibraryItem,
     selected: Boolean,
+    /** Color de las chispas de neón de la selección; null = sin chispas. */
+    sparkColor: Color?,
     metrics: Metrics,
     pairIndex: Int,
     onTap: () -> Unit,
@@ -792,6 +815,11 @@ private fun LibraryTile(
     var cardBounds by remember { mutableStateOf(Rect.Zero) }
     val scope = rememberCoroutineScope()
     val dimmed = item is LibraryItem.App && !item.installed
+    // Con las chispas encendidas, el marco (y su resplandor) toman su color.
+    val sparkFrame = sparkColor?.takeIf { selected }
+    val sparks = sparkFrame != null
+    val frameColor = sparkFrame ?: skin.a1
+    val glowColor = if (sparks) frameColor.copy(alpha = 0.6f) else P.shade.copy(alpha = if (selected) 0.32f else 0.2f)
     // Mismo motivo que en RomTile: el detector vive más que una composición.
     val tap by rememberUpdatedState(onTap)
     val open by rememberUpdatedState(onOpen)
@@ -835,18 +863,21 @@ private fun LibraryTile(
                     scaleX = scale * pressed.value
                     scaleY = scale * pressed.value
                 }
+                // Tras la escala (la acompañan) y antes del recorte: las chispas
+                // caen por el marco, encima de la card, y su halo asoma fuera.
+                .neonParticles(sparks, frameColor)
                 .shadow(
                     if (press.pressed) 4.dp else if (selected) 16.dp else 8.dp,
                     shape,
                     clip = false,
-                    ambientColor = P.shade.copy(alpha = if (selected) 0.32f else 0.2f),
-                    spotColor = P.shade.copy(alpha = if (selected) 0.32f else 0.2f),
+                    ambientColor = glowColor,
+                    spotColor = glowColor,
                 )
                 // Sin fondo de serie: cristal semitransparente, que deja ver la
                 // aurora de la pantalla por detrás del icono.
-                .liquidGlass(shape, if (selected) skin.a1 else P.hairline)
+                .liquidGlass(shape, if (selected) frameColor else P.hairline)
                 // Marco más grueso: la selección tiene que leerse de lejos.
-                .then(if (selected) Modifier.border(6.dp, skin.a1, shape) else Modifier),
+                .then(if (selected) Modifier.border(6.dp, frameColor, shape) else Modifier),
         ) {
             // Ni un juego Android ni una carpeta de emulador usan carátula: se
             // representan con su icono — el elegido en "Personalizar icono" o, si
