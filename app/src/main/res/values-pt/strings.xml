@@ -507,6 +507,8 @@
     <string name="frame_rate_120">120 fps</string>
     <string name="frame_rate_60">60 fps</string>
     <string name="frame_rate_unsupported">Esta tela não suporta 120 Hz: são usados 60 fps.</string>
+    <string name="masha_high_refresh">Masha: alta fluidez (120 Hz)</string>
+    <string name="masha_high_refresh_desc">Desligado, a Masha roda a 60 fps: igualmente fluida para um holograma, com metade do trabalho da GPU, menos bateria e menos calor em conversas longas.</string>
     <string name="masha_particles_title">Cor das partículas</string>
     <string name="masha_particles_desc">O rastro fosforescente que a Masha deixa ao ser arrastada.</string>
     <string name="masha_particles_hue">Tom</string>
@@ -536,4 +538,35 @@
     <string name="masha_new_chat">Nova conversa</string>
     <string name="masha_back">Voltar</string>
     <string name="masha_listening_hint">Fale agora…</string>
+
+    <!-- Acerca de, licencias y opciones de desarrollador (calibrar la sincronía de la voz) -->
+    <string name="section_about">Sobre</string>
+    <string name="about_version">Versão</string>
+    <string name="licenses_title">Licenças de código aberto</string>
+    <string name="licenses_desc">O Elyndra é feito com estes componentes de terceiros. Obrigado a quem os faz.</string>
+    <string name="licenses_components">Bibliotecas e fontes</string>
+    <string name="licenses_assets">Recursos 3D</string>
+    <string name="licenses_apache_notice">Os componentes com Apache License 2.0 são distribuídos sob essa licença; uma cópia está em https://www.apache.org/licenses/LICENSE-2.0. A SIL Open Font License 1.1 está em https://openfontlicense.org.</string>
+    <string name="licenses_mpfb_note">O modelo 3D da Masha (feito com o MPFB2 e os recursos de sistema do MakeHuman)</string>
+    <string name="licenses_cmudict_use">A Masha usa o dicionário de pronúncia da CMU para mexer os lábios quando fala inglês. O aviso, na íntegra:</string>
+    <string name="dev_section">Desenvolvedor</string>
+    <string name="dev_voice_sync">Calibrar sincronia da voz</string>
+    <string name="dev_voice_sync_desc">Alinha os lábios da Masha com o som para cada saída de áudio (fones Bluetooth adicionam atraso).</string>
+    <string name="dev_hide">Ocultar opções de desenvolvedor</string>
+    <string name="dev_unlocked">Opções de desenvolvedor ativadas</string>
+    <string name="dev_already">As opções de desenvolvedor já estão ativadas</string>
+    <string name="voice_sync_route">Saída de áudio</string>
+    <string name="route_speaker">Alto-falante do telefone</string>
+    <string name="route_wired">Fones com fio</string>
+    <string name="route_bluetooth">Bluetooth</string>
+    <string name="route_other">Outra saída</string>
+    <string name="voice_sync_offset">Atraso do áudio</string>
+    <string name="voice_sync_test">Testar</string>
+    <string name="voice_sync_reset">Redefinir</string>
+    <string name="voice_sync_hint">Toque em Testar e olhe os lábios: devem fechar exatamente em cada P, B e M. Se a boca vier antes do som, aumente o atraso; se vier depois, diminua. Fica salvo só para esta saída.</string>
+    <string name="voice_sync_phrase">Papai, mamãe, pão, pipa, bomba.</string>
+    <plurals name="dev_taps_left">
+        <item quantity="one">Falta %d toque para as opções de desenvolvedor</item>
+        <item quantity="other">Faltam %d toques para as opções de desenvolvedor</item>
+    </plurals>
 </resources>

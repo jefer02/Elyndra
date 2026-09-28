@@ -476,6 +476,8 @@
     <string name="frame_rate_120">120fps</string>
     <string name="frame_rate_60">60fps</string>
     <string name="frame_rate_unsupported">このディスプレイは 120Hz に対応していないため、60fps を使用します。</string>
+    <string name="masha_high_refresh">マーシャ：高リフレッシュ（120Hz）</string>
+    <string name="masha_high_refresh_desc">オフの場合、マーシャは 60fps で動作します。ホログラムとしては十分滑らかで、GPU の負荷が半分になり、長い会話でもバッテリー消費と発熱を抑えます。</string>
     <string name="masha_particles_title">パーティクルの色</string>
     <string name="masha_particles_desc">Masha をドラッグしたときに残る光の軌跡です。</string>
     <string name="masha_particles_hue">色相</string>
@@ -505,4 +507,34 @@
     <string name="masha_new_chat">新しい会話</string>
     <string name="masha_back">戻る</string>
     <string name="masha_listening_hint">どうぞ話してください…</string>
+
+    <!-- Acerca de, licencias y opciones de desarrollador (calibrar la sincronía de la voz) -->
+    <string name="section_about">このアプリについて</string>
+    <string name="about_version">バージョン</string>
+    <string name="licenses_title">オープンソースライセンス</string>
+    <string name="licenses_desc">Elyndra は以下のサードパーティ製コンポーネントで作られています。作者の皆さんに感謝します。</string>
+    <string name="licenses_components">ライブラリとフォント</string>
+    <string name="licenses_assets">3D アセット</string>
+    <string name="licenses_apache_notice">Apache License 2.0 のコンポーネントは同ライセンスの下で提供されています。全文は https://www.apache.org/licenses/LICENSE-2.0 にあります。SIL Open Font License 1.1 は https://openfontlicense.org にあります。</string>
+    <string name="licenses_mpfb_note">Masha の 3D モデル(MPFB2 と MakeHuman システムアセットで作成)</string>
+    <string name="licenses_cmudict_use">Masha は英語を話すときの口の動きに CMU 発音辞書を使っています。その告知文(原文のまま):</string>
+    <string name="dev_section">開発者</string>
+    <string name="dev_voice_sync">音声同期のキャリブレーション</string>
+    <string name="dev_voice_sync_desc">オーディオ出力ごとに Masha の口の動きを音に合わせます(Bluetooth イヤホンは遅延が生じます)。</string>
+    <string name="dev_hide">開発者向けオプションを隠す</string>
+    <string name="dev_unlocked">開発者向けオプションが有効になりました</string>
+    <string name="dev_already">開発者向けオプションはすでに有効です</string>
+    <string name="voice_sync_route">オーディオ出力</string>
+    <string name="route_speaker">本体スピーカー</string>
+    <string name="route_wired">有線ヘッドホン</string>
+    <string name="route_bluetooth">Bluetooth</string>
+    <string name="route_other">その他の出力</string>
+    <string name="voice_sync_offset">音声の遅延</string>
+    <string name="voice_sync_test">テスト</string>
+    <string name="voice_sync_reset">リセット</string>
+    <string name="voice_sync_hint">「テスト」をタップして口元を見てください。パ・バ・マの音でぴったり唇が閉じるはずです。口が音より早ければ遅延を増やし、遅ければ減らしてください。この出力にだけ保存されます。</string>
+    <string name="voice_sync_phrase">パパ、ママ、パンパン、ポンポン、ばんばん。</string>
+    <plurals name="dev_taps_left">
+        <item quantity="other">開発者向けオプションまであと %d 回</item>
+    </plurals>
 </resources>
