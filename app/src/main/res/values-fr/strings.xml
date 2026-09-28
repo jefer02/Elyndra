@@ -507,6 +507,8 @@
     <string name="frame_rate_120">120 i/s</string>
     <string name="frame_rate_60">60 i/s</string>
     <string name="frame_rate_unsupported">Cet écran ne prend pas en charge 120 Hz : 60 i/s sont utilisées.</string>
+    <string name="masha_high_refresh">Masha : haute fluidité (120 Hz)</string>
+    <string name="masha_high_refresh_desc">Désactivé, Masha tourne à 60 i/s : tout aussi fluide pour un hologramme, avec deux fois moins de travail GPU, moins de batterie et moins de chaleur lors de longues conversations.</string>
     <string name="masha_particles_title">Couleur des particules</string>
     <string name="masha_particles_desc">La traînée phosphorescente que laisse Masha quand on la déplace.</string>
     <string name="masha_particles_hue">Teinte</string>
@@ -536,4 +538,35 @@
     <string name="masha_new_chat">Nouvelle conversation</string>
     <string name="masha_back">Retour</string>
     <string name="masha_listening_hint">Parle maintenant…</string>
+
+    <!-- Acerca de, licencias y opciones de desarrollador (calibrar la sincronía de la voz) -->
+    <string name="section_about">À propos</string>
+    <string name="about_version">Version</string>
+    <string name="licenses_title">Licences open source</string>
+    <string name="licenses_desc">Elyndra est construite avec ces composants tiers. Merci à celles et ceux qui les font.</string>
+    <string name="licenses_components">Bibliothèques et polices</string>
+    <string name="licenses_assets">Ressources 3D</string>
+    <string name="licenses_apache_notice">Les composants sous Apache License 2.0 sont distribués sous cette licence ; une copie est disponible sur https://www.apache.org/licenses/LICENSE-2.0. La SIL Open Font License 1.1 est sur https://openfontlicense.org.</string>
+    <string name="licenses_mpfb_note">Le modèle 3D de Masha (réalisé avec MPFB2 et les ressources système de MakeHuman)</string>
+    <string name="licenses_cmudict_use">Masha utilise le dictionnaire de prononciation de la CMU pour bouger les lèvres quand elle parle anglais. Sa notice, telle quelle :</string>
+    <string name="dev_section">Développeur</string>
+    <string name="dev_voice_sync">Calibrer la synchro de la voix</string>
+    <string name="dev_voice_sync_desc">Aligne les lèvres de Masha sur le son pour chaque sortie audio (les écouteurs Bluetooth ajoutent du retard).</string>
+    <string name="dev_hide">Masquer les options pour développeurs</string>
+    <string name="dev_unlocked">Options pour développeurs activées</string>
+    <string name="dev_already">Les options pour développeurs sont déjà activées</string>
+    <string name="voice_sync_route">Sortie audio</string>
+    <string name="route_speaker">Haut-parleur du téléphone</string>
+    <string name="route_wired">Écouteurs filaires</string>
+    <string name="route_bluetooth">Bluetooth</string>
+    <string name="route_other">Autre sortie</string>
+    <string name="voice_sync_offset">Retard audio</string>
+    <string name="voice_sync_test">Tester</string>
+    <string name="voice_sync_reset">Réinitialiser</string>
+    <string name="voice_sync_hint">Touchez Tester et regardez ses lèvres : elles doivent se fermer pile sur chaque P, B et M. Si la bouche bouge avant le son, augmentez le retard ; si elle bouge après, diminuez-le. Enregistré pour cette sortie uniquement.</string>
+    <string name="voice_sync_phrase">Papa, maman, pomme, bombe, pipe.</string>
+    <plurals name="dev_taps_left">
+        <item quantity="one">Encore %d appui pour les options pour développeurs</item>
+        <item quantity="other">Encore %d appuis pour les options pour développeurs</item>
+    </plurals>
 </resources>
