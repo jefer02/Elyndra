@@ -345,6 +345,7 @@ class ElyndraViewModel @Inject constructor(
             sheet != null -> sheet = null
             artPicker != null -> closeArtPicker()
             detailsKey != null -> closeDetails()
+            screen.isSettingsPage -> go(Screen.Settings)
             screen != Screen.Library -> go(Screen.Library)
             searchOpen -> toggleSearch()
         }

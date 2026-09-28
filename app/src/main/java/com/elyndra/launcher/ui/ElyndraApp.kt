@@ -57,8 +57,10 @@ import com.elyndra.launcher.ui.screens.ArtPickerSheet
 import com.elyndra.launcher.ui.screens.DetailsSheet
 import com.elyndra.launcher.ui.screens.FolderScreen
 import com.elyndra.launcher.ui.screens.LibraryScreen
+import com.elyndra.launcher.ui.screens.LicensesScreen
 import com.elyndra.launcher.ui.screens.MashaScreen
 import com.elyndra.launcher.ui.screens.SettingsScreen
+import com.elyndra.launcher.ui.screens.VoiceSyncScreen
 import com.elyndra.launcher.ui.theme.ElyndraTheme
 
 /**
@@ -183,7 +185,7 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                             // Eje compartido con muelles: la que entra llega
                             // desde el lado al que se va con un leve zoom; volver
                             // invierte el sentido. Interrumpible a mitad.
-                            val dir = if (targetState == Screen.Library) -1 else 1
+                            val dir = if (targetState == Screen.Library || (targetState == Screen.Settings && initialState.isSettingsPage)) -1 else 1
                             if (reduced) {
                                 fadeIn(snap()).togetherWith(fadeOut(snap()))
                             } else {
@@ -206,6 +208,8 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                             Screen.Add -> AddScreen(vm)
                             Screen.Settings -> SettingsScreen(vm)
                             Screen.Masha -> MashaScreen(vm)
+                            Screen.Licenses -> LicensesScreen(vm)
+                            Screen.VoiceSync -> VoiceSyncScreen(vm)
                         }
                     }
                 }
