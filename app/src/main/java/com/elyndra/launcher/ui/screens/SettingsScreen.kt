@@ -106,12 +106,14 @@ fun SettingsScreen(vm: ElyndraViewModel) {
                     }
                     Column(Modifier.weight(1f)) {
                         MetadataColumn(vm)
+                        AboutColumn(vm)
                     }
                 }
             } else {
                 AppearanceColumn(vm)
                 MashaColumn(vm)
                 MetadataColumn(vm)
+                AboutColumn(vm)
             }
         }
     }
@@ -169,6 +171,19 @@ private fun AppearanceColumn(vm: ElyndraViewModel) {
                     active = s.frameRate == FrameRate.STANDARD,
                     onClick = { s.updateFrameRate(FrameRate.STANDARD) },
                 )
+            }
+            // Masha va aparte: a 60 salvo que se pida alta fluidez (solo tiene sentido con la app a 120).
+            if (s.frameRate == FrameRate.HIGH) {
+                Spacer(Modifier.height(14.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        ElyText(stringResource(R.string.masha_high_refresh), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
+                        Spacer(Modifier.height(4.dp))
+                        ElyText(stringResource(R.string.masha_high_refresh_desc), size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    GlowingSwitch(s.mashaHighRefresh, s::toggleMashaHighRefresh)
+                }
             }
         }
 
