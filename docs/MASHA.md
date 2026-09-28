@@ -13,16 +13,25 @@ que solo se reutiliza el holotanque.
 
     blender -b -P tools/masha_v2/build.py -- --stages body,face,hands,shoulders,export --qa 0 --out out/masha_v2
     # sin --factory-startup: desactivaría la extensión MPFB
+    # Blender 4.2 LTS de este equipo: C:\Users\jefer\AppData\Local\bl423\blender.exe
+    # la salida es determinista: sin cambios en el código, masha.glb sale idéntico byte a byte
+    # export.py pasa cada GLB por densify_morphs.py (morphs sparse con base de ceros): sin eso,
+    # Filament 1.56 no deforma la cara en el dispositivo (ver docs/MASHA_LIPSYNC.md, "Coste")
     # copiar out/masha_v2/masha*.glb a app/src/main/assets/masha/
     # y out/masha_v2/runtime_textures/*.png a app/src/main/assets/masha/textures/
 
 Requisitos: Blender 4.2 LTS + extensión MPFB 2.0.x con los paquetes CC0 `makehuman_system_assets`,
-`faceunits01`, `visemes02` y `hair01` instalados. Unos 4 min.
+`faceunits01`, `visemes02` y `hair01` instalados, más las descargas de Mixamo y `base_pose.json` que
+usa la etapa export (ver `export.py`). Unos 5 min.
+
+Solo cara/boca: se ajusta en `face.py` (recetas de visemas, poses de lengua), se reconstruye con el mismo
+comando y se revisa con `tools/masha_v2/face_review/` (hojas de render y diff semántico de GLB). El
+contrato de morphs para la sincronía de labios está en `docs/MASHA_LIPSYNC.md`.
 
 | Etapa | Archivo | Qué hace |
 |---|---|---|
 | body | `body.py` | humano MPFB (proporciones en `MACRO`/`DETAIL_TARGETS`), esqueleto Mixamo, huesos blandos `masha:breast.*`, `masha:glute.*`, `masha:hair.0-3`, máscaras del traje |
-| face | `face.py` | 31 morphs (ARKit + visemas, contrato en `face_contract.json`), boca cerrada en reposo, `Masha_Head` separada por el anillo `NECK_SEAM_VERTS`, huesos de ojos |
+| face | `face.py` | 47 morphs (ARKit + 14 visemas solo-labios; contrato v2 en `face_contract.json` y `docs/MASHA_LIPSYNC.md`), lengua en reposo bajada 5 mm, boca cerrada en reposo, `Masha_Head` separada por el anillo `NECK_SEAM_VERTS`, huesos de ojos |
 | hands | `hands.py` | huesos de giro de antebrazo/brazo, pesos, poses de mano (`hand_poses.json`) |
 | export | `export.py` | quita la geometría auxiliar, nombres/materiales del contrato, clips Idle/Talk/Listen/Think/Explain/Wave, holotanque v1, GLB alta + LOD ligera, texturas de ejecución |
 
@@ -59,8 +68,8 @@ propias (procedurales en `export.py`), sin Mixamo. Filament/SceneView: Apache 2.
 
 Assets (ya generados y en el repo):
 
-- `app/src/main/assets/masha/masha.glb` — calidad alta (~6,0 MB, ~57k triángulos)
-- `app/src/main/assets/masha/masha_lite.glb` — ligera (~3,9 MB, ~33k triángulos), para gama media/baja
+- `app/src/main/assets/masha/masha.glb` — calidad alta (~8,1 MB, ~57k triángulos)
+- `app/src/main/assets/masha/masha_lite.glb` — ligera (~7,8 MB, ~33k triángulos), para gama media/baja
 - `app/src/main/assets/masha/room.hdr` — sala de control (IBL + fondo)
 - `app/src/main/res/raw/masha_ambient.ogg` — 96 s, lazo perfecto (~1,1 MB)
 
