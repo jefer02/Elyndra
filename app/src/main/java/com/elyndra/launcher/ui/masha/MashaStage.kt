@@ -2,6 +2,7 @@ package com.elyndra.launcher.ui.masha
 
 import android.app.ActivityManager
 import android.content.Context
+import com.elyndra.launcher.BuildConfig
 import android.opengl.EGLContext
 import android.os.Build
 import android.os.Handler
@@ -187,7 +188,7 @@ fun MashaStage(
                 val maxSize = if (quality == MashaQuality.High) 2048 else 1024
                 runCatching { HoloShader.decodeTextures(context, HoloShader.TextureAssets(maxSize = maxSize)) }.getOrNull()
             }
-            HoloShader.create(context, gpu.engine)?.also { s -> textures?.let(s::bindTextures) }
+            (if (BuildConfig.DEBUG && java.io.File(context.cacheDir, "noholo").exists()) null else HoloShader.create(context, gpu.engine))?.also { s -> textures?.let(s::bindTextures) }
         } else {
             null
         }
@@ -201,6 +202,47 @@ fun MashaStage(
     LaunchedEffect(recenter, landscape) {
         cameraNode.position = home
         cameraNode.lookAt(target)
+    }
+    // Solo en debug (QA del lip-sync): primer plano de la boca por adb.
+    //   adb shell am broadcast -a com.elyndra.launcher.DEBUG_CAM --ef y 1.50 --ef z 0.45 --ef x 0
+    if (BuildConfig.DEBUG) {
+        DisposableEffect(cameraNode) {
+            val receiver = object : android.content.BroadcastReceiver() {
+                override fun onReceive(c: Context, i: android.content.Intent) {
+                    if (i.action == "com.elyndra.launcher.DEBUG_PERF") {
+                        // Interruptores de perfilado: --ez ssao/bloom/fxaa/fog/vignette/atmo/springs, --ef scale 0.5..1
+                        val v = gpu.view
+                        if (i.hasExtra("ssao")) v.ambientOcclusionOptions = v.ambientOcclusionOptions.apply { enabled = i.getBooleanExtra("ssao", true) }
+                        if (i.hasExtra("bloom")) v.bloomOptions = v.bloomOptions.apply { enabled = i.getBooleanExtra("bloom", true) }
+                        if (i.hasExtra("fxaa")) v.antiAliasing = if (i.getBooleanExtra("fxaa", true)) com.google.android.filament.View.AntiAliasing.FXAA else com.google.android.filament.View.AntiAliasing.NONE
+                        if (i.hasExtra("fog")) v.fogOptions = v.fogOptions.apply { enabled = i.getBooleanExtra("fog", true) }
+                        if (i.hasExtra("vignette")) v.vignetteOptions = v.vignetteOptions.apply { enabled = i.getBooleanExtra("vignette", true) }
+                        if (i.hasExtra("scale")) {
+                            val k = i.getFloatExtra("scale", 1f)
+                            v.dynamicResolutionOptions = v.dynamicResolutionOptions.apply { enabled = k < 1f; minScale = k; maxScale = k }
+                        }
+                        if (i.hasExtra("atmo")) MashaDebugPose.noAtmo = !i.getBooleanExtra("atmo", true)
+                        if (i.hasExtra("hz")) (context as? android.app.Activity)?.window?.let { w ->
+                            w.attributes = w.attributes.apply { preferredRefreshRate = i.getFloatExtra("hz", 0f) }
+                        }
+                        if (i.hasExtra("atmoHz")) MashaDebugPose.atmoHz = i.getIntExtra("atmoHz", 0)
+                        if (i.hasExtra("springs")) MashaDebugPose.noSprings = !i.getBooleanExtra("springs", true)
+                        return
+                    }
+                    val y = i.getFloatExtra("y", 1.50f)
+                    cameraNode.position = Position(i.getFloatExtra("x", 0f), y + 0.02f, i.getFloatExtra("z", 0.45f))
+                    cameraNode.lookAt(Position(0f, y, 0f))
+                }
+            }
+            val filter = android.content.IntentFilter("com.elyndra.launcher.DEBUG_CAM").apply { addAction("com.elyndra.launcher.DEBUG_PERF") }
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+            } else {
+                @Suppress("UnspecifiedRegisterReceiverFlag")
+                context.registerReceiver(receiver, filter)
+            }
+            onDispose { context.unregisterReceiver(receiver) }
+        }
     }
 
     DisposableEffect(gpu) {
