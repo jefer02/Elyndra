@@ -2,6 +2,8 @@ package com.elyndra.launcher.ui.screens
 
 import android.Manifest
 import android.content.pm.PackageManager
+import com.elyndra.launcher.BuildConfig
+import com.elyndra.launcher.ui.masha.MashaDebugSay
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -183,6 +185,8 @@ fun MashaScreen(vm: ElyndraViewModel) {
         if (last == null || !last.fromMasha || last.restored || last.id == alreadyShown || !settings.mashaVoice) return@LaunchedEffect
         voice.feed(last.id, last.text, final = !last.pending)
     }
+    // Solo en debug: `adb shell am broadcast` hace hablar a Masha con un texto fijo (QA del lip-sync).
+    if (BuildConfig.DEBUG) MashaDebugSay(voice)
     // Gestos: saluda al materializarse; explica cuando trae una tarjeta.
     LaunchedEffect(stage) { if (stage == StageStatus.Ready) presence.play(MashaPresence.Cue.Wave) }
     LaunchedEffect(last?.id, last?.pending) {
