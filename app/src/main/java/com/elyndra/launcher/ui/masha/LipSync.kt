@@ -1,217 +1,171 @@
 package com.elyndra.launcher.ui.masha
 
-import java.text.Normalizer
-import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.sin
+import com.elyndra.launcher.ui.masha.lipsync.Ch
+import com.elyndra.launcher.ui.masha.lipsync.LipSyncConfig
+import com.elyndra.launcher.ui.masha.lipsync.Track
+import com.elyndra.launcher.ui.masha.lipsync.Vis
+import kotlin.math.exp
+import kotlin.math.floor
 
 /**
- * Sincronía de labios aproximada.
+ * Sincronía de labios, lado del render.
  *
- * El motor de voz avisa de cada palabra al empezar a decirla
- * (`UtteranceProgressListener.onRangeStart`). Con eso se reparte la palabra
- * en visemas —uno por letra que se note en la boca— a lo largo de lo que se
- * calcula que dura, y el render muestrea el resultado en cada fotograma.
- *
- * Si el motor no da rangos (algunos no lo hacen), mientras suena la voz se
- * mueve la boca con un patrón silábico: no es exacto, pero no se queda muda.
- *
- * La tabla letra → visema es la del contrato de la cara v2
- * (`face_contract.json`, `grapheme_to_viseme`): dígrafos primero, vocales
- * más largas que las consonantes (que son cortas y se funden con la vocal
- * siguiente). En español la "v" es bilabial (como la "b"); en inglés, labiodental.
- *
- * Todo se usa desde el hilo principal: los avisos del motor se pasan a él
- * antes de llegar aquí.
+ * El hilo de la voz ([MashaVoice]) prepara, por cada frase, unas curvas de
+ * 100 Hz ([Track]: visemas coarticulados, mandíbula, nivel de la voz, cejas,
+ * cabeceos, parpadeos) a partir del texto, los rangos de palabra del motor y
+ * el propio audio (ver `lipsync/`). Aquí, en cada fotograma, se mira dónde va
+ * el audio que se oye ([Clock]: la cabeza de reproducción de AudioTrack con
+ * su latencia) y se leen las curvas en ese instante + el adelanto visual
+ * (60 ms por defecto), con un suavizado final exponencial en función de dt
+ * (independiente de los fps). Sin objetos por fotograma.
  */
-class LipSync {
+class LipSync(val config: LipSyncConfig = LipSyncConfig()) {
 
-    /**
-     * Índices de los visemas en [Weights]. [Open] es cuánto baja la mandíbula
-     * (lo suman todos según [OPEN]). [EE] es el visema "e/i" genérico del
-     * modelo antiguo (lo usa el patrón silábico de repuesto); las letras usan
-     * ya [E] e [I] por separado. Los nuevos van al final para no mover los
-     * ordinales de los antiguos.
-     */
-    enum class V { Open, AA, O, EE, FV, MBP, E, I, U, SS, DD, CH }
-
-    class Weights {
-        val v = FloatArray(V.entries.size)
-        fun clear() = v.fill(0f)
+    /** Una frase: sus curvas (las publica el hilo de la voz) y su posición en la salida de audio. */
+    class Item internal constructor(val id: String) {
+        @Volatile var track: Track = Track.EMPTY
+        /** Frecuencia de muestreo del audio de la frase (0 = aún no se sabe). */
+        @Volatile var sampleRate = 0
+        /** Trama de la salida (AudioTrack) donde empieza la frase; −1 = aún no se ha escrito. */
+        @Volatile var startFrame = -1L
+        /** Trama de la salida donde acaba (−1 = sigue llegando). */
+        @Volatile var endFrame = -1L
+        /** Pista de audio a la que pertenecen [startFrame]/[endFrame]. */
+        @Volatile var outputId = -1
+        /** Modo de repuesto (el motor reproduce): instante en que empezó a sonar, o −1. */
+        @Volatile var startNanos = -1L
+        /** Modo de repuesto: el motor avisó de que terminó. */
+        @Volatile var spokenDone = false
     }
 
-    private class Key(val at: Long, val viseme: V, val amount: Float)
-
-    private val keys = ArrayList<Key>(64)
-    private var wordEnd = 0L
-    private var lastRange = 0L
-    private var speakingSince = 0L
-    private var speaking = false
-    /** ms por letra a velocidad 1: una media razonable para español/inglés. */
-    private var msPerChar = BASE_MS_PER_CHAR
-    /** Español (y portugués): la "v" se dice con los labios juntos. */
-    private var bilabialV = true
-
-    /** Sube con cada palabra: el rig la usa para acentos de ceja. */
-    var wordSeq = 0
-        private set
-
-    fun setRate(rate: Float) {
-        msPerChar = BASE_MS_PER_CHAR / rate.coerceIn(0.5f, 2f)
+    /** Dónde va el audio. */
+    interface Clock {
+        /** Segundos desde el principio de [item] que se oyen en [nowNanos] (NaN = no ha empezado o no se sabe). */
+        fun seconds(item: Item, nowNanos: Long): Double
     }
 
-    /** Idioma de la voz (etiqueta BCP 47): decide cómo se dice la "v". */
-    fun setLanguage(tag: String) {
-        val lang = tag.substringBefore('-').substringBefore('_').lowercase()
-        bilabialV = lang == "es" || lang == "pt"
-    }
+    /** Lo que sale en cada fotograma (ya suavizado). */
+    class Frame {
+        /** Visemas de labios, por ordinal de [Vis]. */
+        val lips = FloatArray(Vis.COUNT)
+        /** Peso de `jawOpen`. */
+        var jaw = 0f
+        /** Nivel real de la voz 0..1 (sin adelanto): gestos del cuerpo y brillo. */
+        var env = 0f
+        /** Acento de cejas 0..1. */
+        var brow = 0f
+        /** Cabeceo (rad, + = barbilla abajo). */
+        var nod = 0f
+        /** Parpadear ahora (coma o punto). */
+        var blink = false
+        /** Hay una frase sonando bajo la boca. */
+        var active = false
 
-    fun onSpeechStart(now: Long) {
-        speaking = true
-        speakingSince = now
-        keys.clear()
-    }
-
-    fun onSpeechEnd() {
-        speaking = false
-        keys.clear()
-    }
-
-    /** Empieza la palabra [word] en el instante [now] (System.nanoTime). */
-    fun onWord(word: String, now: Long) {
-        lastRange = now
-        keys.clear()
-        val letters = normalize(word).filter { it.isLetter() }
-        if (letters.isEmpty()) return
-        wordSeq++
-        val step = msPerChar * 1_000_000f
-        var t = now
-        var i = 0
-        while (i < letters.length) {
-            val g = grapheme(letters, i, bilabialV)
-            if (g.viseme != null) {
-                keys += Key(t, g.viseme, g.amount)
-                // Vocales largas, consonantes cortas (40–70 ms a velocidad 1).
-                t += (step * if (g.vowel) VOWEL_LENGTH else CONSONANT_LENGTH).toLong()
-            }
-            i += g.length
+        fun clear() {
+            lips.fill(0f); jaw = 0f; env = 0f; brow = 0f; nod = 0f; blink = false; active = false
         }
-        keys += Key(t, V.Open, 0.05f)
-        wordEnd = t
     }
 
+    @Volatile var clock: Clock? = null
+
+    @Volatile private var items: Array<Item> = emptyArray()
+    private val lock = Any()
+
+    internal fun add(item: Item) = synchronized(lock) { items = items + item }
+
+    internal fun remove(item: Item) = synchronized(lock) { items = items.filter { it !== item }.toTypedArray() }
+
+    internal fun clear() = synchronized(lock) { items = emptyArray() }
+
+    internal val count: Int get() = items.size
+
+    private val target = FloatArray(Ch.COUNT)
+    private var lastItem: Item? = null
+    private var lastT = 0.0
+
     /**
-     * Pesos de la boca en [now]: interpola entre visemas con una ventana corta
-     * (la boca no salta de forma a forma). [out] se reutiliza para no crear
-     * basura en cada fotograma.
+     * Pesos en [now] (System.nanoTime / tiempo de vsync); [dt] en s desde el
+     * fotograma anterior. Escribe en [out], que se reutiliza.
      */
-    fun sample(now: Long, out: Weights) {
-        out.clear()
-        if (!speaking) return
-        if (keys.isNotEmpty() && now <= wordEnd + 90_000_000L) {
-            val blend = 55_000_000f
-            // Índices y no iterador: esto corre en cada fotograma.
-            for (i in 0 until keys.size) {
-                val k = keys[i]
-                val d = (now - k.at).toFloat()
-                // Triángulo centrado en cada clave: sube antes, cae después.
-                val w = 1f - abs(d) / blend
-                if (w > 0f) {
-                    val o = k.viseme.ordinal
-                    out.v[o] = max(out.v[o], k.amount * w)
-                    out.v[V.Open.ordinal] = max(out.v[V.Open.ordinal], k.amount * w * OPEN[o])
+    fun sample(now: Long, dt: Float, out: Frame) {
+        target.fill(0f)
+        out.blink = false
+        var active = false
+        val c = clock
+        val list = items
+        val lead = config.leadSeconds.toDouble()
+        if (c != null) {
+            // La más reciente que ya suena (las siguientes aún tienen tiempo negativo).
+            var i = list.size - 1
+            while (i >= 0) {
+                val item = list[i--]
+                val t = c.seconds(item, now)
+                if (t.isNaN() || t < -lead - 0.05) continue
+                val tr = item.track
+                if (tr.complete && t > tr.frames * 0.01) continue
+                if (tr.frames > 0) {
+                    for (ch in 0 until Ch.COUNT) if (ch != Ch.ENV) target[ch] = value(tr, t + lead, ch)
+                    target[Ch.ENV] = value(tr, t, Ch.ENV)
+                    if (item === lastItem) {
+                        val a = lastT * 100.0
+                        val b = t * 100.0
+                        for (k in tr.blinks) if (k > a && k <= b) out.blink = true
+                    }
                 }
+                active = t >= 0.0 && t * 100.0 < tr.audioFrames + 5
+                lastItem = item
+                lastT = t
+                break
             }
-            return
         }
-        // Sin rangos del motor: sílabas de ~180 ms con algo de variación.
-        if (now - lastRange > 400_000_000L) {
-            val s = (now - speakingSince) / 1_000_000_000.0
-            val syll = 0.5 + 0.5 * sin(s * 2 * Math.PI * 5.4)
-            val var2 = 0.5 + 0.5 * sin(s * 2 * Math.PI * 1.7 + 1.3)
-            val open = (0.15 + 0.55 * syll * (0.6 + 0.4 * var2)).toFloat()
-            out.v[V.Open.ordinal] = open
-            out.v[V.AA.ordinal] = open * 0.6f
-            out.v[V.EE.ordinal] = (1 - var2).toFloat() * 0.3f
+        out.active = active
+
+        // Suavizado final (las curvas ya son suaves: solo quita escalones entre fotogramas y cierra al acabar).
+        // Filtro de primer orden integrado exactamente con el objetivo lineal entre fotogramas
+        // (retención de primer orden): el resultado casi no depende de los fps.
+        val s = config.smoothing.coerceAtLeast(0.05f)
+        if (!primed) {
+            target.copyInto(prev)
+            primed = true
         }
+        for (v in 0 until Vis.COUNT) {
+            // El cierre de P/B/M es más rápido (τ ≈ 11 ms): el contacto de labios no se puede perder.
+            out.lips[v] = foh(out.lips[v], prev[v], target[v], (if (v == PP) 90f else 55f) * s, dt)
+        }
+        out.jaw = foh(out.jaw, prev[Ch.JAW], target[Ch.JAW], 40f * s, dt)
+        out.env = foh(out.env, prev[Ch.ENV], target[Ch.ENV], 60f, dt)
+        out.brow = foh(out.brow, prev[Ch.BROW], target[Ch.BROW], 25f * s, dt)
+        out.nod = foh(out.nod, prev[Ch.NOD], target[Ch.NOD], 25f * s, dt)
+        target.copyInto(prev)
     }
 
-    /** Un grafema: cuántas letras ocupa y qué visema (null = mudo, sin tiempo). */
-    internal class Grapheme(val length: Int, val viseme: V?, val amount: Float, val vowel: Boolean)
+    private val prev = FloatArray(Ch.COUNT)
+    private var primed = false
 
-    internal companion object {
-        const val BASE_MS_PER_CHAR = 62f
-        const val VOWEL_LENGTH = 1.25f
-        const val CONSONANT_LENGTH = 0.8f
-
-        /** Cuánto abre la mandíbula cada visema (además de su forma), por ordinal de [V]. */
-        val OPEN = floatArrayOf(
-            1f, // Open
-            0.85f, // AA
-            0.45f, // O
-            0.25f, // EE
-            0.05f, // FV
-            0f, // MBP
-            0.35f, // E
-            0.18f, // I
-            0.2f, // U
-            0.08f, // SS
-            0.2f, // DD
-            0.12f, // CH
-        )
-
-        private val MARKS = Regex("\\p{Mn}+")
-
-        fun normalize(s: String): String =
-            Normalizer.normalize(s.lowercase(), Normalizer.Form.NFD).replace(MARKS, "")
-
-        private const val VOWELS = "aeiou"
+    private companion object {
+        val PP = Vis.PP.ordinal
 
         /**
-         * El grafema que empieza en [i] de [s] (ya normalizado: minúsculas, sin
-         * tildes; la ñ llega como n). Tabla del contrato de la cara v2.
+         * y' = λ(x − y) con x lineal de [x0] a [x1] durante [dt]: solución exacta.
+         * Con dt → 0 o λ·dt muy pequeño, un paso de Euler.
          */
-        fun grapheme(s: String, i: Int, bilabialV: Boolean): Grapheme {
-            val c = s[i]
-            val next = s.getOrNull(i + 1)
-            val after = s.getOrNull(i + 2)
-            // Dígrafos primero.
-            when {
-                (c == 'c' || c == 's') && next == 'h' -> return Grapheme(2, V.CH, 1f, false)
-                c == 'l' && next == 'l' -> return Grapheme(2, V.CH, 0.7f, false)
-                c == 'r' && next == 'r' -> return Grapheme(2, V.DD, 0.8f, false)
-                c == 't' && next == 'h' -> return Grapheme(2, V.DD, 0.7f, false)
-                // "qu" y "gue/gui": la u no suena.
-                c == 'q' && next == 'u' -> return Grapheme(2, V.DD, 0.6f, false)
-                c == 'g' && next == 'u' && (after == 'e' || after == 'i') -> return Grapheme(2, V.DD, 0.6f, false)
-            }
-            return when (c) {
-                'a' -> Grapheme(1, V.AA, 1f, true)
-                'e' -> Grapheme(1, V.E, 1f, true)
-                'i' -> Grapheme(1, V.I, 1f, true)
-                'o' -> Grapheme(1, V.O, 1f, true)
-                'u' -> Grapheme(1, V.U, 1f, true)
-                // La "y" final o entre consonantes suena a "i"; delante de vocal es consonante (CH suave).
-                'y' -> if (next != null && next in VOWELS) Grapheme(1, V.CH, 0.6f, false) else Grapheme(1, V.I, 0.8f, true)
-                'w' -> Grapheme(1, V.U, 0.9f, false)
-                'm', 'b', 'p' -> Grapheme(1, V.MBP, 1f, false)
-                'v' -> if (bilabialV) Grapheme(1, V.MBP, 0.7f, false) else Grapheme(1, V.FV, 1f, false)
-                'f' -> Grapheme(1, V.FV, 1f, false)
-                's' -> Grapheme(1, V.SS, 1f, false)
-                'z' -> Grapheme(1, V.SS, 0.9f, false)
-                // "ce/ci" es /s/ o /θ/; "ca/co/cu" y la c final, /k/.
-                'c' -> if (next == 'e' || next == 'i') Grapheme(1, V.SS, 0.8f, false) else Grapheme(1, V.DD, 0.6f, false)
-                'x' -> Grapheme(1, V.SS, 0.7f, false)
-                'j' -> Grapheme(1, V.CH, 0.6f, false)
-                'g', 'k', 'q' -> Grapheme(1, V.DD, 0.6f, false)
-                't', 'd' -> Grapheme(1, V.DD, 1f, false)
-                'n', 'l' -> Grapheme(1, V.DD, 0.8f, false)
-                'r' -> Grapheme(1, V.DD, 0.6f, false)
-                // La h no suena: ni forma ni tiempo.
-                'h' -> Grapheme(1, null, 0f, false)
-                // Kana/kanji y el resto: abrir un poco.
-                else -> Grapheme(1, V.Open, 0.35f, true)
-            }
+        fun foh(y: Float, x0: Float, x1: Float, lambda: Float, dt: Float): Float {
+            if (dt <= 0f) return y
+            val ld = lambda * dt
+            if (ld < 1e-4f) return y + (x1 - y) * ld
+            val e = exp(-ld)
+            val slope = (x1 - x0) / ld
+            return x1 - slope + e * (y - x0 + slope)
         }
+    }
+
+    private fun value(tr: Track, t: Double, ch: Int): Float {
+        val x = t * 100.0
+        if (x <= 0.0) return if (x > -1.0) tr.at(0, ch) else 0f
+        val k = floor(x).toInt()
+        // Más allá de lo calculado: la última trama (en una pista completa es la cola, ya cerrada).
+        if (k >= tr.frames - 1) return tr.at(tr.frames - 1, ch)
+        val f = (x - k).toFloat()
+        return tr.at(k, ch) * (1f - f) + tr.at(k + 1, ch) * f
     }
 }

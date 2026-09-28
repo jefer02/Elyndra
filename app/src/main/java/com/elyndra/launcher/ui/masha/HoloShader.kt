@@ -123,7 +123,7 @@ internal class HoloShader private constructor(
                 selfIllum = 0.06f,
             )
 
-            /** Interior de la boca: oscuro, opaco, sin efectos. */
+            /** Interior de la boca: oscuro, opaco, sin efectos salvo el glitch (se desgarra con la cara). */
             val MOUTH = HoloShaderParams(
                 albedo = 0.08f,
                 desaturate = 0.6f,
@@ -135,7 +135,6 @@ internal class HoloShader private constructor(
                 alpha = 1f,
                 emissiveDamp = 0f,
                 selfIllum = 0f,
-                glitchAmount = 0f,
             )
         }
     }
@@ -409,7 +408,13 @@ internal class HoloShader private constructor(
                     mi.setParameter("glitch", glitch * s.holo.glitchAmount)
                     mi.setParameter("glitchSeed", glitchSeed)
                 }
-                Family.Eye -> mi.setParameter("pulse", pulse)
+                Family.Eye -> {
+                    // El mismo desgarro que la cara: ojos, dientes y lengua van con su banda.
+                    mi.setParameter("pulse", pulse)
+                    mi.setParameter("time", time)
+                    mi.setParameter("glitch", glitch)
+                    mi.setParameter("glitchSeed", glitchSeed)
+                }
                 Family.Card -> {
                     mi.setParameter("time", time)
                     mi.setParameter("energy", energy)
@@ -488,6 +493,9 @@ internal class HoloShader private constructor(
                 mi.setParameter("corneaRoughness", corneaRoughness)
                 mi.setParameter("brightness", brightness)
                 mi.setParameter("pulse", 0f)
+                mi.setParameter("time", 0f)
+                mi.setParameter("glitch", 0f)
+                mi.setParameter("glitchSeed", 0f)
             }
             Family.Card -> with(s.card) {
                 mi.setParameter("albedo", albedo)
