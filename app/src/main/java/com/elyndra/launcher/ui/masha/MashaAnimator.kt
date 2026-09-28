@@ -223,6 +223,13 @@ internal class MashaAnimator(
         // 3. Mirada.
         if (config.look.enabled && head >= 0) gaze(t, dt, input.thinking, camera)
 
+        // 3b. Cabeceo del habla (acentos, preguntas): capa aditiva sobre la mirada
+        // (después, para que la mirada no la compense). 40 % cuello, 60 % cabeza.
+        if (input.headNod != 0f && head >= 0) {
+            rotate(neck, left, 0.4f * input.headNod, model)
+            rotate(head, left, 0.6f * input.headNod, model)
+        }
+
         // 4. Pies.
         if (config.feet.enabled) {
             leg(upLegL, legL, footL, 0)

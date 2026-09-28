@@ -63,7 +63,8 @@ data class IdleConfig(
 /**
  * Habla: gestos de ritmo (Talk_*) al compás de la voz.
  *
- * La envolvente sigue el canal Open de [LipSync] (ataque [attack], caída
+ * La envolvente sigue el nivel real del audio de la voz ([LipSync.Frame.env],
+ * dBFS −45..−10 → 0..1) (ataque [attack], caída
  * [release]); un golpe sale cuando sube [riseDb] dB sobre su media lenta
  * ([meanTau]) y pasa de [minLevel], o cuando pasa de [strongLevel] (sílaba
  * fuerte), si hace al menos [minGap]–[maxGap] s del
