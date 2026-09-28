@@ -493,6 +493,8 @@
     <string name="frame_rate_120">120 fps</string>
     <string name="frame_rate_60">60 fps</string>
     <string name="frame_rate_unsupported">Dieses Display unterstützt keine 120 Hz, daher werden 60 fps verwendet.</string>
+    <string name="masha_high_refresh">Masha: hohe Flüssigkeit (120 Hz)</string>
+    <string name="masha_high_refresh_desc">Aus: Masha läuft mit 60 fps – für ein Hologramm genauso flüssig, mit halber GPU-Last, weniger Akkuverbrauch und weniger Wärme bei langen Gesprächen.</string>
     <string name="masha_particles_title">Partikelfarbe</string>
     <string name="masha_particles_desc">Die leuchtende Spur, die Masha beim Ziehen hinterlässt.</string>
     <string name="masha_particles_hue">Farbton</string>
@@ -522,4 +524,35 @@
     <string name="masha_new_chat">Neue Unterhaltung</string>
     <string name="masha_back">Zurück</string>
     <string name="masha_listening_hint">Sprich jetzt…</string>
+
+    <!-- Acerca de, licencias y opciones de desarrollador (calibrar la sincronía de la voz) -->
+    <string name="section_about">Über</string>
+    <string name="about_version">Version</string>
+    <string name="licenses_title">Open-Source-Lizenzen</string>
+    <string name="licenses_desc">Elyndra ist mit diesen Komponenten von Drittanbietern gebaut. Danke an alle, die sie machen.</string>
+    <string name="licenses_components">Bibliotheken und Schriften</string>
+    <string name="licenses_assets">3D-Assets</string>
+    <string name="licenses_apache_notice">Komponenten unter der Apache License 2.0 stehen unter dieser Lizenz; eine Kopie gibt es unter https://www.apache.org/licenses/LICENSE-2.0. Die SIL Open Font License 1.1 steht unter https://openfontlicense.org.</string>
+    <string name="licenses_mpfb_note">Mashas 3D-Modell (erstellt mit MPFB2 und den MakeHuman-System-Assets)</string>
+    <string name="licenses_cmudict_use">Masha nutzt das CMU Pronouncing Dictionary, um beim Englischsprechen die Lippen zu bewegen. Der Hinweis im Wortlaut:</string>
+    <string name="dev_section">Entwickler</string>
+    <string name="dev_voice_sync">Sprachsynchronisierung kalibrieren</string>
+    <string name="dev_voice_sync_desc">Stimmt Mashas Lippen für jede Audioausgabe auf den Ton ab (Bluetooth-Kopfhörer verzögern).</string>
+    <string name="dev_hide">Entwickleroptionen ausblenden</string>
+    <string name="dev_unlocked">Entwickleroptionen freigeschaltet</string>
+    <string name="dev_already">Die Entwickleroptionen sind bereits aktiv</string>
+    <string name="voice_sync_route">Audioausgabe</string>
+    <string name="route_speaker">Telefonlautsprecher</string>
+    <string name="route_wired">Kabelkopfhörer</string>
+    <string name="route_bluetooth">Bluetooth</string>
+    <string name="route_other">Andere Ausgabe</string>
+    <string name="voice_sync_offset">Audioverzögerung</string>
+    <string name="voice_sync_test">Testen</string>
+    <string name="voice_sync_reset">Zurücksetzen</string>
+    <string name="voice_sync_hint">Tippe auf Testen und achte auf die Lippen: Sie sollten sich genau bei jedem P, B und M schließen. Bewegt sich der Mund vor dem Ton, erhöhe die Verzögerung; bewegt er sich danach, verringere sie. Wird nur für diese Ausgabe gespeichert.</string>
+    <string name="voice_sync_phrase">Papa, Mama, Puppe, Bombe, Pumpe.</string>
+    <plurals name="dev_taps_left">
+        <item quantity="one">Noch %d Mal tippen bis zu den Entwickleroptionen</item>
+        <item quantity="other">Noch %d Mal tippen bis zu den Entwickleroptionen</item>
+    </plurals>
 </resources>

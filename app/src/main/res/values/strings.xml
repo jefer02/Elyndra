@@ -499,6 +499,8 @@
     <string name="frame_rate_120">120 fps</string>
     <string name="frame_rate_60">60 fps</string>
     <string name="frame_rate_unsupported">This display doesn\'t support 120 Hz, so 60 fps is used.</string>
+    <string name="masha_high_refresh">Masha: high smoothness (120 Hz)</string>
+    <string name="masha_high_refresh_desc">Off, Masha runs at 60 fps: just as fluid for a hologram, with half the GPU work, less battery and less heat in long chats.</string>
     <string name="masha_particles_title">Particle color</string>
     <string name="masha_particles_desc">The glowing trail Masha leaves behind when you drag her.</string>
     <string name="masha_particles_hue">Hue</string>
@@ -528,4 +530,35 @@
     <string name="masha_new_chat">New conversation</string>
     <string name="masha_back">Back</string>
     <string name="masha_listening_hint">Speak now…</string>
+
+    <!-- Acerca de, licencias y opciones de desarrollador (calibrar la sincronía de la voz) -->
+    <string name="section_about">About</string>
+    <string name="about_version">Version</string>
+    <string name="licenses_title">Open-source licenses</string>
+    <string name="licenses_desc">Elyndra is built with these third-party components. Thanks to everyone who makes them.</string>
+    <string name="licenses_components">Libraries and fonts</string>
+    <string name="licenses_assets">3D assets</string>
+    <string name="licenses_apache_notice">Components under the Apache License 2.0 are licensed under it; you may obtain a copy at https://www.apache.org/licenses/LICENSE-2.0. The SIL Open Font License 1.1 is at https://openfontlicense.org.</string>
+    <string name="licenses_mpfb_note">Masha’s 3D model (made with MPFB2 and the MakeHuman system assets)</string>
+    <string name="licenses_cmudict_use">Masha uses the CMU Pronouncing Dictionary to move her lips when she speaks English. Its notice, verbatim:</string>
+    <string name="dev_section">Developer</string>
+    <string name="dev_voice_sync">Calibrate voice sync</string>
+    <string name="dev_voice_sync_desc">Line up Masha’s lips with the sound for each audio output (Bluetooth headphones add delay).</string>
+    <string name="dev_hide">Hide developer options</string>
+    <string name="dev_unlocked">Developer options unlocked</string>
+    <string name="dev_already">Developer options are already on</string>
+    <string name="voice_sync_route">Audio output</string>
+    <string name="route_speaker">Phone speaker</string>
+    <string name="route_wired">Wired headphones</string>
+    <string name="route_bluetooth">Bluetooth</string>
+    <string name="route_other">Other output</string>
+    <string name="voice_sync_offset">Audio delay</string>
+    <string name="voice_sync_test">Test</string>
+    <string name="voice_sync_reset">Reset</string>
+    <string name="voice_sync_hint">Tap Test and watch her lips: they should close exactly on every P, B and M. If the mouth moves before the sound, raise the delay; if it moves after, lower it. Saved for this output only.</string>
+    <string name="voice_sync_phrase">Bob, pop the map in the big pink box, mom.</string>
+    <plurals name="dev_taps_left">
+        <item quantity="one">%d tap away from developer options</item>
+        <item quantity="other">%d taps away from developer options</item>
+    </plurals>
 </resources>
