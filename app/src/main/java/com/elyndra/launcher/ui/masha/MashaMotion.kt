@@ -173,8 +173,10 @@ internal class MotionInput {
     var listening = false
     var thinking = false
     var mood = MashaMood.Neutral
-    /** Canal Open de la boca (0..1) mientras suena la voz. */
+    /** Nivel real de la voz (0..1, envolvente del audio que suena). */
     var voice = 0f
+    /** Cabeceo del habla (rad, + = barbilla abajo; − = cabeza arriba al preguntar). */
+    var headNod = 0f
 }
 
 /**
