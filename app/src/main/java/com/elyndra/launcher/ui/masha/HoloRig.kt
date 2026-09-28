@@ -18,8 +18,9 @@ import kotlin.random.Random
  *   inercialización, máquina de estados (reposo y sus variaciones, escuchar,
  *   pensar, hablar con gestos al ritmo de la voz, gestos pedidos), respiración
  *   y balanceo procedurales, mirada a la cámara con sacadas e IK de los pies.
- *   Orden por fotograma: clips → capas → mirada → pies → giros y muelles
- *   ([SpringBonesFilament]) → `updateBoneMatrices` → cara.
+ *   Orden por fotograma: clips → fundidos → capas aditivas (con el cabeceo
+ *   del habla) → mirada → pies → cara (expresión y labios, [LipSync]) → giros
+ *   y muelles ([SpringBonesFilament]) → `updateBoneMatrices`.
  * - **Cara:** morph targets mezclados en vivo — visemas de la voz, parpadeo
  *   con doble parpadeo ocasional, sonrisa y cejas según el ánimo y pequeñas
  *   microexpresiones al azar.
@@ -57,7 +58,8 @@ internal class HoloRig(
     private val morphs = FaceMorphs.forNames(face?.morphTargetNames.orEmpty())
     private val weights = FloatArray(morphs.names.size)
     private val channels = FaceChannels()
-    private val mouth = LipSync.Weights()
+    /** Voz de este fotograma: labios, mandíbula, nivel, cejas, cabeceo (ver [LipSync]). */
+    private val speech = LipSync.Frame()
 
     /* ── huesos procedurales (muelles y giros; el modelo v1 no trae ninguno) ── */
 
@@ -155,6 +157,7 @@ internal class HoloRig(
     private val uv = FloatArray(9)
 
     init {
+        morphs.smileCut = presence.lipSync.config.smileRoundingCut
         linear(presence.visibleMood.skin, skin)
         linear(presence.visibleMood.glow, glow)
         // Orden de dibujo (0 primero): el cuerpo y la cara escriben profundidad,
@@ -205,16 +208,23 @@ internal class HoloRig(
         val dt = ((frameTimeNanos - last) / 1e9f).coerceIn(0f, 0.1f)
         last = frameTimeNanos
 
-        // La boca de este fotograma: la usan el cuerpo (gestos al ritmo), la cara y el brillo.
-        presence.lipSync.sample(frameTimeNanos, mouth)
-        body(t, dt, frameTimeNanos)
+        // La voz de este fotograma (reloj de audio): la usan el cuerpo (gestos al
+        // ritmo, cabeceos), la cara y el brillo.
+        dbgT0 = System.nanoTime()
+        presence.lipSync.sample(frameTimeNanos, dt, speech)
+        dbgT1 = System.nanoTime()
+        // Orden: clips → fundidos → capas aditivas (+ cabeceo del habla) →
+        // expresión y labios → muelles → matrices de huesos.
+        body(t, dt)
         faceFrame(t, dt)
+        if (!(com.elyndra.launcher.BuildConfig.DEBUG && MashaDebugPose.noSprings)) springs?.frame(frameTimeNanos)
+        animator.updateBoneMatrices()
         hologram(t, dt)
     }
 
     /* ── cuerpo ───────────────────────────────────────────────── */
 
-    private fun body(t: Float, dt: Float, now: Long) {
+    private fun body(t: Float, dt: Float) {
         val m = motion
         if (presence.cueSeq != cueSeen) {
             cueSeen = presence.cueSeq
@@ -225,7 +235,9 @@ internal class HoloRig(
             input.listening = presence.listening
             input.thinking = presence.thinking
             input.mood = presence.mood
-            input.voice = mouth.v[LipSync.V.Open.ordinal]
+            // Nivel real de la voz (no una suposición por letras): golpes de gesto al compás.
+            input.voice = speech.env
+            input.headNod = speech.nod
             // Clips → capas → mirada → pies (y escribe las locales).
             m.frame(t, dt, input, cameraEntity)
         } else {
@@ -233,9 +245,7 @@ internal class HoloRig(
             animator.applyAnimation(idle, if (d > 0f) t % d else 0f)
         }
         for (r in rings) animator.applyAnimation(r, t % animator.getAnimationDuration(r))
-        // Giros y muelles leen lo que acaba de quedar en los huesos; después, las matrices.
-        springs?.frame(now)
-        animator.updateBoneMatrices()
+        // Los muelles y las matrices van después de la cara (ver [frame]).
     }
 
     private fun actionOf(cue: MashaPresence.Cue): Action? = when (cue) {
@@ -257,9 +267,19 @@ internal class HoloRig(
         val mood = presence.visibleMood
         val body = motion?.core
 
-        // La boca sigue a los visemas con algo de inercia (no salta).
-        val k = 1f - exp(-dt * 28f)
-        for (i in c.mouth.indices) c.mouth[i] += (mouth.v[i] - c.mouth[i]) * k
+        // Labios y mandíbula: ya coarticulados y suavizados (con dt) en LipSync.
+        speech.lips.copyInto(c.lips)
+        c.jaw = speech.jaw
+        c.speechBrow = speech.brow
+        if (com.elyndra.launcher.BuildConfig.DEBUG) MashaDebugPose.jaw?.let { j ->
+            MashaDebugPose.lips.copyInto(c.lips)
+            c.jaw = j
+            if (MashaDebugPose.wobble) {
+                val k = 0.5f + 0.5f * kotlin.math.sin(t * 10f)
+                for (v in c.lips.indices) c.lips[v] *= k
+                c.jaw *= k
+            }
+        }
 
         // Microexpresiones: una ceja que sube, un amago de sonrisa, entrecerrar.
         if (t > nextMicro) {
@@ -289,6 +309,8 @@ internal class HoloRig(
             body.blinkRequest = false
             blink.trigger(t)
         }
+        // Y en las comas y puntos de lo que dice.
+        if (speech.blink) blink.trigger(t)
         blink.update(t, slow = presence.thinking)
         // Párpados acoplados a la mirada: mirar abajo los baja, mirar arriba los abre.
         val pitch = body?.eyePitch ?: 0f
@@ -301,7 +323,29 @@ internal class HoloRig(
         c.wideR = c.wideL
 
         morphs.write(c, weights)
+        if (com.elyndra.launcher.BuildConfig.DEBUG) MashaDebugPose.raw?.let { (n, v) ->
+            val k = morphs.names.indexOf(n)
+            if (k >= 0) weights[k] = v
+        }
         face.setMorphWeights(weights, 0)
+        if (com.elyndra.launcher.BuildConfig.DEBUG && (presence.speaking || MashaDebugPose.traceAll)) traceFace(t)
+    }
+
+    private var dbgT0 = 0L
+    private var dbgT1 = 0L
+
+    /** Solo debug (QA del lip-sync): pesos de boca por fotograma en logcat, etiqueta MashaFace. */
+    private fun traceFace(t: Float) {
+        val now = System.nanoTime()
+        val sb = StringBuilder(160).append("t=").append((t * 1000).toInt())
+            .append(" us_lip=").append((dbgT1 - dbgT0) / 1000).append(" us_body_face=").append((now - dbgT1) / 1000)
+        for (k in morphs.names.indices) {
+            val n = morphs.names[k]
+            if ((n.startsWith("viseme_") || n.startsWith("jaw") || n.startsWith("mouth")) && weights[k] > 0.02f) {
+                sb.append(' ').append(n.removePrefix("viseme_")).append('=').append((weights[k] * 100).toInt())
+            }
+        }
+        android.util.Log.v("MashaFace", sb.toString())
     }
 
     /* ── holograma ────────────────────────────────────────────── */
@@ -314,7 +358,7 @@ internal class HoloRig(
         linearTo(mood.glow, glow, k)
 
         // Pulso: la voz (apertura de boca), el micrófono o una respiración lenta.
-        val voice = if (presence.speaking) mouth.v[LipSync.V.Open.ordinal] else 0f
+        val voice = if (presence.speaking) speech.env else 0f
         val mic = if (presence.listening) presence.micLevel else 0f
         val breath = 0.5f + 0.5f * sin(t * 2f * PI.toFloat() / 3f)
         val target = max(max(voice * 0.9f, mic), 0.12f * breath) + presence.energy * 0.25f
@@ -330,7 +374,7 @@ internal class HoloRig(
             }
             nextGlitch = t + calm + rnd.nextFloat() * calm
         }
-        val glitch = t < glitchUntil
+        val glitch = t < glitchUntil || (com.elyndra.launcher.BuildConfig.DEBUG && MashaDebugPose.glitch)
         val flicker = if (glitch) 0.45f + 0.4f * rnd.nextFloat() else 1f
         val tear = if (glitch) (rnd.nextFloat() - 0.5f) * 0.06f else 0f
 

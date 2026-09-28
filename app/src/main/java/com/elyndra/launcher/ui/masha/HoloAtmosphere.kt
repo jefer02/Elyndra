@@ -50,6 +50,9 @@ import kotlin.random.Random
 
 private const val MOTES = 42
 
+/** Actualizaciones por segundo de la atmósfera (ver el reloj en [HoloAtmosphere]). */
+private const val ATMOSPHERE_HZ = 30
+
 private class Mote(val x: Float, val period: Float, val phase: Float, val size: Float, val sway: Float, val twinkle: Float)
 
 private val MOTE_SET = Random(0x4D41).let { r ->
@@ -72,7 +75,21 @@ fun HoloAtmosphere(presence: MashaPresence, modifier: Modifier = Modifier) {
     LaunchedEffect(reduced) {
         if (reduced) return@LaunchedEffect
         val start = withFrameNanos { it }
-        while (true) withFrameNanos { clock.floatValue = (it - start) / 1e9f }
+        // El reloj (y con él el redibujado) avanza a ATMOSPHERE_HZ, no en cada vsync: redibujar
+        // esta capa obliga a Android a recomponer toda la interfaz, que compite con el
+        // holograma por la GPU (medido: 64 → 119 fps a 120 Hz). Lo que mueve es lento
+        // (motas de 7–16 s, barrido cada 9 s): a 30 Hz no se nota.
+        var last = 0L
+        while (true) withFrameNanos {
+            val debugHz = if (com.elyndra.launcher.BuildConfig.DEBUG) MashaDebugPose.atmoHz else 0
+            val hz = if (debugHz > 0) debugHz else ATMOSPHERE_HZ
+            val off = com.elyndra.launcher.BuildConfig.DEBUG && MashaDebugPose.noAtmo
+            // Margen de 2 ms: con vsync a 60/120 Hz cae justo cada 2/4 fotogramas.
+            if (!off && it - last >= 1_000_000_000L / hz - 2_000_000L) {
+                last = it
+                clock.floatValue = (it - start) / 1e9f
+            }
+        }
     }
     Spacer(
         modifier
