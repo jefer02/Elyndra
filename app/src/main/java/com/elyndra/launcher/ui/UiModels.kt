@@ -13,7 +13,14 @@ import com.elyndra.launcher.metadata.ArtKind
 import com.elyndra.launcher.metadata.RaGameProgress
 import com.elyndra.launcher.metadata.Service
 
-enum class Screen { Library, Folder, Add, Settings, Masha }
+enum class Screen {
+    Library, Folder, Add, Settings, Masha,
+
+    /** Subpantallas de Ajustes: "atrás" vuelve a Ajustes. */
+    Licenses, VoiceSync;
+
+    val isSettingsPage: Boolean get() = this == Licenses || this == VoiceSync
+}
 
 enum class LibraryFilter(@StringRes val label: Int) {
     All(R.string.filter_all),

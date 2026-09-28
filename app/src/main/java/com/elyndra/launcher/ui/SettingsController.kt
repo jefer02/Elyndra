@@ -20,6 +20,8 @@ import com.elyndra.launcher.masha.MashaError
 import com.elyndra.launcher.metadata.ApiException
 import com.elyndra.launcher.metadata.FailureKind
 import com.elyndra.launcher.metadata.Service
+import com.elyndra.launcher.ui.masha.lipsync.AudioRoute
+import com.elyndra.launcher.ui.masha.lipsync.AudioRouteOffsets
 import com.elyndra.launcher.ui.theme.ElyndraSkin
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -195,6 +197,20 @@ class SettingsController(private val vm: ElyndraViewModel) {
     /** Los fps que se piden de verdad a la pantalla; la Activity los aplica al cambiar. */
     val frameRate: Int get() = FrameRate.effective(storedFrameRate, supportsHighRefresh)
 
+    /** Masha a 120 Hz (Ajustes → Pantalla); apagado, sus pantallas van a 60. */
+    var mashaHighRefresh by mutableStateOf(store.mashaHighRefresh); private set
+
+    fun toggleMashaHighRefresh() {
+        mashaHighRefresh = !mashaHighRefresh
+        store.mashaHighRefresh = mashaHighRefresh
+    }
+
+    /** Los fps que se piden en [screen]: los de Ajustes, salvo Masha a 60 si no está en alta fluidez. */
+    fun frameRateFor(screen: Screen): Int {
+        val masha = screen == Screen.Masha || screen == Screen.VoiceSync
+        return if (masha && !mashaHighRefresh) minOf(frameRate, FrameRate.STANDARD) else frameRate
+    }
+
     fun updateFrameRate(fps: Int) {
         if (fps == FrameRate.HIGH && !supportsHighRefresh) return
         storedFrameRate = fps
@@ -285,6 +301,56 @@ class SettingsController(private val vm: ElyndraViewModel) {
                 dismiss = DialogButton(UiText.res(R.string.close)) {},
             ),
         )
+    }
+
+    /* ── acerca de y opciones de desarrollador ────────────────── */
+
+    /** Opciones de desarrollador visibles (se desbloquean con siete toques en la versión). */
+    var developerOptions by mutableStateOf(store.developerOptions); private set
+
+    private var versionTaps = 0
+    private var lastVersionTap = 0L
+
+    /** Un toque en la fila de la versión: al séptimo seguido se desbloquean las opciones de desarrollador. */
+    fun tapVersion() {
+        if (developerOptions) {
+            vm.showToast(UiText.res(R.string.dev_already))
+            return
+        }
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastVersionTap > VERSION_TAP_WINDOW_MS) versionTaps = 0
+        lastVersionTap = now
+        versionTaps++
+        val left = VERSION_TAPS - versionTaps
+        when {
+            left <= 0 -> {
+                versionTaps = 0
+                developerOptions = true
+                store.developerOptions = true
+                vm.showToast(UiText.res(R.string.dev_unlocked))
+            }
+            left <= 4 -> vm.showToast(UiText.plural(R.plurals.dev_taps_left, left))
+        }
+    }
+
+    /** Oculta otra vez las opciones de desarrollador (los ajustes guardados se quedan). */
+    fun hideDeveloperOptions() {
+        developerOptions = false
+        store.developerOptions = false
+    }
+
+    /** Ajuste de sincronía guardado para [route] (el que aplica la voz). */
+    fun voiceOffset(route: AudioRoute): Int = AudioRouteOffsets.select(store.voiceOffsets(), route)
+
+    /** Guarda el ajuste de [route] (en Bluetooth, también como genérico para otros auriculares). */
+    fun setVoiceOffset(route: AudioRoute, ms: Int) {
+        val v = AudioRouteOffsets.clamp(ms)
+        AudioRouteOffsets.keysToSave(route).forEach { store.setVoiceOffset(it, v) }
+    }
+
+    /** Vuelve a 0 el ajuste de [route] (en Bluetooth, también el genérico). */
+    fun resetVoiceOffset(route: AudioRoute) {
+        AudioRouteOffsets.keysToSave(route).forEach { store.setVoiceOffset(it, null) }
     }
 
     /* ── prioridad de fuentes de metadatos ────────────────────── */
@@ -579,6 +645,9 @@ class SettingsController(private val vm: ElyndraViewModel) {
 
     companion object {
         /** Reserva por si el proveedor no declara el tipo del archivo elegido. */
+        private const val VERSION_TAPS = 7
+        private const val VERSION_TAP_WINDOW_MS = 1500L
+
         private val VIDEO_EXTENSIONS = setOf("mp4", "webm", "mkv", "m4v", "mov", "3gp", "avi", "ts")
 
         fun helpUrl(s: Service): String = when (s) {
