@@ -216,6 +216,13 @@ def export_glb(path):
     import glb_tools
     st = glb_tools.prune_animation_channels(path)
     print(f"EXPORT pruned animation channels {st['channels_before']} -> {st['channels_after']}")
+    # Filament 1.56 does not deform with sparse morph accessors that have no bufferView (what
+    # export_try_sparse_sk writes): give them a shared all-zero base (see densify_morphs.py).
+    here = os.path.dirname(os.path.abspath(__file__))
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    import densify_morphs
+    densify_morphs.rewrite(path, path, "shared")
     print(f"EXPORT {path} {os.path.getsize(path) / 1e6:.2f} MB")
 
 
