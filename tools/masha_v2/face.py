@@ -6,8 +6,10 @@ face.build(ctx) runs after body, before hands. Deterministic and headless.
      Optional brow/lash/eye asset swaps (object names kept: Masha_Brows/Masha_Lashes/Masha_Eyes).
   2. Blendshapes: Meta visemes + ARKit face units loaded on the basemesh (before any vertex deletion:
      they are indexed by base-mesh vertex), MHCLO-interpolated to brows/lashes/teeth/tongue.
-     The rest mouth is closed (REST_CLOSE baked into the basis; lip/jaw/viseme shapes rebased so their
-     full-weight pose equals MPFB's original). A subset (KEEP, 31 shapes) is kept.
+     The rest mouth is closed (REST_CLOSE baked into the basis; absolute shapes rebased so their
+     full-weight pose equals MPFB's original). A subset (KEEP, 47 shapes) is kept. Lip-sync set (contract v2,
+     docs/MASHA_LIPSYNC.md): visemes are LIP-ONLY (jaw component removed, jaw only via jawOpen), O/U/PP/FF
+     strengthened with ARKit units, procedural tongue poses on TH/DD/nn/RR, tongue rest lowered 5 mm.
   3. Teeth decimated (keys re-created by nearest-vertex deltas). Head+neck separated from Masha_Body
      along a quad edge loop at the base of the neck -> Masha_Head (brows, lashes, teeth, tongue joined
      in). Masha_Body keeps NO shape keys. Seam normals made identical on both sides.
@@ -111,17 +113,61 @@ def build(ctx):
 
 
 # ---------------------------------------------------------------- 2. blendshapes
-# Rest-pose lip closure: MPFB's neutral mouth is slightly parted (teeth visible at the corners).
+# Morph contract for lip-sync: docs/MASHA_LIPSYNC.md ("Morph contract") and the "lipsync" block of
+# face_contract.json. Summary of how the mouth set is built (all in MPFB's raw delta space first):
+#   raw deltas R (relative to MPFB's slightly parted neutral) -> composites/recipes -> lip-only visemes
+#   (jaw removed) -> tongue poses -> rest-closure rebasing (restUndo) -> gains.
+# Rest-pose lip closure: MPFB's neutral mouth is slightly parted (teeth visible at the corners). The basis
+# gets C = 0.15 * mouthClose (~5 mm on the lips).
 REST_CLOSE = ("mouthClose", 0.15)
-# Shapes that are "absolute poses" of the lips/jaw: rebased so weight 1.0 reproduces MPFB's pose
-# exactly despite the closed rest (V' = V - c * mouthClose).
-REBASE_PREFIX = ("viseme_", "jaw", "mouthClose", "mouthFunnel", "mouthPucker", "mouthLowerDown",
-                 "mouthUpperUp", "mouthRoll", "mouthStretch", "mouthShrug")
-# Composite shapes (new name -> {source: weight}); built from raw deltas, then rebased like any shape.
-# mouthPress is deliberately *relative* (not rebased): it presses the already-closed rest lips.
-COMPOSITES = {"mouthPress": {"mouthPressLeft": 1.0, "mouthPressRight": 1.0}}
-# Per-shape gain applied to the delta (so runtime weight 1.0 is the natural maximum).
-GAINS = {"jawOpen": 0.6}
+# Shapes that are "absolute poses" of the lips: rebased (V' = V - restUndo * C) so weight 1.0 reproduces
+# their MPFB pose despite the closed rest. restUndo = 1 for these; jawOpen is rebased before its gain, so its
+# effective restUndo is GAINS["jawOpen"]. Every other mouth unit is a RELATIVE modifier (restUndo 0): it
+# acts on top of whatever the lips are doing (sealed rest, or a viseme). A sum of absolute shapes whose
+# restUndo-weighted total U exceeds 1 undoes C more than once; the runtime corrects it exactly with
+# mouthClose += REST_FIX_PER_UNIT * (U - 1) (see write_contract / docs).
+REBASE_PREFIX = ("viseme_", "jawOpen", "mouthPucker")
+# Composite shapes (new name -> {source: weight}) built from raw deltas (L+R pairs merged).
+COMPOSITES = {"mouthPress": {"mouthPressLeft": 1.0, "mouthPressRight": 1.0},
+              "mouthUpperUp": {"mouthUpperUpLeft": 1.0, "mouthUpperUpRight": 1.0},
+              "mouthLowerDown": {"mouthLowerDownLeft": 1.0, "mouthLowerDownRight": 1.0},
+              "mouthStretch": {"mouthStretchLeft": 1.0, "mouthStretchRight": 1.0},
+              "mouthDimple": {"mouthDimpleLeft": 1.0, "mouthDimpleRight": 1.0}}
+# Per-shape gain applied to the final delta (so runtime weight 1.0 is the natural maximum).
+# mouthClose: scaled so that mouthClose == jawOpen keeps the lips sealed over the open jaw
+# (raw jaw 0.6*j needs raw close 0.6*j, plus the 0.09*j of rest closure the jaw removes -> 0.69).
+GAINS = {"jawOpen": 0.6, "mouthClose": 0.69}
+
+# Viseme recipes in raw space (before the jaw is removed): strengthen the weak MPFB shapes with ARKit units.
+# seal=True: a closed-lip viseme; the lips must stay sealed when the jaw is removed, so the removed jaw
+# component is the *sealed* jaw k*(jawOpen + mouthClose) instead of k*jawOpen.
+VISEME_RECIPES = {
+    "viseme_O": {"src": {"viseme_O": 1.0, "mouthFunnel": 0.3, "mouthPucker": 0.15}},
+    "viseme_U": {"src": {"viseme_U": 1.0, "mouthPucker": 0.6, "mouthFunnel": 0.3}},
+    "viseme_PP": {"src": {"viseme_PP": 1.0, "mouthPressLeft": 0.3, "mouthPressRight": 0.3,
+                          "mouthRollLower": 0.15, "mouthRollUpper": 0.1}, "seal": True},
+    "viseme_FF": {"src": {"viseme_FF": 1.0, "mouthRollLower": 0.3, "mouthShrugLower": 0.6,
+                          "mouthUpperUpLeft": 0.2, "mouthUpperUpRight": 0.2}},
+}
+# Tongue poses (procedural, tongue mesh only, in the closed-jaw frame; the jaw carries the tongue with it).
+# weight profile along the tongue from the tip: f = s**p, s = 1 at the tip -> 0 at TONGUE_REACH behind it.
+TONGUE_REACH = 0.030
+# MPFB's tongue01 floats ~15 mm above the mouth floor with its dorsum above the lower incisal edge, so any
+# open mouth shows a flat pink slab filling the gap. The tongue rest is lowered (inner mouth only, invisible
+# with closed lips): the tip ends up ~6 mm below the lower incisal edge, still ~9 mm above the floor.
+TONGUE_REST_OFFSET = (0.0, 0.0, -0.005)
+TONGUE_POSES = {
+    # tip forward between the incisors (dental fricative); needs jawOpen >= ~0.12 to clear the teeth.
+    # "w": lateral half-width (m) of the part that moves: a narrow tip, not the whole tongue front.
+    "tip_forward": {"d": (0.0, -0.0105, 0.0095), "p": 1.6, "w": (0.008, 0.017)},
+    # tip raised to the alveolar ridge behind the upper incisors (t/d/n/l, Spanish tap r)
+    "tip_up": {"d": (0.0, 0.0015, 0.0175), "p": 2.0, "w": (0.010, 0.020)},
+}
+VISEME_TONGUE = {"viseme_TH": {"tip_forward": 1.0}, "viseme_DD": {"tip_up": 1.0},
+                 "viseme_nn": {"tip_up": 1.0}, "viseme_RR": {"tip_up": 0.7}}
+# Jaw-region cleanup of the lip-only visemes: residual skin motion is faded out where the jaw moves
+# (chin, jaw line, mouth floor) away from the lips; the lips keep their exact shape.
+LIP_KEEP_DIST = (0.007, 0.020)   # full residual within 7 mm of a lip vertex, none beyond 20 mm
 KEEP = [
     "eyeBlinkLeft", "eyeBlinkRight", "eyeSquintLeft", "eyeSquintRight", "eyeWideLeft", "eyeWideRight",
     "browInnerUp", "browDownLeft", "browDownRight", "browOuterUpLeft", "browOuterUpRight",
@@ -130,7 +176,13 @@ KEEP = [
     "jawOpen", "mouthPucker", "mouthPress", "mouthLeft",
     "viseme_aa", "viseme_E", "viseme_I", "viseme_O", "viseme_U", "viseme_PP", "viseme_FF",
     "viseme_SS", "viseme_DD", "viseme_CH",
+    # lip-sync additions (appended: the 31 indices above are unchanged)
+    "viseme_kk", "viseme_nn", "viseme_RR", "viseme_TH",
+    "mouthClose", "mouthFunnel", "mouthRollLower", "mouthRollUpper", "mouthUpperUp", "mouthLowerDown",
+    "mouthShrugLower", "mouthShrugUpper", "mouthStretch", "mouthDimple", "mouthRight", "tongueOut",
 ]
+LIP_ONLY = [n for n in KEEP if n.startswith("viseme_")]
+REST_FIX_PER_UNIT = REST_CLOSE[1] / GAINS["mouthClose"]   # mouthClose weight that re-adds one C
 
 
 def load_face_units(ctx):
@@ -154,8 +206,76 @@ def _co(obj, kb):
     return a.reshape(-1, 3)
 
 
+def _recipe(name):
+    return VISEME_RECIPES.get(name, {"src": {name: 1.0}})
+
+
+def _mix(deltas, src, like):
+    return sum((deltas[k] * w for k, w in src.items() if k in deltas), np.zeros_like(like))
+
+
+def lip_only_setup(ctx):
+    """Jaw coefficient k per viseme: least squares of the viseme's lower-teeth motion onto jawOpen's (the lower
+    teeth are the only rigid part that moves with the jaw alone). Plus the skin cleanup weight: 1 where the jaw
+    moves the skin far from the lips (chin, jaw line, mouth floor), 0 on and near the lips."""
+    teeth, body = ctx.get("teeth"), ctx["body"]
+    ks = {n: 0.0 for n in LIP_ONLY}
+    if teeth is not None and teeth.data.shape_keys is not None:
+        kbs = teeth.data.shape_keys.key_blocks
+        tb = _co(teeth, kbs[0])
+        td = {kb.name: _co(teeth, kb) - tb for kb in kbs[1:]}
+        J = td.get("jawOpen")
+        if J is not None:
+            n = np.linalg.norm(J, axis=1)
+            low = n > 0.3 * n.max()
+            jj = J[low].ravel()
+            for name in LIP_ONLY:
+                v = _mix(td, _recipe(name)["src"], tb)[low].ravel()
+                ks[name] = max(0.0, float(jj @ v / (jj @ jj)))
+    kbs = body.data.shape_keys.key_blocks
+    bb = _co(body, kbs[0])
+    jn = np.linalg.norm(_co(body, kbs["jawOpen"]) - bb, axis=1)
+    g = body.vertex_groups.get("lips")
+    skin = body.vertex_groups.get("body")
+    lips = [v.index for v in body.data.vertices if g is not None and any(x.group == g.index and x.weight > 0.5 for x in v.groups)]
+    ref = jn.max() if skin is None else max(jn[[v.index for v in body.data.vertices
+                                               if any(x.group == skin.index and x.weight > 0.5 for x in v.groups)]].max(), 1e-9)
+    jawness = np.clip(jn / (0.5 * ref), 0, 1)
+    clean = np.zeros(len(bb), dtype=np.float32)
+    if lips:
+        kd = mathutils.kdtree.KDTree(len(lips))
+        for i in lips:
+            kd.insert(bb[i], i)
+        kd.balance()
+        for i in np.nonzero(jawness > 1e-3)[0]:
+            dist = kd.find(bb[i])[2]
+            clean[i] = jawness[i] * float(_smooth01(np.array(dist), *LIP_KEEP_DIST))
+    ctx["_lip_only"] = {"k": ks, "clean": clean}
+    print("FACE lip-only jaw coefficients (raw jawOpen units):", {k: round(v, 3) for k, v in ks.items()})
+    return ctx["_lip_only"]
+
+
+def tongue_pose(basis, poses):
+    """Procedural tongue deltas (tongue mesh basis, metres): each pose moves the front of the tongue by d,
+    weighted s**p along the tongue (s = 1 at the tip, 0 at TONGUE_REACH behind it)."""
+    d = np.zeros_like(basis)
+    if not poses:
+        return d
+    tip_y = float(basis[:, 1].min())
+    s = np.clip((tip_y + TONGUE_REACH - basis[:, 1]) / TONGUE_REACH, 0, 1)
+    for name, w in poses.items():
+        P = TONGUE_POSES[name]
+        f = s ** P["p"]
+        if "w" in P:
+            f = f * (1.0 - _smooth01(np.abs(basis[:, 0]), *P["w"]))
+        d += w * f[:, None] * np.array(P["d"], dtype=np.float32)[None, :]
+    return d
+
+
 def process_keys(ctx):
-    """Rest closure, rebasing, gains, composites and pruning, identically on every face mesh."""
+    """Rest closure, composites, lip-only visemes, tongue poses, rebasing, gains and pruning, identically on
+    every face mesh (skin/brows/lashes/teeth/tongue keep the same key names)."""
+    lo = ctx.get("_lip_only") or lip_only_setup(ctx)
     for key in ("body", "brows", "lashes", "teeth", "tongue"):
         o = ctx.get(key)
         if o is None or o.data.shape_keys is None:
@@ -163,11 +283,29 @@ def process_keys(ctx):
         kbs = o.data.shape_keys.key_blocks
         basis = _co(o, kbs[0])
         deltas = {kb.name: _co(o, kb) - basis for kb in kbs[1:]}
+        zero = np.zeros_like(basis)
         cname, c = REST_CLOSE
-        close = deltas.get(cname, np.zeros_like(basis)) * c
+        close = deltas.get(cname, zero) * c
         new_basis = basis + close
+        if key == "tongue":
+            new_basis = new_basis + np.array(TONGUE_REST_OFFSET, dtype=np.float32)[None, :]
         for name, recipe in COMPOSITES.items():
-            deltas[name] = sum((deltas[k] * w for k, w in recipe.items() if k in deltas), np.zeros_like(basis))
+            deltas[name] = _mix(deltas, recipe, basis)
+        # lip-only visemes: recipe mix minus its jaw component (sealed jaw for closed-lip visemes)
+        J, M = deltas.get("jawOpen", zero), deltas.get("mouthClose", zero)
+        lip = {}
+        for name in LIP_ONLY:
+            rec = _recipe(name)
+            k = lo["k"].get(name, 0.0)
+            d = _mix(deltas, rec["src"], basis) - k * (J + M if rec.get("seal") else J)
+            if key == "teeth":
+                d = zero.copy()                      # teeth only move with jawOpen
+            elif key == "tongue":
+                d = tongue_pose(basis, VISEME_TONGUE.get(name))
+            elif key == "body":
+                d = d * (1.0 - lo["clean"])[:, None]
+            lip[name] = d
+        deltas.update(lip)
         for name, d in list(deltas.items()):
             if name.startswith(REBASE_PREFIX):
                 d = d - close
@@ -826,12 +964,110 @@ RECIPES = {
 RECIPE_GAZE = {"thoughtful": {"yaw_deg": -12, "pitch_deg": 10}, "listening": {"yaw_deg": 0, "pitch_deg": 0}}
 
 
+# Lip-sync contract metadata: name -> (group, recommended max runtime weight, semantics).
+# Mirrored in docs/MASHA_LIPSYNC.md ("Morph contract"); the JSON written by write_contract is authoritative.
+MORPH_META = {
+    "jawOpen": ("jaw", 0.6, "Jaw drop (chin, lower teeth, tongue, mouth floor). The ONLY jaw opening. x0.6 pre-scaled: "
+                            "1.0 = natural maximum; speech 0.15-0.6."),
+    "viseme_aa": ("viseme", 0.75, "A (father, casa). Lips-only: slightly raised upper lip, lips parted by the jaw."),
+    "viseme_E": ("viseme", 0.75, "E (bed, mesa). Lips spread, upper teeth shown."),
+    "viseme_I": ("viseme", 0.7, "I (see, sí). Strong spread."),
+    "viseme_O": ("viseme", 0.8, "O. Rounded + protruded (MPFB O + 0.3 funnel + 0.15 pucker)."),
+    "viseme_U": ("viseme", 0.85, "U / W glide. Tight round + protrusion (MPFB U + 0.6 pucker + 0.3 funnel)."),
+    "viseme_PP": ("viseme", 1.0, "P/B/M. Lips sealed and pressed, slightly rolled; sealed at any jaw with the seal rule."),
+    "viseme_FF": ("viseme", 0.9, "F/V(en). Lower lip up and tucked under the upper incisors; upper incisors shown."),
+    "viseme_TH": ("viseme", 0.85, "Dental θ/ð (Spain z/c, English th). Tongue tip between the incisors: needs "
+                                  "jawOpen >= 0.12 or the tip intersects the closed teeth."),
+    "viseme_DD": ("viseme", 0.8, "T/D. Tongue tip raised to the alveolar ridge."),
+    "viseme_kk": ("viseme", 0.7, "K/G/J(x). Lips neutral-open, tongue back (not visible)."),
+    "viseme_CH": ("viseme", 0.8, "CH/SH/LL(y). Lips protruded and squared, teeth close."),
+    "viseme_SS": ("viseme", 0.8, "S/Z(seseo). Lips spread, teeth close (jaw <= 0.15)."),
+    "viseme_nn": ("viseme", 0.8, "N/L/Ñ. Tongue tip at the alveolar ridge, lips relaxed."),
+    "viseme_RR": ("viseme", 0.75, "R (MPFB/Meta RR: English r, mild lip rounding) + tongue tip up 0.7. For the Spanish "
+                                  "tap/trill prefer viseme_nn/DD lips with a short RR accent."),
+    "mouthClose": ("mouthUnit", 1.0, "Lips sealed over an open jaw: mouthClose == jawOpen keeps the lips closed. "
+                                     "Also the rest-closure correction channel."),
+    "mouthFunnel": ("mouthUnit", 0.6, "Lips funnel (open rounding). Relative modifier (anticipate O/U)."),
+    "mouthPucker": ("mouthUnit", 0.7, "Lips pushed forward, closed round (kiss). Absolute (restUndo 1)."),
+    "mouthPress": ("mouthUnit", 0.6, "Lips pressed together (L+R). Relative."),
+    "mouthRollLower": ("mouthUnit", 0.5, "Lower lip rolled in. Relative."),
+    "mouthRollUpper": ("mouthUnit", 0.5, "Upper lip rolled in. Relative."),
+    "mouthUpperUp": ("mouthUnit", 0.5, "Upper lip raised (L+R). Relative."),
+    "mouthLowerDown": ("mouthUnit", 0.6, "Lower lip lowered (L+R). Relative."),
+    "mouthShrugLower": ("mouthUnit", 0.5, "Lower lip pushed up/out. Relative."),
+    "mouthShrugUpper": ("mouthUnit", 0.5, "Upper lip pushed up/out. Relative."),
+    "mouthStretch": ("mouthUnit", 0.5, "Mouth corners stretched sideways/down (L+R). Relative."),
+    "mouthDimple": ("mouthUnit", 0.5, "Corners pulled back, dimples (L+R). Relative."),
+    "mouthLeft": ("mouthUnit", 0.5, "Whole mouth to her left. Relative."),
+    "mouthRight": ("mouthUnit", 0.5, "Whole mouth to her right. Relative."),
+    "tongueOut": ("tongue", 0.8, "Tongue out over the lower lip (tongue only). Use with jawOpen >= 0.3."),
+    "mouthSmileLeft": ("expression", 0.6, "Smile corner. Relative."), "mouthSmileRight": ("expression", 0.6, "Smile corner. Relative."),
+    "mouthFrownLeft": ("expression", 0.5, "Frown corner. Relative."), "mouthFrownRight": ("expression", 0.5, "Frown corner. Relative."),
+}
+SEAL = {"viseme_PP": 1.0, "viseme_FF": 0.6}   # mouthClose += jawOpen * w_viseme * SEAL (lips stay in contact)
+TH_MIN_JAW = 0.12
+
+
+def _rest_undo(name):
+    if name.startswith(REBASE_PREFIX):
+        return GAINS.get(name, 1.0) if name == "jawOpen" else 1.0
+    return 0.0
+
+
+def lipsync_contract(ctx):
+    names = ctx["face_shapes"]
+    ks = (ctx.get("_lip_only") or {}).get("k", {})
+    morphs = []
+    for i, n in enumerate(names):
+        group, mx, doc = MORPH_META.get(n, ("eyes" if n.startswith("eye") else "brows" if n.startswith("brow")
+                                             else "cheeks" if n.startswith("cheek") else "other", 1.0, ""))
+        m = {"name": n, "index": i, "group": group, "lipOnly": n in LIP_ONLY, "recommendedMax": mx,
+             "restUndo": round(_rest_undo(n), 3)}
+        if n in LIP_ONLY:
+            m["sourceJawOpen"] = round(ks.get(n, 0.0) / GAINS["jawOpen"], 3)
+            if n in SEAL:
+                m["sealWithJaw"] = SEAL[n]
+            if n in VISEME_TONGUE:
+                m["tongue"] = VISEME_TONGUE[n]
+        if n == "viseme_TH":
+            m["minJawOpen"] = TH_MIN_JAW
+        if n == "tongueOut":
+            m["minJawOpen"] = 0.3
+        if doc:
+            m["doc"] = doc
+        morphs.append(m)
+    return {
+        "version": 2,
+        "doc": "docs/MASHA_LIPSYNC.md#morph-contract. Resolve morphs BY NAME (indices are listed for reference; "
+               "0-30 are unchanged from contract v1, the 16 lip-sync targets are appended).",
+        "morphs": morphs,
+        "rest_closure_rule": {
+            "doc": "The basis has closed lips (C = 0.15 raw mouthClose, ~5 mm). Absolute shapes (restUndo > 0) each "
+                   "undo C once at weight 1. When their restUndo-weighted sum U exceeds 1 the lips would be opened "
+                   "(U-1) extra times; add mouthClose to put C back. Exact (linear).",
+            "U": "sum(restUndo_i * w_i)  (visemes 1, mouthPucker 1, jawOpen 0.6, all others 0)",
+            "correction": "if U > 1: mouthClose += %.4f * (U - 1)" % REST_FIX_PER_UNIT,
+            "mouthClose_per_unit": round(REST_FIX_PER_UNIT, 4),
+        },
+        "seal_rule": {
+            "doc": "Lip-contact visemes are built sealed at jawOpen 0. If the jaw is open while they are active, add "
+                   "mouthClose so the lips stay in contact (mouthClose == jawOpen closes the lips over the jaw).",
+            "correction": "mouthClose += jawOpen * sum(w_v * seal_v)",
+            "seal": SEAL,
+        },
+        "order": "final mouthClose = authored mouthClose + seal correction + rest-closure correction; clamp to [0, 1].",
+        "tongue_rest_offset_m": list(TONGUE_REST_OFFSET),
+        "reconstruction": "viseme_X(1) + jawOpen(sourceJawOpen_X) + rest-closure correction == the original MPFB viseme "
+                          "(lips exact; chin/jaw-line skin within a few mm, teeth/tongue follow jawOpen).",
+    }
+
+
 def write_contract(ctx):
     head = ctx["head"]
     nverts = len(head.data.vertices)
     ntargets = len(ctx["face_shapes"])
     contract = {
-        "version": 1,
+        "version": 2,
         "mesh": "Masha_Head",
         "head_vertices": nverts,
         "head_triangles": common.tri_count(head),
@@ -840,10 +1076,12 @@ def write_contract(ctx):
         "notes": [
             "Masha_Body carries no morph targets; all face morphs live on Masha_Head (brows, lashes, teeth, "
             "tongue joined in). Masha_Eyes carries no morphs; it is skinned to the eye bones.",
-            "Rest pose has closed lips. Visemes and jaw/lip shapes are absolute poses: weight 1.0 = full pose. "
-            "jawOpen is pre-scaled (x0.6): 1.0 is the natural maximum, speech uses 0.15-0.5.",
-            "Weights of mouth shapes should sum to <= ~1.1 at any instant (normalise viseme blend).",
+            "Rest pose has closed lips. Visemes are LIP-ONLY (no jaw): the jaw opens only through jawOpen "
+            "(pre-scaled x0.6: 1.0 is the natural maximum, speech uses 0.15-0.6). See the 'lipsync' block and "
+            "docs/MASHA_LIPSYNC.md for the rest-closure and seal rules.",
+            "Normalise the viseme blend (sum of viseme weights <= 1); jawOpen is driven separately.",
         ],
+        "lipsync": lipsync_contract(ctx),
         "eye_bones": {
             "left": EYE_BONES["L"], "right": EYE_BONES["R"], "parent": "mixamorig:Head",
             "rest": "head at eyeball centre, bone points forward (-Y Blender / +Z glTF)",
@@ -861,8 +1099,8 @@ def write_contract(ctx):
         },
         "old_to_new": {
             "MouthOpen": {"jawOpen": 0.55},
-            "V_AA": {"viseme_aa": 1.0},
-            "V_O": {"viseme_O": 1.0},
+            "V_AA": {"viseme_aa": 1.0, "jawOpen": 0.5},
+            "V_O": {"viseme_O": 1.0, "jawOpen": 0.2},
             "V_EE": {"viseme_E": 0.6, "viseme_I": 0.4},
             "V_FV": {"viseme_FF": 1.0},
             "V_MBP": {"viseme_PP": 1.0},
@@ -873,19 +1111,20 @@ def write_contract(ctx):
             "Blink_R": {"eyeBlinkRight": 1.0},
         },
         "grapheme_to_viseme": {
-            "_doc": "Spanish/English letters -> viseme (weight). Digraphs first. Vowels carry the jaw; "
-                    "consonants are short (40-70 ms) and blend 60% into the next vowel.",
+            "_doc": "LEGACY (contract v1 letter-based lip-sync). Spanish/English letters -> viseme (weight). Digraphs "
+                    "first. Visemes are lip-only since v2: drive jawOpen separately. Consonants are short (40-70 ms) "
+                    "and blend 60% into the next vowel.",
             "a": {"viseme_aa": 1.0}, "e": {"viseme_E": 1.0}, "i": {"viseme_I": 1.0}, "y": {"viseme_I": 0.8},
             "o": {"viseme_O": 1.0}, "u": {"viseme_U": 1.0}, "w": {"viseme_U": 0.9},
             "m": {"viseme_PP": 1.0}, "b": {"viseme_PP": 1.0}, "p": {"viseme_PP": 1.0}, "v": {"viseme_PP": 0.7},
             "f": {"viseme_FF": 1.0},
             "s": {"viseme_SS": 1.0}, "z": {"viseme_SS": 0.9}, "c": {"viseme_SS": 0.8}, "x": {"viseme_SS": 0.7},
             "ch": {"viseme_CH": 1.0}, "sh": {"viseme_CH": 1.0}, "j": {"viseme_CH": 0.6}, "ll": {"viseme_CH": 0.7},
-            "g": {"viseme_DD": 0.6}, "k": {"viseme_DD": 0.6}, "q": {"viseme_DD": 0.6},
-            "t": {"viseme_DD": 1.0}, "d": {"viseme_DD": 1.0}, "n": {"viseme_DD": 0.8}, "l": {"viseme_DD": 0.8},
-            "ñ": {"viseme_DD": 0.8}, "r": {"viseme_DD": 0.6}, "rr": {"viseme_DD": 0.8},
-            "th": {"viseme_DD": 0.7, "viseme_FF": 0.2}, "h": {}, "_note_es": "Spanish 'v' is bilabial -> PP; "
-            "English 'v' -> FF. 'c' before e/i and 'z' are /s/ or /θ/ -> SS; 'c' before a/o/u, 'qu', 'k' -> DD.",
+            "g": {"viseme_kk": 0.8}, "k": {"viseme_kk": 0.8}, "q": {"viseme_kk": 0.8},
+            "t": {"viseme_DD": 1.0}, "d": {"viseme_DD": 1.0}, "n": {"viseme_nn": 0.9}, "l": {"viseme_nn": 0.9},
+            "ñ": {"viseme_nn": 0.8, "viseme_I": 0.3}, "r": {"viseme_nn": 0.6}, "rr": {"viseme_nn": 0.7, "viseme_RR": 0.2},
+            "th": {"viseme_TH": 1.0}, "h": {}, "_note_es": "Spanish 'v' is bilabial -> PP; "
+            "English 'v' -> FF. 'c' before e/i and 'z' are /s/ (SS) or /θ/ (TH); 'c' before a/o/u, 'qu', 'k' -> kk.",
         },
         "recipes": {k: {"morphs": v, "gaze": RECIPE_GAZE.get(k)} for k, v in RECIPES.items()},
         "blink": {

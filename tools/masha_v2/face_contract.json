@@ -1,5 +1,5 @@
 {
- "version": 1,
+ "version": 2,
  "mesh": "Masha_Head",
  "head_vertices": 7047,
  "head_triangles": 13471,
@@ -34,14 +34,497 @@
   "viseme_FF",
   "viseme_SS",
   "viseme_DD",
-  "viseme_CH"
+  "viseme_CH",
+  "viseme_kk",
+  "viseme_nn",
+  "viseme_RR",
+  "viseme_TH",
+  "mouthClose",
+  "mouthFunnel",
+  "mouthRollLower",
+  "mouthRollUpper",
+  "mouthUpperUp",
+  "mouthLowerDown",
+  "mouthShrugLower",
+  "mouthShrugUpper",
+  "mouthStretch",
+  "mouthDimple",
+  "mouthRight",
+  "tongueOut"
  ],
- "morph_vram_bytes_estimate": 5242968,
+ "morph_vram_bytes_estimate": 7949016,
  "notes": [
   "Masha_Body carries no morph targets; all face morphs live on Masha_Head (brows, lashes, teeth, tongue joined in). Masha_Eyes carries no morphs; it is skinned to the eye bones.",
-  "Rest pose has closed lips. Visemes and jaw/lip shapes are absolute poses: weight 1.0 = full pose. jawOpen is pre-scaled (x0.6): 1.0 is the natural maximum, speech uses 0.15-0.5.",
-  "Weights of mouth shapes should sum to <= ~1.1 at any instant (normalise viseme blend)."
+  "Rest pose has closed lips. Visemes are LIP-ONLY (no jaw): the jaw opens only through jawOpen (pre-scaled x0.6: 1.0 is the natural maximum, speech uses 0.15-0.6). See the 'lipsync' block and docs/MASHA_LIPSYNC.md for the rest-closure and seal rules.",
+  "Normalise the viseme blend (sum of viseme weights <= 1); jawOpen is driven separately."
  ],
+ "lipsync": {
+  "version": 2,
+  "doc": "docs/MASHA_LIPSYNC.md#morph-contract. Resolve morphs BY NAME (indices are listed for reference; 0-30 are unchanged from contract v1, the 16 lip-sync targets are appended).",
+  "morphs": [
+   {
+    "name": "eyeBlinkLeft",
+    "index": 0,
+    "group": "eyes",
+    "lipOnly": false,
+    "recommendedMax": 1.0,
+    "restUndo": 0.0
+   },
+   {
+    "name": "eyeBlinkRight",
+    "index": 1,
+    "group": "eyes",
+    "lipOnly": false,
+    "recommendedMax": 1.0,
+    "restUndo": 0.0
+   },
+   {
+    "name": "eyeSquintLeft",
+    "index": 2,
+    "group": "eyes",
+    "lipOnly": false,
+    "recommendedMax": 1.0,
+    "restUndo": 0.0
+   },
+   {
+    "name": "eyeSquintRight",
+    "index": 3,
+    "group": "eyes",
+    "lipOnly": false,
+    "recommendedMax": 1.0,
+    "restUndo": 0.0
+   },
+   {
+    "name": "eyeWideLeft",
+    "index": 4,
+    "group": "eyes",
+    "lipOnly": false,
+    "recommendedMax": 1.0,
+    "restUndo": 0.0
+   },
+   {
+    "name": "eyeWideRight",
+    "index": 5,
+    "group": "eyes",
+    "lipOnly": false,
+    "recommendedMax": 1.0,
+    "restUndo": 0.0
+   },
+   {
+    "name": "browInnerUp",
+    "index": 6,
+    "group": "brows",
+    "lipOnly": false,
+    "recommendedMax": 1.0,
+    "restUndo": 0.0
+   },
+   {
+    "name": "browDownLeft",
+    "index": 7,
+    "group": "brows",
+    "lipOnly": false,
+    "recommendedMax": 1.0,
+    "restUndo": 0.0
+   },
+   {
+    "name": "browDownRight",
+    "index": 8,
+    "group": "brows",
+    "lipOnly": false,
+    "recommendedMax": 1.0,
+    "restUndo": 0.0
+   },
+   {
+    "name": "browOuterUpLeft",
+    "index": 9,
+    "group": "brows",
+    "lipOnly": false,
+    "recommendedMax": 1.0,
+    "restUndo": 0.0
+   },
+   {
+    "name": "browOuterUpRight",
+    "index": 10,
+    "group": "brows",
+    "lipOnly": false,
+    "recommendedMax": 1.0,
+    "restUndo": 0.0
+   },
+   {
+    "name": "cheekSquintLeft",
+    "index": 11,
+    "group": "cheeks",
+    "lipOnly": false,
+    "recommendedMax": 1.0,
+    "restUndo": 0.0
+   },
+   {
+    "name": "cheekSquintRight",
+    "index": 12,
+    "group": "cheeks",
+    "lipOnly": false,
+    "recommendedMax": 1.0,
+    "restUndo": 0.0
+   },
+   {
+    "name": "mouthSmileLeft",
+    "index": 13,
+    "group": "expression",
+    "lipOnly": false,
+    "recommendedMax": 0.6,
+    "restUndo": 0.0,
+    "doc": "Smile corner. Relative."
+   },
+   {
+    "name": "mouthSmileRight",
+    "index": 14,
+    "group": "expression",
+    "lipOnly": false,
+    "recommendedMax": 0.6,
+    "restUndo": 0.0,
+    "doc": "Smile corner. Relative."
+   },
+   {
+    "name": "mouthFrownLeft",
+    "index": 15,
+    "group": "expression",
+    "lipOnly": false,
+    "recommendedMax": 0.5,
+    "restUndo": 0.0,
+    "doc": "Frown corner. Relative."
+   },
+   {
+    "name": "mouthFrownRight",
+    "index": 16,
+    "group": "expression",
+    "lipOnly": false,
+    "recommendedMax": 0.5,
+    "restUndo": 0.0,
+    "doc": "Frown corner. Relative."
+   },
+   {
+    "name": "jawOpen",
+    "index": 17,
+    "group": "jaw",
+    "lipOnly": false,
+    "recommendedMax": 0.6,
+    "restUndo": 0.6,
+    "doc": "Jaw drop (chin, lower teeth, tongue, mouth floor). The ONLY jaw opening. x0.6 pre-scaled: 1.0 = natural maximum; speech 0.15-0.6."
+   },
+   {
+    "name": "mouthPucker",
+    "index": 18,
+    "group": "mouthUnit",
+    "lipOnly": false,
+    "recommendedMax": 0.7,
+    "restUndo": 1.0,
+    "doc": "Lips pushed forward, closed round (kiss). Absolute (restUndo 1)."
+   },
+   {
+    "name": "mouthPress",
+    "index": 19,
+    "group": "mouthUnit",
+    "lipOnly": false,
+    "recommendedMax": 0.6,
+    "restUndo": 0.0,
+    "doc": "Lips pressed together (L+R). Relative."
+   },
+   {
+    "name": "mouthLeft",
+    "index": 20,
+    "group": "mouthUnit",
+    "lipOnly": false,
+    "recommendedMax": 0.5,
+    "restUndo": 0.0,
+    "doc": "Whole mouth to her left. Relative."
+   },
+   {
+    "name": "viseme_aa",
+    "index": 21,
+    "group": "viseme",
+    "lipOnly": true,
+    "recommendedMax": 0.75,
+    "restUndo": 1.0,
+    "sourceJawOpen": 0.861,
+    "doc": "A (father, casa). Lips-only: slightly raised upper lip, lips parted by the jaw."
+   },
+   {
+    "name": "viseme_E",
+    "index": 22,
+    "group": "viseme",
+    "lipOnly": true,
+    "recommendedMax": 0.75,
+    "restUndo": 1.0,
+    "sourceJawOpen": 0.144,
+    "doc": "E (bed, mesa). Lips spread, upper teeth shown."
+   },
+   {
+    "name": "viseme_I",
+    "index": 23,
+    "group": "viseme",
+    "lipOnly": true,
+    "recommendedMax": 0.7,
+    "restUndo": 1.0,
+    "sourceJawOpen": 0.0,
+    "doc": "I (see, sí). Strong spread."
+   },
+   {
+    "name": "viseme_O",
+    "index": 24,
+    "group": "viseme",
+    "lipOnly": true,
+    "recommendedMax": 0.8,
+    "restUndo": 1.0,
+    "sourceJawOpen": 0.191,
+    "doc": "O. Rounded + protruded (MPFB O + 0.3 funnel + 0.15 pucker)."
+   },
+   {
+    "name": "viseme_U",
+    "index": 25,
+    "group": "viseme",
+    "lipOnly": true,
+    "recommendedMax": 0.85,
+    "restUndo": 1.0,
+    "sourceJawOpen": 0.0,
+    "doc": "U / W glide. Tight round + protrusion (MPFB U + 0.6 pucker + 0.3 funnel)."
+   },
+   {
+    "name": "viseme_PP",
+    "index": 26,
+    "group": "viseme",
+    "lipOnly": true,
+    "recommendedMax": 1.0,
+    "restUndo": 1.0,
+    "sourceJawOpen": 0.203,
+    "sealWithJaw": 1.0,
+    "doc": "P/B/M. Lips sealed and pressed, slightly rolled; sealed at any jaw with the seal rule."
+   },
+   {
+    "name": "viseme_FF",
+    "index": 27,
+    "group": "viseme",
+    "lipOnly": true,
+    "recommendedMax": 0.9,
+    "restUndo": 1.0,
+    "sourceJawOpen": 0.0,
+    "sealWithJaw": 0.6,
+    "doc": "F/V(en). Lower lip up and tucked under the upper incisors; upper incisors shown."
+   },
+   {
+    "name": "viseme_SS",
+    "index": 28,
+    "group": "viseme",
+    "lipOnly": true,
+    "recommendedMax": 0.8,
+    "restUndo": 1.0,
+    "sourceJawOpen": 0.0,
+    "doc": "S/Z(seseo). Lips spread, teeth close (jaw <= 0.15)."
+   },
+   {
+    "name": "viseme_DD",
+    "index": 29,
+    "group": "viseme",
+    "lipOnly": true,
+    "recommendedMax": 0.8,
+    "restUndo": 1.0,
+    "sourceJawOpen": 0.044,
+    "tongue": {
+     "tip_up": 1.0
+    },
+    "doc": "T/D. Tongue tip raised to the alveolar ridge."
+   },
+   {
+    "name": "viseme_CH",
+    "index": 30,
+    "group": "viseme",
+    "lipOnly": true,
+    "recommendedMax": 0.8,
+    "restUndo": 1.0,
+    "sourceJawOpen": 0.0,
+    "doc": "CH/SH/LL(y). Lips protruded and squared, teeth close."
+   },
+   {
+    "name": "viseme_kk",
+    "index": 31,
+    "group": "viseme",
+    "lipOnly": true,
+    "recommendedMax": 0.7,
+    "restUndo": 1.0,
+    "sourceJawOpen": 0.079,
+    "doc": "K/G/J(x). Lips neutral-open, tongue back (not visible)."
+   },
+   {
+    "name": "viseme_nn",
+    "index": 32,
+    "group": "viseme",
+    "lipOnly": true,
+    "recommendedMax": 0.8,
+    "restUndo": 1.0,
+    "sourceJawOpen": 0.044,
+    "tongue": {
+     "tip_up": 1.0
+    },
+    "doc": "N/L/Ñ. Tongue tip at the alveolar ridge, lips relaxed."
+   },
+   {
+    "name": "viseme_RR",
+    "index": 33,
+    "group": "viseme",
+    "lipOnly": true,
+    "recommendedMax": 0.75,
+    "restUndo": 1.0,
+    "sourceJawOpen": 0.0,
+    "tongue": {
+     "tip_up": 0.7
+    },
+    "doc": "R (MPFB/Meta RR: English r, mild lip rounding) + tongue tip up 0.7. For the Spanish tap/trill prefer viseme_nn/DD lips with a short RR accent."
+   },
+   {
+    "name": "viseme_TH",
+    "index": 34,
+    "group": "viseme",
+    "lipOnly": true,
+    "recommendedMax": 0.85,
+    "restUndo": 1.0,
+    "sourceJawOpen": 0.078,
+    "tongue": {
+     "tip_forward": 1.0
+    },
+    "minJawOpen": 0.12,
+    "doc": "Dental θ/ð (Spain z/c, English th). Tongue tip between the incisors: needs jawOpen >= 0.12 or the tip intersects the closed teeth."
+   },
+   {
+    "name": "mouthClose",
+    "index": 35,
+    "group": "mouthUnit",
+    "lipOnly": false,
+    "recommendedMax": 1.0,
+    "restUndo": 0.0,
+    "doc": "Lips sealed over an open jaw: mouthClose == jawOpen keeps the lips closed. Also the rest-closure correction channel."
+   },
+   {
+    "name": "mouthFunnel",
+    "index": 36,
+    "group": "mouthUnit",
+    "lipOnly": false,
+    "recommendedMax": 0.6,
+    "restUndo": 0.0,
+    "doc": "Lips funnel (open rounding). Relative modifier (anticipate O/U)."
+   },
+   {
+    "name": "mouthRollLower",
+    "index": 37,
+    "group": "mouthUnit",
+    "lipOnly": false,
+    "recommendedMax": 0.5,
+    "restUndo": 0.0,
+    "doc": "Lower lip rolled in. Relative."
+   },
+   {
+    "name": "mouthRollUpper",
+    "index": 38,
+    "group": "mouthUnit",
+    "lipOnly": false,
+    "recommendedMax": 0.5,
+    "restUndo": 0.0,
+    "doc": "Upper lip rolled in. Relative."
+   },
+   {
+    "name": "mouthUpperUp",
+    "index": 39,
+    "group": "mouthUnit",
+    "lipOnly": false,
+    "recommendedMax": 0.5,
+    "restUndo": 0.0,
+    "doc": "Upper lip raised (L+R). Relative."
+   },
+   {
+    "name": "mouthLowerDown",
+    "index": 40,
+    "group": "mouthUnit",
+    "lipOnly": false,
+    "recommendedMax": 0.6,
+    "restUndo": 0.0,
+    "doc": "Lower lip lowered (L+R). Relative."
+   },
+   {
+    "name": "mouthShrugLower",
+    "index": 41,
+    "group": "mouthUnit",
+    "lipOnly": false,
+    "recommendedMax": 0.5,
+    "restUndo": 0.0,
+    "doc": "Lower lip pushed up/out. Relative."
+   },
+   {
+    "name": "mouthShrugUpper",
+    "index": 42,
+    "group": "mouthUnit",
+    "lipOnly": false,
+    "recommendedMax": 0.5,
+    "restUndo": 0.0,
+    "doc": "Upper lip pushed up/out. Relative."
+   },
+   {
+    "name": "mouthStretch",
+    "index": 43,
+    "group": "mouthUnit",
+    "lipOnly": false,
+    "recommendedMax": 0.5,
+    "restUndo": 0.0,
+    "doc": "Mouth corners stretched sideways/down (L+R). Relative."
+   },
+   {
+    "name": "mouthDimple",
+    "index": 44,
+    "group": "mouthUnit",
+    "lipOnly": false,
+    "recommendedMax": 0.5,
+    "restUndo": 0.0,
+    "doc": "Corners pulled back, dimples (L+R). Relative."
+   },
+   {
+    "name": "mouthRight",
+    "index": 45,
+    "group": "mouthUnit",
+    "lipOnly": false,
+    "recommendedMax": 0.5,
+    "restUndo": 0.0,
+    "doc": "Whole mouth to her right. Relative."
+   },
+   {
+    "name": "tongueOut",
+    "index": 46,
+    "group": "tongue",
+    "lipOnly": false,
+    "recommendedMax": 0.8,
+    "restUndo": 0.0,
+    "minJawOpen": 0.3,
+    "doc": "Tongue out over the lower lip (tongue only). Use with jawOpen >= 0.3."
+   }
+  ],
+  "rest_closure_rule": {
+   "doc": "The basis has closed lips (C = 0.15 raw mouthClose, ~5 mm). Absolute shapes (restUndo > 0) each undo C once at weight 1. When their restUndo-weighted sum U exceeds 1 the lips would be opened (U-1) extra times; add mouthClose to put C back. Exact (linear).",
+   "U": "sum(restUndo_i * w_i)  (visemes 1, mouthPucker 1, jawOpen 0.6, all others 0)",
+   "correction": "if U > 1: mouthClose += 0.2174 * (U - 1)",
+   "mouthClose_per_unit": 0.2174
+  },
+  "seal_rule": {
+   "doc": "Lip-contact visemes are built sealed at jawOpen 0. If the jaw is open while they are active, add mouthClose so the lips stay in contact (mouthClose == jawOpen closes the lips over the jaw).",
+   "correction": "mouthClose += jawOpen * sum(w_v * seal_v)",
+   "seal": {
+    "viseme_PP": 1.0,
+    "viseme_FF": 0.6
+   }
+  },
+  "order": "final mouthClose = authored mouthClose + seal correction + rest-closure correction; clamp to [0, 1].",
+  "tongue_rest_offset_m": [
+   0.0,
+   0.0,
+   -0.005
+  ],
+  "reconstruction": "viseme_X(1) + jawOpen(sourceJawOpen_X) + rest-closure correction == the original MPFB viseme (lips exact; chin/jaw-line skin within a few mm, teeth/tongue follow jawOpen)."
+ },
  "eye_bones": {
   "left": "masha:eye.L",
   "right": "masha:eye.R",
@@ -83,10 +566,12 @@
    "jawOpen": 0.55
   },
   "V_AA": {
-   "viseme_aa": 1.0
+   "viseme_aa": 1.0,
+   "jawOpen": 0.5
   },
   "V_O": {
-   "viseme_O": 1.0
+   "viseme_O": 1.0,
+   "jawOpen": 0.2
   },
   "V_EE": {
    "viseme_E": 0.6,
@@ -125,7 +610,7 @@
   }
  },
  "grapheme_to_viseme": {
-  "_doc": "Spanish/English letters -> viseme (weight). Digraphs first. Vowels carry the jaw; consonants are short (40-70 ms) and blend 60% into the next vowel.",
+  "_doc": "LEGACY (contract v1 letter-based lip-sync). Spanish/English letters -> viseme (weight). Digraphs first. Visemes are lip-only since v2: drive jawOpen separately. Consonants are short (40-70 ms) and blend 60% into the next vowel.",
   "a": {
    "viseme_aa": 1.0
   },
@@ -187,13 +672,13 @@
    "viseme_CH": 0.7
   },
   "g": {
-   "viseme_DD": 0.6
+   "viseme_kk": 0.8
   },
   "k": {
-   "viseme_DD": 0.6
+   "viseme_kk": 0.8
   },
   "q": {
-   "viseme_DD": 0.6
+   "viseme_kk": 0.8
   },
   "t": {
    "viseme_DD": 1.0
@@ -202,26 +687,27 @@
    "viseme_DD": 1.0
   },
   "n": {
-   "viseme_DD": 0.8
+   "viseme_nn": 0.9
   },
   "l": {
-   "viseme_DD": 0.8
+   "viseme_nn": 0.9
   },
   "ñ": {
-   "viseme_DD": 0.8
+   "viseme_nn": 0.8,
+   "viseme_I": 0.3
   },
   "r": {
-   "viseme_DD": 0.6
+   "viseme_nn": 0.6
   },
   "rr": {
-   "viseme_DD": 0.8
+   "viseme_nn": 0.7,
+   "viseme_RR": 0.2
   },
   "th": {
-   "viseme_DD": 0.7,
-   "viseme_FF": 0.2
+   "viseme_TH": 1.0
   },
   "h": {},
-  "_note_es": "Spanish 'v' is bilabial -> PP; English 'v' -> FF. 'c' before e/i and 'z' are /s/ or /θ/ -> SS; 'c' before a/o/u, 'qu', 'k' -> DD."
+  "_note_es": "Spanish 'v' is bilabial -> PP; English 'v' -> FF. 'c' before e/i and 'z' are /s/ (SS) or /θ/ (TH); 'c' before a/o/u, 'qu', 'k' -> kk."
  },
  "recipes": {
   "blink": {
