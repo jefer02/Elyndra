@@ -20,6 +20,7 @@
 //              A = 0 (no iris emission, whole surface treated as "sclera").
 //
 // Parameters (default / range — effect)
+//   time / glitch / glitchSeed — same as masha_holo.mat (vertex tearing only; no color change).
 //   holoColor           mood skin, linear RGB — tint for the sclera / surface.
 //   glowColor           mood glow, linear RGB — tint mixed into the iris glow.
 //   irisEmission        0.35 / [0, 1]    — iris self-illumination (x iris albedo).
@@ -54,9 +55,35 @@ material {
         { type : float, name : corneaGloss },
         { type : float, name : corneaRoughness },
         { type : float, name : pulse },
-        { type : float, name : brightness }
+        { type : float, name : brightness },
+        { type : float, name : time, precision : high },
+        { type : float, name : glitch },
+        { type : float, name : glitchSeed }
     ],
     variantFilter : [ shadowReceiver, vsm, ssr, stereo ]
+}
+
+// Same signal glitch as masha_holo.mat (identical bands and shift for the same world Y, time and
+// seed), so eyes, teeth and tongue tear together with the face instead of floating in place.
+vertex {
+    highp float holoHash(highp float n) {
+        return fract(sin(n) * 43758.5453);
+    }
+
+    void materialVertex(inout MaterialVertexInputs material) {
+        float g = materialParams.glitch;
+        if (g > 0.001) {
+            highp vec4 userPos = getUserWorldFromWorldMatrix() * vec4(material.worldPosition.xyz, 1.0);
+            highp float step20 = floor(materialParams.time * 20.0) + materialParams.glitchSeed * 17.0;
+            highp float bands = 9.0 + 14.0 * holoHash(step20 * 1.31);
+            highp float band = floor(userPos.y * bands + holoHash(step20) * 3.0);
+            highp float r = holoHash(band * 7.13 + step20 * 3.7);
+            float on = step(1.0 - 0.45 * g, r);
+            highp float shift = (holoHash(band * 1.91 + step20 * 0.77) - 0.5) * 0.07 * g * on;
+            highp vec3 camRight = getWorldFromViewMatrix()[0].xyz;
+            material.worldPosition.xyz += camRight * shift;
+        }
+    }
 }
 
 fragment {
