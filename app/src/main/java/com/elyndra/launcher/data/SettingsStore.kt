@@ -216,6 +216,15 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("masha.voice", true)
         set(v) = prefs.edit { putBoolean("masha.voice", v) }
 
+    /**
+     * Masha a 120 Hz en pantallas que lo admiten. Apagado (por defecto), su pantalla
+     * pide 60 Hz: el holograma se ve igual de fluido a 60 fps y la GPU trabaja la mitad
+     * (menos batería y calor en conversaciones largas).
+     */
+    var mashaHighRefresh: Boolean
+        get() = prefs.getBoolean("masha.highRefresh", false)
+        set(v) = prefs.edit { putBoolean("masha.highRefresh", v) }
+
     /** El ambiente sonoro del holotanque (zumbido, pads, datos) en la pantalla de Masha. */
     var mashaSoundscape: Boolean
         get() = prefs.getBoolean("masha.soundscape", true)
@@ -253,7 +262,27 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("perm.notificationsAsked", false)
         set(v) = prefs.edit { putBoolean("perm.notificationsAsked", v) }
 
+    /* ── opciones de desarrollador ────────────────────────────── */
+
+    /** Opciones de desarrollador desbloqueadas (siete toques en la versión, en Ajustes → Acerca de). */
+    var developerOptions: Boolean
+        get() = prefs.getBoolean("dev.unlocked", false)
+        set(v) = prefs.edit { putBoolean("dev.unlocked", v) }
+
+    /**
+     * Ajuste de sincronía de la voz (ms) por salida de audio, con las claves de
+     * [com.elyndra.launcher.ui.masha.lipsync.AudioRouteOffsets] (`speaker`, `wired`, `bt:…`, `bt`).
+     */
+    fun voiceOffsets(): Map<String, Int> = prefs.all.mapNotNull { (k, v) ->
+        if (k.startsWith(VOICE_OFFSET) && v is Int) k.removePrefix(VOICE_OFFSET) to v else null
+    }.toMap()
+
+    fun setVoiceOffset(routeKey: String, ms: Int?) =
+        prefs.edit { if (ms == null) remove(VOICE_OFFSET + routeKey) else putInt(VOICE_OFFSET + routeKey, ms) }
+
     companion object {
+        private const val VOICE_OFFSET = "voice.offset."
+
         /** Cian de fósforo: se ve bien sobre el tema claro y sobre el oscuro. */
         const val DEFAULT_PARTICLE_COLOR = 0xFF5CF2FF.toInt()
 

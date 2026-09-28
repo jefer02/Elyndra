@@ -131,7 +131,8 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             // 120 o 60 fps según Ajustes: se aplica al instante al cambiarlo.
-            val fps = vm.settings.frameRate
+            // En la pantalla de Masha, 60 salvo "alta fluidez" (ver SettingsController.frameRateFor).
+            val fps = vm.settings.frameRateFor(vm.screen)
             LaunchedEffect(fps) { FrameRate.apply(this@MainActivity, fps) }
             CompositionLocalProvider(LocalReducedMotion provides reducedMotion()) { ElyndraApp(vm) }
         }
@@ -154,7 +155,7 @@ class MainActivity : ComponentActivity() {
             vm.input.onGamepadConnected(device.name, announce = false)
         }
         // Al volver de un juego el modo de pantalla puede haber cambiado.
-        FrameRate.apply(this, vm.settings.frameRate)
+        FrameRate.apply(this, vm.settings.frameRateFor(vm.screen))
     }
 
     override fun onPause() {
