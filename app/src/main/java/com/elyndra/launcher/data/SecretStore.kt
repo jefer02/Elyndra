@@ -87,4 +87,7 @@ object SecretKeys {
     const val SGDB_KEY = "sgdb.key"
     const val RA_USER = "ra.user"
     const val RA_KEY = "ra.key"
+
+    /** Clave de DeepSeek puesta por el usuario; manda sobre la compilada (BuildConfig). */
+    const val MASHA_KEY = "masha.key"
 }

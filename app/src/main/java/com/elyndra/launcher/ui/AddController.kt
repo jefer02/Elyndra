@@ -81,6 +81,7 @@ class AddController(private val vm: ElyndraViewModel) {
         vm.showToast(UiText.plural(R.plurals.toast_added_apps, keys.size))
         vm.go(Screen.Library)
         keys.firstOrNull()?.let { vm.select(it) }
+        vm.materialize(keys)
         if (app.settings.autoMeta && keys.isNotEmpty() && app.credentials.anyConfigured()) {
             vm.engine.start(keys, force = false)
         }
@@ -191,6 +192,7 @@ class AddController(private val vm: ElyndraViewModel) {
         resetRoms()
         vm.go(Screen.Library)
         vm.select(rf.key)
+        vm.materialize(listOf(rf.key))
         if (app.settings.autoMeta && keys.isNotEmpty() && app.credentials.anyConfigured()) {
             vm.engine.start(keys, force = false)
             vm.autoFolderArt(listOf(rf.key))
@@ -205,6 +207,9 @@ class AddController(private val vm: ElyndraViewModel) {
         scanJob?.cancel()
         scanJob = vm.viewModelScope.launch {
             val keys = mutableListOf<String>()
+            // Las cards que aparecen en la biblioteca son las carpetas, no sus
+            // ROMs: son esas las que hay que montar.
+            val folderKeys = mutableListOf<String>()
             var systems = 0
             subs.forEachIndexed { i, sub ->
                 bulkProgress = UiText.res(R.string.adding_systems, sub.system.name, i + 1, subs.size)
@@ -224,12 +229,14 @@ class AddController(private val vm: ElyndraViewModel) {
                     lastScan = now,
                 )
                 keys += app.library.addFolder(rf, found)
+                folderKeys += rf.key
                 systems++
             }
             bulkProgress = null
             vm.showToast(UiText.plural(R.plurals.toast_bulk_added, keys.size, keys.size, systems))
             resetRoms()
             vm.go(Screen.Library)
+            vm.materialize(folderKeys)
             if (app.settings.autoMeta && keys.isNotEmpty() && app.credentials.anyConfigured()) {
                 vm.engine.start(keys, force = false)
                 vm.autoFolderArt()

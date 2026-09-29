@@ -53,11 +53,12 @@ import com.elyndra.launcher.data.ACCENTS
 import com.elyndra.launcher.data.AppLocale
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.data.TINTS
+import com.elyndra.launcher.display.FrameRate
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.Screen
 import com.elyndra.launcher.ui.SortMode
 import com.elyndra.launcher.ui.components.AccentSlider
-import com.elyndra.launcher.ui.components.AccentSwitch
+import com.elyndra.launcher.ui.components.GlowingSwitch
 import com.elyndra.launcher.ui.components.ArcSpinner
 import com.elyndra.launcher.ui.components.BackChevron
 import com.elyndra.launcher.ui.components.CssGrid
@@ -65,7 +66,7 @@ import com.elyndra.launcher.ui.components.CtaButton
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GhostButton
 import com.elyndra.launcher.ui.components.GlassIconButton
-import com.elyndra.launcher.ui.components.GlassPanel
+import com.elyndra.launcher.ui.components.SettingsGroup
 import com.elyndra.launcher.ui.components.Pill
 import com.elyndra.launcher.ui.components.Swatch
 import com.elyndra.launcher.ui.components.metrics
@@ -74,7 +75,6 @@ import com.elyndra.launcher.ui.resolve
 import com.elyndra.launcher.ui.theme.AuroraBackdrop
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.accentGradient
-import com.elyndra.launcher.ui.theme.animRiseSheet
 import com.elyndra.launcher.ui.theme.cssLinearGradient
 import com.elyndra.launcher.ui.theme.glass
 
@@ -82,7 +82,7 @@ import com.elyndra.launcher.ui.theme.glass
 fun SettingsScreen(vm: ElyndraViewModel) {
     val m = metrics()
 
-    Box(Modifier.fillMaxSize().animRiseSheet(key = Screen.Settings)) {
+    Box(Modifier.fillMaxSize()) {
         AuroraBackdrop()
 
         Column(
@@ -98,15 +98,23 @@ fun SettingsScreen(vm: ElyndraViewModel) {
                 ElyText(stringResource(R.string.settings_title), size = 19f, weight = FontWeight.SemiBold, color = P.ink)
             }
 
-            CssGrid(
-                columns = if (m.landscape) 2 else 1,
-                horizontalGap = 16.dp,
-                verticalGap = 0.dp,
-                items = listOf(
-                    { AppearanceColumn(vm) },
-                    { MetadataColumn(vm) },
-                ),
-            )
+            if (m.landscape) {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        AppearanceColumn(vm)
+                        MashaColumn(vm)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        MetadataColumn(vm)
+                        AboutColumn(vm)
+                    }
+                }
+            } else {
+                AppearanceColumn(vm)
+                MashaColumn(vm)
+                MetadataColumn(vm)
+                AboutColumn(vm)
+            }
         }
     }
 }
@@ -126,7 +134,7 @@ private fun AppearanceColumn(vm: ElyndraViewModel) {
 
     Column(Modifier.fillMaxWidth()) {
         SectionLabel(stringResource(R.string.section_theme))
-        GlassPanel {
+        SettingsGroup {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     ElyText(stringResource(R.string.dark_mode), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
@@ -134,12 +142,53 @@ private fun AppearanceColumn(vm: ElyndraViewModel) {
                     ElyText(stringResource(R.string.dark_mode_desc), size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
                 }
                 Spacer(Modifier.width(12.dp))
-                AccentSwitch(s.darkMode, s::toggleDark)
+                GlowingSwitch(s.darkMode, s::toggleDark)
+            }
+        }
+
+        // Pantalla: 120 o 60 fps. En una pantalla de 60 Hz la opción de 120
+        // sale apagada y se explica por qué.
+        SectionLabel(stringResource(R.string.section_display))
+        SettingsGroup {
+            ElyText(stringResource(R.string.frame_rate_title), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
+            Spacer(Modifier.height(4.dp))
+            ElyText(
+                stringResource(if (s.supportsHighRefresh) R.string.frame_rate_desc else R.string.frame_rate_unsupported),
+                size = 10f,
+                color = P.ink2,
+                lineHeightRatio = 1.45f,
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Pill(
+                    stringResource(R.string.frame_rate_120),
+                    active = s.frameRate == FrameRate.HIGH,
+                    onClick = { s.updateFrameRate(FrameRate.HIGH) },
+                    enabled = s.supportsHighRefresh,
+                )
+                Pill(
+                    stringResource(R.string.frame_rate_60),
+                    active = s.frameRate == FrameRate.STANDARD,
+                    onClick = { s.updateFrameRate(FrameRate.STANDARD) },
+                )
+            }
+            // Masha va aparte: a 60 salvo que se pida alta fluidez (solo tiene sentido con la app a 120).
+            if (s.frameRate == FrameRate.HIGH) {
+                Spacer(Modifier.height(14.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        ElyText(stringResource(R.string.masha_high_refresh), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
+                        Spacer(Modifier.height(4.dp))
+                        ElyText(stringResource(R.string.masha_high_refresh_desc), size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    GlowingSwitch(s.mashaHighRefresh, s::toggleMashaHighRefresh)
+                }
             }
         }
 
         SectionLabel(stringResource(R.string.section_background))
-        GlassPanel {
+        SettingsGroup {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     ElyText(stringResource(R.string.background_title), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
@@ -147,7 +196,7 @@ private fun AppearanceColumn(vm: ElyndraViewModel) {
                     ElyText(stringResource(R.string.background_desc), size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
                 }
                 Spacer(Modifier.width(12.dp))
-                AccentSwitch(s.backgroundEnabled, s::toggleBackground)
+                GlowingSwitch(s.backgroundEnabled, s::toggleBackground)
             }
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -199,7 +248,7 @@ private fun AppearanceColumn(vm: ElyndraViewModel) {
         }
 
         SectionLabel(stringResource(R.string.section_accent))
-        GlassPanel {
+        SettingsGroup {
             SwatchGrid(
                 items = ACCENTS.map { accent ->
                     {
@@ -217,7 +266,7 @@ private fun AppearanceColumn(vm: ElyndraViewModel) {
         }
 
         SectionLabel(stringResource(R.string.section_glass))
-        GlassPanel {
+        SettingsGroup {
             // Vista previa: una franja de color con una lámina de cristal encima.
             Box(
                 Modifier
@@ -296,7 +345,7 @@ private fun AppearanceColumn(vm: ElyndraViewModel) {
         }
 
         SectionLabel(stringResource(R.string.section_library))
-        GlassPanel {
+        SettingsGroup {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     ElyText(stringResource(R.string.rescan_all), size = 12f, weight = FontWeight.SemiBold, color = P.ink)
@@ -371,10 +420,11 @@ private fun MetadataColumn(vm: ElyndraViewModel) {
     Column(Modifier.fillMaxWidth()) {
         SectionLabel(stringResource(R.string.section_metadata_apis))
         ApiPanels(vm)
+        MetadataPriorityPanel(vm)
 
-        GlassPanel(Modifier.padding(top = 9.dp), padding = 0.dp, cornerRadius = 16.dp) {
+        SettingsGroup(padding = 0.dp) {
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 12.dp),
+                Modifier.fillMaxWidth().padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
@@ -383,12 +433,12 @@ private fun MetadataColumn(vm: ElyndraViewModel) {
                     ElyText(stringResource(R.string.auto_meta_desc), size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
                 }
                 Spacer(Modifier.width(12.dp))
-                AccentSwitch(s.autoMeta, s::toggleAutoMeta)
+                GlowingSwitch(s.autoMeta, s::toggleAutoMeta)
             }
         }
 
         if (p.running) {
-            GlassPanel(Modifier.padding(top = 9.dp)) {
+            SettingsGroup {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ElyText(stringResource(R.string.applying, p.done, p.total), size = 11.5f, weight = FontWeight.SemiBold, color = P.ink, modifier = Modifier.weight(1f))
                     GhostButton(stringResource(R.string.cancel), s::cancelMetadata)
@@ -414,7 +464,7 @@ private fun MetadataColumn(vm: ElyndraViewModel) {
                 ElyText(p.current, size = 9f, color = P.ink2, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         } else if (p.finishedAt > 0) {
-            GlassPanel(Modifier.padding(top = 9.dp)) {
+            SettingsGroup {
                 ElyText(
                     if (p.cancelled) stringResource(R.string.metadata_cancelled) else stringResource(R.string.applied_detail, p.matched, p.missed),
                     size = 10.5f,

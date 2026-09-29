@@ -1,0 +1,114 @@
+// =============================================================================
+// masha_holo_card.mat — hologram look for alpha-textured cards: hair
+// (Masha_Hair), eyebrows and eyelashes (Masha_Head slots Masha_Brows /
+// Masha_Lashes).
+//
+// Filament 1.56.0 material, compile with the pinned matc only.
+//
+// Why a separate material: masha_holo.mat has no alpha texture, so on cards it
+// would render solid quads. Cards need their texture's alpha. Why not
+// `twoPassesOneSide`: Filament's depth pre-pass for transparent materials does
+// not run material(), so it can't cut out alpha and would write the whole
+// quad into depth. Instead this material is plain `transparent` with
+// depth-write OFF (draw it after the body/head via renderable priority),
+// discards near-empty texels, and is double sided (cards are seen from both
+// sides). Overlapping strands blend softly, which suits a hologram.
+// If hair sorting ever looks wrong, set depthWrite = true on the instance: the
+// discard then keeps holes out of the depth buffer (masked-like behaviour).
+//
+// -----------------------------------------------------------------------------
+// Samplers (1)
+//   cardMap     RGBA8 sRGB (SRGB8_A8): strand/brow/lash texture, A = coverage.
+//
+// Parameters (default / range — effect)
+//   time             0 / s           — animation clock.
+//   baseColor        mood skin, linear RGB.
+//   glowColor        mood glow, linear RGB.
+//   rimColor         linear RGB.
+//   albedo           0.45 / [0, 1]   — base color scale (x texture luminance detail).
+//   detail           0.7 / [0, 1]    — how much the texture luminance modulates color.
+//   roughness        0.45 / [0.05,1]
+//   rimPower         2.5 / [0.5, 8]
+//   rimIntensity     0.6 / [0, 4]
+//   sheenIntensity   0.5 / [0, 3]    — emission of the strand "flow" sheen.
+//   sheenSpeed       0.25 / [-2, 2]  — V units per second the sheen travels.
+//   sheenFrequency   2.0 / [0.5, 10] — sheen bands per V unit.
+//   glowIntensity    0.15 / [0, 2]   — steady emission (x glowColor x texture).
+//   alpha            0.85 / [0, 1]   — global opacity.
+//   cutoff           0.08 / [0, 0.5] — texels with alpha below are discarded.
+//   glitch           0 / [0, 1]      — signal glitch: flicker + color flash.
+//   pulse            0 / [0, 1.5]    — voice pulse.
+//   energy           0.5 / [0, 1]    — mood energy.
+// =============================================================================
+
+material {
+    name : masha_holo_card,
+    shadingModel : lit,
+    blending : transparent,
+    doubleSided : true,
+    flipUV : false,
+    postLightingBlending : add,
+    requires : [ uv0 ],
+    parameters : [
+        { type : sampler2d, name : cardMap, format : float, precision : medium },
+        { type : float, name : time, precision : high },
+        { type : float3, name : baseColor },
+        { type : float3, name : glowColor },
+        { type : float3, name : rimColor },
+        { type : float, name : albedo },
+        { type : float, name : detail },
+        { type : float, name : roughness },
+        { type : float, name : rimPower },
+        { type : float, name : rimIntensity },
+        { type : float, name : sheenIntensity },
+        { type : float, name : sheenSpeed },
+        { type : float, name : sheenFrequency },
+        { type : float, name : glowIntensity },
+        { type : float, name : alpha },
+        { type : float, name : cutoff },
+        { type : float, name : glitch },
+        { type : float, name : pulse },
+        { type : float, name : energy }
+    ],
+    variantFilter : [ shadowReceiver, vsm, ssr, stereo ]
+}
+
+fragment {
+    void material(inout MaterialInputs material) {
+        highp vec2 uv = getUV0();
+        highp float t = materialParams.time;
+        vec4 tex = texture(materialParams_cardMap, uv);
+        if (tex.a < materialParams.cutoff) {
+            discard;
+        }
+
+        prepareMaterial(material);
+
+        float NoV = abs(dot(getWorldNormalVector(), getWorldViewVector()));
+        float fresnel = pow(1.0 - saturate(NoV), materialParams.rimPower);
+
+        float luma = dot(tex.rgb, vec3(0.2126, 0.7152, 0.0722));
+        float detail = mix(1.0, saturate(luma * 2.2), materialParams.detail);
+        vec3 tint = materialParams.baseColor;
+        float tl = dot(tint, vec3(0.2126, 0.7152, 0.0722));
+        vec3 base = mix(tint, vec3(tl), 0.35) * materialParams.albedo * detail;
+
+        highp float gt = floor(t * 30.0);
+        float flicker = 1.0 - materialParams.glitch * 0.5 * fract(sin(gt * 12.9898) * 43758.5453);
+        float a = saturate(tex.a * materialParams.alpha * flicker);
+
+        material.baseColor = vec4(base * a, a);
+        material.roughness = materialParams.roughness;
+        material.metallic = 0.0;
+        material.reflectance = 0.4;
+
+        // Flowing sheen along the strands (V runs root -> tip on MPFB cards).
+        highp float s = fract(uv.y * materialParams.sheenFrequency - t * materialParams.sheenSpeed);
+        float sheen = exp(-(s - 0.5) * (s - 0.5) * 60.0);
+        vec3 glow = materialParams.glowColor;
+        vec3 emit = glow * detail * (materialParams.glowIntensity + sheen * materialParams.sheenIntensity * (0.6 + 0.6 * materialParams.energy));
+        emit += materialParams.rimColor * fresnel * materialParams.rimIntensity * (0.85 + 0.5 * materialParams.pulse);
+        emit += vec3(0.3, 0.0, 0.25) * materialParams.glitch * (1.0 - flicker) * 2.0;
+        material.postLightingColor = vec4(emit * a, 0.0);
+    }
+}

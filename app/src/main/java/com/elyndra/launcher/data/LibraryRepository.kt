@@ -14,22 +14,18 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.json.Json
-import java.io.File
 import java.security.MessageDigest
 
 /**
- * Fuente única de la biblioteca. Mantiene el estado en memoria (StateFlow) y
- * lo persiste en JSON con escritura atómica (archivo temporal + rename) y un
- * pequeño retardo para agrupar cambios seguidos.
+ * Fuente única de la biblioteca.
+ *
+ * La interfaz trabaja contra una instantánea en memoria (StateFlow) que cambia
+ * al instante y de forma síncrona: quien modifica algo puede releerlo en la
+ * línea siguiente. La persistencia va detrás, con un pequeño retardo para
+ * agrupar cambios seguidos: la [LibraryStore] recibe lo último guardado y lo
+ * nuevo, y escribe solo la diferencia (Room, ver RoomLibraryStore).
  */
-class LibraryRepository(private val file: File, private val scope: CoroutineScope) {
-
-    private val json = Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = false
-        explicitNulls = false
-    }
+class LibraryRepository(private val store: LibraryStore, private val scope: CoroutineScope) {
 
     private val _state = MutableStateFlow(Library())
     val state: StateFlow<Library> = _state.asStateFlow()
@@ -38,18 +34,19 @@ class LibraryRepository(private val file: File, private val scope: CoroutineScop
     private val saveMutex = Mutex()
     private var saveJob: Job? = null
 
+    /** Lo último que llegó a la tienda: la base de la siguiente diferencia. */
+    private var persisted = Library()
+
     val current: Library get() = _state.value
 
-    /** Carga el JSON del disco. Se llama una vez al arrancar la app. */
+    /** Carga la biblioteca guardada. Se llama una vez al arrancar la app. */
     fun load() {
         scope.launch(Dispatchers.IO) {
-            val lib = runCatching {
-                if (file.exists()) json.decodeFromString(Library.serializer(), file.readText()) else Library()
-            }.getOrElse {
-                // Un JSON corrupto no debe impedir arrancar: se aparta para poder recuperarlo a mano.
-                runCatching { file.renameTo(File(file.parentFile, file.name + ".corrupt")) }
-                Library()
-            }
+            // Si la base de datos no se puede leer, se arranca vacío: mejor una
+            // biblioteca en blanco que una app que no abre. Como lo guardado
+            // pasa a ser "nada", los siguientes guardados solo añaden filas.
+            val lib = runCatching { store.load() }.getOrElse { Library() }
+            persisted = lib
             _state.value = lib
             loadedSignal.complete(Unit)
         }
@@ -76,15 +73,16 @@ class LibraryRepository(private val file: File, private val scope: CoroutineScop
         writeNow()
     }
 
-    private suspend fun writeNow() = saveMutex.withLock {
-        runCatching {
-            val text = json.encodeToString(Library.serializer(), _state.value)
-            val tmp = File(file.parentFile, file.name + ".tmp")
-            tmp.writeText(text)
-            if (!tmp.renameTo(file)) {
-                file.delete()
-                tmp.renameTo(file)
-            }
+    private suspend fun writeNow() {
+        // Antes de cargar no hay base contra la que calcular la diferencia:
+        // lo que se cambiara entonces lo sustituye la propia carga.
+        loadedSignal.await()
+        saveMutex.withLock {
+            val next = _state.value
+            if (next === persisted) return@withLock
+            // Si falla, `persisted` no se mueve: el siguiente guardado vuelve a
+            // intentar la diferencia completa y no se pierde nada.
+            runCatching { store.save(persisted, next) }.onSuccess { persisted = next }
         }
     }
 
@@ -235,9 +233,17 @@ class LibraryRepository(private val file: File, private val scope: CoroutineScop
     fun recordLaunch(key: String, now: Long = System.currentTimeMillis()) =
         updateStats(key) { it.copy(launches = it.launches + 1, lastPlayed = now) }
 
-    fun addPlaytime(key: String, minutes: Int, start: Long) {
-        updateStats(key) { it.copy(minutes = it.minutes + minutes) }
-        update { lib -> lib.copy(sessions = (lib.sessions + PlaySession(key, start, minutes)).takeLast(MAX_SESSIONS)) }
+    fun addPlaytime(key: String, minutes: Int, start: Long) =
+        recordSession(PlaySession(key, start, minutes))
+
+    /**
+     * Guarda una sesión terminada y suma sus minutos al juego. Las salidas
+     * inmediatas (0 minutos) también se guardan: no suman tiempo, pero son lo
+     * que delata un emulador que no funciona con ese juego.
+     */
+    fun recordSession(session: PlaySession) {
+        if (session.minutes > 0) updateStats(session.key) { it.copy(minutes = it.minutes + session.minutes) }
+        update { lib -> lib.copy(sessions = (lib.sessions + session).takeLast(MAX_SESSIONS)) }
     }
 
     fun markAutoScan(now: Long) = update { it.copy(lastAutoScan = now) }
@@ -266,10 +272,17 @@ class LibraryRepository(private val file: File, private val scope: CoroutineScop
         title = Names.cleanTitle(f.name, stripExtension = !f.isDir || f.name.substringAfterLast('.', "").length in 2..5),
         mainDocId = f.mainDocId,
         mainFile = f.mainFile,
+        addedAt = System.currentTimeMillis(),
     )
 
     companion object {
-        const val MAX_SESSIONS = 2000
+        /**
+         * Tope de sesiones guardadas. Con el JSON eran 2000 para no reescribir
+         * un archivo enorme en cada cambio; en Room solo se escribe la sesión
+         * nueva, y el historial completo es lo que alimenta el perfil de cada
+         * juego y la elección de emulador. El tope queda como seguro.
+         */
+        const val MAX_SESSIONS = 20_000
 
         fun romId(folderId: String, docId: String): String {
             val digest = MessageDigest.getInstance("SHA-1").digest("$folderId|$docId".toByteArray())

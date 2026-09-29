@@ -30,7 +30,7 @@ import androidx.media3.ui.PlayerView
  *     cada vez que arranca un juego, dejarlo corriendo gastaría batería
  *     durante toda la partida.
  */
-@OptIn(UnstableApi::class)
+@androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 @Composable
 fun VideoBackdrop(uri: String, opacity: Float, modifier: Modifier = Modifier) {
     val context = LocalContext.current

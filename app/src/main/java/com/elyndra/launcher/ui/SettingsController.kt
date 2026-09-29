@@ -4,6 +4,8 @@ import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewModelScope
 import com.elyndra.launcher.R
@@ -13,9 +15,13 @@ import com.elyndra.launcher.data.Emulators
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.data.SecretKeys
 import com.elyndra.launcher.data.TINTS
+import com.elyndra.launcher.display.FrameRate
+import com.elyndra.launcher.masha.MashaError
 import com.elyndra.launcher.metadata.ApiException
 import com.elyndra.launcher.metadata.FailureKind
 import com.elyndra.launcher.metadata.Service
+import com.elyndra.launcher.ui.masha.lipsync.AudioRoute
+import com.elyndra.launcher.ui.masha.lipsync.AudioRouteOffsets
 import com.elyndra.launcher.ui.theme.ElyndraSkin
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -40,9 +46,9 @@ class SettingsController(private val vm: ElyndraViewModel) {
 
     var accentId by mutableStateOf(store.accentId); private set
     var tintId by mutableStateOf(store.tintId); private set
-    var blur by mutableStateOf(store.blur); private set
-    var alphaPct by mutableStateOf(store.alphaPct); private set
-    var scrimPct by mutableStateOf(store.scrimPct); private set
+    var blur by mutableIntStateOf(store.blur); private set
+    var alphaPct by mutableIntStateOf(store.alphaPct); private set
+    var scrimPct by mutableIntStateOf(store.scrimPct); private set
     var autoMeta by mutableStateOf(store.autoMeta); private set
     var lang by mutableStateOf(AppLocale.current(vm.app)); private set
 
@@ -67,7 +73,7 @@ class SettingsController(private val vm: ElyndraViewModel) {
     var backgroundEnabled by mutableStateOf(store.backgroundEnabled); private set
     var backgroundUri by mutableStateOf(store.backgroundUri); private set
     var backgroundIsVideo by mutableStateOf(store.backgroundIsVideo); private set
-    var backgroundOpacity by mutableStateOf(store.backgroundOpacity); private set
+    var backgroundOpacity by mutableIntStateOf(store.backgroundOpacity); private set
 
     fun toggleBackground() {
         backgroundEnabled = !backgroundEnabled
@@ -115,22 +121,257 @@ class SettingsController(private val vm: ElyndraViewModel) {
         return ext in VIDEO_EXTENSIONS
     }
 
-    /* ── botón de Lucy ────────────────────────────────────────── */
+    /* ── botón de Masha ───────────────────────────────────────── */
 
     /**
-     * Dónde está el botón de Lucy, en dp desde la esquina superior izquierda.
+     * Dónde está el botón de Masha, en dp desde la esquina superior izquierda.
      * `null` en cualquiera de los dos = nunca se ha movido, y entonces manda
      * su esquina de siempre.
      */
-    var lucyX by mutableStateOf(store.lucyX); private set
-    var lucyY by mutableStateOf(store.lucyY); private set
+    var mashaX by mutableStateOf(store.mashaX); private set
+    var mashaY by mutableStateOf(store.mashaY); private set
 
-    /** Lucy se queda donde se la suelte, también al volver a abrir la app. */
-    fun moveLucy(x: Float, y: Float) {
-        lucyX = x
-        lucyY = y
-        store.lucyX = x
-        store.lucyY = y
+    /** Masha se queda donde se la suelte, también al volver a abrir la app. */
+    fun moveMasha(x: Float, y: Float) {
+        mashaX = x
+        mashaY = y
+        store.mashaX = x
+        store.mashaY = y
+    }
+
+    /** Color (ARGB) de la estela de partículas de Masha al arrastrarla. */
+    var mashaParticleColor by mutableIntStateOf(store.mashaParticleColor); private set
+
+    fun updateMashaParticleColor(argb: Int) {
+        mashaParticleColor = argb
+        store.mashaParticleColor = argb
+    }
+
+    /** Partículas de neón alrededor del icono o la carátula seleccionados. */
+    var selectionParticles by mutableStateOf(store.selectionParticles); private set
+
+    fun toggleSelectionParticles() {
+        selectionParticles = !selectionParticles
+        store.selectionParticles = selectionParticles
+    }
+
+    /** Color (ARGB) de las partículas de la selección. */
+    var selectionParticleColor by mutableIntStateOf(store.selectionParticleColor); private set
+
+    fun updateSelectionParticleColor(argb: Int) {
+        selectionParticleColor = argb
+        store.selectionParticleColor = argb
+    }
+
+    /* ── Masha: voz y ambiente sonoro ─────────────────────────── */
+
+    var mashaVoice by mutableStateOf(store.mashaVoice); private set
+
+    fun toggleMashaVoice() {
+        mashaVoice = !mashaVoice
+        store.mashaVoice = mashaVoice
+    }
+
+    var mashaSoundscape by mutableStateOf(store.mashaSoundscape); private set
+
+    fun toggleMashaSoundscape() {
+        mashaSoundscape = !mashaSoundscape
+        store.mashaSoundscape = mashaSoundscape
+    }
+
+    var mashaSoundscapeVolume by mutableIntStateOf(store.mashaSoundscapeVolume); private set
+
+    fun updateMashaSoundscapeVolume(v: Int) {
+        mashaSoundscapeVolume = v.coerceIn(0, 100)
+        store.mashaSoundscapeVolume = mashaSoundscapeVolume
+    }
+
+    /* ── pantalla: 120 / 60 fps ───────────────────────────────── */
+
+    /** La pantalla llega a 120 Hz (o más). Si no, la opción de 120 fps sale desactivada. */
+    val supportsHighRefresh: Boolean = FrameRate.supportsHigh(vm.app)
+
+    /** Lo guardado: 120, 60 o [FrameRate.AUTO]. */
+    private var storedFrameRate by mutableIntStateOf(store.frameRate)
+
+    /** Los fps que se piden de verdad a la pantalla; la Activity los aplica al cambiar. */
+    val frameRate: Int get() = FrameRate.effective(storedFrameRate, supportsHighRefresh)
+
+    /** Masha a 120 Hz (Ajustes → Pantalla); apagado, sus pantallas van a 60. */
+    var mashaHighRefresh by mutableStateOf(store.mashaHighRefresh); private set
+
+    fun toggleMashaHighRefresh() {
+        mashaHighRefresh = !mashaHighRefresh
+        store.mashaHighRefresh = mashaHighRefresh
+    }
+
+    /** Los fps que se piden en [screen]: los de Ajustes, salvo Masha a 60 si no está en alta fluidez. */
+    fun frameRateFor(screen: Screen): Int {
+        val masha = screen == Screen.Masha || screen == Screen.VoiceSync
+        return if (masha && !mashaHighRefresh) minOf(frameRate, FrameRate.STANDARD) else frameRate
+    }
+
+    fun updateFrameRate(fps: Int) {
+        if (fps == FrameRate.HIGH && !supportsHighRefresh) return
+        storedFrameRate = fps
+        store.frameRate = fps
+    }
+
+    /* ── Masha ────────────────────────────────────────────────── */
+
+    var mashaOnline by mutableStateOf(store.mashaOnline); private set
+    var mashaAmbient by mutableStateOf(store.mashaAmbient); private set
+    var mashaNudges by mutableStateOf(store.mashaNudges); private set
+    var mashaKey by mutableStateOf(vm.brain.config.userKey); private set
+    var mashaTest by mutableStateOf<MashaTest>(MashaTest.Idle); private set
+
+    /** El usuario ha dado acceso de uso (tiempo de juego exacto). Se relee al abrir Ajustes. */
+    var usageAccess by mutableStateOf(false); private set
+
+    sealed interface MashaTest {
+        data object Idle : MashaTest
+        data object Checking : MashaTest
+        data class Ok(val balance: String?) : MashaTest
+        data class Failed(val message: UiText) : MashaTest
+    }
+
+    val mashaHasKey: Boolean get() = vm.brain.config.hasKey
+    val mashaBuiltInKey: Boolean get() = vm.brain.config.usesBuiltInKey
+
+    fun toggleMashaOnline() {
+        mashaOnline = !mashaOnline
+        store.mashaOnline = mashaOnline
+    }
+
+    fun toggleMashaAmbient() {
+        mashaAmbient = !mashaAmbient
+        store.mashaAmbient = mashaAmbient
+        vm.masha.refreshInsight()
+    }
+
+    fun toggleMashaNudges() {
+        mashaNudges = !mashaNudges
+        store.mashaNudges = mashaNudges
+    }
+
+    fun updateMashaKey(value: String) {
+        mashaKey = value
+        vm.brain.config.setUserKey(value)
+        mashaTest = MashaTest.Idle
+    }
+
+    /** "Probar conexión": consulta el saldo de la cuenta (no gasta tokens). */
+    fun testMasha() {
+        if (!vm.brain.config.hasKey) {
+            mashaTest = MashaTest.Failed(UiText.res(R.string.masha_err_no_key))
+            return
+        }
+        mashaTest = MashaTest.Checking
+        vm.viewModelScope.launch {
+            mashaTest = vm.brain.ai.ping().fold(
+                onSuccess = { MashaTest.Ok(it) },
+                onFailure = { e -> MashaTest.Failed((e as? MashaError)?.let { vm.masha.errorText(it) } ?: UiText.Raw(e.message ?: "?")) },
+            )
+        }
+    }
+
+    fun refreshUsageAccess() {
+        usageAccess = vm.sessions.hasUsageAccess()
+    }
+
+    /** Lleva a Ajustes del sistema → Acceso de uso (con Elyndra señalada si el sistema lo admite). */
+    fun openUsageAccess() {
+        val opened = runCatching { vm.app.startActivity(vm.sessions.usageAccessIntent()) }.isSuccess
+        if (!opened) runCatching { vm.app.startActivity(vm.sessions.usageAccessFallbackIntent()) }
+    }
+
+    fun forgetMasha() {
+        vm.showDialog(
+            DialogSpec(
+                title = UiText.res(R.string.settings_masha_forget),
+                message = UiText.res(R.string.settings_masha_forget_msg),
+                destructive = true,
+                confirm = DialogButton(UiText.res(R.string.remove)) {
+                    vm.viewModelScope.launch {
+                        vm.brain.forgetEverything()
+                        vm.masha.clearConversation(null)
+                        vm.showToast(UiText.res(R.string.toast_masha_forgot))
+                    }
+                },
+                dismiss = DialogButton(UiText.res(R.string.close)) {},
+            ),
+        )
+    }
+
+    /* ── acerca de y opciones de desarrollador ────────────────── */
+
+    /** Opciones de desarrollador visibles (se desbloquean con siete toques en la versión). */
+    var developerOptions by mutableStateOf(store.developerOptions); private set
+
+    private var versionTaps = 0
+    private var lastVersionTap = 0L
+
+    /** Un toque en la fila de la versión: al séptimo seguido se desbloquean las opciones de desarrollador. */
+    fun tapVersion() {
+        if (developerOptions) {
+            vm.showToast(UiText.res(R.string.dev_already))
+            return
+        }
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastVersionTap > VERSION_TAP_WINDOW_MS) versionTaps = 0
+        lastVersionTap = now
+        versionTaps++
+        val left = VERSION_TAPS - versionTaps
+        when {
+            left <= 0 -> {
+                versionTaps = 0
+                developerOptions = true
+                store.developerOptions = true
+                vm.showToast(UiText.res(R.string.dev_unlocked))
+            }
+            left <= 4 -> vm.showToast(UiText.plural(R.plurals.dev_taps_left, left))
+        }
+    }
+
+    /** Oculta otra vez las opciones de desarrollador (los ajustes guardados se quedan). */
+    fun hideDeveloperOptions() {
+        developerOptions = false
+        store.developerOptions = false
+    }
+
+    /** Ajuste de sincronía guardado para [route] (el que aplica la voz). */
+    fun voiceOffset(route: AudioRoute): Int = AudioRouteOffsets.select(store.voiceOffsets(), route)
+
+    /** Guarda el ajuste de [route] (en Bluetooth, también como genérico para otros auriculares). */
+    fun setVoiceOffset(route: AudioRoute, ms: Int) {
+        val v = AudioRouteOffsets.clamp(ms)
+        AudioRouteOffsets.keysToSave(route).forEach { store.setVoiceOffset(it, v) }
+    }
+
+    /** Vuelve a 0 el ajuste de [route] (en Bluetooth, también el genérico). */
+    fun resetVoiceOffset(route: AudioRoute) {
+        AudioRouteOffsets.keysToSave(route).forEach { store.setVoiceOffset(it, null) }
+    }
+
+    /* ── prioridad de fuentes de metadatos ────────────────────── */
+
+    var priority by mutableStateOf(vm.metadataPriority.get()); private set
+
+    /** Mueve un servicio una posición en el orden de textos o de imágenes. */
+    fun movePriority(art: Boolean, service: Service, delta: Int) {
+        val list = (if (art) priority.art else priority.text).toMutableList()
+        val from = list.indexOf(service)
+        val to = (from + delta).coerceIn(0, list.lastIndex)
+        if (from < 0 || from == to) return
+        list.removeAt(from)
+        list.add(to, service)
+        priority = if (art) priority.copy(art = list) else priority.copy(text = list)
+        vm.metadataPriority.set(priority)
+    }
+
+    fun resetPriority() {
+        vm.metadataPriority.reset()
+        priority = vm.metadataPriority.get()
     }
 
     /* ── orden de la biblioteca ───────────────────────────────── */
@@ -305,9 +546,10 @@ class SettingsController(private val vm: ElyndraViewModel) {
     /* ── biblioteca ───────────────────────────────────────────── */
 
     var rescanning by mutableStateOf(false); private set
-    var mediaBytes by mutableStateOf(-1L); private set
+    var mediaBytes by mutableLongStateOf(-1L); private set
 
     fun onOpen() {
+        refreshUsageAccess()
         Service.entries.forEach { s ->
             if (states[s]?.status != ServiceState.Status.Checking && states[s]?.status != ServiceState.Status.Connected) {
                 states[s] = idleState(s)
@@ -403,6 +645,9 @@ class SettingsController(private val vm: ElyndraViewModel) {
 
     companion object {
         /** Reserva por si el proveedor no declara el tipo del archivo elegido. */
+        private const val VERSION_TAPS = 7
+        private const val VERSION_TAP_WINDOW_MS = 1500L
+
         private val VIDEO_EXTENSIONS = setOf("mp4", "webm", "mkv", "m4v", "mov", "3gp", "avi", "ts")
 
         fun helpUrl(s: Service): String = when (s) {

@@ -81,5 +81,4 @@ class AppCatalog(private val context: Context) {
 
     fun icon(pkg: String): Drawable? = runCatching { pm.getApplicationIcon(pkg) }.getOrNull()
 
-    fun launchIntent(pkg: String): Intent? = pm.getLaunchIntentForPackage(pkg)
 }

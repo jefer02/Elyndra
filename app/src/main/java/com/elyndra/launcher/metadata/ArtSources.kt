@@ -1,5 +1,6 @@
 package com.elyndra.launcher.metadata
 
+import com.elyndra.launcher.data.ArtOrigin
 import com.elyndra.launcher.data.GameMeta
 import com.elyndra.launcher.data.GameSystem
 import com.elyndra.launcher.data.LibraryRepository
@@ -46,24 +47,33 @@ class ArtSources(
         else -> true
     }
 
-    /** ¿Hay imagen de esta clase que se pueda quitar? */
-    fun has(key: String, kind: ArtKind): Boolean {
+    /**
+     * Ruta de la imagen puesta de esta clase, si la hay.
+     *
+     * La usa el menú de acciones para enseñar la miniatura de lo que ya está
+     * puesto, en vez de un icono genérico: se ve de un vistazo qué imagen
+     * tiene cada juego sin abrir nada.
+     */
+    fun path(key: String, kind: ArtKind): String? {
         repo.folderByKey(key)?.let { f ->
             return when (kind) {
                 ArtKind.Cover -> f.cover
                 ArtKind.Background -> f.hero
                 ArtKind.Logo -> f.logo
                 ArtKind.Icon -> f.icon
-            } != null
+            }
         }
-        val meta = repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta ?: return false
+        val meta = repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta ?: return null
         return when (kind) {
             ArtKind.Cover -> meta.cover
             ArtKind.Background -> meta.hero
             ArtKind.Logo -> meta.logo
             ArtKind.Icon -> meta.icon
-        } != null
+        }
     }
+
+    /** ¿Hay imagen de esta clase que se pueda quitar? */
+    fun has(key: String, kind: ArtKind): Boolean = path(key, kind) != null
 
     suspend fun candidates(key: String, kind: ArtKind, service: Service): List<ArtCandidate> = withContext(Dispatchers.IO) {
         val rom = repo.romByKey(key)
@@ -87,10 +97,13 @@ class ArtSources(
         }.distinctBy { it.url }.take(MAX_CANDIDATES)
     }
 
-    /** Descarga la imagen elegida y la fija para que "Actualizar metadatos" no la sustituya. */
-    suspend fun apply(key: String, kind: ArtKind, url: String): Boolean {
+    /**
+     * Descarga la imagen elegida y la fija para que "Actualizar metadatos" no la
+     * sustituya. [service] es de dónde sale, para que la imagen recuerde su origen.
+     */
+    suspend fun apply(key: String, kind: ArtKind, url: String, service: Service? = null): Boolean {
         val path = media.download(url, key, kind.media) ?: return false
-        return store(key, kind, path)
+        return store(key, kind, path, service?.let { ArtOrigin(it.id, url) })
     }
 
     /**
@@ -101,10 +114,10 @@ class ArtSources(
      */
     suspend fun applyLocal(key: String, kind: ArtKind, image: LocalImage): Boolean {
         val path = withContext(Dispatchers.IO) { media.save(image.bytes, key, kind.media, image.extension) } ?: return false
-        return store(key, kind, path)
+        return store(key, kind, path, ArtOrigin(LOCAL_SOURCE))
     }
 
-    private suspend fun store(key: String, kind: ArtKind, path: String): Boolean {
+    private suspend fun store(key: String, kind: ArtKind, path: String, origin: ArtOrigin?): Boolean {
         val folderId = folderIdOf(key)
         if (folderId != null) {
             repo.setFolderArt(folderId, kind.media, path)
@@ -116,7 +129,10 @@ class ArtSources(
                     ArtKind.Logo -> old.copy(logo = path)
                     ArtKind.Icon -> old.copy(icon = path)
                 }
-                updated.copy(pinned = (old.pinned + kind.media).distinct())
+                updated.copy(
+                    pinned = (old.pinned + kind.media).distinct(),
+                    artOrigins = if (origin != null) old.artOrigins + (kind.media to origin) else old.artOrigins - kind.media,
+                )
             }
         }
         repo.flush()
@@ -137,7 +153,7 @@ class ArtSources(
                     ArtKind.Logo -> old.copy(logo = null)
                     ArtKind.Icon -> old.copy(icon = null)
                 }
-                updated.copy(pinned = old.pinned - kind.media)
+                updated.copy(pinned = old.pinned - kind.media, artOrigins = old.artOrigins - kind.media)
             }
         }
         repo.flush()
@@ -237,10 +253,13 @@ class ArtSources(
         }
     }
 
-    private companion object {
-        const val MAX_GAMES = 5
-        const val SGDB_GAMES = 3
-        const val PER_GAME = 20
-        const val MAX_CANDIDATES = 60
+    companion object {
+        /** Origen de las imágenes elegidas en la galería del dispositivo. */
+        const val LOCAL_SOURCE = "local"
+
+        private const val MAX_GAMES = 5
+        private const val SGDB_GAMES = 3
+        private const val PER_GAME = 20
+        private const val MAX_CANDIDATES = 60
     }
 }

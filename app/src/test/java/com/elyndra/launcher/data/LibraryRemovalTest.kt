@@ -8,12 +8,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.io.File
 
 /** Quitar un juego de la biblioteca sin tocar el archivo que hay en el disco. */
 class LibraryRemovalTest {
 
-    private lateinit var file: File
     private lateinit var job: Job
     private lateinit var repo: LibraryRepository
 
@@ -38,16 +36,14 @@ class LibraryRemovalTest {
 
     @Before
     fun setUp() {
-        file = File.createTempFile("library", ".json").also { it.delete() }
         job = Job()
-        repo = LibraryRepository(file, CoroutineScope(job))
+        repo = LibraryRepository(InMemoryLibraryStore(), CoroutineScope(job))
         repo.addFolder(folder, scan)
     }
 
     @After
     fun tearDown() {
         job.cancel()
-        file.delete()
     }
 
     @Test

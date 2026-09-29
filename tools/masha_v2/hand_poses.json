@@ -1,0 +1,1094 @@
+{
+ "conventions": "Euler XYZ degrees in each bone's local space (glTF: rest * euler). Hand & finger bones re-rolled: +X = flexion towards palm, +Z = volar normal, Y along bone.",
+ "twist_rule": {
+  "forearm": "for each forearm twist bone: local = rest * axisAngle(Y, factor * twistY(R0 * q_hand * R0^-1))",
+  "upperarm": "upperarm_twist.local = rest * axisAngle(Y, -0.5 * twistY(q_arm))",
+  "twistY(q)": "2*atan2(q.y, q.w)",
+  "hand_rest_in_forearm": {
+   "L": [
+    0.860663,
+    0.040949,
+    0.506481,
+    -0.032542
+   ],
+   "R": [
+    0.865726,
+    0.063448,
+    -0.495885,
+    0.024318
+   ]
+  },
+  "bones": {
+   "masha:forearm_twist_mid.L": {
+    "parent": "mixamorig:LeftForeArm",
+    "head": [
+     0.3838,
+     -0.0751,
+     1.1811
+    ],
+    "tail": [
+     0.4196,
+     -0.1205,
+     1.1417
+    ],
+    "source": "mixamorig:LeftHand",
+    "factor": 0.333333,
+    "axis": "Y"
+   },
+   "masha:forearm_twist.L": {
+    "parent": "mixamorig:LeftForeArm",
+    "head": [
+     0.4219,
+     -0.1235,
+     1.1391
+    ],
+    "tail": [
+     0.4577,
+     -0.1689,
+     1.0997
+    ],
+    "source": "mixamorig:LeftHand",
+    "factor": 0.666667,
+    "axis": "Y"
+   },
+   "masha:upperarm_twist.L": {
+    "parent": "mixamorig:LeftArm",
+    "head": [
+     0.1742,
+     -0.0232,
+     1.4087
+    ],
+    "tail": [
+     0.2611,
+     -0.0265,
+     1.3146
+    ],
+    "source": "mixamorig:LeftArm",
+    "factor": -0.5,
+    "axis": "Y"
+   },
+   "masha:forearm_twist_mid.R": {
+    "parent": "mixamorig:RightForeArm",
+    "head": [
+     -0.3838,
+     -0.0751,
+     1.1811
+    ],
+    "tail": [
+     -0.4196,
+     -0.1205,
+     1.1417
+    ],
+    "source": "mixamorig:RightHand",
+    "factor": 0.333333,
+    "axis": "Y"
+   },
+   "masha:forearm_twist.R": {
+    "parent": "mixamorig:RightForeArm",
+    "head": [
+     -0.4219,
+     -0.1235,
+     1.1391
+    ],
+    "tail": [
+     -0.4577,
+     -0.1689,
+     1.0997
+    ],
+    "source": "mixamorig:RightHand",
+    "factor": 0.666667,
+    "axis": "Y"
+   },
+   "masha:upperarm_twist.R": {
+    "parent": "mixamorig:RightArm",
+    "head": [
+     -0.1742,
+     -0.0232,
+     1.4087
+    ],
+    "tail": [
+     -0.2611,
+     -0.0265,
+     1.3146
+    ],
+    "source": "mixamorig:RightArm",
+    "factor": -0.5,
+    "axis": "Y"
+   }
+  }
+ },
+ "poses": {
+  "relaxed": {
+   "mixamorig:LeftHand": [
+    -12.0,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandThumb1": [
+    14.0,
+    10.0,
+    -10.0
+   ],
+   "mixamorig:LeftHandThumb2": [
+    0.66,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandThumb3": [
+    -3.79,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandIndex1": [
+    17.0,
+    0.0,
+    -13.13
+   ],
+   "mixamorig:LeftHandIndex2": [
+    9.01,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandIndex3": [
+    1.67,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandMiddle1": [
+    25.0,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandMiddle2": [
+    25.13,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandMiddle3": [
+    2.4,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandRing1": [
+    30.0,
+    0.0,
+    7.41
+   ],
+   "mixamorig:LeftHandRing2": [
+    27.78,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandRing3": [
+    6.02,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandPinky1": [
+    35.0,
+    0.0,
+    9.06
+   ],
+   "mixamorig:LeftHandPinky2": [
+    31.04,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandPinky3": [
+    16.24,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:RightHand": [
+    -12.0,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandThumb1": [
+    14.0,
+    -10.0,
+    10.0
+   ],
+   "mixamorig:RightHandThumb2": [
+    0.66,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandThumb3": [
+    -3.79,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandIndex1": [
+    17.0,
+    -0.0,
+    13.2
+   ],
+   "mixamorig:RightHandIndex2": [
+    9.01,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandIndex3": [
+    1.67,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandMiddle1": [
+    25.0,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandMiddle2": [
+    25.13,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandMiddle3": [
+    2.4,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandRing1": [
+    30.0,
+    -0.0,
+    -7.32
+   ],
+   "mixamorig:RightHandRing2": [
+    27.78,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandRing3": [
+    6.02,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandPinky1": [
+    35.0,
+    -0.0,
+    -8.98
+   ],
+   "mixamorig:RightHandPinky2": [
+    31.04,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandPinky3": [
+    16.24,
+    -0.0,
+    0.0
+   ]
+  },
+  "wave": {
+   "mixamorig:LeftHand": [
+    -8.0,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandThumb1": [
+    2.0,
+    0.0,
+    6.0
+   ],
+   "mixamorig:LeftHandThumb2": [
+    -3.34,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandThumb3": [
+    -11.79,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandIndex1": [
+    4.0,
+    0.0,
+    -13.13
+   ],
+   "mixamorig:LeftHandIndex2": [
+    -7.99,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandIndex3": [
+    -4.33,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandMiddle1": [
+    4.0,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandMiddle2": [
+    0.13,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandMiddle3": [
+    -4.6,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandRing1": [
+    5.0,
+    0.0,
+    8.41
+   ],
+   "mixamorig:LeftHandRing2": [
+    -1.22,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandRing3": [
+    -2.98,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandPinky1": [
+    6.0,
+    0.0,
+    13.06
+   ],
+   "mixamorig:LeftHandPinky2": [
+    -1.96,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandPinky3": [
+    5.24,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:RightHand": [
+    -8.0,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandThumb1": [
+    2.0,
+    -0.0,
+    -6.0
+   ],
+   "mixamorig:RightHandThumb2": [
+    -3.34,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandThumb3": [
+    -11.79,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandIndex1": [
+    4.0,
+    -0.0,
+    13.2
+   ],
+   "mixamorig:RightHandIndex2": [
+    -7.99,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandIndex3": [
+    -4.33,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandMiddle1": [
+    4.0,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandMiddle2": [
+    0.13,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandMiddle3": [
+    -4.6,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandRing1": [
+    5.0,
+    -0.0,
+    -8.32
+   ],
+   "mixamorig:RightHandRing2": [
+    -1.22,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandRing3": [
+    -2.98,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandPinky1": [
+    6.0,
+    -0.0,
+    -12.98
+   ],
+   "mixamorig:RightHandPinky2": [
+    -1.96,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandPinky3": [
+    5.24,
+    -0.0,
+    0.0
+   ]
+  },
+  "point": {
+   "mixamorig:LeftHand": [
+    -6.0,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandIndex1": [
+    2.0,
+    0.0,
+    -14.13
+   ],
+   "mixamorig:LeftHandIndex2": [
+    -8.99,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandIndex3": [
+    -5.33,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandMiddle1": [
+    80.0,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandMiddle2": [
+    90.13,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandMiddle3": [
+    47.4,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandRing1": [
+    85.0,
+    0.0,
+    10.41
+   ],
+   "mixamorig:LeftHandRing2": [
+    87.78,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandRing3": [
+    49.02,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandPinky1": [
+    88.0,
+    0.0,
+    15.06
+   ],
+   "mixamorig:LeftHandPinky2": [
+    83.04,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandPinky3": [
+    51.24,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandThumb1": [
+    8.25,
+    14.5,
+    -23.5
+   ],
+   "mixamorig:LeftHandThumb2": [
+    57.75,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandThumb3": [
+    32.25,
+    0.0,
+    0.0
+   ],
+   "mixamorig:RightHand": [
+    -6.0,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandIndex1": [
+    2.0,
+    -0.0,
+    14.2
+   ],
+   "mixamorig:RightHandIndex2": [
+    -8.99,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandIndex3": [
+    -5.33,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandMiddle1": [
+    80.0,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandMiddle2": [
+    90.13,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandMiddle3": [
+    47.4,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandRing1": [
+    85.0,
+    -0.0,
+    -10.32
+   ],
+   "mixamorig:RightHandRing2": [
+    87.78,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandRing3": [
+    49.02,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandPinky1": [
+    88.0,
+    -0.0,
+    -14.98
+   ],
+   "mixamorig:RightHandPinky2": [
+    83.04,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandPinky3": [
+    51.24,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandThumb1": [
+    8.25,
+    -14.5,
+    23.5
+   ],
+   "mixamorig:RightHandThumb2": [
+    57.75,
+    0.0,
+    0.0
+   ],
+   "mixamorig:RightHandThumb3": [
+    32.25,
+    0.0,
+    0.0
+   ]
+  },
+  "explain": {
+   "mixamorig:LeftHand": [
+    -15.0,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandThumb1": [
+    6.0,
+    4.0,
+    2.0
+   ],
+   "mixamorig:LeftHandThumb2": [
+    -1.34,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandThumb3": [
+    -7.79,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandIndex1": [
+    6.0,
+    0.0,
+    -13.13
+   ],
+   "mixamorig:LeftHandIndex2": [
+    -3.99,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandIndex3": [
+    -3.33,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandMiddle1": [
+    9.0,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandMiddle2": [
+    6.13,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandMiddle3": [
+    -2.6,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandRing1": [
+    12.0,
+    0.0,
+    9.41
+   ],
+   "mixamorig:LeftHandRing2": [
+    5.78,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandRing3": [
+    0.02,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandPinky1": [
+    15.0,
+    0.0,
+    14.06
+   ],
+   "mixamorig:LeftHandPinky2": [
+    6.04,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandPinky3": [
+    8.24,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:RightHand": [
+    -15.0,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandThumb1": [
+    6.0,
+    -4.0,
+    -2.0
+   ],
+   "mixamorig:RightHandThumb2": [
+    -1.34,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandThumb3": [
+    -7.79,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandIndex1": [
+    6.0,
+    -0.0,
+    13.2
+   ],
+   "mixamorig:RightHandIndex2": [
+    -3.99,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandIndex3": [
+    -3.33,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandMiddle1": [
+    9.0,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandMiddle2": [
+    6.13,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandMiddle3": [
+    -2.6,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandRing1": [
+    12.0,
+    -0.0,
+    -9.32
+   ],
+   "mixamorig:RightHandRing2": [
+    5.78,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandRing3": [
+    0.02,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandPinky1": [
+    15.0,
+    -0.0,
+    -13.98
+   ],
+   "mixamorig:RightHandPinky2": [
+    6.04,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandPinky3": [
+    8.24,
+    -0.0,
+    0.0
+   ]
+  },
+  "fist": {
+   "mixamorig:LeftHand": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandIndex1": [
+    78.0,
+    0.0,
+    -15.13
+   ],
+   "mixamorig:LeftHandIndex2": [
+    79.01,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandIndex3": [
+    47.67,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandMiddle1": [
+    82.0,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandMiddle2": [
+    90.13,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandMiddle3": [
+    47.4,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandRing1": [
+    85.0,
+    0.0,
+    10.41
+   ],
+   "mixamorig:LeftHandRing2": [
+    87.78,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandRing3": [
+    49.02,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandPinky1": [
+    88.0,
+    0.0,
+    15.06
+   ],
+   "mixamorig:LeftHandPinky2": [
+    83.04,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandPinky3": [
+    51.24,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandThumb1": [
+    28.0,
+    9.0,
+    2.75
+   ],
+   "mixamorig:LeftHandThumb2": [
+    31.0,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandThumb3": [
+    29.75,
+    0.0,
+    0.0
+   ],
+   "mixamorig:RightHand": [
+    0.0,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandIndex1": [
+    78.0,
+    -0.0,
+    15.2
+   ],
+   "mixamorig:RightHandIndex2": [
+    79.01,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandIndex3": [
+    47.67,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandMiddle1": [
+    82.0,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandMiddle2": [
+    90.13,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandMiddle3": [
+    47.4,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandRing1": [
+    85.0,
+    -0.0,
+    -10.32
+   ],
+   "mixamorig:RightHandRing2": [
+    87.78,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandRing3": [
+    49.02,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandPinky1": [
+    88.0,
+    -0.0,
+    -14.98
+   ],
+   "mixamorig:RightHandPinky2": [
+    83.04,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandPinky3": [
+    51.24,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandThumb1": [
+    28.0,
+    -9.0,
+    -2.75
+   ],
+   "mixamorig:RightHandThumb2": [
+    31.0,
+    0.0,
+    0.0
+   ],
+   "mixamorig:RightHandThumb3": [
+    29.75,
+    0.0,
+    0.0
+   ]
+  },
+  "thinking_chin": {
+   "mixamorig:LeftHand": [
+    -10.0,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandThumb1": [
+    16.0,
+    10.0,
+    -8.0
+   ],
+   "mixamorig:LeftHandThumb2": [
+    2.66,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandThumb3": [
+    -1.79,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandIndex1": [
+    35.0,
+    0.0,
+    -14.13
+   ],
+   "mixamorig:LeftHandIndex2": [
+    22.01,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandIndex3": [
+    5.67,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandMiddle1": [
+    40.0,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandMiddle2": [
+    35.13,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandMiddle3": [
+    7.4,
+    0.0,
+    0.0
+   ],
+   "mixamorig:LeftHandRing1": [
+    45.0,
+    0.0,
+    7.41
+   ],
+   "mixamorig:LeftHandRing2": [
+    34.78,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandRing3": [
+    9.02,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandPinky1": [
+    50.0,
+    0.0,
+    9.06
+   ],
+   "mixamorig:LeftHandPinky2": [
+    36.04,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:LeftHandPinky3": [
+    17.24,
+    0.0,
+    -0.0
+   ],
+   "mixamorig:RightHand": [
+    -10.0,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandThumb1": [
+    16.0,
+    -10.0,
+    8.0
+   ],
+   "mixamorig:RightHandThumb2": [
+    2.66,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandThumb3": [
+    -1.79,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandIndex1": [
+    35.0,
+    -0.0,
+    14.2
+   ],
+   "mixamorig:RightHandIndex2": [
+    22.01,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandIndex3": [
+    5.67,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandMiddle1": [
+    40.0,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandMiddle2": [
+    35.13,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandMiddle3": [
+    7.4,
+    -0.0,
+    -0.0
+   ],
+   "mixamorig:RightHandRing1": [
+    45.0,
+    -0.0,
+    -7.32
+   ],
+   "mixamorig:RightHandRing2": [
+    34.78,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandRing3": [
+    9.02,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandPinky1": [
+    50.0,
+    -0.0,
+    -8.98
+   ],
+   "mixamorig:RightHandPinky2": [
+    36.04,
+    -0.0,
+    0.0
+   ],
+   "mixamorig:RightHandPinky3": [
+    17.24,
+    -0.0,
+    0.0
+   ]
+  }
+ }
+}

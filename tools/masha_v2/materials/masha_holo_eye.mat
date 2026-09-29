@@ -1,0 +1,121 @@
+// =============================================================================
+// masha_holo_eye.mat — Masha's eyes (also usable for teeth / tongue).
+//
+// Filament 1.56.0 material, compile with the pinned matc only.
+//
+// Opaque and lit: the eyes must read as real eyes inside the hologram, not as
+// glowing bulbs (the old avatar had emissive 6 + bloom = bulging lamps). The
+// iris keeps its texture and gets a *soft* self-illumination (<= 1 relative
+// to its albedo, stays under the bloom threshold at default values); the
+// sclera is dimmed and tinted towards the hologram color so it doesn't pop
+// as a white ball; a clear-coat cornea keeps a tiny sharp specular highlight
+// (catch light) from the key light / IBL.
+//
+// -----------------------------------------------------------------------------
+// Samplers (1)
+//   eyeMap     RGBA8, sRGB color + LINEAR alpha (SRGB8_A8). RGB = eye base
+//              color (masha_eye_basecolor.png), A = iris mask
+//              (masha_eye_irismask.png). HoloShader.kt packs both PNGs into one
+//              texture at load time. For teeth/tongue: their base color with
+//              A = 0 (no iris emission, whole surface treated as "sclera").
+//
+// Parameters (default / range — effect)
+//   time / glitch / glitchSeed — same as masha_holo.mat (vertex tearing only; no color change).
+//   holoColor           mood skin, linear RGB — tint for the sclera / surface.
+//   glowColor           mood glow, linear RGB — tint mixed into the iris glow.
+//   irisEmission        0.35 / [0, 1]    — iris self-illumination (x iris albedo).
+//   irisTint            0.25 / [0, 1]    — pushes the iris hue towards glowColor.
+//   irisBrightness      1.0 / [0.5, 2]   — iris albedo scale.
+//   scleraDim           0.55 / [0, 1]    — sclera albedo scale (1 = texture white).
+//   scleraTint          0.40 / [0, 1]    — sclera hue towards holoColor.
+//   roughness           0.35 / [0.05, 1] — base layer roughness (wet but soft).
+//   corneaGloss         1.0 / [0, 1]     — clear-coat strength (catch light).
+//   corneaRoughness     0.06 / [0.02, 0.5] — clear-coat roughness (smaller = tighter highlight).
+//   pulse               0 / [0, 1.5]     — voice pulse, adds up to +40% iris glow.
+//   brightness          1.0 / [0, 2]     — overall albedo scale (teeth: ~0.6).
+// =============================================================================
+
+material {
+    name : masha_holo_eye,
+    shadingModel : lit,
+    blending : opaque,
+    doubleSided : false,
+    flipUV : false,
+    requires : [ uv0 ],
+    parameters : [
+        { type : sampler2d, name : eyeMap, format : float, precision : medium },
+        { type : float3, name : holoColor },
+        { type : float3, name : glowColor },
+        { type : float, name : irisEmission },
+        { type : float, name : irisTint },
+        { type : float, name : irisBrightness },
+        { type : float, name : scleraDim },
+        { type : float, name : scleraTint },
+        { type : float, name : roughness },
+        { type : float, name : corneaGloss },
+        { type : float, name : corneaRoughness },
+        { type : float, name : pulse },
+        { type : float, name : brightness },
+        { type : float, name : time, precision : high },
+        { type : float, name : glitch },
+        { type : float, name : glitchSeed }
+    ],
+    variantFilter : [ shadowReceiver, vsm, ssr, stereo ]
+}
+
+// Same signal glitch as masha_holo.mat (identical bands and shift for the same world Y, time and
+// seed), so eyes, teeth and tongue tear together with the face instead of floating in place.
+vertex {
+    highp float holoHash(highp float n) {
+        return fract(sin(n) * 43758.5453);
+    }
+
+    void materialVertex(inout MaterialVertexInputs material) {
+        float g = materialParams.glitch;
+        if (g > 0.001) {
+            highp vec4 userPos = getUserWorldFromWorldMatrix() * vec4(material.worldPosition.xyz, 1.0);
+            highp float step20 = floor(materialParams.time * 20.0) + materialParams.glitchSeed * 17.0;
+            highp float bands = 9.0 + 14.0 * holoHash(step20 * 1.31);
+            highp float band = floor(userPos.y * bands + holoHash(step20) * 3.0);
+            highp float r = holoHash(band * 7.13 + step20 * 3.7);
+            float on = step(1.0 - 0.45 * g, r);
+            highp float shift = (holoHash(band * 1.91 + step20 * 0.77) - 0.5) * 0.07 * g * on;
+            highp vec3 camRight = getWorldFromViewMatrix()[0].xyz;
+            material.worldPosition.xyz += camRight * shift;
+        }
+    }
+}
+
+fragment {
+    void material(inout MaterialInputs material) {
+        prepareMaterial(material);
+
+        vec4 tex = texture(materialParams_eyeMap, getUV0());
+        vec3 albedo = tex.rgb;
+        float iris = tex.a;
+
+        // Sclera: dimmer, desaturated, hue pulled to the hologram.
+        float luma = dot(albedo, vec3(0.2126, 0.7152, 0.0722));
+        vec3 holo = materialParams.holoColor;
+        float holoLuma = max(dot(holo, vec3(0.2126, 0.7152, 0.0722)), 1e-3);
+        vec3 scleraCol = mix(albedo, luma * holo / holoLuma, materialParams.scleraTint) * materialParams.scleraDim;
+
+        // Iris: keeps its texture, hue nudged towards the glow color.
+        vec3 glow = materialParams.glowColor;
+        float glowLuma = max(dot(glow, vec3(0.2126, 0.7152, 0.0722)), 1e-3);
+        vec3 irisCol = mix(albedo, luma * glow / glowLuma, materialParams.irisTint) * materialParams.irisBrightness;
+
+        vec3 base = mix(scleraCol, irisCol, iris) * materialParams.brightness;
+        material.baseColor = vec4(saturate(base), 1.0);
+        material.roughness = materialParams.roughness;
+        material.metallic = 0.0;
+        material.reflectance = 0.5;
+        material.clearCoat = materialParams.corneaGloss;
+        material.clearCoatRoughness = materialParams.corneaRoughness;
+
+        // Soft iris glow: proportional to the iris albedo (pupil stays dark),
+        // exposure-independent (w = 0). ~0.1-0.3 absolute: no bloom halo.
+        float e = materialParams.irisEmission * (1.0 + 0.4 * materialParams.pulse) * iris;
+        material.emissive = vec4(irisCol * e, 0.0);
+    }
+}

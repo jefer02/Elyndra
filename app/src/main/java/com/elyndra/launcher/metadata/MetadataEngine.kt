@@ -3,10 +3,12 @@ package com.elyndra.launcher.metadata
 import android.content.Context
 import com.elyndra.launcher.data.AppEntry
 import com.elyndra.launcher.data.AppLocale
+import com.elyndra.launcher.data.ArtOrigin
 import com.elyndra.launcher.data.FileHashes
 import com.elyndra.launcher.data.GameMeta
 import com.elyndra.launcher.data.GameSystem
 import com.elyndra.launcher.data.LibraryRepository
+import com.elyndra.launcher.data.MatchMethod
 import com.elyndra.launcher.data.RaHashKind
 import com.elyndra.launcher.data.RaInfo
 import com.elyndra.launcher.data.RomEntry
@@ -42,18 +44,25 @@ enum class FailureKind { Credentials, Quota, Blocked, Unavailable, Network }
  * "Aplicar metadatos": identifica cada juego y descarga su información.
  *
  *   ROMs: hash del archivo → ScreenScraper (jeuInfos, y jeuRecherche si no hay
- *         coincidencia) → IGDB para lo que falte → SteamGridDB para el arte que
- *         falte → RetroAchievements (por hash rcheevos o, si no, por título).
- *   Apps: IGDB (plataforma Android) → SteamGridDB.
+ *         coincidencia), que identifica el juego y da el nombre bueno → el resto
+ *         de servicios en el orden de prioridad del usuario, cada uno solo si
+ *         puede mejorar algún campo → RetroAchievements (por hash rcheevos o,
+ *         si no, por título) siempre, porque además trae los logros.
+ *   Apps: IGDB (plataforma Android) → SteamGridDB, en el mismo orden de prioridad.
+ *
+ * Lo que da cada servicio se reúne aparte ([SourceData]) y se mezcla al final
+ * campo a campo ([MetadataMerge]): la prioridad decide qué se queda. Cada
+ * imagen guarda de qué servicio salió, y el juego cómo se identificó.
  *
  * Corre en un ámbito de aplicación y, mientras dura, ScrapeService mantiene
- * el proceso en primer plano.
+ * el proceso en primer plano (o el propio worker, en las pasadas automáticas).
  */
 class MetadataEngine(
     private val context: Context,
     private val repo: LibraryRepository,
     private val credentials: ServiceCredentials,
     private val settings: SettingsStore,
+    private val priorityStore: MetadataPriorityStore,
     private val media: MediaCache,
     private val files: SafFiles,
     private val scope: CoroutineScope,
@@ -87,9 +96,13 @@ class MetadataEngine(
      * Arranca una pasada. [keys] null = toda la biblioteca. [force] vuelve a
      * consultar también lo que ya tiene metadatos. Si ya hay una en marcha,
      * las claves nuevas se encolan para después.
+     *
+     * [foreground] levanta ScrapeService para que la pasada siga aunque se
+     * salga a jugar; los workers no lo necesitan (WorkManager ya mantiene vivo
+     * el proceso) y, desde segundo plano, Android no dejaría arrancarlo.
      */
     @Synchronized
-    fun start(keys: List<String>?, force: Boolean): Boolean {
+    fun start(keys: List<String>?, force: Boolean, foreground: Boolean = true): Boolean {
         if (!credentials.anyConfigured()) return false
         if (job?.isActive == true) {
             if (keys != null) pending += keys
@@ -97,8 +110,15 @@ class MetadataEngine(
         }
         _progress.value = Progress(running = true)
         job = scope.launch(Dispatchers.IO) { runPass(keys, force) }
-        ScrapeService.start(context)
+        if (foreground) ScrapeService.start(context)
         return true
+    }
+
+    /** Lo mismo, esperando a que termine: es lo que usan las pasadas automáticas. */
+    suspend fun runAndWait(keys: List<String>?, force: Boolean): Progress {
+        if (!start(keys, force, foreground = false)) return progress.value
+        job?.join()
+        return progress.value
     }
 
     fun cancel() {
@@ -106,9 +126,11 @@ class MetadataEngine(
         job?.cancel()
     }
 
-    private fun needsWork(key: String): Boolean {
+    /** ¿Le falta algo a este juego? Es lo que decide qué entra en una pasada normal. */
+    fun needsWork(key: String): Boolean {
         val meta = repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta ?: return false
-        return meta.scrapedAt == 0L || !meta.matched || meta.cover == null
+        val isApp = key.startsWith("a:")
+        return meta.scrapedAt == 0L || !meta.matched || (if (isApp) meta.icon == null else meta.cover == null)
     }
 
     private suspend fun runPass(keys: List<String>?, force: Boolean) {
@@ -166,30 +188,6 @@ class MetadataEngine(
 
     /* ─────────────────────────────────────────────────────────── */
 
-    private class Draft {
-        var name: String? = null
-        var description: String? = null
-        var releaseDate: String? = null
-        var developer: String? = null
-        var publisher: String? = null
-        var genre: String? = null
-        var players: String? = null
-        var rating: Float? = null
-        var coverUrl: String? = null
-        var heroUrl: String? = null
-        var logoUrl: String? = null
-        var iconUrl: String? = null
-        var screenshotUrl: String? = null
-        var ssId: String? = null
-        var igdbId: Long? = null
-        var sgdbId: Long? = null
-        var ra: RaInfo? = null
-        val sources = LinkedHashSet<String>()
-
-        val needsText get() = description == null || name == null
-        val needsArt get() = coverUrl == null || heroUrl == null || logoUrl == null || iconUrl == null
-    }
-
     private fun usable(service: Service, failures: Map<Service, FailureKind>) =
         credentials.isConfigured(service) && service !in failures
 
@@ -218,162 +216,179 @@ class MetadataEngine(
 
     private suspend fun scrapeKey(key: String, force: Boolean, failures: MutableMap<Service, FailureKind>): Boolean {
         val lang = AppLocale.current(context)
-        val draft = Draft()
+        val priority = priorityStore.get()
         return when {
             key.startsWith("r:") -> {
                 val rom = repo.romByKey(key) ?: return false
                 val folder = repo.folder(rom.folderId) ?: return false
                 val system = Systems.byId(rom.systemId) ?: return false
-                scrapeRom(rom, folder, system, draft, lang, failures)
-                save(key, draft, force)
+                save(key, scrapeRom(rom, folder, system, lang, priority, failures), priority)
             }
             key.startsWith("a:") -> {
                 val app = repo.appByKey(key) ?: return false
-                scrapeApp(app, draft, failures)
-                save(key, draft, force)
+                save(key, scrapeApp(app, priority, failures), priority)
             }
             else -> false
         }
     }
 
+    /** El mejor nombre conocido: el que dio quien identificó el juego o, si nadie, el del archivo. */
+    private fun bestName(results: Map<Service, SourceData>, fallback: String): String =
+        results[Service.ScreenScraper]?.text?.get(MetaField.Name)
+            ?: results.values.firstNotNullOfOrNull { it.text[MetaField.Name] }
+            ?: fallback
+
     private suspend fun scrapeRom(
         rom: RomEntry,
         folder: RomFolder,
         system: GameSystem,
-        draft: Draft,
         lang: String,
+        priority: MetadataPriority,
         failures: MutableMap<Service, FailureKind>,
-    ) {
-        val regions = regionsFor(lang)
-        val languages = languagesFor(lang)
+    ): Map<Service, SourceData> {
+        val results = LinkedHashMap<Service, SourceData>()
         val searchName = rom.title
         val wantSs = usable(Service.ScreenScraper, failures) && system.ssId != null
         val wantRa = usable(Service.RetroAchievements, failures) && system.raId != null
         val hashes = ensureHashes(rom, folder, system, wantSs, wantRa)
 
-        // 1 · ScreenScraper
-        if (wantSs) {
-            try {
-                val romType = when {
-                    rom.isDirectory -> "dossier"
-                    system.disc -> "iso"
-                    else -> "rom"
+        // ScreenScraper identifica por hash: va primero siempre, sea cual sea la prioridad.
+        if (wantSs) ssInto(results, rom, system, hashes, searchName, regionsFor(lang), languagesFor(lang), failures)
+
+        for (service in priority.queryOrder()) {
+            when (service) {
+                Service.ScreenScraper -> Unit
+                Service.Igdb -> if (usable(Service.Igdb, failures) && MetadataMerge.wanted(Service.Igdb, results, priority).isNotEmpty()) {
+                    igdbInto(results, bestName(results, searchName), system.igdbIds.ifEmpty { null }, failures)
                 }
-                val game = screenScraper.gameInfo(
-                    systemId = system.ssId!!,
-                    romName = rom.fileName,
-                    size = rom.size,
-                    romType = romType,
-                    crc = hashes?.crc,
-                    md5 = hashes?.md5,
-                    sha1 = hashes?.sha1,
-                ) ?: if (searchName.length >= 4) {
-                    screenScraper.search(system.ssId, searchName)
-                        .firstOrNull { g -> Names.similarity(searchName, g.name(regions).orEmpty()) >= 0.6 }
-                } else null
-                if (game != null) {
-                    draft.sources += Service.ScreenScraper.id
-                    draft.ssId = game.id
-                    draft.name = game.name(regions)
-                    draft.description = game.description(languages)
-                    draft.releaseDate = game.releaseDate(regions)
-                    draft.developer = game.developer
-                    draft.publisher = game.publisher
-                    draft.genre = game.genre(languages)
-                    draft.players = game.players
-                    draft.rating = game.rating?.let { (it / 20.0).toFloat().coerceIn(0f, 1f) }
-                    game.media(listOf("box-2D", "box-3D"), regions)?.let { draft.coverUrl = ScreenScraperClient.sizedMediaUrl(it, 640, jpg = true) }
-                    game.media(listOf("fanart", "ss", "sstitle"), regions)?.let { draft.heroUrl = ScreenScraperClient.sizedMediaUrl(it, 1280, jpg = true) }
-                    game.media(listOf("wheel-hd", "wheel", "wheel-carbon"), regions)?.let { draft.logoUrl = ScreenScraperClient.sizedMediaUrl(it, 640, jpg = false) }
-                    game.media(listOf("wheel-hd", "wheel", "box-2D"), regions)?.let { draft.iconUrl = ScreenScraperClient.sizedMediaUrl(it, 512, jpg = false) }
-                    game.media(listOf("ss", "sstitle"), regions)?.let { draft.screenshotUrl = ScreenScraperClient.sizedMediaUrl(it, 960, jpg = true) }
+                Service.SteamGridDb -> if (usable(Service.SteamGridDb, failures) && MetadataMerge.wanted(Service.SteamGridDb, results, priority).isNotEmpty()) {
+                    sgdbInto(results, bestName(results, searchName), SteamGridDbClient.PORTRAIT, failures)
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                recordFailure(Service.ScreenScraper, e, failures)
+                // Siempre que se pueda: aunque no aporte ningún campo, trae los logros.
+                Service.RetroAchievements -> if (wantRa) raInto(results, hashes, bestName(results, searchName), system, failures)
             }
         }
-
-        // 2 · IGDB para lo que falte
-        if (usable(Service.Igdb, failures) && (draft.needsText || draft.coverUrl == null)) {
-            igdbInto(draft, draft.name ?: searchName, system.igdbIds.ifEmpty { null }, failures)
-        }
-
-        // 3 · SteamGridDB para el arte que falte
-        if (usable(Service.SteamGridDb, failures) && draft.needsArt) {
-            sgdbInto(draft, draft.name ?: searchName, SteamGridDbClient.PORTRAIT, failures)
-        }
-
-        // 4 · RetroAchievements
-        if (wantRa) {
-            try {
-                val list = retroAchievements.gameList(system.raId!!)
-                val byHash = RaParser.matchHash(list, hashes?.ra)
-                val entry = byHash ?: RaParser.matchTitle(list, draft.name ?: searchName)
-                if (entry != null) {
-                    val p = retroAchievements.progress(entry.id)
-                    draft.sources += Service.RetroAchievements.id
-                    draft.ra = raInfo(p, if (byHash != null) "hash" else "title")
-                    if (draft.coverUrl == null) p.boxArt?.let { draft.coverUrl = RetroAchievementsClient.mediaUrl(it) }
-                    if (draft.iconUrl == null) p.imageIcon?.let { draft.iconUrl = RetroAchievementsClient.mediaUrl(it) }
-                    if (draft.name == null) draft.name = p.title.takeIf { it.isNotBlank() }
-                    if (draft.developer == null) draft.developer = p.developer
-                    if (draft.publisher == null) draft.publisher = p.publisher
-                    if (draft.genre == null) draft.genre = p.genre
-                    if (draft.releaseDate == null) draft.releaseDate = p.released
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                recordFailure(Service.RetroAchievements, e, failures)
-            }
-        }
+        return results
     }
 
-    private suspend fun scrapeApp(app: AppEntry, draft: Draft, failures: MutableMap<Service, FailureKind>) {
+    private suspend fun scrapeApp(
+        app: AppEntry,
+        priority: MetadataPriority,
+        failures: MutableMap<Service, FailureKind>,
+    ): Map<Service, SourceData> {
+        val results = LinkedHashMap<Service, SourceData>()
         val name = app.label
-        if (usable(Service.Igdb, failures)) {
-            igdbInto(draft, name, listOf(ANDROID_IGDB), failures)
-            if (draft.igdbId == null) igdbInto(draft, name, null, failures, minSimilarity = 0.9)
+        for (service in priority.queryOrder()) {
+            when (service) {
+                Service.Igdb -> if (usable(Service.Igdb, failures)) {
+                    igdbInto(results, name, listOf(ANDROID_IGDB), failures)
+                    if (results[Service.Igdb]?.igdbId == null) igdbInto(results, name, null, failures, minSimilarity = 0.9)
+                }
+                Service.SteamGridDb -> if (usable(Service.SteamGridDb, failures) && MetadataMerge.wanted(Service.SteamGridDb, results, priority).isNotEmpty()) {
+                    sgdbInto(results, bestName(results, name), SteamGridDbClient.SQUARE + SteamGridDbClient.PORTRAIT, failures)
+                }
+                // ScreenScraper y RetroAchievements no catalogan juegos Android.
+                Service.ScreenScraper, Service.RetroAchievements -> Unit
+            }
         }
-        if (usable(Service.SteamGridDb, failures)) {
-            sgdbInto(draft, draft.name ?: name, SteamGridDbClient.SQUARE + SteamGridDbClient.PORTRAIT, failures)
+        return results
+    }
+
+    private suspend fun ssInto(
+        results: MutableMap<Service, SourceData>,
+        rom: RomEntry,
+        system: GameSystem,
+        hashes: FileHashes?,
+        searchName: String,
+        regions: List<String>,
+        languages: List<String>,
+        failures: MutableMap<Service, FailureKind>,
+    ) {
+        try {
+            val romType = when {
+                rom.isDirectory -> "dossier"
+                system.disc -> "iso"
+                else -> "rom"
+            }
+            val data = SourceData(Service.ScreenScraper)
+            var game = screenScraper.gameInfo(
+                systemId = system.ssId!!,
+                romName = rom.fileName,
+                size = rom.size,
+                romType = romType,
+                crc = hashes?.crc,
+                md5 = hashes?.md5,
+                sha1 = hashes?.sha1,
+            )
+            if (game != null) {
+                // jeuInfos casa por hash si se le dio; si no, por nombre de archivo y tamaño.
+                if (hashes?.md5 != null || hashes?.crc != null) data.matched(MatchMethod.HASH, 1.0) else data.matched(MatchMethod.NAME, 0.9)
+            } else if (searchName.length >= 4) {
+                val found = screenScraper.search(system.ssId, searchName)
+                    .map { g -> g to Names.similarity(searchName, g.name(regions).orEmpty()) }
+                    .filter { it.second >= 0.6 }
+                    .maxByOrNull { it.second }
+                if (found != null) {
+                    game = found.first
+                    data.matched(MetadataMerge.nameMethod(found.second), found.second)
+                }
+            }
+            if (game == null) return
+            data.ssId = game.id
+            data.setText(MetaField.Name, game.name(regions))
+            data.setText(MetaField.Description, game.description(languages))
+            data.setText(MetaField.ReleaseDate, game.releaseDate(regions))
+            data.setText(MetaField.Developer, game.developer)
+            data.setText(MetaField.Publisher, game.publisher)
+            data.setText(MetaField.Genre, game.genre(languages))
+            data.setText(MetaField.Players, game.players)
+            data.rating = game.rating?.let { (it / 20.0).toFloat().coerceIn(0f, 1f) }
+            game.media(listOf("box-2D", "box-3D"), regions)?.let { data.setArt(MetaField.Cover, ScreenScraperClient.sizedMediaUrl(it, 640, jpg = true)) }
+            game.media(listOf("fanart", "ss", "sstitle"), regions)?.let { data.setArt(MetaField.Hero, ScreenScraperClient.sizedMediaUrl(it, 1280, jpg = true)) }
+            game.media(listOf("wheel-hd", "wheel", "wheel-carbon"), regions)?.let { data.setArt(MetaField.Logo, ScreenScraperClient.sizedMediaUrl(it, 640, jpg = false)) }
+            game.media(listOf("wheel-hd", "wheel", "box-2D"), regions)?.let { data.setArt(MetaField.Icon, ScreenScraperClient.sizedMediaUrl(it, 512, jpg = false)) }
+            game.media(listOf("ss", "sstitle"), regions)?.let { data.setArt(MetaField.Screenshot, ScreenScraperClient.sizedMediaUrl(it, 960, jpg = true)) }
+            results[Service.ScreenScraper] = data
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            recordFailure(Service.ScreenScraper, e, failures)
         }
     }
 
     private suspend fun igdbInto(
-        draft: Draft,
+        results: MutableMap<Service, SourceData>,
         name: String,
         platforms: List<Int>?,
         failures: MutableMap<Service, FailureKind>,
         minSimilarity: Double = 0.75,
     ) {
         try {
-            val best = igdb.search(name, platforms)
+            val (best, similarity) = igdb.search(name, platforms)
                 .map { it to Names.similarity(name, it.name) }
                 .filter { it.second >= minSimilarity }
-                .maxByOrNull { it.second }?.first ?: return
-            draft.sources += Service.Igdb.id
-            draft.igdbId = best.id
-            if (draft.name == null) draft.name = best.name
-            if (draft.description == null) draft.description = best.summary
-            if (draft.releaseDate == null) {
-                draft.releaseDate = best.firstRelease?.let { Instant.ofEpochSecond(it).atZone(ZoneOffset.UTC).toLocalDate().toString() }
-            }
-            if (draft.genre == null) draft.genre = best.genres.take(3).joinToString(", ").ifEmpty { null }
-            if (draft.developer == null) draft.developer = best.developers.firstOrNull()
-            if (draft.publisher == null) draft.publisher = best.publishers.firstOrNull()
-            if (draft.players == null) draft.players = best.modes.joinToString(", ").ifEmpty { null }
-            if (draft.rating == null) draft.rating = best.rating?.let { (it / 100.0).toFloat().coerceIn(0f, 1f) }
-            if (draft.coverUrl == null) best.coverId?.let { draft.coverUrl = IgdbClient.imageUrl(it, "cover_big_2x") }
-            if (draft.heroUrl == null) {
-                (best.artworkIds.firstOrNull()?.let { IgdbClient.imageUrl(it, "1080p") }
-                    ?: best.screenshotIds.firstOrNull()?.let { IgdbClient.imageUrl(it, "screenshot_huge") })
-                    ?.let { draft.heroUrl = it }
-            }
-            if (draft.iconUrl == null) best.coverId?.let { draft.iconUrl = IgdbClient.imageUrl(it, "cover_big") }
-            if (draft.screenshotUrl == null) best.screenshotIds.firstOrNull()?.let { draft.screenshotUrl = IgdbClient.imageUrl(it, "screenshot_big") }
+                .maxByOrNull { it.second } ?: return
+            val data = SourceData(Service.Igdb)
+            data.matched(MetadataMerge.nameMethod(similarity), similarity)
+            data.igdbId = best.id
+            data.setText(MetaField.Name, best.name)
+            data.setText(MetaField.Description, best.summary)
+            data.setText(
+                MetaField.ReleaseDate,
+                best.firstRelease?.let { Instant.ofEpochSecond(it).atZone(ZoneOffset.UTC).toLocalDate().toString() },
+            )
+            data.setText(MetaField.Genre, best.genres.take(3).joinToString(", "))
+            data.setText(MetaField.Developer, best.developers.firstOrNull())
+            data.setText(MetaField.Publisher, best.publishers.firstOrNull())
+            data.setText(MetaField.Players, best.modes.joinToString(", "))
+            data.rating = best.rating?.let { (it / 100.0).toFloat().coerceIn(0f, 1f) }
+            best.coverId?.let { data.setArt(MetaField.Cover, IgdbClient.imageUrl(it, "cover_big_2x")) }
+            (best.artworkIds.firstOrNull()?.let { IgdbClient.imageUrl(it, "1080p") }
+                ?: best.screenshotIds.firstOrNull()?.let { IgdbClient.imageUrl(it, "screenshot_huge") })
+                ?.let { data.setArt(MetaField.Hero, it) }
+            best.coverId?.let { data.setArt(MetaField.Icon, IgdbClient.imageUrl(it, "cover_big")) }
+            best.screenshotIds.firstOrNull()?.let { data.setArt(MetaField.Screenshot, IgdbClient.imageUrl(it, "screenshot_big")) }
+            results[Service.Igdb] = data
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -381,22 +396,66 @@ class MetadataEngine(
         }
     }
 
-    private suspend fun sgdbInto(draft: Draft, name: String, gridDimensions: List<String>, failures: MutableMap<Service, FailureKind>) {
+    private suspend fun sgdbInto(
+        results: MutableMap<Service, SourceData>,
+        name: String,
+        gridDimensions: List<String>,
+        failures: MutableMap<Service, FailureKind>,
+    ) {
         try {
-            val game = steamGridDb.search(name).take(8)
+            val (game, similarity) = steamGridDb.search(name).take(8)
                 .map { it to Names.similarity(name, it.name) }
                 .filter { it.second >= 0.8 }
-                .maxByOrNull { it.second }?.first ?: return
-            draft.sources += Service.SteamGridDb.id
-            draft.sgdbId = game.id
-            if (draft.coverUrl == null) steamGridDb.grids(game.id, gridDimensions).firstOrNull()?.let { draft.coverUrl = it.url }
-            if (draft.heroUrl == null) steamGridDb.heroes(game.id).firstOrNull()?.let { draft.heroUrl = it.url }
-            if (draft.logoUrl == null) steamGridDb.logos(game.id).firstOrNull()?.let { draft.logoUrl = it.url }
-            if (draft.iconUrl == null) steamGridDb.icons(game.id).firstOrNull()?.let { draft.iconUrl = it.url }
+                .maxByOrNull { it.second } ?: return
+            val data = SourceData(Service.SteamGridDb)
+            data.matched(MetadataMerge.nameMethod(similarity), similarity)
+            data.sgdbId = game.id
+            // Solo se pide lo que de verdad puede ganar: cada clase de imagen es una llamada.
+            val wanted = MetadataMerge.wanted(Service.SteamGridDb, results, priorityStore.get())
+            if (MetaField.Cover in wanted) steamGridDb.grids(game.id, gridDimensions).firstOrNull()?.let { data.setArt(MetaField.Cover, it.url) }
+            if (MetaField.Hero in wanted) steamGridDb.heroes(game.id).firstOrNull()?.let { data.setArt(MetaField.Hero, it.url) }
+            if (MetaField.Logo in wanted) steamGridDb.logos(game.id).firstOrNull()?.let { data.setArt(MetaField.Logo, it.url) }
+            if (MetaField.Icon in wanted) steamGridDb.icons(game.id).firstOrNull()?.let { data.setArt(MetaField.Icon, it.url) }
+            results[Service.SteamGridDb] = data
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             recordFailure(Service.SteamGridDb, e, failures)
+        }
+    }
+
+    private suspend fun raInto(
+        results: MutableMap<Service, SourceData>,
+        hashes: FileHashes?,
+        name: String,
+        system: GameSystem,
+        failures: MutableMap<Service, FailureKind>,
+    ) {
+        try {
+            val list = retroAchievements.gameList(system.raId!!)
+            val byHash = RaParser.matchHash(list, hashes?.ra)
+            val entry = byHash ?: RaParser.matchTitle(list, name) ?: return
+            val p = retroAchievements.progress(entry.id)
+            val data = SourceData(Service.RetroAchievements)
+            if (byHash != null) {
+                data.matched(MatchMethod.HASH, 1.0)
+            } else {
+                val similarity = entry.title.split(" | ").maxOf { Names.similarity(name, it) }
+                data.matched(MetadataMerge.nameMethod(similarity), similarity)
+            }
+            data.ra = raInfo(p, if (byHash != null) "hash" else "title")
+            p.boxArt?.let { data.setArt(MetaField.Cover, RetroAchievementsClient.mediaUrl(it)) }
+            p.imageIcon?.let { data.setArt(MetaField.Icon, RetroAchievementsClient.mediaUrl(it)) }
+            data.setText(MetaField.Name, p.title)
+            data.setText(MetaField.Developer, p.developer)
+            data.setText(MetaField.Publisher, p.publisher)
+            data.setText(MetaField.Genre, p.genre)
+            data.setText(MetaField.ReleaseDate, p.released)
+            results[Service.RetroAchievements] = data
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            recordFailure(Service.RetroAchievements, e, failures)
         }
     }
 
@@ -412,42 +471,57 @@ class MetadataEngine(
         updatedAt = System.currentTimeMillis(),
     )
 
-    /** Guarda lo encontrado. Devuelve true si algún servicio reconoció el juego. */
-    private suspend fun save(key: String, d: Draft, force: Boolean): Boolean {
+    /** Mezcla lo reunido y lo guarda. Devuelve true si algún servicio reconoció el juego. */
+    private suspend fun save(key: String, results: Map<Service, SourceData>, priority: MetadataPriority): Boolean {
+        val merged = MetadataMerge.merge(results, priority)
         // Lo elegido a mano en "Personalizar…" no se vuelve a descargar (la descarga borraría el archivo).
         val pinned = (repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta)?.pinned.orEmpty()
-        // Un juego Android no usa carátula (se representa con su icono): no se baja.
         val isApp = key.startsWith("a:")
-        val cover = d.coverUrl?.takeIf { !isApp && "cover" !in pinned }?.let { media.download(it, key, "cover") }
+        val origins = LinkedHashMap<String, ArtOrigin>()
+
+        suspend fun fetch(field: MetaField, allowed: Boolean): String? {
+            if (!allowed) return null
+            val (service, url) = merged.art[field] ?: return null
+            val kind = field.artKind ?: return null
+            return media.download(url, key, kind)?.also { origins[kind] = ArtOrigin(service.id, url) }
+        }
+
+        // Un juego Android no usa carátula (se representa con su icono): no se baja.
+        val cover = fetch(MetaField.Cover, !isApp && "cover" !in pinned)
         // El icono es la imagen de un juego Android: se baja solo para ellos.
-        val icon = d.iconUrl?.takeIf { isApp && "icon" !in pinned }?.let { media.download(it, key, "icon") }
-        val hero = d.heroUrl?.takeIf { "hero" !in pinned }?.let { media.download(it, key, "hero") }
-        val logo = d.logoUrl?.takeIf { "logo" !in pinned }?.let { media.download(it, key, "logo") }
-        val shot = d.screenshotUrl?.let { media.download(it, key, "shot") }
-        val matched = d.sources.isNotEmpty()
+        val icon = fetch(MetaField.Icon, isApp && "icon" !in pinned)
+        val hero = fetch(MetaField.Hero, "hero" !in pinned)
+        val logo = fetch(MetaField.Logo, "logo" !in pinned)
+        val shot = fetch(MetaField.Screenshot, true)
+        val matched = merged.matched
+        val text = merged.text
         repo.updateMeta(key) { old ->
             GameMeta(
                 scrapedAt = System.currentTimeMillis(),
                 matched = matched || old.matched,
-                sources = if (matched) d.sources.toList() else old.sources,
-                name = d.name ?: old.name,
-                description = d.description ?: old.description,
-                releaseDate = d.releaseDate ?: old.releaseDate,
-                developer = d.developer ?: old.developer,
-                publisher = d.publisher ?: old.publisher,
-                genre = d.genre ?: old.genre,
-                players = d.players ?: old.players,
-                rating = d.rating ?: old.rating,
+                sources = if (matched) merged.sources.map { it.id } else old.sources,
+                name = text[MetaField.Name] ?: old.name,
+                description = text[MetaField.Description] ?: old.description,
+                releaseDate = text[MetaField.ReleaseDate] ?: old.releaseDate,
+                developer = text[MetaField.Developer] ?: old.developer,
+                publisher = text[MetaField.Publisher] ?: old.publisher,
+                genre = text[MetaField.Genre] ?: old.genre,
+                players = text[MetaField.Players] ?: old.players,
+                rating = merged.rating ?: old.rating,
                 cover = cover ?: old.cover,
                 hero = hero ?: old.hero,
                 logo = logo ?: old.logo,
                 screenshot = shot ?: old.screenshot,
                 icon = icon ?: old.icon,
                 pinned = old.pinned,
-                ssGameId = d.ssId ?: old.ssGameId,
-                igdbId = d.igdbId ?: old.igdbId,
-                sgdbId = d.sgdbId ?: old.sgdbId,
-                ra = d.ra ?: old.ra,
+                ssGameId = merged.ssId ?: old.ssGameId,
+                igdbId = merged.igdbId ?: old.igdbId,
+                sgdbId = merged.sgdbId ?: old.sgdbId,
+                ra = merged.ra ?: old.ra,
+                artOrigins = old.artOrigins + origins,
+                // Una identificación a mano no la corrige una pasada automática.
+                matchedBy = if (old.matchedBy == MatchMethod.MANUAL) old.matchedBy else merged.matchedBy ?: old.matchedBy,
+                matchConfidence = if (old.matchedBy == MatchMethod.MANUAL) old.matchConfidence else merged.confidence ?: old.matchConfidence,
             )
         }
         return matched

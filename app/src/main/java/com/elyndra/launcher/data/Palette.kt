@@ -37,7 +37,6 @@ object P {
 
     /* ── Marca: constantes, no dependen del tema ─────────────── */
     val light = Color(0xFFF59659)
-    val strong = Color(0xFFEE7E28)
     val dark = Color(0xFFE26D19)
     val green = Color(0xFF9BD494)
 

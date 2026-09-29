@@ -78,7 +78,6 @@ data class EmulatorProfile(
     val launchOnly: Boolean = false,
 ) {
     val packages: List<String> get() = components.map { it.substringBefore('/') }.distinct()
-    val isRetroArch: Boolean get() = id.startsWith("ra_")
 }
 
 object Emulators {

@@ -62,6 +62,18 @@ class SettingsStore(context: Context) {
         get() = prefs.getLong("igdb.tokenExpiry", 0L)
         set(v) = prefs.edit { putLong("igdb.tokenExpiry", v) }
 
+    /**
+     * Orden de fuentes para textos e imágenes ("ss,igdb,ra,sgdb"). Null = el de
+     * siempre (ver MetadataPriority.DEFAULT).
+     */
+    var metaPriorityText: String?
+        get() = prefs.getString("meta.priority.text", null)
+        set(v) = prefs.edit { if (v == null) remove("meta.priority.text") else putString("meta.priority.text", v) }
+
+    var metaPriorityArt: String?
+        get() = prefs.getString("meta.priority.art", null)
+        set(v) = prefs.edit { if (v == null) remove("meta.priority.art") else putString("meta.priority.art", v) }
+
     /** Juego lanzado cuyo tiempo se mide al volver a Elyndra. */
     var pendingSessionKey: String?
         get() = prefs.getString("session.key", null)
@@ -71,11 +83,62 @@ class SettingsStore(context: Context) {
         get() = prefs.getLong("session.start", 0L)
         set(v) = prefs.edit { putLong("session.start", v) }
 
+    /** Emulador de la sesión pendiente (null en apps Android). */
+    var pendingSessionEmulator: String?
+        get() = prefs.getString("session.emulator", null)
+        set(v) = prefs.edit { if (v == null) remove("session.emulator") else putString("session.emulator", v) }
+
+    /** Paquete que se lanzó: es el que se busca en UsageStatsManager para medir el tiempo real. */
+    var pendingSessionPackage: String?
+        get() = prefs.getString("session.package", null)
+        set(v) = prefs.edit { if (v == null) remove("session.package") else putString("session.package", v) }
+
+    /* ── Masha ────────────────────────────────────────────────── */
+
+    /**
+     * Masha habla con la IA en línea (DeepSeek). Apagado, sigue funcionando
+     * entera sin conexión: planes, listas, lanzamientos y estadísticas salen
+     * de los datos locales; solo se pierde la conversación libre.
+     */
+    var mashaOnline: Boolean
+        get() = prefs.getBoolean("masha.online", true)
+        set(v) = prefs.edit { putBoolean("masha.online", v) }
+
+    /** La línea de Masha sobre el carrusel (sugerencias ambientales). */
+    var mashaAmbient: Boolean
+        get() = prefs.getBoolean("masha.ambient", true)
+        set(v) = prefs.edit { putBoolean("masha.ambient", v) }
+
+    /** Avisos de Masha fuera de la app (como mucho uno cada pocos días, nunca de noche). */
+    var mashaNudges: Boolean
+        get() = prefs.getBoolean("masha.nudges", true)
+        set(v) = prefs.edit { putBoolean("masha.nudges", v) }
+
+    /** Último aviso enviado (epoch ms), para no repetirse. */
+    var mashaLastNudgeAt: Long
+        get() = prefs.getLong("masha.lastNudgeAt", 0L)
+        set(v) = prefs.edit { putLong("masha.lastNudgeAt", v) }
+
+    /** Huella del último aviso: el mismo consejo no se manda dos veces seguidas. */
+    var mashaLastNudgeId: String?
+        get() = prefs.getString("masha.lastNudgeId", null)
+        set(v) = prefs.edit { if (v == null) remove("masha.lastNudgeId") else putString("masha.lastNudgeId", v) }
+
+    /** Sugerencias descartadas ("día|id"): solo valen las de hoy, las viejas se limpian solas. */
+    var mashaDismissed: Set<String>
+        get() = prefs.getStringSet("masha.dismissed", emptySet()).orEmpty().toSet()
+        set(v) = prefs.edit { putStringSet("masha.dismissed", v) }
+
+    /** Última vez que se abrió Elyndra: quien acaba de estar dentro no necesita un aviso. */
+    var lastOpenedAt: Long
+        get() = prefs.getLong("app.lastOpenedAt", 0L)
+        set(v) = prefs.edit { putLong("app.lastOpenedAt", v) }
+
     /* ── tema y fondo ─────────────────────────────────────────── */
 
     /** Modo oscuro de la interfaz (independiente del tema del sistema). */
     var darkMode: Boolean
-        get() = prefs.getBoolean("darkMode", false)
+        get() = prefs.getBoolean("darkMode", true)
         set(v) = prefs.edit { putBoolean("darkMode", v) }
 
     /**
@@ -109,10 +172,10 @@ class SettingsStore(context: Context) {
         get() = prefs.getInt("videoBg.opacity", 45)
         set(v) = prefs.edit { putInt("videoBg.opacity", v) }
 
-    /* ── botón de Lucy ────────────────────────────────────────── */
+    /* ── botón de Masha ───────────────────────────────────────── */
 
     /**
-     * Dónde dejó el usuario el botón de Lucy: dp desde la esquina superior
+     * Dónde dejó el usuario el botón de Masha: dp desde la esquina superior
      * izquierda del espacio útil. Sin valor = su esquina de siempre (abajo a
      * la derecha), así que se guarda como par y se lee como par.
      *
@@ -120,13 +183,67 @@ class SettingsStore(context: Context) {
      * al girar el móvil se recorta contra el nuevo tamaño (ver LibraryScreen)
      * y así conserva la distancia al borde en vez de saltar.
      */
-    var lucyX: Float?
-        get() = if (prefs.contains(LUCY_X)) prefs.getFloat(LUCY_X, 0f) else null
-        set(v) = prefs.edit { if (v == null) remove(LUCY_X) else putFloat(LUCY_X, v) }
+    var mashaX: Float?
+        get() = if (prefs.contains(MASHA_X)) prefs.getFloat(MASHA_X, 0f) else null
+        set(v) = prefs.edit { if (v == null) remove(MASHA_X) else putFloat(MASHA_X, v) }
 
-    var lucyY: Float?
-        get() = if (prefs.contains(LUCY_Y)) prefs.getFloat(LUCY_Y, 0f) else null
-        set(v) = prefs.edit { if (v == null) remove(LUCY_Y) else putFloat(LUCY_Y, v) }
+    var mashaY: Float?
+        get() = if (prefs.contains(MASHA_Y)) prefs.getFloat(MASHA_Y, 0f) else null
+        set(v) = prefs.edit { if (v == null) remove(MASHA_Y) else putFloat(MASHA_Y, v) }
+
+    /**
+     * Color de las partículas fosforescentes que deja Masha al arrastrarla
+     * (ARGB). Por omisión, un cian de fósforo de monitor CRT.
+     */
+    var mashaParticleColor: Int
+        get() = prefs.getInt("masha.particleColor", DEFAULT_PARTICLE_COLOR)
+        set(v) = prefs.edit { putInt("masha.particleColor", v) }
+
+    /** Partículas de neón que caen alrededor del icono o la carátula seleccionados. */
+    var selectionParticles: Boolean
+        get() = prefs.getBoolean("selection.particles", true)
+        set(v) = prefs.edit { putBoolean("selection.particles", v) }
+
+    /** Color (ARGB) de esas partículas. Por omisión, un magenta de neón. */
+    var selectionParticleColor: Int
+        get() = prefs.getInt("selection.particleColor", DEFAULT_SELECTION_PARTICLE_COLOR)
+        set(v) = prefs.edit { putInt("selection.particleColor", v) }
+
+    /* ── Masha: voz y ambiente sonoro ─────────────────────────── */
+
+    /** Masha lee sus respuestas en voz alta en su pantalla. */
+    var mashaVoice: Boolean
+        get() = prefs.getBoolean("masha.voice", true)
+        set(v) = prefs.edit { putBoolean("masha.voice", v) }
+
+    /**
+     * Masha a 120 Hz en pantallas que lo admiten. Apagado (por defecto), su pantalla
+     * pide 60 Hz: el holograma se ve igual de fluido a 60 fps y la GPU trabaja la mitad
+     * (menos batería y calor en conversaciones largas).
+     */
+    var mashaHighRefresh: Boolean
+        get() = prefs.getBoolean("masha.highRefresh", false)
+        set(v) = prefs.edit { putBoolean("masha.highRefresh", v) }
+
+    /** El ambiente sonoro del holotanque (zumbido, pads, datos) en la pantalla de Masha. */
+    var mashaSoundscape: Boolean
+        get() = prefs.getBoolean("masha.soundscape", true)
+        set(v) = prefs.edit { putBoolean("masha.soundscape", v) }
+
+    /** Volumen del ambiente (0–100), siempre por debajo de la voz. */
+    var mashaSoundscapeVolume: Int
+        get() = prefs.getInt("masha.soundscapeVolume", 45)
+        set(v) = prefs.edit { putInt("masha.soundscapeVolume", v) }
+
+    /* ── pantalla ─────────────────────────────────────────────── */
+
+    /**
+     * Fotogramas por segundo pedidos a la pantalla: 120, 60 o 0 = automático
+     * (120 si la pantalla lo admite). Ver [com.elyndra.launcher.display.FrameRate].
+     */
+    var frameRate: Int
+        get() = prefs.getInt("display.fps", 0)
+        set(v) = prefs.edit { putInt("display.fps", v) }
 
     /** Criterio de orden de la biblioteca (id de [com.elyndra.launcher.ui.SortMode]). */
     var sortMode: String
@@ -145,8 +262,39 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("perm.notificationsAsked", false)
         set(v) = prefs.edit { putBoolean("perm.notificationsAsked", v) }
 
-    private companion object {
-        const val LUCY_X = "lucy.x"
-        const val LUCY_Y = "lucy.y"
+    /* ── opciones de desarrollador ────────────────────────────── */
+
+    /** Opciones de desarrollador desbloqueadas (siete toques en la versión, en Ajustes → Acerca de). */
+    var developerOptions: Boolean
+        get() = prefs.getBoolean("dev.unlocked", false)
+        set(v) = prefs.edit { putBoolean("dev.unlocked", v) }
+
+    /**
+     * Ajuste de sincronía de la voz (ms) por salida de audio, con las claves de
+     * [com.elyndra.launcher.ui.masha.lipsync.AudioRouteOffsets] (`speaker`, `wired`, `bt:…`, `bt`).
+     */
+    fun voiceOffsets(): Map<String, Int> = prefs.all.mapNotNull { (k, v) ->
+        if (k.startsWith(VOICE_OFFSET) && v is Int) k.removePrefix(VOICE_OFFSET) to v else null
+    }.toMap()
+
+    fun setVoiceOffset(routeKey: String, ms: Int?) =
+        prefs.edit { if (ms == null) remove(VOICE_OFFSET + routeKey) else putInt(VOICE_OFFSET + routeKey, ms) }
+
+    companion object {
+        private const val VOICE_OFFSET = "voice.offset."
+
+        /** Cian de fósforo: se ve bien sobre el tema claro y sobre el oscuro. */
+        const val DEFAULT_PARTICLE_COLOR = 0xFF5CF2FF.toInt()
+
+        /** Magenta de neón: se distingue del cian de Masha y del acento del marco. */
+        const val DEFAULT_SELECTION_PARTICLE_COLOR = 0xFFFF5CD6.toInt()
+
+        /*
+         * Las claves siguen diciendo "lucy" a propósito, como las de "videoBg":
+         * la asistente se llamaba así, y renombrarlas devolvería el botón a su
+         * esquina a quien ya lo había movido. Cambia el nombre, no dónde se guarda.
+         */
+        private const val MASHA_X = "lucy.x"
+        private const val MASHA_Y = "lucy.y"
     }
 }

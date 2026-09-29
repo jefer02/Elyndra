@@ -2,7 +2,6 @@ package com.elyndra.launcher.ui.screens
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,14 +9,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -28,8 +25,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -48,8 +43,8 @@ import com.elyndra.launcher.ui.SettingsController.Field
 import com.elyndra.launcher.ui.components.ArcSpinner
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GhostButton
-import com.elyndra.launcher.ui.components.GlassPanel
-import com.elyndra.launcher.ui.components.inputStyle
+import com.elyndra.launcher.ui.components.SettingsGroup
+import com.elyndra.launcher.ui.components.GlassTextField
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.resolve
 import com.elyndra.launcher.ui.theme.LocalSkin
@@ -127,8 +122,8 @@ private fun ApiPanel(
     fields: @Composable ColumnScope.() -> Unit,
 ) {
     val state = vm.settings.state(service)
-    GlassPanel(padding = 0.dp, cornerRadius = 16.dp) {
-        Column(Modifier.padding(horizontal = 13.dp, vertical = 12.dp)) {
+    SettingsGroup(padding = 0.dp) {
+        Column(Modifier.padding(vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 StatusDot(state.status)
                 Spacer(Modifier.width(8.dp))
@@ -217,44 +212,30 @@ private fun StatusBadge(status: ServiceState.Status) {
 private fun CredentialField(label: String, value: String, secret: Boolean, onChange: (String) -> Unit) {
     val skin = LocalSkin.current
     var reveal by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth()) {
-        ElyText(label, size = 8.5f, weight = FontWeight.SemiBold, color = P.ink2, letterSpacing = tracking(0.08f))
-        Spacer(Modifier.height(3.dp))
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color.White.copy(alpha = 0.7f))
-                .border(1.dp, P.ink.copy(alpha = 0.14f), RoundedCornerShape(10.dp))
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            BasicTextField(
-                value = value,
-                onValueChange = onChange,
-                singleLine = true,
-                textStyle = inputStyle(11f),
-                cursorBrush = SolidColor(skin.a2),
-                visualTransformation = if (secret && !reveal) PasswordVisualTransformation() else VisualTransformation.None,
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.None,
-                    keyboardType = if (secret) KeyboardType.Password else KeyboardType.Ascii,
-                    imeAction = ImeAction.Next,
-                ),
-                modifier = Modifier.weight(1f),
-            )
-            if (secret && value.isNotEmpty()) {
+    GlassTextField(
+        value = value,
+        onValueChange = onChange,
+        label = label,
+        visualTransformation = if (secret && !reveal) PasswordVisualTransformation() else VisualTransformation.None,
+        keyboardOptions = KeyboardOptions(
+            capitalization = KeyboardCapitalization.None,
+            keyboardType = if (secret) KeyboardType.Password else KeyboardType.Ascii,
+            imeAction = ImeAction.Next,
+        ),
+        // "Mostrar" solo tiene sentido en un secreto ya escrito.
+        trailing = if (secret && value.isNotEmpty()) {
+            {
                 ElyText(
                     stringResource(if (reveal) R.string.hide else R.string.show),
                     size = 8.5f,
                     weight = FontWeight.SemiBold,
                     color = skin.a2,
                     uppercase = true,
-                    modifier = Modifier
-                        .clickable { reveal = !reveal }
-                        .padding(start = 8.dp),
+                    modifier = Modifier.clickable { reveal = !reveal },
                 )
             }
-        }
-    }
+        } else {
+            null
+        },
+    )
 }
