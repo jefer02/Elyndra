@@ -216,6 +216,21 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("masha.voice", true)
         set(v) = prefs.edit { putBoolean("masha.voice", v) }
 
+    /** Voz natural (Supertonic, en el móvil) cuando está descargada; apagada = siempre la del sistema. */
+    var mashaVoiceNatural: Boolean
+        get() = prefs.getBoolean("masha.voice.natural", true)
+        set(v) = prefs.edit { putBoolean("masha.voice.natural", v) }
+
+    /** Cuál de las cinco voces femeninas de la voz natural (0–4). */
+    var mashaVoiceSpeaker: Int
+        get() = prefs.getInt("masha.voice.speaker", 0).coerceIn(0, 4)
+        set(v) = prefs.edit { putInt("masha.voice.speaker", v.coerceIn(0, 4)) }
+
+    /** Velocidad de la voz (0,8–1,25; 1 = normal), para las dos voces. */
+    var mashaVoiceRate: Float
+        get() = prefs.getFloat("masha.voice.rate", 1f).coerceIn(0.8f, 1.25f)
+        set(v) = prefs.edit { putFloat("masha.voice.rate", v.coerceIn(0.8f, 1.25f)) }
+
     /**
      * Masha a 120 Hz en pantallas que lo admiten. Apagado (por defecto), su pantalla
      * pide 60 Hz: el holograma se ve igual de fluido a 60 fps y la GPU trabaja la mitad

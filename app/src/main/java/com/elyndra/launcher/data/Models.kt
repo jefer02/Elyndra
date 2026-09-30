@@ -93,6 +93,12 @@ data class RomEntry(
      * manda en el intent (ver [BannerHub]).
      */
     val pcGameId: String? = null,
+    /**
+     * Id estable del juego según el propio juego: el TITLE_ID de PS4
+     * ("CUSA00900", leído de su PARAM.SFO). Es lo que se manda al emulador para
+     * arrancarlo y lo que lo identifica aunque su carpeta cambie. Null en el resto.
+     */
+    val serial: String? = null,
     /** Cuándo entró en la biblioteca (0 en las ROMs de antes de guardarlo: vale la fecha de su carpeta). */
     val addedAt: Long = 0,
 ) {
