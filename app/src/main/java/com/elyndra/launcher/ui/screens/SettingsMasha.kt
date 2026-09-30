@@ -1,6 +1,12 @@
 package com.elyndra.launcher.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.runtime.collectAsState
+import com.elyndra.launcher.ui.masha.voice.VoicePack
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.elyndra.launcher.ui.theme.shapeClickable
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
@@ -94,6 +101,9 @@ internal fun MashaColumn(vm: ElyndraViewModel) {
             }
         }
 
+        // Voz: la natural (descargable) o la del sistema, cuál de las cinco y a qué velocidad.
+        VoiceGroup(vm)
+
         // Presencia: la línea sobre el carrusel y los avisos.
         SettingsGroup(padding = 0.dp) {
             Column(Modifier.padding(vertical = 12.dp)) {
@@ -148,6 +158,104 @@ internal fun MashaColumn(vm: ElyndraViewModel) {
     }
 }
 
+/** La voz natural de Masha: descarga, elección de voz, velocidad y prueba. */
+@Composable
+private fun VoiceGroup(vm: ElyndraViewModel) {
+    val s = vm.settings
+    val skin = LocalSkin.current
+    val pack by s.voicePack.collectAsState()
+    val sample = stringResource(R.string.settings_masha_voice_sample)
+    SettingsGroup(padding = 0.dp) {
+        Column(Modifier.padding(vertical = 12.dp)) {
+            ToggleRow(
+                title = stringResource(R.string.settings_masha_voice_natural),
+                desc = stringResource(R.string.settings_masha_voice_natural_desc),
+                checked = s.mashaVoiceNatural,
+                onToggle = s::toggleMashaVoiceNatural,
+            )
+            Spacer(Modifier.height(10.dp))
+            // El modelo: descargar, progreso, instalado o error.
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                val mb = (VoicePack.TOTAL_BYTES / 1_000_000).toInt()
+                val status: String = when (val p = pack) {
+                    VoicePack.State.Missing -> stringResource(R.string.settings_masha_voice_missing, mb)
+                    is VoicePack.State.Downloading -> stringResource(R.string.settings_masha_voice_downloading, (p.done * 100 / p.total.coerceAtLeast(1)).toInt())
+                    VoicePack.State.Installed -> when {
+                        !s.voiceHardwareOk -> stringResource(R.string.settings_masha_voice_unsupported)
+                        !s.mashaVoiceNatural -> stringResource(R.string.settings_masha_voice_off)
+                        s.voiceTooSlow -> stringResource(R.string.settings_masha_voice_slow)
+                        else -> stringResource(R.string.settings_masha_voice_installed)
+                    }
+                    is VoicePack.State.Failed -> stringResource(R.string.settings_masha_voice_failed, p.reason)
+                }
+                ElyText(
+                    status,
+                    size = 10f,
+                    color = if (pack is VoicePack.State.Failed) P.red else P.ink2,
+                    lineHeightRatio = 1.4f,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(10.dp))
+                when (pack) {
+                    VoicePack.State.Missing, is VoicePack.State.Failed ->
+                        if (s.voiceHardwareOk) GhostButton(stringResource(R.string.settings_masha_voice_download), s::downloadVoice)
+                    is VoicePack.State.Downloading -> GhostButton(stringResource(R.string.cancel), s::cancelVoiceDownload)
+                    VoicePack.State.Installed ->
+                        Row {
+                            if (s.voiceTooSlow && s.mashaVoiceNatural) {
+                                GhostButton(stringResource(R.string.settings_masha_voice_retry), s::retryVoiceSpeed)
+                                Spacer(Modifier.width(6.dp))
+                            }
+                            GhostButton(stringResource(R.string.settings_masha_voice_delete), s::deleteVoice)
+                        }
+                }
+            }
+            if (pack == VoicePack.State.Installed && s.voiceHardwareOk && !s.voiceTooSlow) {
+                Spacer(Modifier.height(12.dp))
+                ElyText(stringResource(R.string.settings_masha_voice_choice), size = 9.5f, weight = FontWeight.SemiBold, color = P.ink2, uppercase = true)
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (sid in 0..4) {
+                        val on = sid == s.mashaVoiceSpeaker
+                        Box(
+                            Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (on) skin.a2.copy(alpha = 0.25f) else P.chip)
+                                .border(1.dp, if (on) skin.a2 else P.ink.copy(alpha = 0.14f), RoundedCornerShape(10.dp))
+                                .shapeClickable(RoundedCornerShape(10.dp), onClickLabel = stringResource(R.string.settings_masha_voice_n, sid + 1)) {
+                                    s.updateMashaVoiceSpeaker(sid)
+                                    s.previewVoice(sample)
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            ElyText("${sid + 1}", size = 11f, weight = FontWeight.Bold, color = if (on) skin.a2 else P.ink)
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ElyText(stringResource(R.string.settings_masha_voice_speed), size = 9.5f, weight = FontWeight.SemiBold, color = P.ink2, uppercase = true, modifier = Modifier.weight(1f))
+                ElyText("${Math.round(s.mashaVoiceRate * 100)} %", size = 10f, color = P.ink2)
+            }
+            Slider(
+                value = s.mashaVoiceRate,
+                onValueChange = s::updateMashaVoiceRate,
+                valueRange = 0.8f..1.25f,
+                colors = SliderDefaults.colors(thumbColor = skin.a2, activeTrackColor = skin.a2, inactiveTrackColor = P.ink.copy(alpha = 0.15f)),
+            )
+            if (pack == VoicePack.State.Installed && s.voiceHardwareOk && !s.voiceTooSlow) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    GhostButton(stringResource(R.string.settings_masha_voice_test), { s.previewVoice(sample) })
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            ElyText(stringResource(R.string.settings_masha_voice_notice), size = 9f, color = P.ink2, lineHeightRatio = 1.45f)
+        }
+    }
+}
+
 @Composable
 private fun ToggleRow(title: String, desc: String?, checked: Boolean, onToggle: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -188,7 +296,10 @@ private fun KeyField(vm: ElyndraViewModel) {
                     weight = FontWeight.SemiBold,
                     color = skin.a2,
                     uppercase = true,
-                    modifier = Modifier.clickable { reveal = !reveal },
+                    // Con recorte y aire: el aro del mando no se pega a las letras.
+                    modifier = Modifier
+                        .shapeClickable(RoundedCornerShape(6.dp)) { reveal = !reveal }
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
                 )
             }
         } else {
@@ -253,8 +364,7 @@ private fun ArrowButton(up: Boolean, enabled: Boolean, label: String, onClick: (
         Modifier
             .size(30.dp)
             .alpha(if (enabled) 1f else 0.3f)
-            .clip(RoundedCornerShape(9.dp))
-            .clickable(enabled = enabled, onClickLabel = label, onClick = onClick),
+            .shapeClickable(RoundedCornerShape(9.dp), enabled = enabled, onClickLabel = label, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         ElyText(if (up) "▲" else "▼", size = 10f, color = P.ink)

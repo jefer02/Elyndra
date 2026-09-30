@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.elyndra.launcher.ui.theme.shapeClickable
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -191,7 +192,7 @@ private fun ColorDot(color: Color, selected: Boolean, modifier: Modifier = Modif
                     drawCircle(Brush.radialGradient(listOf(Color.White, color, color.copy(alpha = 0.7f)), radius = size.minDimension * 0.7f))
                 }
                 .border(if (selected) 2.5.dp else 1.dp, if (selected) P.ink else P.ink.copy(alpha = 0.15f), CircleShape)
-                .clickable(onClick = onClick),
+                .shapeClickable(CircleShape, onClick = onClick),
         )
     }
 }
