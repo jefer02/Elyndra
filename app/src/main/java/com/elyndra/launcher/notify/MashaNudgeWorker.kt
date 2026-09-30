@@ -112,6 +112,7 @@ object MashaNotifier {
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_elyndra)
+            .setColor(com.elyndra.launcher.data.BrandTokens.PRIMARY)
             .setContentTitle(localized.getString(R.string.masha))
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))

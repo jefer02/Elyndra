@@ -94,6 +94,7 @@ class ScrapeService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_elyndra)
+            .setColor(com.elyndra.launcher.data.BrandTokens.PRIMARY)
             .setContentTitle(ctx.getString(R.string.notif_metadata_title))
             .setContentText(
                 if (p.total > 0) ctx.getString(R.string.notif_metadata_progress, p.done, p.total, p.current)
