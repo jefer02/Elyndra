@@ -163,7 +163,7 @@ private fun ApiPanel(
 @Composable
 private fun StatusDot(status: ServiceState.Status) {
     val color = when (status) {
-        ServiceState.Status.Connected -> P.green
+        ServiceState.Status.Connected -> P.success
         ServiceState.Status.Error -> P.red
         ServiceState.Status.Checking, ServiceState.Status.Unverified -> LocalSkin.current.a1
         ServiceState.Status.Unconfigured -> P.ink.copy(alpha = 0.18f)
@@ -173,7 +173,7 @@ private fun StatusDot(status: ServiceState.Status) {
             .size(8.dp)
             .then(
                 if (status == ServiceState.Status.Connected) {
-                    Modifier.shadow(5.dp, CircleShape, clip = false, ambientColor = P.green, spotColor = P.green)
+                    Modifier.shadow(5.dp, CircleShape, clip = false, ambientColor = P.success, spotColor = P.success)
                 } else Modifier,
             )
             .clip(CircleShape)
@@ -184,7 +184,7 @@ private fun StatusDot(status: ServiceState.Status) {
 @Composable
 private fun StatusBadge(status: ServiceState.Status) {
     val (label, bg) = when (status) {
-        ServiceState.Status.Connected -> R.string.status_connected to P.green.copy(alpha = 0.45f)
+        ServiceState.Status.Connected -> R.string.status_connected to P.success.copy(alpha = 0.45f)
         ServiceState.Status.Error -> R.string.status_error to P.red.copy(alpha = 0.18f)
         ServiceState.Status.Checking -> R.string.status_checking to P.ink.copy(alpha = 0.06f)
         ServiceState.Status.Unverified -> R.string.status_unverified to P.ink.copy(alpha = 0.06f)

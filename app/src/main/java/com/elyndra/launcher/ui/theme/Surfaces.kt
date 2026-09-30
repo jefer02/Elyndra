@@ -28,7 +28,6 @@ import androidx.compose.ui.graphics.layer.setOutline
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.data.P
-import com.elyndra.launcher.data.PAIRS
 import kotlin.math.max
 import kotlin.math.min
 
@@ -288,24 +287,6 @@ private fun Modifier.insetHighlight(): Modifier = drawBehind {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   Carátulas procedurales (`art()`)
-   ───────────────────────────────────────────────────────────── */
-
-/** Pinta la carátula del par [pairIndex]: base a 150deg + trama de rayas a 115deg. */
-fun DrawScope.drawArt(pairIndex: Int) {
-    val pair = PAIRS[((pairIndex % PAIRS.size) + PAIRS.size) % PAIRS.size]
-    drawRect(artBaseBrush(pair, size))
-    val period = 9.dp.toPx()
-    val width = 2.dp.toPx()
-    artStripeSegments(size, period).forEach { (a, b) ->
-        drawLine(ArtStripeColor, a, b, strokeWidth = width)
-    }
-}
-
-/** La carátula como modificador de fondo. */
-fun Modifier.art(pairIndex: Int): Modifier = drawBehind { drawArt(pairIndex) }
-
-/* ─────────────────────────────────────────────────────────────
    Aurora — los dos blobs difuminados del fondo de las hojas.
 
    El CSS los define como elipses sólidas dentro de un contenedor
@@ -329,7 +310,7 @@ fun AuroraBackdrop(modifier: Modifier = Modifier) {
             )
             // blobB: right 0%, bottom 6%, 54% × 32%, color a2 al 22%
             drawBlob(
-                color = skin.a2.copy(alpha = 0.22f * 0.85f),
+                color = skin.secondary.copy(alpha = 0.22f * 0.85f),
                 left = 1f - 0.54f + dxB, top = 1f - 0.06f - 0.32f + dyB,
                 w = 0.54f, h = 0.32f, scale = scaleB,
             )
