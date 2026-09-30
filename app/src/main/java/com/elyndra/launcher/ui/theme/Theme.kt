@@ -14,6 +14,8 @@ import com.elyndra.launcher.R
 import com.elyndra.launcher.data.Accent
 import com.elyndra.launcher.data.ACCENTS
 import com.elyndra.launcher.data.TINTS
+import com.elyndra.launcher.data.P
+import com.elyndra.launcher.data.Palettes
 import com.elyndra.launcher.data.Tint
 
 /* ─────────────────────────────────────────────────────────────
@@ -50,18 +52,31 @@ data class ElyndraSkin(
     /** Intensidad del velo del hero, 20…85 (%). */
     val scrimPct: Int,
 ) {
+    /** Brillo, halos y filos del acento; inicio del degradado de relleno. No cambia con el tema. */
     val a1: Color get() = accent.a
-    val a2: Color get() = accent.b
+
+    /**
+     * El acento como color de contenido: texto, iconos, aro de foco y
+     * rellenos pequeños sobre el papel. Cambia con el tema para llegar a AA.
+     */
+    val a2: Color get() = accent.content(P.isDark)
+
+    /** Final del degradado de relleno (botones, píldoras): blanco encima. */
+    val fillEnd: Color get() = accent.b
+
+    /** Secundario del acento: brillos y auroras. */
+    val secondary: Color get() = accent.c
+
     val alpha: Float get() = alphaPct / 100f
     val scrim: Float get() = scrimPct / 100f
 }
 
 val DefaultSkin = ElyndraSkin(
-    accent = ACCENTS.first { it.id == "lila" },
-    tint = TINTS[0],
-    blur = 16,
-    alphaPct = 55,
-    scrimPct = 62,
+    accent = ACCENTS.first { it.id == Palettes.DEFAULT_ACCENT },
+    tint = TINTS.first { it.id == Palettes.DEFAULT_TINT },
+    blur = Palettes.DEFAULT_BLUR,
+    alphaPct = Palettes.DEFAULT_ALPHA,
+    scrimPct = Palettes.DEFAULT_SCRIM,
 )
 
 val LocalSkin = staticCompositionLocalOf { DefaultSkin }
