@@ -252,6 +252,13 @@ data class SheetAction(
     val preview: String? = null,
     /** Fila que abre otra hoja: lleva galón a la derecha en vez de nada. */
     val opensSheet: Boolean = false,
+    /** La acción protagonista del menú de un juego ("Jugar"): el botón grande. */
+    val primary: Boolean = false,
+    /**
+     * Se hace al momento y no pide confirmación en otro sitio (quitar una
+     * imagen): el menú la protege con "mantén pulsado o pulsa otra vez".
+     */
+    val holdToConfirm: Boolean = false,
     val action: () -> Unit,
 )
 
@@ -263,11 +270,31 @@ data class SheetThumb(
     val pairIndex: Int = 0,
 )
 
+/**
+ * El arte de un juego para la cabecera de su menú: el fondo hace de banda que
+ * se funde con el cristal, el logo va encima (si no hay, el icono y el
+ * título) y de ese arte sale el color del panel. Todo es opcional.
+ */
+data class SheetHero(
+    /** Fondo del juego (o su captura): la banda de arriba. */
+    val backgroundPath: String? = null,
+    val logoPath: String? = null,
+    val coverPath: String? = null,
+    /** Icono elegido a mano; si no, el de [packageName]. */
+    val iconPath: String? = null,
+    val packageName: String? = null,
+    val pairIndex: Int = 0,
+    /** La línea de datos: tiempo jugado, última partida, plataforma, emulador. */
+    val info: List<UiText> = emptyList(),
+)
+
 data class ActionSheetSpec(
     val title: UiText,
     val subtitle: UiText? = null,
     val groups: List<SheetGroup>,
     val thumb: SheetThumb? = null,
+    /** Menú de un juego: con esto se pinta como tarjeta de juego y no como lista. */
+    val hero: SheetHero? = null,
 )
 
 /**
