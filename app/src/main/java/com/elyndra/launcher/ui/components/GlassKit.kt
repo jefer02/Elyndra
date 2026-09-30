@@ -1,5 +1,7 @@
 package com.elyndra.launcher.ui.components
 
+import com.elyndra.launcher.sound.UiSound
+import com.elyndra.launcher.ui.LocalUiSounds
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -173,6 +175,7 @@ fun GlowingSwitch(
     enabled: Boolean = true,
 ) {
     val skin = LocalSkin.current
+    val sounds = LocalUiSounds.current
     val shape = RoundedCornerShape(15.dp)
     // Un muelle medio: llega rápido y se asienta sin rebotar de más.
     val knob = animateDpAsState(
@@ -209,7 +212,11 @@ fun GlowingSwitch(
                 }
             }
             .border(1.dp, Color.White.copy(alpha = 0.35f), shape)
-            .shapeClickable(shape, enabled = enabled, onClick = onToggle)
+            .shapeClickable(shape, enabled = enabled) {
+                // Todos los interruptores de la app pasan por aquí: un solo enganche.
+                sounds?.play(if (checked) UiSound.ToggleOff else UiSound.ToggleOn)
+                onToggle()
+            }
             .padding(3.dp),
         contentAlignment = Alignment.CenterStart,
     ) {

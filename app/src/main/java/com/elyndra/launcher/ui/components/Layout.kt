@@ -213,13 +213,14 @@ fun metrics(): Metrics {
  * solo va el velo de los cantos, que no toca el centro (ver
  * [heroEdgeScrimBrush]).
  *
- * Sin fondo no hay nada que enseñar y el texto blanco se quedaría sobre el
- * papel de la app: ahí sí entran el cristal —que además deja ver la aurora—
- * y el velo entero del diseño.
+ * Sin fondo, la banda es el arte de reserva del juego ([FallbackArt], con
+ * una deriva muy lenta) y encima el velo entero del diseño, para que el
+ * texto blanco se lea. Sin juego ([fallback] null), el cristal, que deja ver
+ * la aurora.
  */
 @Composable
 fun Hero(
-    pairIndex: Int,
+    fallback: ArtFallback?,
     heroKey: Any,
     modifier: Modifier = Modifier,
     height: Dp,
@@ -268,9 +269,13 @@ fun Hero(
             }
             Box(Modifier.fillMaxSize().drawBehind { drawRect(heroEdgeScrimBrush(skin.scrim, size)) })
         } else {
-            // Sin animar: el cristal es material de la pantalla, no del juego,
-            // y encenderlo en cada cambio de selección se lee como parpadeo.
-            Box(Modifier.fillMaxSize().liquidGlass(RectangleShape, Color.Transparent))
+            if (fallback != null) {
+                FallbackArt(fallback, ArtVariant.Banner, Modifier.fillMaxSize(), drift = true)
+            } else {
+                // Sin animar: el cristal es material de la pantalla, no del juego,
+                // y encenderlo en cada cambio de selección se lee como parpadeo.
+                Box(Modifier.fillMaxSize().liquidGlass(RectangleShape, Color.Transparent))
+            }
             // `heroScrim`
             Box(Modifier.fillMaxSize().drawBehind { drawRect(heroScrimBrush(skin.scrim, size)) })
         }
