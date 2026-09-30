@@ -77,6 +77,14 @@ android {
 
     // El modelo y el entorno de Masha se leen enteros a memoria: sin comprimir
     // en el APK se cargan sin descomprimir (y el Ogg ya viene comprimido).
+    // La voz natural solo se usa en procesos de 64 bits (NeuralRuntime.hardwareOk): el ONNX
+    // Runtime de 32 bits serían ~55 MB muertos en el APK universal.
+    packaging {
+        jniLibs {
+            excludes += listOf("lib/armeabi-v7a/libonnxruntime*.so", "lib/x86/libonnxruntime*.so")
+        }
+    }
+
     androidResources {
         noCompress += listOf("glb", "hdr")
     }
@@ -133,9 +141,14 @@ dependencies {
     // Widget de la pantalla de inicio.
     implementation(libs.androidx.glance.appwidget)
 
+    // Voz neuronal de Masha (Supertonic): ONNX Runtime (MIT); la versión JVM solo para tests.
+    // 1.28.0 fijo: desde 1.29 el AAR añade un proveedor de telemetría (TelemetryInitializer) que arranca con la app.
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.28.0")
+
     debugImplementation(libs.androidx.ui.tooling)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
+    testImplementation("com.microsoft.onnxruntime:onnxruntime:1.28.0")
 }
