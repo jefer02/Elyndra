@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="paper">#F6F8F9</color>
+    <!-- Copia de BrandTokens para lo que no puede leer Kotlin (tema de la ventana,
+         splash del sistema). Si cambia allí, cambia aquí. -->
+    <color name="paper">#F3F4F8</color>
+    <color name="console_black">#05070A</color>
+    <color name="brand_primary">#4E56D8</color>
 </resources>

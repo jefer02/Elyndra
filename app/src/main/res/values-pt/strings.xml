@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Acentos -->
+    <string name="accent_indigo">Índigo</string>
+    <string name="accent_abismo">Abismo</string>
+    <string name="accent_medianoche">Meia-noite</string>
     <string name="accent_mandarina">Tangerina</string>
     <string name="accent_fuego">Fogo</string>
     <string name="accent_menta">Menta</string>
@@ -595,4 +598,61 @@
         <item quantity="one">Falta %d toque para as opções de desenvolvedor</item>
         <item quantity="other">Faltam %d toques para as opções de desenvolvedor</item>
     </plurals>
+
+    <!-- Sonidos de la interfaz -->
+    <string name="section_sounds">Sons</string>
+    <string name="sound_enabled">Sons da interface</string>
+    <string name="sound_enabled_desc">Avisos curtos e originais, ao estilo de um console. Nunca pausam sua música e ficam em silêncio no modo silencioso ou vibração e enquanto a Masha fala ou escuta.</string>
+    <string name="sound_volume">Volume</string>
+    <string name="sound_navigation">Som ao navegar</string>
+    <string name="sound_navigation_desc">Um toque suave cada vez que a seleção se move.</string>
+    <string name="sound_pack">Pacote de sons</string>
+    <string name="sound_pack_console">Console</string>
+    <string name="sound_pack_soft">Suave</string>
+    <string name="sound_pack_retro">Retrô</string>
+    <string name="sound_pack_off">Sem som</string>
+    <string name="sound_custom_title">Sons próprios</string>
+    <string name="sound_custom_desc">Escolha um áudio curto para qualquer evento: até %1$d KB e %2$s s (o de iniciar, até %3$s s). Ele é copiado para o Elyndra.</string>
+    <string name="sound_event_navigate">Mover</string>
+    <string name="sound_event_select">Confirmar</string>
+    <string name="sound_event_back">Voltar</string>
+    <string name="sound_event_toggle_on">Ativar</string>
+    <string name="sound_event_toggle_off">Desativar</string>
+    <string name="sound_event_open">Abrir menu</string>
+    <string name="sound_event_close">Fechar menu</string>
+    <string name="sound_event_error">Erro</string>
+    <string name="sound_event_launch">Iniciar jogo</string>
+    <string name="sound_preview">Ouvir</string>
+    <string name="sound_choose">Escolher…</string>
+    <string name="sound_reset">Restaurar</string>
+    <string name="sound_source_custom">Próprio</string>
+    <string name="sound_checking">Verificando…</string>
+    <string name="sound_custom_ok">%1$s: som próprio definido</string>
+    <string name="sound_custom_failed">Não foi possível ler esse arquivo</string>
+    <string name="sound_custom_too_big">Grande demais: até %1$d KB</string>
+    <string name="sound_custom_too_long">Longo demais: até %1$s s</string>
+    <string name="sound_custom_too_short">Curto demais para ouvir</string>
+    <string name="sound_custom_not_audio">Esse arquivo não é um áudio que este dispositivo consiga tocar</string>
+
+    <!-- Música de fondo -->
+    <string name="section_music">Música de fundo</string>
+    <string name="music_enabled">Música do menu</string>
+    <string name="music_enabled_desc">Um ambiente calmo e original, de menu de console, enquanto você navega. Para ao iniciar um jogo, abaixa enquanto a Masha fala e nunca toca por cima da música de outro app.</string>
+    <string name="music_volume">Volume da música</string>
+    <string name="music_source">Música</string>
+    <string name="music_source_builtin">Ambiente do Elyndra</string>
+    <string name="music_choose">Escolher do armazenamento…</string>
+    <string name="music_use_builtin">Usar a do Elyndra</string>
+    <string name="music_custom_failed">Não foi possível tocar esse arquivo; voltando à música do Elyndra</string>
+
+    <!-- Hora y batería -->
+    <string name="status_title">Hora e bateria</string>
+    <string name="status_desc">Uma pequena pílula no canto superior direito da biblioteca e das pastas.</string>
+    <string name="status_mode_both">Ambas</string>
+    <string name="status_mode_time">Hora</string>
+    <string name="status_mode_battery">Bateria</string>
+    <string name="status_a11y_time">Hora %1$s</string>
+    <string name="status_a11y_battery">Bateria em %1$d%%</string>
+    <string name="status_a11y_charging">, carregando</string>
+    <string name="status_a11y_low">, fraca</string>
 </resources>

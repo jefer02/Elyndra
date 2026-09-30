@@ -14,7 +14,7 @@
          consola apagada, del mismo color que el primer fotograma del arranque
          de Compose (BootSplash), así el paso de uno a otro no se ve. -->
     <style name="Theme.Elyndra.Starting" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#FF05070A</item>
+        <item name="windowSplashScreenBackground">@color/console_black</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/splash_blank</item>
         <item name="windowSplashScreenAnimationDuration">0</item>
         <item name="postSplashScreenTheme">@style/Theme.Elyndra</item>

@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- アクセント -->
+    <string name="accent_indigo">インディゴ</string>
+    <string name="accent_abismo">アビス</string>
+    <string name="accent_medianoche">ミッドナイト</string>
     <string name="accent_mandarina">マンダリン</string>
     <string name="accent_fuego">ファイア</string>
     <string name="accent_menta">ミント</string>
@@ -563,4 +566,61 @@
     <plurals name="dev_taps_left">
         <item quantity="other">開発者向けオプションまであと %d 回</item>
     </plurals>
+
+    <!-- Sonidos de la interfaz -->
+    <string name="section_sounds">サウンド</string>
+    <string name="sound_enabled">インターフェースのサウンド</string>
+    <string name="sound_enabled_desc">コンソール風の短いオリジナル効果音。音楽を止めることはなく、サイレント・バイブ中や Masha が話している・聞いている間は鳴りません。</string>
+    <string name="sound_volume">音量</string>
+    <string name="sound_navigation">移動音</string>
+    <string name="sound_navigation_desc">選択が動くたびに小さく鳴ります。</string>
+    <string name="sound_pack">サウンドパック</string>
+    <string name="sound_pack_console">コンソール</string>
+    <string name="sound_pack_soft">ソフト</string>
+    <string name="sound_pack_retro">レトロ</string>
+    <string name="sound_pack_off">オフ</string>
+    <string name="sound_custom_title">カスタムサウンド</string>
+    <string name="sound_custom_desc">各イベントに短い音声ファイルを選べます：最大 %1$d KB・%2$s 秒（起動音は %3$s 秒まで）。Elyndra 内にコピーされます。</string>
+    <string name="sound_event_navigate">移動</string>
+    <string name="sound_event_select">決定</string>
+    <string name="sound_event_back">戻る</string>
+    <string name="sound_event_toggle_on">オン</string>
+    <string name="sound_event_toggle_off">オフ</string>
+    <string name="sound_event_open">メニューを開く</string>
+    <string name="sound_event_close">メニューを閉じる</string>
+    <string name="sound_event_error">エラー</string>
+    <string name="sound_event_launch">ゲームを起動</string>
+    <string name="sound_preview">試聴</string>
+    <string name="sound_choose">選択…</string>
+    <string name="sound_reset">リセット</string>
+    <string name="sound_source_custom">カスタム</string>
+    <string name="sound_checking">確認中…</string>
+    <string name="sound_custom_ok">%1$s：カスタムサウンドを設定しました</string>
+    <string name="sound_custom_failed">ファイルを読み込めませんでした</string>
+    <string name="sound_custom_too_big">大きすぎます：最大 %1$d KB</string>
+    <string name="sound_custom_too_long">長すぎます：最大 %1$s 秒</string>
+    <string name="sound_custom_too_short">短すぎて聞こえません</string>
+    <string name="sound_custom_not_audio">このデバイスで再生できる音声ファイルではありません</string>
+
+    <!-- Música de fondo -->
+    <string name="section_music">BGM</string>
+    <string name="music_enabled">メニュー BGM</string>
+    <string name="music_enabled_desc">閲覧中に流れる、落ち着いたオリジナルのコンソール風 BGM。ゲーム起動時に止まり、Masha が話す間は小さくなり、他のアプリの音楽の上では再生されません。</string>
+    <string name="music_volume">BGM の音量</string>
+    <string name="music_source">音楽</string>
+    <string name="music_source_builtin">Elyndra アンビエント</string>
+    <string name="music_choose">ストレージから選択…</string>
+    <string name="music_use_builtin">Elyndra の BGM を使う</string>
+    <string name="music_custom_failed">このファイルを再生できませんでした。Elyndra の BGM に戻します</string>
+
+    <!-- Hora y batería -->
+    <string name="status_title">時刻とバッテリー</string>
+    <string name="status_desc">ライブラリとフォルダの右上に小さく表示します。</string>
+    <string name="status_mode_both">両方</string>
+    <string name="status_mode_time">時刻</string>
+    <string name="status_mode_battery">バッテリー</string>
+    <string name="status_a11y_time">時刻 %1$s</string>
+    <string name="status_a11y_battery">バッテリー %1$d%%</string>
+    <string name="status_a11y_charging">、充電中</string>
+    <string name="status_a11y_low">、残量低下</string>
 </resources>
