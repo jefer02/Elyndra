@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui
 
+import com.elyndra.launcher.core.device.StatusMode
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -13,6 +14,7 @@ import com.elyndra.launcher.data.ACCENTS
 import com.elyndra.launcher.data.AppLocale
 import com.elyndra.launcher.data.Emulators
 import com.elyndra.launcher.data.P
+import com.elyndra.launcher.data.Palettes
 import com.elyndra.launcher.data.SecretKeys
 import com.elyndra.launcher.data.TINTS
 import com.elyndra.launcher.display.FrameRate
@@ -64,6 +66,21 @@ class SettingsController(private val vm: ElyndraViewModel) {
         // `P` guarda el tema en un estado de Compose: fijarlo aquí basta para
         // que toda la interfaz se repinte, sin tocar ningún sitio de llamada.
         P.isDark = store.darkMode
+    }
+
+    /* ── píldora de hora y batería ────────────────────────────── */
+
+    var statusVisible by mutableStateOf(store.statusVisible); private set
+    var statusMode by mutableStateOf(StatusMode.byId(store.statusMode)); private set
+
+    fun toggleStatus() {
+        statusVisible = !statusVisible
+        store.statusVisible = statusVisible
+    }
+
+    fun updateStatusMode(mode: StatusMode) {
+        statusMode = mode
+        store.statusMode = mode.id
     }
 
     fun toggleDark() {
@@ -455,8 +472,8 @@ class SettingsController(private val vm: ElyndraViewModel) {
 
     val skin: ElyndraSkin
         get() = ElyndraSkin(
-            accent = ACCENTS.firstOrNull { it.id == accentId } ?: ACCENTS.first { it.id == "lila" },
-            tint = TINTS.firstOrNull { it.id == tintId } ?: TINTS[0],
+            accent = ACCENTS.firstOrNull { it.id == accentId } ?: ACCENTS.first { it.id == Palettes.DEFAULT_ACCENT },
+            tint = TINTS.firstOrNull { it.id == tintId } ?: TINTS.first { it.id == Palettes.DEFAULT_TINT },
             blur = blur,
             alphaPct = alphaPct,
             scrimPct = scrimPct,

@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui
 
+import com.elyndra.launcher.ui.components.ArtFallback
 import android.net.Uri
 import androidx.annotation.StringRes
 import com.elyndra.launcher.R
@@ -193,6 +194,8 @@ data class DialogSpec(
     val dismiss: DialogButton? = null,
     val extra: DialogButton? = null,
     val input: DialogInput? = null,
+    /** Algo ha fallado o está bloqueado: al abrirse suena el aviso de error. */
+    val error: Boolean = false,
 )
 
 /**
@@ -267,7 +270,8 @@ data class SheetThumb(
     val coverPath: String? = null,
     val iconPath: String? = null,
     val packageName: String? = null,
-    val pairIndex: Int = 0,
+    /** El arte de reserva si no hay carátula. */
+    val fallback: ArtFallback? = null,
 )
 
 /**
@@ -283,7 +287,8 @@ data class SheetHero(
     /** Icono elegido a mano; si no, el de [packageName]. */
     val iconPath: String? = null,
     val packageName: String? = null,
-    val pairIndex: Int = 0,
+    /** El arte de reserva de la banda cuando no hay fondo ni carátula. */
+    val fallback: ArtFallback,
     /** La línea de datos: tiempo jugado, última partida, plataforma, emulador. */
     val info: List<UiText> = emptyList(),
 )

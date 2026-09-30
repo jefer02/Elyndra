@@ -22,13 +22,15 @@ import com.elyndra.launcher.data.BannerHub
 import com.elyndra.launcher.data.Emulators
 import com.elyndra.launcher.data.Library
 import com.elyndra.launcher.data.LibraryRepository
-import com.elyndra.launcher.data.PAIRS
 import com.elyndra.launcher.data.PlaySession
 import com.elyndra.launcher.data.RomEntry
 import com.elyndra.launcher.data.RomFolder
 import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.data.fmtMinutes
-import com.elyndra.launcher.data.pairIndexFor
+import com.elyndra.launcher.ui.components.ArtFallback
+import com.elyndra.launcher.sound.BackgroundMusic
+import com.elyndra.launcher.sound.SoundManager
+import com.elyndra.launcher.sound.UiSound
 import com.elyndra.launcher.launch.GameLauncher
 import com.elyndra.launcher.library.InstalledApp
 import com.elyndra.launcher.library.PcGameIds
@@ -71,6 +73,10 @@ class ElyndraViewModel @Inject constructor(
     private val inventory: EmulatorInventory,
     private val work: ElyndraWork,
     val metadataPriority: MetadataPriorityStore,
+    /** Los sonidos de la interfaz (ver [SoundManager]). */
+    val sound: SoundManager,
+    /** La música de fondo de la interfaz (ver [BackgroundMusic]). */
+    val music: BackgroundMusic,
 ) : AndroidViewModel(application) {
 
     val app = application as ElyndraApplication
@@ -127,6 +133,7 @@ class ElyndraViewModel @Inject constructor(
 
     val add = AddController(this)
     val settings = SettingsController(this)
+    val sounds = SoundsController(this)
     val masha = MashaController(this, brain)
 
     private var launchJob: Job? = null
@@ -276,14 +283,20 @@ class ElyndraViewModel @Inject constructor(
         return all.firstOrNull { it.key == selectedKey } ?: all.firstOrNull()
     }
 
-    fun pairIndexOf(item: LibraryItem): Int = when (item) {
-        is LibraryItem.Folder -> item.system.pair
-        is LibraryItem.App -> pairIndexFor(item.app.packageName)
+    /** El arte de reserva de una card del carrusel: su color sale del icono. */
+    fun fallbackOf(item: LibraryItem): ArtFallback = when (item) {
+        is LibraryItem.Folder -> ArtFallback(item.key, item.system.name, item.iconPath, item.emulatorPackage)
+        is LibraryItem.App -> ArtFallback(item.key, item.app.displayTitle, item.app.meta.icon, item.app.packageName)
     }
 
-    fun romPairIndex(rom: RomEntry): Int {
-        val base = Systems.byId(rom.systemId)?.pair ?: 0
-        return (base + pairIndexFor(rom.title)) % PAIRS.size
+    /** El arte de reserva de un juego sin carátula: su icono, si tiene, y su título. */
+    fun romFallback(rom: RomEntry): ArtFallback = ArtFallback(rom.key, rom.displayTitle, rom.meta.icon)
+
+    /** El arte de reserva de cualquier juego de la biblioteca por su clave. */
+    fun fallbackForKey(key: String, title: String): ArtFallback {
+        library.roms.firstOrNull { it.key == key }?.let { return romFallback(it) }
+        library.apps.firstOrNull { it.key == key }?.let { return ArtFallback(it.key, it.displayTitle, it.meta.icon, it.packageName) }
+        return ArtFallback(key, title)
     }
 
     fun currentFolder(): LibraryItem.Folder? = derived().folders.firstOrNull { it.folder.id == folderId }
@@ -364,9 +377,20 @@ class ElyndraViewModel @Inject constructor(
         }
     }
 
-    fun select(key: String) { selectedKey = key }
+    /**
+     * Cambiar la selección suena a "moverse", se haga con el dedo o con el
+     * mando (el paso del mando que no cambia nada ya lo filtra el reloj de
+     * [SoundManager]: dos avisos seguidos en menos de 60 ms son uno).
+     */
+    fun select(key: String) {
+        if (selected()?.key != key) sound.play(UiSound.Navigate)
+        selectedKey = key
+    }
 
-    fun selectRom(key: String) { selectedRomKey = key }
+    fun selectRom(key: String) {
+        if (selectedRom()?.key != key) sound.play(UiSound.Navigate)
+        selectedRomKey = key
+    }
 
     fun updateFilter(f: LibraryFilter) { filter = f }
 
@@ -422,11 +446,15 @@ class ElyndraViewModel @Inject constructor(
             val outcome = launcher.launchApp(entry.packageName)
             orchestrator.record(entry.key, null, null, entry.packageName, outcomeId(outcome))
             when (outcome) {
-                GameLauncher.Outcome.Started -> startSession(entry.key, null, entry.packageName)
+                GameLauncher.Outcome.Started -> {
+                    sound.play(UiSound.Launch)
+                    startSession(entry.key, null, entry.packageName)
+                }
                 else -> {
                     opening = null
                     showDialog(
                         DialogSpec(
+                            error = true,
                             title = UiText.res(R.string.dialog_app_missing_title),
                             message = UiText.res(R.string.dialog_app_missing_msg, entry.displayTitle),
                             confirm = DialogButton(UiText.res(R.string.remove)) { repo.removeApp(entry.packageName) },
@@ -451,6 +479,7 @@ class ElyndraViewModel @Inject constructor(
         if (!app.files.hasPermission(folder.treeUri)) {
             showDialog(
                 DialogSpec(
+                    error = true,
                     title = UiText.res(R.string.dialog_permission_lost_title),
                     message = UiText.res(R.string.dialog_permission_lost_msg, folder.displayPath),
                     confirm = DialogButton(UiText.res(R.string.ok)) {},
@@ -469,6 +498,7 @@ class ElyndraViewModel @Inject constructor(
                     if (emuId == null) {
                         showDialog(
                             DialogSpec(
+                                error = true,
                                 title = UiText.res(R.string.dialog_no_emulator_title),
                                 message = UiText.res(R.string.dialog_no_emulator_msg),
                                 confirm = DialogButton(UiText.res(R.string.change_emulator)) { pickFolderEmulator(folder) },
@@ -497,12 +527,14 @@ class ElyndraViewModel @Inject constructor(
         val pkg = orchestrator.packageFor(emuId)
         orchestrator.record(rom.key, rom.systemId, emuId, pkg, outcomeId(outcome))
         if (outcome == GameLauncher.Outcome.Started) {
+            sound.play(UiSound.Launch)
             startSession(rom.key, emuId, pkg)
             return
         }
         // No se pudo arrancar el juego directamente: el emulador está abierto y
         // el usuario lo elige dentro. La sesión se mide igual.
         if (outcome == GameLauncher.Outcome.OpenedApp) {
+            sound.play(UiSound.Launch)
             startSession(rom.key, emuId, pkg)
             showToast(UiText.res(R.string.toast_pick_game_in_app, emuName))
             return
@@ -511,6 +543,7 @@ class ElyndraViewModel @Inject constructor(
             GameLauncher.Outcome.NotInstalled -> emulatorMissing(emuId, emuName, folder, rom)
             GameLauncher.Outcome.NeedsPath -> showDialog(
                 DialogSpec(
+                    error = true,
                     title = UiText.res(R.string.dialog_needs_path_title),
                     message = UiText.res(R.string.dialog_needs_path_msg, emuName),
                     confirm = DialogButton(UiText.res(R.string.choose_other)) { pickFolderEmulator(folder) },
@@ -519,6 +552,7 @@ class ElyndraViewModel @Inject constructor(
             )
             GameLauncher.Outcome.NeedsVitaTitle -> showDialog(
                 DialogSpec(
+                    error = true,
                     title = UiText.res(R.string.dialog_vita_title),
                     message = UiText.res(R.string.dialog_vita_msg),
                     confirm = DialogButton(UiText.res(R.string.ok)) {},
@@ -529,6 +563,7 @@ class ElyndraViewModel @Inject constructor(
             // una salida: se ofrece, ya explicado, en vez de hacerlo a ciegas.
             GameLauncher.Outcome.NeedsPcLauncher -> showDialog(
                 DialogSpec(
+                    error = true,
                     title = UiText.res(R.string.dialog_pc_launcher_title, emuName),
                     message = UiText.res(R.string.dialog_pc_launcher_msg, emuName),
                     confirm = DialogButton(UiText.res(R.string.open_runtime, emuName)) { openRuntime(emuId) },
@@ -545,6 +580,7 @@ class ElyndraViewModel @Inject constructor(
             )
             is GameLauncher.Outcome.Failed -> showDialog(
                 DialogSpec(
+                    error = true,
                     title = UiText.res(R.string.dialog_launch_failed_title),
                     message = UiText.res(R.string.dialog_launch_failed_msg, emuName, outcome.reason),
                     confirm = DialogButton(UiText.res(R.string.choose_other)) { pickFolderEmulator(folder) },
@@ -693,13 +729,14 @@ class ElyndraViewModel @Inject constructor(
     /** Abrir el runtime de Windows y apartarse: el juego se elige dentro. */
     private fun openRuntime(emuId: String) {
         val pkg = Emulators.byId(emuId)?.let { launcher.installedComponent(it) }?.substringBefore('/') ?: return
-        launcher.launchApp(pkg)
+        if (launcher.launchApp(pkg) == GameLauncher.Outcome.Started) sound.play(UiSound.Launch)
     }
 
     private fun emulatorMissing(emuId: String, emuName: String, folder: RomFolder, rom: RomEntry) {
         val profile = Emulators.byId(emuId)
         showDialog(
             DialogSpec(
+                error = true,
                 title = UiText.res(R.string.dialog_emulator_missing_title, emuName),
                 message = UiText.res(R.string.dialog_emulator_missing_msg),
                 confirm = DialogButton(UiText.res(R.string.choose_other)) {
@@ -956,7 +993,12 @@ class ElyndraViewModel @Inject constructor(
             Emulators.byId(BachataS4.PROFILE_ID)?.let { openExternal(launcher.storeIntent(it)) }
             return
         }
-        if (launcher.launchApp(pkg) != GameLauncher.Outcome.Started) showToast(UiText.res(R.string.dialog_launch_failed_title))
+        if (launcher.launchApp(pkg) == GameLauncher.Outcome.Started) {
+            sound.play(UiSound.Launch)
+        } else {
+            sound.play(UiSound.Error)
+            showToast(UiText.res(R.string.dialog_launch_failed_title))
+        }
     }
 
     fun rescanFolder(folder: RomFolder) {
@@ -1267,7 +1309,7 @@ class ElyndraViewModel @Inject constructor(
                     ),
                     removalGroup(UiText.res(R.string.remove_game)) { removeRom(rom) },
                 ),
-                SheetThumb(coverPath = rom.meta.cover, pairIndex = romPairIndex(rom)),
+                SheetThumb(coverPath = rom.meta.cover, fallback = romFallback(rom)),
                 heroOf(rom),
             ),
             cardOrigin(),
@@ -1283,7 +1325,7 @@ class ElyndraViewModel @Inject constructor(
             coverPath = item.coverPath,
             iconPath = item.iconPath,
             packageName = item.emulatorPackage,
-            pairIndex = pairIndexOf(item),
+            fallback = fallbackOf(item),
             info = listOfNotNull(
                 UiText.Raw(item.system.name),
                 item.emulatorName?.let { UiText.Raw(it) },
@@ -1296,7 +1338,7 @@ class ElyndraViewModel @Inject constructor(
             coverPath = item.app.meta.cover,
             iconPath = item.app.meta.icon,
             packageName = item.app.packageName,
-            pairIndex = pairIndexOf(item),
+            fallback = fallbackOf(item),
             info = playInfo(item.app.stats.minutes, item.app.stats.lastPlayed) + UiText.Raw("Android"),
         )
     }
@@ -1309,7 +1351,7 @@ class ElyndraViewModel @Inject constructor(
             logoPath = rom.meta.logo,
             coverPath = rom.meta.cover,
             iconPath = rom.meta.icon,
-            pairIndex = romPairIndex(rom),
+            fallback = romFallback(rom),
             info = playInfo(rom.stats.minutes, rom.stats.lastPlayed) +
                 listOfNotNull(Systems.byId(rom.systemId)?.name?.let { UiText.Raw(it) }, emulator?.let { UiText.Raw(it) }),
         )
@@ -1337,13 +1379,13 @@ class ElyndraViewModel @Inject constructor(
             coverPath = item.coverPath,
             iconPath = item.iconPath ?: item.logoPath,
             packageName = item.emulatorPackage,
-            pairIndex = pairIndexOf(item),
+            fallback = fallbackOf(item),
         )
         is LibraryItem.App -> SheetThumb(
             coverPath = item.app.meta.cover,
             iconPath = item.app.meta.icon,
             packageName = item.app.packageName,
-            pairIndex = pairIndexOf(item),
+            fallback = fallbackOf(item),
         )
     }
 
