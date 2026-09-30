@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
 import com.elyndra.launcher.ui.ElyndraViewModel
+import com.elyndra.launcher.ui.MashaQuietsSounds
 import com.elyndra.launcher.ui.Screen
 import com.elyndra.launcher.ui.components.AccentSlider
 import com.elyndra.launcher.ui.components.BackChevron
@@ -67,6 +68,8 @@ fun VoiceSyncScreen(vm: ElyndraViewModel) {
     val context = LocalContext.current
 
     val presence = remember { MashaPresence() }
+    // Mientras Masha habla o escucha, la interfaz no suena.
+    MashaQuietsSounds(vm, presence, hold = true)
     val quality = remember { MashaQuality.detect(context) }
     var stage by remember { mutableStateOf(StageStatus.Loading) }
     val voice = rememberMashaVoice(presence, s.lang, enabled = true)

@@ -210,7 +210,7 @@ private fun ParticlePreview(color: Color) {
         Modifier
             .size(64.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF0B0E13))
+            .background(P.mediaBack)
             .drawBehind {
                 val c = Offset(size.width / 2f, size.height / 2f)
                 val orbit = size.minDimension * 0.34f
@@ -250,7 +250,7 @@ private fun SelectionPreview(color: Color, enabled: Boolean) {
         Modifier
             .size(64.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF0B0E13)),
+            .background(P.mediaBack),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -258,7 +258,7 @@ private fun SelectionPreview(color: Color, enabled: Boolean) {
                 .size(26.dp)
                 .neonParticles(enabled, color, frame = 2.5.dp, sparkScale = 0.6f)
                 .clip(shape)
-                .background(Brush.linearGradient(listOf(skin.a1, skin.a2)))
+                .background(Brush.linearGradient(listOf(skin.a1, skin.fillEnd)))
                 .border(2.5.dp, if (enabled) color else skin.a1, shape),
         )
     }
