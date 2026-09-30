@@ -20,7 +20,9 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun database(@ApplicationContext context: Context): ElyndraDatabase =
-        Room.databaseBuilder(context, ElyndraDatabase::class.java, ElyndraDatabase.NAME).build()
+        Room.databaseBuilder(context, ElyndraDatabase::class.java, ElyndraDatabase.NAME)
+            .addMigrations(*ElyndraDatabase.MIGRATIONS)
+            .build()
 
     @Provides
     @Singleton

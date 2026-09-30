@@ -34,6 +34,11 @@ class GameLauncher(
         data object NeedsVitaTitle : Outcome
         /** Juego de PC sin el archivo lanzador que pide su runtime de Windows. */
         data object NeedsPcLauncher : Outcome
+        /**
+         * No se pudo arrancar el juego directamente y se ha abierto el emulador
+         * para que el usuario lo elija allí (Bachata S4, ver [BachataS4]).
+         */
+        data object OpenedApp : Outcome
         data class Failed(val reason: String) : Outcome
     }
 
@@ -115,6 +120,7 @@ class GameLauncher(
             pcLauncher = PcGames.launcherOf(fileName),
             launcherId = launcherId,
             idIsAssigned = idIsAssigned,
+            serial = rom.serial,
         )
     }
 
@@ -125,6 +131,7 @@ class GameLauncher(
             return launchSpec(LaunchPlanner.custom(pkg, ref))
         }
         val profile = Emulators.byId(emulatorId) ?: return Outcome.NotInstalled
+        if (profile.id == BachataS4.PROFILE_ID) return launchBachata(profile, ref)
         val component = installedComponent(profile) ?: return Outcome.NotInstalled
         // Mobox y MiceWine no publican ningún intent al que pasarle el juego,
         // así que se abre la app y el usuario lo elige dentro (ver EmulatorProfile).
@@ -134,7 +141,26 @@ class GameLauncher(
             PlanResult.NeedsPath -> Outcome.NeedsPath
             PlanResult.NeedsVitaTitle -> Outcome.NeedsVitaTitle
             PlanResult.NeedsPcLauncher -> Outcome.NeedsPcLauncher
+            PlanResult.NeedsTitleId -> Outcome.Failed("title id")
         }
+    }
+
+    /**
+     * Bachata S4: directo por CUSA si se puede y, si no, su pantalla principal
+     * (ver [BachataS4]). Nada de esto rompe si Bachata cambia: cada paso se
+     * comprueba con el PackageManager y cualquier fallo acaba en el plan B.
+     */
+    private fun launchBachata(profile: EmulatorProfile, ref: RomRef): Outcome {
+        val chosen = settings?.preferredPackage(profile.id)
+        val installed = BachataS4.PACKAGES.filter { isPackageInstalled(it) }
+        val pkg = installed.firstOrNull { it == chosen } ?: installed.firstOrNull() ?: return Outcome.NotInstalled
+        val direct = activityExists(pkg, BachataS4.DIRECT_ACTIVITY)
+        when (val plan = BachataS4.plan(pkg, ref.serial, direct)) {
+            is BachataS4.Plan.Direct -> if (launchSpec(plan.spec) == Outcome.Started) return Outcome.Started
+            is BachataS4.Plan.Fallback -> Unit
+        }
+        val opened = if (activityExists(pkg, BachataS4.MAIN_ACTIVITY)) launchSpec(BachataS4.fallback(pkg)) else launchApp(pkg)
+        return if (opened == Outcome.Started) Outcome.OpenedApp else opened
     }
 
     fun launchSpec(spec: LaunchSpec): Outcome {
