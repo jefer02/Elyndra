@@ -86,6 +86,8 @@ data class RomEntity(
     @ColumnInfo(name = "main_doc_id") val mainDocId: String?,
     @ColumnInfo(name = "main_file") val mainFile: String?,
     @ColumnInfo(name = "pc_game_id") val pcGameId: String?,
+    /** TITLE_ID de PS4 (ver RomEntry.serial). Añadida en la versión 2 del esquema. */
+    val serial: String? = null,
     @ColumnInfo(name = "hash_size") val hashSize: Long?,
     @ColumnInfo(name = "hash_modified") val hashModified: Long?,
     val crc: String?,

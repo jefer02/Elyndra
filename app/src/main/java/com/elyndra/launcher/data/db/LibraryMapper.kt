@@ -54,6 +54,7 @@ object LibraryMapper {
         mainDocId = r.mainDocId,
         mainFile = r.mainFile,
         pcGameId = r.pcGameId,
+        serial = r.serial,
         hashSize = r.hashes?.size,
         hashModified = r.hashes?.modified,
         crc = r.hashes?.crc,
@@ -188,6 +189,7 @@ object LibraryMapper {
                     mainDocId = r.mainDocId,
                     mainFile = r.mainFile,
                     pcGameId = r.pcGameId,
+                    serial = r.serial,
                     addedAt = r.addedAt,
                 )
             },

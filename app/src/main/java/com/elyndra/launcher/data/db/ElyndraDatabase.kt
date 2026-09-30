@@ -2,6 +2,8 @@ package com.elyndra.launcher.data.db
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * Base de datos de Elyndra (files/../databases/elyndra.db).
@@ -32,7 +34,7 @@ import androidx.room.RoomDatabase
         ArcStepEntity::class,
         AiCacheEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class ElyndraDatabase : RoomDatabase() {
@@ -45,5 +47,14 @@ abstract class ElyndraDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "elyndra.db"
+
+        /** 1 → 2: el TITLE_ID de los juegos de PS4 (RomEntry.serial). Nada se borra. */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `roms` ADD COLUMN `serial` TEXT")
+            }
+        }
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2)
     }
 }
