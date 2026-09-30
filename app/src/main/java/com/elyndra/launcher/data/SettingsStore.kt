@@ -9,24 +9,25 @@ class SettingsStore(context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
+    /** Acento guardado; sin guardar (instalación nueva), el de partida (ver Palettes). */
     var accentId: String
-        get() = prefs.getString("accent", "lila") ?: "lila"
+        get() = Palettes.accentId(prefs.getString("accent", null), ACCENTS.map { it.id })
         set(v) = prefs.edit { putString("accent", v) }
 
     var tintId: String
-        get() = prefs.getString("tint", "papel") ?: "papel"
+        get() = Palettes.tintId(prefs.getString("tint", null), TINTS.map { it.id })
         set(v) = prefs.edit { putString("tint", v) }
 
     var blur: Int
-        get() = prefs.getInt("blur", 16)
+        get() = prefs.getInt("blur", Palettes.DEFAULT_BLUR)
         set(v) = prefs.edit { putInt("blur", v) }
 
     var alphaPct: Int
-        get() = prefs.getInt("alpha", 55)
+        get() = prefs.getInt("alpha", Palettes.DEFAULT_ALPHA)
         set(v) = prefs.edit { putInt("alpha", v) }
 
     var scrimPct: Int
-        get() = prefs.getInt("scrim", 62)
+        get() = prefs.getInt("scrim", Palettes.DEFAULT_SCRIM)
         set(v) = prefs.edit { putInt("scrim", v) }
 
     /** Descargar metadatos en cuanto se añade algo a la biblioteca. */
@@ -137,8 +138,19 @@ class SettingsStore(context: Context) {
     /* ── tema y fondo ─────────────────────────────────────────── */
 
     /** Modo oscuro de la interfaz (independiente del tema del sistema). */
+    /** Píldora de hora y batería en Biblioteca y Carpeta. */
+    var statusVisible: Boolean
+        get() = prefs.getBoolean("status.visible", true)
+        set(v) = prefs.edit { putBoolean("status.visible", v) }
+
+    /** Qué enseña la píldora: "both", "time" o "battery" (ver StatusMode). */
+    var statusMode: String?
+        get() = prefs.getString("status.mode", null)
+        set(v) = prefs.edit { putString("status.mode", v) }
+
     var darkMode: Boolean
-        get() = prefs.getBoolean("darkMode", true)
+        // Claro es el de partida; lo guardado manda.
+        get() = prefs.getBoolean("darkMode", Palettes.DEFAULT_DARK)
         set(v) = prefs.edit { putBoolean("darkMode", v) }
 
     /**
@@ -301,8 +313,8 @@ class SettingsStore(context: Context) {
         /** Cian de fósforo: se ve bien sobre el tema claro y sobre el oscuro. */
         const val DEFAULT_PARTICLE_COLOR = 0xFF5CF2FF.toInt()
 
-        /** Magenta de neón: se distingue del cian de Masha y del acento del marco. */
-        const val DEFAULT_SELECTION_PARTICLE_COLOR = 0xFFFF5CD6.toInt()
+        /** El mismo cian de fósforo, el primero de la paleta de partículas. */
+        const val DEFAULT_SELECTION_PARTICLE_COLOR = DEFAULT_PARTICLE_COLOR
 
         /*
          * Las claves siguen diciendo "lucy" a propósito, como las de "videoBg":

@@ -29,6 +29,8 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.elyndra.launcher.data.AppLocale
+import com.elyndra.launcher.data.BrandTokens
+import com.elyndra.launcher.sound.UiSound
 import com.elyndra.launcher.display.FrameRate
 import com.elyndra.launcher.input.AxisGate
 import com.elyndra.launcher.input.DirectionalRepeater
@@ -113,7 +115,7 @@ class MainActivity : ComponentActivity() {
         // puede venir de un `values-night`: se pinta aquí el fondo de ventana
         // para que el primer fotograma (antes de Compose) no dé un destello claro.
         val dark = (application as ElyndraApplication).settings.darkMode
-        window.setBackgroundDrawable(ColorDrawable(if (dark) 0xFF13161A.toInt() else 0xFFF6F8F9.toInt()))
+        window.setBackgroundDrawable(ColorDrawable(if (dark) BrandTokens.DARK.paper else BrandTokens.LIGHT.paper))
 
         hideSystemBars()
         askForNotifications()
@@ -143,6 +145,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        vm.sound.setForeground(true)
+        vm.music.setForeground(true)
         inputManager.registerInputDeviceListener(deviceListener, null)
         // Lo que se conectó o desconectó mientras la app estaba en segundo plano.
         val now = InputDevice.getDeviceIds().filter { Gamepad.isGamepad(InputDevice.getDevice(it)) }.toSet()
@@ -159,6 +163,9 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onPause() {
+        // Saliendo de la app (a un juego, al inicio) no suena nada más.
+        vm.sound.setForeground(false)
+        vm.music.setForeground(false)
         inputManager.unregisterInputDeviceListener(deviceListener)
         releaseDirections()
         super.onPause()
@@ -243,15 +250,32 @@ class MainActivity : ComponentActivity() {
         if (event.action == KeyEvent.ACTION_DOWN) {
             // Mantener A no "pulsa" veinte veces por segundo.
             if (event.repeatCount > 0) return true
-            if (vm.input.handle(pad)) return true
+            if (vm.input.handle(pad)) {
+                padSound(pad)
+                return true
+            }
         }
         val system = Gamepad.systemKey(event.keyCode)
-        if (system != null) {
-            return super.dispatchKeyEvent(
-                KeyEvent(event.downTime, event.eventTime, event.action, system, event.repeatCount),
-            )
+        val handled = if (system != null) {
+            super.dispatchKeyEvent(KeyEvent(event.downTime, event.eventTime, event.action, system, event.repeatCount))
+        } else {
+            super.dispatchKeyEvent(event)
         }
-        return super.dispatchKeyEvent(event)
+        if (handled && event.action == KeyEvent.ACTION_DOWN) padSound(pad)
+        return handled
+    }
+
+    /**
+     * El único enganche de sonido del mando: aceptar y volver. Lo que abren o
+     * cierran (menús, diálogos) suena desde el estado —ver `UiSoundEffects`—
+     * y manda sobre esto, así que A que abre un menú suena a "abrir".
+     */
+    private fun padSound(pad: Pad) {
+        when (pad) {
+            Pad.Confirm -> vm.sound.play(UiSound.Select)
+            Pad.Back -> vm.sound.play(UiSound.Back)
+            else -> Unit
+        }
     }
 
     /**
@@ -283,11 +307,16 @@ class MainActivity : ComponentActivity() {
      */
     @SuppressLint("RestrictedApi")
     private fun deliverDirection(pad: Pad) {
-        if (vm.input.handle(pad)) return
+        // El paso suena si alguien lo ha movido (el carrusel o el foco de Compose).
+        if (vm.input.handle(pad)) {
+            vm.sound.play(UiSound.Navigate)
+            return
+        }
         val key = Gamepad.systemKeyFor(pad) ?: return
         val now = SystemClock.uptimeMillis()
-        super.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, key, 0))
+        val moved = super.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, key, 0))
         super.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, key, 0))
+        if (moved) vm.sound.play(UiSound.Navigate)
     }
 
     private fun releaseDirections() {
