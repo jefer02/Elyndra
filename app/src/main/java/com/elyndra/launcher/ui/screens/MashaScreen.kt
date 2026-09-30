@@ -48,6 +48,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.masha.MashaFraming
 import com.elyndra.launcher.ui.theme.shapeClickable
 import androidx.compose.runtime.mutableFloatStateOf
@@ -76,6 +77,7 @@ import androidx.core.content.ContextCompat
 import com.elyndra.launcher.R
 import com.elyndra.launcher.data.fmtMinutes
 import com.elyndra.launcher.ui.ElyndraViewModel
+import com.elyndra.launcher.ui.MashaQuietsSounds
 import com.elyndra.launcher.ui.Screen
 import com.elyndra.launcher.ui.UiText
 import com.elyndra.launcher.ui.components.BackChevron
@@ -124,6 +126,8 @@ fun MashaScreen(vm: ElyndraViewModel) {
     val context = LocalContext.current
 
     val presence = remember { MashaPresence() }
+    // Mientras Masha habla o escucha, la interfaz no suena.
+    MashaQuietsSounds(vm, presence)
     val quality = remember { MashaQuality.detect(context) }
     var stage by remember { mutableStateOf(StageStatus.Loading) }
     // Al entrar, cuerpo entero (en vertical y en horizontal); el botón de
@@ -503,7 +507,7 @@ private fun Dock(vm: ElyndraViewModel, presence: MashaPresence, glow: Color, onM
             Modifier
                 .size(46.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(Brush.linearGradient(listOf(glow, Color(0xFF3A5BFF))))
+                .background(Brush.linearGradient(listOf(glow, P.primary)))
                 .shapeClickable(RoundedCornerShape(16.dp)) { if (masha.busy) masha.stop() else masha.send(lang) },
             contentAlignment = Alignment.Center,
         ) {

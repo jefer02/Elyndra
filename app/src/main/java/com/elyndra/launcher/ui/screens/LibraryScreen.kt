@@ -1,5 +1,9 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.components.StatusStrip
+import com.elyndra.launcher.ui.components.FallbackArt
+import com.elyndra.launcher.ui.components.ArtVariant
+import com.elyndra.launcher.ui.components.ArtFallback
 import com.elyndra.launcher.ui.components.DynamicBackdrop
 import com.elyndra.launcher.ui.theme.rememberPress
 import com.elyndra.launcher.ui.theme.pressScale
@@ -163,7 +167,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
         Column(Modifier.fillMaxSize().animAppEntrance(key = Screen.Library)) {
 
             Hero(
-                pairIndex = sel?.let { vm.pairIndexOf(it) } ?: 0,
+                fallback = sel?.let { vm.fallbackOf(it) },
                 heroKey = sel?.key ?: "none",
                 // Quitar el fondo lo deshace en polvo antes de borrarlo.
                 backgroundVanishing = sel?.let { vm.isVanishingArt(it.key, ArtKind.Background) } == true,
@@ -183,6 +187,12 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Spacer(Modifier.weight(1f))
+                        // Hora y batería, arriba a la derecha junto a la barra. Con el
+                        // buscador abierto se aparta: el campo necesita el ancho.
+                        if (vm.settings.statusVisible && !vm.searchOpen) {
+                            StatusStrip(vm.settings.statusMode)
+                            Spacer(Modifier.width(8.dp))
+                        }
                         // "Abrir" vive aquí, sobre el fondo del juego. Mientras
                         // se busca desaparece: el campo abierto necesita ese
                         // ancho y ahí nadie está lanzando nada.
@@ -395,7 +405,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                                         selected = item.key == sel?.key && !addFocused,
                                         sparkColor = sparkColor,
                                         metrics = m,
-                                        pairIndex = vm.pairIndexOf(item),
+                                        fallback = vm.fallbackOf(item),
                                         onTap = { vm.select(item.key) },
                                         onOpen = { vm.requestOpen(item) },
                                         onBounds = vm::noteSelectedCard,
@@ -804,7 +814,7 @@ private fun LibraryTile(
     /** Color de las chispas de neón de la selección; null = sin chispas. */
     sparkColor: Color?,
     metrics: Metrics,
-    pairIndex: Int,
+    fallback: ArtFallback,
     onTap: () -> Unit,
     onOpen: () -> Unit,
     /** Recibe el rectángulo de la card en la ventana: el menú de acciones sale de ahí. */
@@ -914,6 +924,8 @@ private fun LibraryTile(
                 GameIcon(icon, autoIconPackage, Modifier.fillMaxSize(), ContentScale.Fit)
             } else if (item is LibraryItem.Folder) {
                 // Carpeta sin icono y sin emulador instalado: rótulo de consola.
+                // Debajo, el arte de reserva de la carpeta; encima, el velo del rótulo.
+                FallbackArt(fallback, ArtVariant.Square, Modifier.fillMaxSize(), showIcon = false)
                 Column(
                     Modifier
                         .fillMaxSize()

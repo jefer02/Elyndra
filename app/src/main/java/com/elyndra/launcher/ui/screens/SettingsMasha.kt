@@ -142,7 +142,7 @@ internal fun MashaColumn(vm: ElyndraViewModel) {
                 }
                 Spacer(Modifier.width(12.dp))
                 if (s.usageAccess) {
-                    ElyText(stringResource(R.string.settings_masha_usage_on), size = 10f, weight = FontWeight.SemiBold, color = P.green, uppercase = true)
+                    ElyText(stringResource(R.string.settings_masha_usage_on), size = 10f, weight = FontWeight.SemiBold, color = P.success, uppercase = true)
                 } else {
                     GhostButton(stringResource(R.string.settings_masha_usage_off), s::openUsageAccess)
                 }

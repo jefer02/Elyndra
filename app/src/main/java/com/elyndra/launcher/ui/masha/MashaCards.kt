@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.elyndra.launcher.data.BrandTokens
 import androidx.compose.runtime.remember
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.indication
@@ -36,11 +37,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
-import com.elyndra.launcher.data.pairIndexFor
 import com.elyndra.launcher.masha.MashaAttachment
 import com.elyndra.launcher.ui.ChatMessage
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.MashaGameRef
+import com.elyndra.launcher.ui.components.ArtFallback
 import com.elyndra.launcher.ui.components.ArtImage
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GameIcon
@@ -54,12 +55,12 @@ import com.elyndra.launcher.ui.theme.animMsgIn
  * holograma necesita oscuridad, así que no sigue al tema claro/oscuro.
  */
 internal object Holo {
-    val bg = Color(0xFF040913)
-    val panel = Color(0xFF0A1630)
-    val line = Color(0xFF5CE1FF)
-    val text = Color(0xFFE9F4FF)
-    val dim = Color(0xFF8EA6C8)
-    val user = Color(0xFF1B3B7A)
+    val bg = Color(BrandTokens.HOLO_BG)
+    val panel = Color(BrandTokens.HOLO_PANEL)
+    val line = Color(BrandTokens.HOLO_LINE)
+    val text = Color(BrandTokens.HOLO_TEXT)
+    val dim = Color(BrandTokens.HOLO_DIM)
+    val user = Color(BrandTokens.HOLO_USER)
 }
 
 internal fun Modifier.holoPanel(shape: RoundedCornerShape, glow: Color, alpha: Float = 0.72f): Modifier =
@@ -201,7 +202,7 @@ private fun GameThumb(ref: MashaGameRef, onClick: () -> Unit) {
                 // El icono llena la miniatura: sin margen ni caja clara alrededor.
                 GameIcon(ref.artPath, ref.packageName, Modifier.fillMaxSize(), ContentScale.Crop)
             } else {
-                ArtImage(ref.artPath, pairIndexFor(ref.title), Modifier.fillMaxSize())
+                ArtImage(ref.artPath, ArtFallback(ref.key, ref.title), Modifier.fillMaxSize(), showTitle = false)
             }
         }
         ElyText(ref.title, size = 9.5f, weight = FontWeight.SemiBold, color = Holo.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -231,7 +232,7 @@ private fun PlanCard(vm: ElyndraViewModel, plan: MashaAttachment.Plan, glow: Col
                     if (ref.packageName != null) {
                         GameIcon(ref.artPath, ref.packageName, Modifier.fillMaxSize(), ContentScale.Crop)
                     } else {
-                        ArtImage(ref.artPath, pairIndexFor(ref.title), Modifier.fillMaxSize())
+                        ArtImage(ref.artPath, ArtFallback(ref.key, ref.title), Modifier.fillMaxSize(), showTitle = false)
                     }
                 }
                 Column(Modifier.weight(1f)) {
