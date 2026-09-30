@@ -14,6 +14,11 @@ import com.elyndra.launcher.metadata.MediaCache
 import com.elyndra.launcher.metadata.MetadataEngine
 import com.elyndra.launcher.metadata.MetadataPriorityStore
 import com.elyndra.launcher.metadata.ServiceCredentials
+import com.elyndra.launcher.sound.BackgroundMusic
+import com.elyndra.launcher.sound.CustomSoundImporter
+import com.elyndra.launcher.sound.PrefsKeyValues
+import com.elyndra.launcher.sound.SoundManager
+import com.elyndra.launcher.sound.SoundSettings
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -44,6 +49,23 @@ object AppModule {
     @Provides
     @Singleton
     fun settings(@ApplicationContext context: Context) = SettingsStore(context)
+
+    @Provides
+    @Singleton
+    fun soundSettings(@ApplicationContext context: Context) =
+        SoundSettings(PrefsKeyValues(context.getSharedPreferences("settings", Context.MODE_PRIVATE)))
+
+    @Provides
+    @Singleton
+    fun sounds(
+        @ApplicationContext context: Context,
+        settings: SoundSettings,
+        @ApplicationScope scope: CoroutineScope,
+    ) = SoundManager(context, settings, scope, CustomSoundImporter(context))
+
+    @Provides
+    @Singleton
+    fun music(@ApplicationContext context: Context, settings: SoundSettings) = BackgroundMusic(context, settings)
 
     @Provides
     @Singleton

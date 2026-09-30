@@ -86,7 +86,11 @@ fun ElyndraApp(vm: ElyndraViewModel) {
         request?.let { mediaPicker.launch(it.mimeTypes.toTypedArray()) }
     }
 
+    // Menús, diálogos y pantallas que cambian suenan desde aquí (ver UiSoundEffects).
+    UiSoundEffects(vm)
+
     ElyndraTheme(skin = vm.settings.skin, landscape = landscape) {
+    CompositionLocalProvider(LocalUiSounds provides vm.sound) {
         // Atrás cierra, por orden: diálogo, hoja, ficha, pantalla y buscador.
         // Atrás predictivo (Android 13+): mientras el gesto dura, la pantalla
         // que se abandona se encoge y se apaga siguiendo al dedo; si el gesto
@@ -236,6 +240,7 @@ fun ElyndraApp(vm: ElyndraViewModel) {
             var booted by rememberSaveable { mutableStateOf(false) }
             if (!booted) BootSplash(onFinished = { booted = true })
         }
+    }
     }
 }
 
