@@ -58,6 +58,7 @@ import com.elyndra.launcher.ui.theme.consoleFocus
 import com.elyndra.launcher.ui.theme.darkGlass
 import com.elyndra.launcher.ui.theme.drawArcSpinner
 import com.elyndra.launcher.ui.theme.glass
+import com.elyndra.launcher.ui.theme.shapeClickable
 import com.elyndra.launcher.ui.theme.spinAngle
 import kotlin.math.roundToInt
 
@@ -95,7 +96,7 @@ fun Pill(
             .border(1.dp, P.ink.copy(alpha = 0.14f), shape)
     }
     Box(
-        m.clickable(enabled = enabled, onClick = onClick)
+        m.shapeClickable(shape, enabled = enabled, onClick = onClick)
             .padding(horizontal = horizontalPadding, vertical = if (height != null) 0.dp else verticalPadding),
         contentAlignment = Alignment.Center,
     ) {
@@ -181,7 +182,7 @@ fun CtaButton(
             )
             .clip(shape)
             .drawBehind { drawRect(accentGradient(skin, 145f, size)) }
-            .clickable(enabled = enabled, onClick = onClick),
+            .shapeClickable(shape, enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         ElyText(label, size = 13.5f, weight = FontWeight.SemiBold, color = Color.White, maxLines = 1)
@@ -205,7 +206,7 @@ fun AccentButton(
             .shadow(12.dp, shape, clip = false, ambientColor = P.shade.copy(alpha = 0.24f), spotColor = P.shade.copy(alpha = 0.24f))
             .clip(shape)
             .drawBehind { drawRect(accentGradient(skin, 145f, size)) }
-            .clickable(onClick = onClick)
+            .shapeClickable(shape, onClick = onClick)
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -226,7 +227,7 @@ fun GlassIconButton(
         modifier
             .size(size)
             .glass(RoundedCornerShape(cornerRadius))
-            .clickable(onClick = onClick),
+            .shapeClickable(RoundedCornerShape(cornerRadius), onClick = onClick),
         contentAlignment = Alignment.Center,
         content = { content() },
     )
@@ -241,7 +242,7 @@ fun GhostButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifie
             .clip(shape)
             .background(P.chip)
             .border(1.dp, P.ink.copy(alpha = 0.14f), shape)
-            .clickable(onClick = onClick)
+            .shapeClickable(shape, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         ElyText(label, size = 11f, weight = FontWeight.Medium, color = P.ink, maxLines = 1)
@@ -430,7 +431,7 @@ fun Swatch(
                 if (selected) P.ink else P.ink.copy(alpha = 0.12f),
                 shape,
             )
-            .clickable(onClick = onClick),
+            .shapeClickable(shape, onClick = onClick),
     )
 }
 

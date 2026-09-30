@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -111,6 +112,17 @@ fun AppIconImage(
         value = icon
     }
     bitmap?.let { Image(it, contentDescription = null, modifier = modifier, contentScale = contentScale) }
+}
+
+/** Acento del icono de una app instalada (ver [ArtPalette]); null si es gris o no está. */
+internal suspend fun appIconAccent(context: Context, packageName: String): Int? = withContext(Dispatchers.Default) {
+    val icon = iconCache.get(packageName) ?: runCatching { loadAppIcon(context, packageName) }.getOrNull()?.also { iconCache.put(packageName, it) }
+    icon?.let { bitmap ->
+        val small = Bitmap.createScaledBitmap(bitmap.asAndroidBitmap(), 32, 32, true)
+        val px = IntArray(32 * 32)
+        small.getPixels(px, 0, 32, 0, 0, 32, 32)
+        ArtPalette.accentOf(px)
+    }
 }
 
 private const val ICON_PX = 384

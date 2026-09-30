@@ -37,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
@@ -52,6 +53,8 @@ import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.Swift
 import com.elyndra.launcher.ui.theme.accentGradient
+import com.elyndra.launcher.ui.theme.outerShadow
+import com.elyndra.launcher.ui.theme.shapeClickable
 
 /* ─────────────────────────────────────────────────────────────
    GlassKit: las piezas de cristal de las pantallas secundarias.
@@ -79,6 +82,9 @@ import com.elyndra.launcher.ui.theme.accentGradient
  * @param glowColor color del filo y del halo; null = el acento del tema.
  * @param glow intensidad del halo, 0…1. A 0 solo queda el filo fino.
  * @param elevation sombra proyectada: es lo que separa la lámina del fondo.
+ * @param onClick la lámina entera es pulsable. Se pasa aquí y no como
+ *   `clickable` en [modifier]: ahí iría antes del recorte y el realce (foco y
+ *   pulsación) se pintaría como un rectángulo de otro radio sobre la lámina.
  */
 @Composable
 fun GlassCard(
@@ -89,6 +95,8 @@ fun GlassCard(
     glow: Float = 0f,
     elevation: Dp = 10.dp,
     padding: PaddingValues = PaddingValues(14.dp),
+    onClick: (() -> Unit)? = null,
+    enabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val skin = LocalSkin.current
@@ -100,11 +108,12 @@ fun GlassCard(
             .fillMaxWidth()
             // El halo va en la sombra y no en un borde ancho: una sombra de
             // color se difumina hacia fuera, que es justo lo que hace un
-            // resplandor. Un borde grueso solo engorda el contorno.
-            .shadow(
+            // resplandor. Un borde grueso solo engorda el contorno. Solo por
+            // fuera: la lámina es translúcida y una sombra de elevación se
+            // vería a través de ella como una caja interior.
+            .outerShadow(
                 elevation = elevation + (14.dp * glow),
                 shape = shape,
-                clip = false,
                 ambientColor = if (glow > 0f) accent else P.shade,
                 spotColor = if (glow > 0f) accent else P.shade,
             )
@@ -142,6 +151,7 @@ fun GlassCard(
                 ),
                 shape,
             )
+            .then(if (onClick != null) Modifier.shapeClickable(shape, enabled = enabled, onClick = onClick) else Modifier)
             .padding(padding),
         content = content,
     )
@@ -179,6 +189,8 @@ fun GlowingSwitch(
     Box(
         modifier
             .size(50.dp, 29.dp)
+            // Desactivado se atenúa todo, pista incluida (antes solo el pomo).
+            .alpha(if (enabled) 1f else 0.5f)
             .shadow(
                 elevation = 10.dp * trackGlow,
                 shape = shape,
@@ -197,9 +209,8 @@ fun GlowingSwitch(
                 }
             }
             .border(1.dp, Color.White.copy(alpha = 0.35f), shape)
-            .clickable(enabled = enabled, onClick = onToggle)
-            .padding(3.dp)
-            .graphicsLayer { alpha = if (enabled) 1f else 0.5f },
+            .shapeClickable(shape, enabled = enabled, onClick = onToggle)
+            .padding(3.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         Box(
@@ -265,10 +276,9 @@ fun GlassTextField(
         Row(
             Modifier
                 .fillMaxWidth()
-                .shadow(
+                .outerShadow(
                     elevation = 12.dp * halo,
                     shape = shape,
-                    clip = false,
                     ambientColor = skin.a1,
                     spotColor = skin.a1,
                 )
@@ -329,7 +339,7 @@ fun GlassTabBar(
         modifier
             .fillMaxWidth()
             .height(height)
-            .shadow(8.dp, shape, clip = false, ambientColor = P.shade, spotColor = P.shade)
+            .outerShadow(8.dp, shape, ambientColor = P.shade, spotColor = P.shade)
             .clip(shape)
             .background(P.paper.copy(alpha = if (P.isDark) 0.4f else 0.66f))
             .border(1.dp, Color.White.copy(alpha = 0.5f), shape),
@@ -361,8 +371,7 @@ fun GlassTabBar(
                     Modifier
                         .width(slot)
                         .fillMaxSize()
-                        .clip(shape)
-                        .clickable { onSelect(index) },
+                        .shapeClickable(shape) { onSelect(index) },
                     contentAlignment = Alignment.Center,
                 ) {
                     ElyText(
