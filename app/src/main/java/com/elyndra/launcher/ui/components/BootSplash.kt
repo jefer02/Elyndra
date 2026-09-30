@@ -10,6 +10,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import com.elyndra.launcher.data.P
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -71,7 +72,7 @@ private const val EXIT_START = 1850f
 private const val REDUCED_MS = 650
 
 /** El negro de la consola apagada: el mismo que el splash del sistema (themes.xml). */
-private val BootBlack = Color(0xFF05070A)
+private val BootBlack get() = P.consoleBlack
 
 @Composable
 fun BootSplash(onFinished: () -> Unit) {
@@ -88,7 +89,8 @@ fun BootSplash(onFinished: () -> Unit) {
     val measurer = rememberTextMeasurer()
     val family = LocalPoppins.current
     val a1 = skin.a1
-    val a2 = skin.a2
+    // Sobre el negro de la consola: el secundario frío del acento como segundo brillo.
+    val a2 = skin.secondary
 
     Box(
         Modifier

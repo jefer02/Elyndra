@@ -58,6 +58,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.elyndra.launcher.data.argb
+import com.elyndra.launcher.data.Palettes
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -105,7 +107,6 @@ import com.elyndra.launcher.ui.theme.LocalLandscape
 import com.elyndra.launcher.ui.theme.LocalReducedMotion
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.Springs
-import com.elyndra.launcher.ui.theme.art
 import com.elyndra.launcher.ui.theme.consoleFocus
 import com.elyndra.launcher.ui.theme.motion
 import com.elyndra.launcher.ui.theme.outerShadow
@@ -270,7 +271,10 @@ private fun ActionPanel(
             ?: hero.packageName?.let { runCatching { appIconAccent(context, it) }.getOrNull() }
         artAccent = argb?.let { Color(it) }
     }
-    val accent by animateColorAsState(artAccent ?: skin.a2, motion(Springs.fade()), label = "panelAccent")
+    // Sin color en el arte, el primario de la marca (el relleno del acento).
+    val base by animateColorAsState(artAccent ?: skin.a1, motion(Springs.fade()), label = "panelAccent")
+    // Como contenido (texto, glifos, aro de foco) tiene que leerse sobre el panel en los dos temas.
+    val accent = Color(Palettes.contentFor(base.argb(), P.isDark))
     val tone = panelTone(accent)
     val bounds = remember { Bounds() }
     val shape = RoundedCornerShape(PANEL_RADIUS)
@@ -494,7 +498,7 @@ private fun HeroContent(
 /**
  * La banda del arte: el fondo del juego a sangre por arriba (se acerca un
  * poco al abrir), un velo que deja leer el logo y, en el último tramo, el
- * fundido al color del cristal. Sin arte, la carátula procedural.
+ * fundido al color del cristal. Sin arte, el arte de reserva del juego.
  */
 @Composable
 private fun HeroBanner(
@@ -519,11 +523,8 @@ private fun HeroBanner(
                     }
                 },
         ) {
-            if (art != null) {
-                ArtImage(art, hero.pairIndex, Modifier.fillMaxSize(), alignment = Alignment.TopCenter)
-            } else {
-                Box(Modifier.fillMaxSize().art(hero.pairIndex))
-            }
+            // Sin arte, la banda de reserva del juego (con su icono desenfocado detrás).
+            ArtImage(art, hero.fallback, Modifier.fillMaxSize(), variant = ArtVariant.Banner, alignment = Alignment.TopCenter)
         }
         Box(
             Modifier
@@ -635,7 +636,9 @@ private fun InfoLine(info: List<UiText>, accent: Color) {
 @Composable
 private fun PlayButton(action: SheetAction, focused: Boolean, accent: Color, gamepad: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(TILE_RADIUS)
-    val deep = remember(accent) { Color(ArtPalette.deeper(accent.toArgb())) }
+    // Relleno con blanco encima: el color del juego oscurecido hasta el 4,5:1.
+    val fill = remember(accent) { Color(Palettes.fillFor(accent.argb())) }
+    val deep = remember(fill) { Color(ArtPalette.deeper(fill.toArgb())) }
     val lift = animateFloatAsState(if (focused) 1f else 0f, Springs.snappy(), label = "playLift")
     Row(
         Modifier
@@ -647,9 +650,9 @@ private fun PlayButton(action: SheetAction, focused: Boolean, accent: Color, gam
                 scaleX = s
                 scaleY = s
             }
-            .shadow(14.dp, shape, clip = false, ambientColor = accent, spotColor = accent)
+            .shadow(14.dp, shape, clip = false, ambientColor = fill, spotColor = fill)
             .clip(shape)
-            .background(Brush.horizontalGradient(listOf(accent, deep)))
+            .background(Brush.horizontalGradient(listOf(fill, deep)))
             .drawBehind {
                 drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.24f), Color.Transparent), endY = size.height * 0.6f))
             }
@@ -799,7 +802,7 @@ private fun ArtTile(
                 Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(accent.copy(alpha = 0.7f), P.shade))))
                 LogoImage(preview, image.padding(horizontal = 10.dp, vertical = 12.dp), alignment = Alignment.Center)
             }
-            preview != null -> ArtImage(preview, hero.pairIndex, image)
+            preview != null -> ArtImage(preview, hero.fallback, image, showTitle = false)
             // Sin icono propio, el de la app (o del emulador): también es lo que se ve en la card.
             kind == SheetIcon.Icon && hero.packageName != null -> AppIconImage(hero.packageName, image, ContentScale.Crop)
             else -> {
@@ -1209,4 +1212,4 @@ private val ART_TILE_H = 76.dp
 private val BANNER_TALL = 152.dp
 private val BANNER_WIDE = 112.dp
 private val FADE_INTO_GLASS = 22.dp
-private val ART_TILE_BACK = Color(0xFF1B1F26)
+private val ART_TILE_BACK get() = P.mediaBack
