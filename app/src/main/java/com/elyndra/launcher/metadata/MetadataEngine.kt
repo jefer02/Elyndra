@@ -319,10 +319,13 @@ class MetadataEngine(
                 crc = hashes?.crc,
                 md5 = hashes?.md5,
                 sha1 = hashes?.sha1,
+                serial = rom.serial,
             )
             if (game != null) {
-                // jeuInfos casa por hash si se le dio; si no, por nombre de archivo y tamaño.
-                if (hashes?.md5 != null || hashes?.crc != null) data.matched(MatchMethod.HASH, 1.0) else data.matched(MatchMethod.NAME, 0.9)
+                // jeuInfos casa por hash o número de serie si se le dio; si no,
+                // por nombre de archivo y tamaño.
+                if (hashes?.md5 != null || hashes?.crc != null || rom.serial != null) data.matched(MatchMethod.HASH, 1.0)
+                else data.matched(MatchMethod.NAME, 0.9)
             } else if (searchName.length >= 4) {
                 val found = screenScraper.search(system.ssId, searchName)
                     .map { g -> g to Names.similarity(searchName, g.name(regions).orEmpty()) }
