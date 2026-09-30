@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -187,33 +188,36 @@ private fun DetectedRow(app: InstalledApp, checked: Boolean, inLibrary: Boolean,
     GlassCard(
         modifier = Modifier
             .animFadeUp(delayMs = minOf(index, 14) * 40, key = app.packageName)
-            .alpha(if (inLibrary) 0.6f else 1f)
-            // La escala se lee en fase de dibujo: marcar no remide la lista.
+            // La escala y la opacidad se leen en fase de dibujo: marcar no remide la lista.
             .graphicsLayer {
                 scaleX = lift
                 scaleY = lift
-            }
-            .clickable(enabled = !inLibrary, onClick = onToggle),
-        cornerRadius = 16.dp,
+                alpha = if (inLibrary) 0.6f else 1f
+            },
+        cornerRadius = ROW_RADIUS,
         // El halo morado solo se enciende en lo elegido: es el estado, no el adorno.
         glow = if (checked) 1f else 0f,
         frost = if (checked) 0.8f else 0.66f,
-        padding = PaddingValues(10.dp),
+        padding = PaddingValues(ROW_PAD),
+        // El clic va dentro de la lámina (después de su recorte): así el foco y
+        // la pulsación tienen su misma forma y no dibujan una caja de otro radio.
+        onClick = onToggle,
+        enabled = !inLibrary,
     ) {
     Row(
         Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
+        // El icono es la propia pieza: lo llena entero y lleva el radio
+        // concéntrico de la lámina (su radio menos el margen), sin una caja
+        // blanca detrás con otro radio.
+        AppIconImage(
+            app.packageName,
             Modifier
                 .size(38.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color.White.copy(alpha = 0.7f))
-                .border(1.dp, Color.White.copy(alpha = 0.7f), RoundedCornerShape(12.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            AppIconImage(app.packageName, Modifier.size(32.dp))
-        }
+                .clip(RoundedCornerShape(ROW_RADIUS - ROW_PAD)),
+            contentScale = ContentScale.Crop,
+        )
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             ElyText(app.label, size = 12.5f, weight = FontWeight.SemiBold, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -231,6 +235,9 @@ private fun DetectedRow(app: InstalledApp, checked: Boolean, inLibrary: Boolean,
     }
     }
 }
+
+private val ROW_RADIUS = 16.dp
+private val ROW_PAD = 9.dp
 
 /* ── Pestaña "Carpeta de ROMs" ────────────────────────────────── */
 
