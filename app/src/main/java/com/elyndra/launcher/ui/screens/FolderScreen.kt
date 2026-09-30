@@ -1,5 +1,7 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.components.StatusStrip
+import com.elyndra.launcher.ui.components.ArtFallback
 import com.elyndra.launcher.ui.theme.rememberPress
 import com.elyndra.launcher.ui.theme.pressScale
 import androidx.compose.foundation.background
@@ -91,7 +93,6 @@ import com.elyndra.launcher.ui.theme.animTitleIn
 import com.elyndra.launcher.ui.theme.curtainAlpha
 import com.elyndra.launcher.ui.theme.darkGlass
 import com.elyndra.launcher.ui.theme.pulseHintAlpha
-import com.elyndra.launcher.ui.theme.romScrimBrush
 import com.elyndra.launcher.ui.theme.selectionLift
 import com.elyndra.launcher.ui.theme.selectionScale
 import com.elyndra.launcher.ui.theme.sheenBrush
@@ -123,7 +124,7 @@ fun FolderScreen(vm: ElyndraViewModel) {
     Column(Modifier.fillMaxSize().animFadeIn(key = Screen.Folder)) {
 
         Hero(
-            pairIndex = rom?.let { vm.romPairIndex(it) } ?: item.system.pair,
+            fallback = rom?.let { vm.romFallback(it) } ?: vm.fallbackOf(item),
             heroKey = rom?.key ?: item.key,
             // Quitar el fondo lo deshace en polvo antes de borrarlo.
             backgroundVanishing = rom?.let { vm.isVanishingArt(it.key, ArtKind.Background) } == true,
@@ -200,6 +201,11 @@ fun FolderScreen(vm: ElyndraViewModel) {
                                 overflow = TextOverflow.Ellipsis,
                                 align = TextAlign.End,
                             )
+                        }
+                        // Hora y batería, pegadas al borde derecho, tras el nombre de la carpeta.
+                        if (vm.settings.statusVisible) {
+                            Spacer(Modifier.width(10.dp))
+                            StatusStrip(vm.settings.statusMode)
                         }
                     }
                 }
@@ -394,7 +400,7 @@ fun FolderScreen(vm: ElyndraViewModel) {
                                 index = i,
                                 selected = r.key == rom?.key,
                                 sparkColor = sparkColor,
-                                pairIndex = vm.romPairIndex(r),
+                                fallback = vm.romFallback(r),
                                 width = m.romW,
                                 height = m.romTileH,
                                 coverVanishing = vm.isVanishingArt(r.key, ArtKind.Cover),
@@ -435,7 +441,7 @@ private fun RomTile(
     selected: Boolean,
     /** Color de las chispas de neón de la selección; null = sin chispas. */
     sparkColor: Color?,
-    pairIndex: Int,
+    fallback: ArtFallback,
     width: Dp,
     height: Dp,
     coverVanishing: Boolean,
@@ -524,36 +530,16 @@ private fun RomTile(
                     onAnimationEnd = onCoverVanished,
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    ArtImage(cover, pairIndex, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                }
-            }
-
-            if (cover == null) {
-                rom.meta.icon?.let { icon ->
-                    GameIcon(
-                        icon,
-                        null,
-                        Modifier
-                            .align(Alignment.Center)
-                            .padding(bottom = height * 0.2f, start = width * 0.1f, end = width * 0.1f)
-                            .fillMaxWidth()
-                            .aspectRatio(1f)
-                            .floating(floatClock, floatPhaseOf(rom.id)),
+                    // Sin carátula, el arte de reserva: el icono del juego (flotando,
+                    // como siempre) y su título.
+                    ArtImage(
+                        cover,
+                        fallback,
+                        Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                        iconModifier = Modifier.floating(floatClock, floatPhaseOf(rom.id)),
                     )
                 }
-                Box(Modifier.fillMaxSize().drawBehind { drawRect(romScrimBrush(size)) })
-                ElyText(
-                    rom.displayTitle,
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(horizontal = 7.dp, vertical = 6.dp),
-                    size = 9.5f,
-                    weight = FontWeight.SemiBold,
-                    color = Color.White,
-                    lineHeightRatio = 1.15f,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
 
             Box(

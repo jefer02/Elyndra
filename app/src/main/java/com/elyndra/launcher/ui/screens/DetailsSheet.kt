@@ -39,7 +39,7 @@ import com.elyndra.launcher.R
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.data.fmtMinutes
-import com.elyndra.launcher.data.pairIndexFor
+import com.elyndra.launcher.ui.components.ArtFallback
 import com.elyndra.launcher.metadata.RaAchievement
 import com.elyndra.launcher.metadata.RetroAchievementsClient
 import com.elyndra.launcher.metadata.Service
@@ -81,7 +81,7 @@ fun DetailsSheet(vm: ElyndraViewModel, key: String) {
     val meta = rom?.meta ?: app!!.meta
     val stats = rom?.stats ?: app!!.stats
     val title = rom?.displayTitle ?: app!!.displayTitle
-    val pair = rom?.let { vm.romPairIndex(it) } ?: pairIndexFor(app!!.packageName)
+    val fallback = rom?.let { vm.romFallback(it) } ?: ArtFallback(app!!.key, app.displayTitle, app.meta.icon, app.packageName)
     val system = rom?.let { Systems.byId(it.systemId) }
     val folder = rom?.let { r -> vm.library.folders.firstOrNull { it.id == r.folderId } }
     val emulator = rom?.let { it.emulatorId ?: folder?.emulatorId }?.let { vm.emulatorName(it) }
@@ -106,10 +106,11 @@ fun DetailsSheet(vm: ElyndraViewModel, key: String) {
                 Box(Modifier.size(78.dp, 104.dp).clip(RoundedCornerShape(12.dp))) {
                     // Un juego Android se representa con su icono; la carátula solo
                     // se usa en las ROMs.
-                    val headerCover = if (app != null) null else meta.cover
-                    ArtImage(headerCover, pair, Modifier.fillMaxSize())
-                    if (headerCover == null && (app != null || meta.icon != null)) {
-                        GameIcon(meta.icon, app?.packageName, Modifier.fillMaxSize(), ContentScale.Crop)
+                    // El título ya va al lado: la reserva lleva solo el icono.
+                    if (app != null) {
+                        GameIcon(meta.icon, app.packageName, Modifier.fillMaxSize(), ContentScale.Crop)
+                    } else {
+                        ArtImage(meta.cover, fallback, Modifier.fillMaxSize(), showTitle = false)
                     }
                 }
                 Spacer(Modifier.width(12.dp))
