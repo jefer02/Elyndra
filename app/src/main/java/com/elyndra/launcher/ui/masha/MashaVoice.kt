@@ -2,18 +2,11 @@ package com.elyndra.launcher.ui.masha
 
 import com.elyndra.launcher.BuildConfig
 import android.content.Context
-import android.media.AudioAttributes
 import android.media.AudioFormat
-import android.os.Build
-import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
-import android.os.ParcelFileDescriptor
 import android.os.SystemClock
-import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
-import android.speech.tts.Voice
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -27,27 +20,37 @@ import com.elyndra.launcher.ui.masha.lipsync.CmuDict
 import com.elyndra.launcher.ui.masha.lipsync.G2p
 import com.elyndra.launcher.ui.masha.lipsync.Utterance
 import com.elyndra.launcher.ui.masha.lipsync.VowelProfile
+import com.elyndra.launcher.ui.masha.voice.HalfbandDecimator
+import com.elyndra.launcher.ui.masha.voice.NeuralVoiceEngine
+import com.elyndra.launcher.ui.masha.voice.SpeechNormalizer
+import com.elyndra.launcher.ui.masha.voice.SynthesisCallback
+import com.elyndra.launcher.ui.masha.voice.SynthesisRequest
+import com.elyndra.launcher.ui.masha.voice.SystemTtsEngine
+import com.elyndra.launcher.ui.masha.voice.VoiceInfo
+import com.elyndra.launcher.ui.masha.voice.VoiceRouter
 import java.io.File
-import java.io.RandomAccessFile
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * La voz de Masha (texto a voz del sistema) con sincronía de labios.
+ * La voz de Masha con sincronía de labios.
  *
  * - Habla **mientras** llega la respuesta: cada frase completa se manda al
  *   motor en cuanto aparece, sin esperar al final del streaming.
- * - El motor **sintetiza** (`synthesizeToFile`) y su PCM llega por
- *   `onAudioAvailable` a trozos: se escribe al momento en un AudioTrack propio
- *   ([SpeechOutput]), que empieza a sonar con ~200 ms de margen. La frase
- *   siguiente se sintetiza mientras suena esta (la cola del motor), sin huecos.
- * - Con ese mismo PCM y los rangos de palabra (`onRangeStart`, con su trama de
- *   audio), un hilo de análisis construye las curvas de la boca de cada frase
- *   ([Utterance] → [LipSync.Item]); el render las lee al ritmo del reloj de audio.
- * - Si el motor no acepta `synthesizeToFile`, se habla con `speak()` como
- *   antes (el motor reproduce) y la boca va con el reloj de pared.
- * - Elige la mejor voz instalada del idioma de la app (local antes que en
- *   red, más calidad antes que menos) con un tono algo más alto.
+ * - **Motores** (ui/masha/voice, docs/MASHA_VOICE.md): la voz natural en el propio
+ *   móvil (Supertonic 3) si está instalada y el móvil puede con ella; si no, o si
+ *   falla en una frase, la voz del sistema. Los dos entregan PCM a trozos con la
+ *   misma forma ([SynthesisCallback]).
+ * - El PCM se escribe al momento en un AudioTrack propio ([SpeechOutput]), que
+ *   empieza a sonar con ~200 ms de margen. La frase siguiente se sintetiza
+ *   mientras suena esta, sin huecos.
+ * - Con ese mismo PCM (y los rangos de palabra si el motor los da), un hilo de
+ *   análisis construye las curvas de la boca de cada frase ([Utterance] →
+ *   [LipSync.Item]); el render las lee al ritmo del reloj de audio. La voz natural
+ *   va a 44,1 kHz: el análisis recibe una copia a la mitad, que es para lo que
+ *   está afinado.
+ * - Si el motor del sistema no acepta `synthesizeToFile`, habla con `speak()` y
+ *   la boca va con el reloj de pared.
  *
  * La voz es opcional: sin motor TTS, o con la voz apagada en su panel, Masha
  * sigue escribiendo igual. [presence] (hablando o no) se toca solo desde el
@@ -82,7 +85,6 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
     private val worker = HandlerThread("masha-lipsync").apply { start() }
     private val work = Handler(worker.looper)
 
-    private var ready = false
     private var released = false
     private var lang: String? = null
     private var seq = 0
@@ -92,16 +94,20 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
     private var feedingId: Long = -1
     private var queuedUpTo = 0
 
+    /** Frases que llegaron antes de que hubiera motor: se dicen en cuanto lo hay. */
+    private val waiting = ArrayList<String>()
+
     /** Una frase en curso: su modelo (hilo de análisis) y su item de render. */
-    private inner class Job(val id: String, val text: String, val gen: Int, val sayNanos: Long) {
+    private inner class Job(val id: String, val text: String, val gen: Int, val sayNanos: Long, val voice: VoiceInfo) {
         val item = LipSync.Item(id)
         var utt: Utterance? = null // hilo de análisis
-        var file: File? = null
-        var pfd: ParcelFileDescriptor? = null
+        /** Copia a media frecuencia para el análisis (voz a 44,1 kHz), o null. */
+        @Volatile var decimator: HalfbandDecimator? = null
+        @Volatile var rate = 0
         @Volatile var chunks = 0
         @Volatile var firstChunkNanos = -1L
         @Volatile var synthDone = false
-        /** El hilo de análisis ya mandó el final a la salida (tras leer el WAV si hacía falta). */
+        /** El hilo de análisis ya mandó el final a la salida. */
         @Volatile var outputEnded = false
         @Volatile var speakMode = false
         var heard = false // hilo principal
@@ -115,20 +121,65 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
 
     // Hilo de análisis.
     private val profile = VowelProfile()
-    private var secPerWeight = 0.075f
+    private var secPerWeight = SEC_PER_WEIGHT
     @Volatile private var dict: CmuDict? = null
-    @Volatile private var voiceLocale: Locale = Locale.getDefault()
+    private var voiceId: String? = null
+    private var voiceLocale: Locale = Locale.getDefault()
 
     // Medida del tiempo hasta el primer sonido (hilo principal).
     private var runStartNanos = -1L
     private var runHeard = false
 
-    private val tts: TextToSpeech = TextToSpeech(app) { status ->
-        main.post {
-            if (released) return@post
-            ready = status == TextToSpeech.SUCCESS
-            if (ready) lang?.let { applyLanguage(it) }
+    private val system = SystemTtsEngine(app).apply { onChanged = { flushWaiting() } }
+    private val engine = VoiceRouter(NeuralVoiceEngine(app), system)
+
+    /** Lo que avisa el motor de cada frase (hilos del motor). */
+    private val callback = object : SynthesisCallback {
+        override fun onSelfPlayback(id: String) {
+            jobs[id]?.speakMode = true
         }
+
+        override fun onPlaybackStart(id: String) {
+            val j = jobs[id] ?: return
+            // En speak() el motor empieza a reproducir aquí: es el reloj del repuesto.
+            if (j.speakMode) j.item.startNanos = System.nanoTime()
+        }
+
+        override fun onBegin(id: String, sampleRate: Int, encoding: Int, channels: Int) {
+            val j = jobs[id] ?: return
+            if (j.gen != gen) return
+            if (j.speakMode) j.item.sampleRate = sampleRate else out.begin(j.item, sampleRate, encoding, channels)
+            j.rate = sampleRate
+            val half = sampleRate >= 32_000 && encoding == AudioFormat.ENCODING_PCM_16BIT && channels == 1
+            j.decimator = if (half) HalfbandDecimator() else null
+            val analysisRate = if (half) sampleRate / 2 else sampleRate
+            work.post { j.utt?.begin(analysisRate, encoding, channels) }
+        }
+
+        override fun onAudio(id: String, pcm: ByteArray) {
+            val j = jobs[id] ?: return
+            if (j.gen != gen) return
+            if (j.chunks++ == 0) j.firstChunkNanos = System.nanoTime()
+            if (!j.speakMode) out.data(j.item, pcm)
+            work.post {
+                // Fuera del hilo del motor (binder): escribir aquí retrasaba sus avisos.
+                if (BuildConfig.DEBUG) dump(j, pcm)
+                val d = j.decimator
+                j.utt?.audio(if (d != null) d.process(pcm) else pcm)
+                scheduleBuild(j, urgent = false)
+            }
+        }
+
+        override fun onRange(id: String, start: Int, end: Int, frame: Int) {
+            val j = jobs[id] ?: return
+            val f = if (j.decimator != null) frame / 2 else frame
+            work.post {
+                j.utt?.range(start, end, f)
+                scheduleBuild(j, urgent = false)
+            }
+        }
+
+        override fun onEnd(id: String, ok: Boolean) = synthesisEnded(id)
     }
 
     init {
@@ -136,88 +187,30 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
         refreshOffset()
         out.onPlay = { item ->
             val j = jobs[item.id]
-            if (j != null) Log.i(TAG, "play ${item.id}: ${(System.nanoTime() - j.sayNanos) / 1_000_000} ms desde la frase (chunks=${j.chunks})")
+            if (j != null) Log.i(TAG, "play ${item.id}: ${(System.nanoTime() - j.sayNanos) / 1_000_000} ms desde la frase (chunks=${j.chunks}, motor=${j.voice.engineId})")
         }
-        // Solo cuenta para speak() (repuesto); la pista propia lleva sus atributos en SpeechOutput.
-        tts.setAudioAttributes(
-            AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ASSISTANT)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .build(),
-        )
-        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String) {
-                val j = jobs[utteranceId] ?: return
-                // En speak() el motor empieza a reproducir aquí: es el reloj del repuesto.
-                if (j.speakMode) j.item.startNanos = System.nanoTime()
-            }
+        applySettings()
+    }
 
-            override fun onBeginSynthesis(utteranceId: String, sampleRateInHz: Int, audioFormat: Int, channelCount: Int) {
-                val j = jobs[utteranceId] ?: return
-                if (j.gen != gen) return
-                if (j.speakMode) j.item.sampleRate = sampleRateInHz else out.begin(j.item, sampleRateInHz, audioFormat, channelCount)
-                work.post { j.utt?.begin(sampleRateInHz, audioFormat, channelCount) }
-            }
-
-            override fun onAudioAvailable(utteranceId: String, audio: ByteArray) {
-                val j = jobs[utteranceId] ?: return
-                if (j.gen != gen) return
-                if (j.chunks++ == 0) j.firstChunkNanos = System.nanoTime()
-                if (!j.speakMode) out.data(j.item, audio)
-                work.post {
-                    j.utt?.audio(audio)
-                    scheduleBuild(j, urgent = false)
-                }
-            }
-
-            override fun onRangeStart(utteranceId: String, start: Int, end: Int, frame: Int) {
-                val j = jobs[utteranceId] ?: return
-                work.post {
-                    j.utt?.range(start, end, frame)
-                    scheduleBuild(j, urgent = false)
-                }
-            }
-
-            override fun onDone(utteranceId: String) = synthesisEnded(utteranceId, ok = true)
-
-            @Deprecated("Deprecated in Java")
-            override fun onError(utteranceId: String) = synthesisEnded(utteranceId, ok = false)
-
-            override fun onError(utteranceId: String, errorCode: Int) = synthesisEnded(utteranceId, ok = false)
-
-            override fun onStop(utteranceId: String, interrupted: Boolean) = synthesisEnded(utteranceId, ok = false)
-        })
+    /** Relee los ajustes de voz (voz natural, hablante, velocidad). */
+    fun applySettings() {
+        engine.naturalEnabled = store.mashaVoiceNatural
+        engine.neural.speaker = store.mashaVoiceSpeaker
+        system.setRate(store.mashaVoiceRate)
     }
 
     fun setLanguage(tag: String) {
         lang = tag
-        if (ready) applyLanguage(tag)
+        engine.setLanguage(tag)
+        engine.warmUp()
+        flushWaiting()
     }
 
-    private fun applyLanguage(tag: String) {
-        val locale = Locale.forLanguageTag(tag)
-        runCatching { tts.language = locale }
-        pickVoice(locale)?.let { runCatching { tts.voice = it } }
-        tts.setPitch(PITCH)
-        tts.setSpeechRate(RATE)
-        val vl = runCatching { tts.voice?.locale }.getOrNull() ?: locale
-        warmUp()
-        work.post {
-            if (vl != voiceLocale) profile.reset()
-            voiceLocale = vl
-            if (vl.language == "en" && dict == null) loadDict()
-        }
-    }
-
-    /**
-     * El motor carga la voz la primera vez que sintetiza (~1 s medido en un Motorola
-     * edge 50 fusion): una palabra a un fichero desechable al elegir idioma, para que
-     * la primera frase de Masha no pague esa espera. El listener ignora este id.
-     */
-    private fun warmUp() {
-        val f = File(File(app.cacheDir, "masha_tts").apply { mkdirs() }, "warm.wav")
-        @Suppress("DEPRECATION")
-        runCatching { tts.synthesizeToFile("a", Bundle(), f, "warm") }
+    private fun flushWaiting() {
+        if (released || !engine.ready || waiting.isEmpty()) return
+        val pending = waiting.toList()
+        waiting.clear()
+        pending.forEach(::say)
     }
 
     private fun loadDict() {
@@ -229,26 +222,9 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
     }
 
     /**
-     * La mejor voz del idioma: instalada, local, de más calidad y, si el motor
-     * lo dice en el nombre, femenina (Masha es ella). Null = la del motor.
-     */
-    private fun pickVoice(locale: Locale): Voice? = runCatching {
-        tts.voices.orEmpty()
-            .filter { it.locale.language == locale.language }
-            .filterNot { TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED in it.features.orEmpty() }
-            .maxByOrNull { v ->
-                var score = v.quality
-                if (!v.isNetworkConnectionRequired) score += 150
-                if (v.locale.country == locale.country) score += 60
-                if ("female" in v.name.lowercase() || "#female" in v.features.orEmpty().joinToString()) score += 220
-                score - v.latency / 10
-            }
-    }.getOrNull()
-
-    /**
      * Lee lo nuevo del mensaje [id] (texto completo hasta ahora). Mientras
      * llega ([final] = false) solo pone en cola frases terminadas; al final,
-     * el resto.
+     * el resto, también frase a frase (la primera suena antes).
      */
     fun feed(id: Long, text: String, final: Boolean) {
         if (id != feedingId) {
@@ -258,13 +234,26 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
         if (queuedUpTo >= text.length) return
         val end = if (final) text.length else lastSentenceEnd(text, queuedUpTo)
         if (end <= queuedUpTo) return
-        val chunk = speakable(text.substring(queuedUpTo, end))
+        for (s in sentences(text, queuedUpTo, end)) {
+            val chunk = speakable(s)
+            if (chunk.isNotBlank()) say(chunk)
+        }
         queuedUpTo = end
-        if (chunk.isNotBlank()) say(chunk)
     }
 
-    private fun say(text: String) {
-        if (!ready || released) return
+    private fun say(raw: String) {
+        if (released) return
+        val voice = engine.voice()
+        if (voice == null) {
+            // Aún sin motor (arrancando): se dice en cuanto lo haya, no se pierde.
+            if (waiting.size < MAX_WAITING) waiting += raw
+            return
+        }
+        val text = if (voice.wantsNormalizedText) {
+            runCatching { SpeechNormalizer.normalize(raw, voice.locale.language, region(voice.locale.language)) }.getOrDefault(raw)
+        } else {
+            raw
+        }
         routes.refresh()
         val now = System.nanoTime()
         if (order.isEmpty()) {
@@ -272,43 +261,57 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
             runHeard = false
         }
         val id = "masha-${seq++}"
-        if (BuildConfig.DEBUG) Log.d(TAG, "say $id: \"$text\"")
-        val j = Job(id, text, gen, now)
+        if (BuildConfig.DEBUG) Log.d(TAG, "say $id [${voice.engineId}]: \"$text\"")
+        val j = Job(id, text, gen, now, voice)
         jobs[id] = j
         order += j
         lip.add(j.item)
         // El modelo de la frase (G2P) se crea en el hilo de análisis, antes que cualquier aviso del motor.
         work.post {
+            if (voice.voiceId != voiceId || voice.locale != voiceLocale) {
+                // Otra voz: lo aprendido de la anterior (vocales, ritmo) no vale.
+                profile.reset()
+                secPerWeight = SEC_PER_WEIGHT
+                voiceId = voice.voiceId
+                voiceLocale = voice.locale
+            }
+            if (voiceLocale.language == "en" && dict == null) loadDict()
             val g2p = G2p.forLocale(voiceLocale, dict)
             j.utt = Utterance(text, g2p, seed = id.hashCode())
         }
-        val params = Bundle()
-        val result = runCatching { synthesize(j, params) }.getOrDefault(TextToSpeech.ERROR)
-        if (result != TextToSpeech.SUCCESS) {
-            // Repuesto: el motor reproduce (como antes).
-            closeFile(j)
-            j.speakMode = true
-            tts.speak(text, TextToSpeech.QUEUE_ADD, params, id)
+        if (!engine.synthesize(SynthesisRequest(id, text, rate = moodRate()), voice, callback)) {
+            synthesisEnded(id)
         }
         tick()
     }
 
-    private fun synthesize(j: Job, params: Bundle): Int {
-        val dir = File(app.cacheDir, "masha_tts").apply { mkdirs() }
-        val f = File(dir, "${j.id}.wav")
-        j.file = f
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val pfd = ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_TRUNCATE or ParcelFileDescriptor.MODE_READ_WRITE)
-            j.pfd = pfd
-            tts.synthesizeToFile(j.text, params, pfd, j.id)
-        } else {
-            @Suppress("DEPRECATION")
-            tts.synthesizeToFile(j.text, params, f, j.id)
+    /**
+     * Región para leer números y siglas ("3,5" = "tres coma cinco" en España, "punto" en
+     * México): el país del primer idioma del sistema que coincide; si no hay, ninguna (neutra).
+     */
+    private fun region(language: String): String? {
+        // Los idiomas del sistema, no los de la app: el de la app es solo "es" (sin país).
+        val system = android.content.res.Resources.getSystem().configuration.locales
+        for (i in 0 until system.size()) {
+            val l = system[i]
+            if (l.language == language && l.country.isNotEmpty()) return l.country
         }
+        return null
     }
 
+    /**
+     * Un matiz de ritmo según el ánimo (el motor natural no tiene tono ni estilo):
+     * algo más viva cuando juega, más pausada cuando consuela o piensa.
+     */
+    private fun moodRate(): Float = when (presence.mood) {
+        MashaMood.Playful -> 1.04f
+        MashaMood.Concerned -> 0.95f
+        MashaMood.Warm, MashaMood.Thinking -> 0.97f
+        else -> 1f
+    } * (if (engine.voice()?.engineId == engine.neural.id) store.mashaVoiceRate else 1f)
+
     /** Fin de la síntesis de una frase (cualquier hilo del motor). */
-    private fun synthesisEnded(id: String, ok: Boolean) {
+    private fun synthesisEnded(id: String) {
         val j = jobs[id] ?: return
         if (j.synthDone) return
         j.synthDone = true
@@ -322,12 +325,8 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
             return
         }
         work.post {
-            closeFile(j)
-            // Motores que no dan onAudioAvailable al sintetizar a fichero: se lee el WAV.
-            if (ok && j.chunks == 0 && j.gen == gen) readWav(j)
             out.end(j.item)
             j.outputEnded = true
-            j.file?.delete()
             j.utt?.finish()
             scheduleBuild(j, urgent = true)
             learn(j)
@@ -335,53 +334,18 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
         main.post { tick() }
     }
 
-    private fun closeFile(j: Job) {
-        runCatching { j.pfd?.close() }
-        j.pfd = null
-    }
-
-    /** Lee el PCM de un WAV (cabecera RIFF) y lo pasa como si hubiera llegado a trozos. */
-    private fun readWav(j: Job) {
-        val f = j.file ?: return
+    /**
+     * QA (solo debug): con `cache/voice_dump.on` presente, el PCM de cada frase tal como va
+     * a la salida se guarda en `cache/voice_dump/<frase>_<frecuencia>.pcm` (16 bits mono).
+     * Android no deja grabar la voz (USAGE_ASSISTANT), así se escucha y se mide en escritorio.
+     */
+    private fun dump(j: Job, pcm: ByteArray) {
+        if (!File(app.cacheDir, "voice_dump.on").exists()) return
+        val sr = j.rate.takeIf { it > 0 } ?: return
         runCatching {
-            RandomAccessFile(f, "r").use { raf ->
-                val head = ByteArray(12)
-                raf.readFully(head)
-                if (String(head, 0, 4) != "RIFF" || String(head, 8, 4) != "WAVE") return
-                var sr = 0; var ch = 1; var bits = 16
-                val hdr = ByteArray(8)
-                while (raf.filePointer + 8 <= raf.length()) {
-                    raf.readFully(hdr)
-                    val tag = String(hdr, 0, 4)
-                    val size = le32(hdr, 4)
-                    if (tag == "fmt ") {
-                        val fmt = ByteArray(size)
-                        raf.readFully(fmt)
-                        ch = le16(fmt, 2); sr = le32(fmt, 4); bits = le16(fmt, 14)
-                    } else if (tag == "data") {
-                        val len = minOf(size.toLong().takeIf { it > 0 } ?: Long.MAX_VALUE, raf.length() - raf.filePointer).toInt()
-                        val data = ByteArray(len)
-                        raf.readFully(data)
-                        val enc = when (bits) { 8 -> AudioFormat.ENCODING_PCM_8BIT; 32 -> AudioFormat.ENCODING_PCM_FLOAT; else -> AudioFormat.ENCODING_PCM_16BIT }
-                        out.begin(j.item, sr, enc, ch)
-                        j.utt?.begin(sr, enc, ch)
-                        val step = sr / 10 * ch * (bits / 8)
-                        var o = 0
-                        while (o < data.size) {
-                            val part = data.copyOfRange(o, minOf(data.size, o + step))
-                            out.data(j.item, part)
-                            j.utt?.audio(part)
-                            o += step
-                        }
-                        j.chunks = 1
-                        Log.i(TAG, "${j.id}: el motor no dio PCM al sintetizar; leído del WAV ($len B)")
-                        return
-                    } else {
-                        raf.seek(raf.filePointer + size)
-                    }
-                }
-            }
-        }.onFailure { Log.w(TAG, "WAV ${j.id}", it) }
+            val dir = File(app.cacheDir, "voice_dump").apply { mkdirs() }
+            File(dir, "${j.id}_${j.voice.engineId}_$sr.pcm").appendBytes(pcm)
+        }
     }
 
     /* ── hilo de análisis ── */
@@ -420,7 +384,7 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
                     u.rangesSeen > 0 -> "texto+rangos"
                     else -> "texto sin rangos"
                 }
-            }, ${f.count * 10} ms",
+            }, ${f.count * 10} ms, motor=${j.voice.engineId}",
         )
     }
 
@@ -445,7 +409,7 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
                     // Cuándo empezó a oírse de verdad: ahora menos lo que ya lleva sonando.
                     val heardAt = now - (t * 1e9).toLong()
                     val first = if (j.firstChunkNanos > 0) (j.firstChunkNanos - j.sayNanos) / 1_000_000 else -1
-                    Log.i(TAG, "tiempo hasta el primer sonido: ${(heardAt - runStartNanos) / 1_000_000} ms (primer PCM a los $first ms, modo=${if (j.speakMode) "speak" else "stream"})")
+                    Log.i(TAG, "tiempo hasta el primer sonido: ${(heardAt - runStartNanos) / 1_000_000} ms (primer PCM a los $first ms, modo=${if (j.speakMode) "speak" else "stream"}, motor=${j.voice.engineId})")
                 }
             }
             val done = j.gen != gen || (j.speakMode && j.synthDone) || (j.outputEnded && out.finished(j.item, now))
@@ -467,14 +431,11 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
     fun stop() {
         if (released) return
         gen++
-        tts.stop()
+        engine.stop(jobs.keys.toList())
         out.stop()
-        for (j in order) {
-            closeFile(j)
-            j.file?.delete()
-        }
         order.clear()
         jobs.clear()
+        waiting.clear()
         lip.clear()
         feedingId = -1
         speakingOff()
@@ -490,12 +451,11 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
         stop()
         released = true
         main.removeCallbacksAndMessages(null)
-        runCatching { tts.shutdown() }
+        engine.release()
         out.release()
         routes.release()
         lip.clock = null
         worker.quitSafely()
-        runCatching { File(app.cacheDir, "masha_tts").listFiles()?.forEach { it.delete() } }
     }
 
     private fun speakingOff() {
@@ -505,11 +465,11 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
 
     companion object {
         private const val TAG = "MashaVoice"
-        const val PITCH = 1.06f
-        const val RATE = 1.0f
         private const val CMUDICT = "lipsync/cmudict.txt"
         private const val TICK_MS = 50L
         private const val BUILD_MS = 40L
+        private const val SEC_PER_WEIGHT = 0.075f
+        private const val MAX_WAITING = 12
 
         // Los signos CJK (。！？) no llevan espacio detrás: cierran la frase por sí solos.
         private val SENTENCE_END = Regex("[.!?…]+[\"'»”)]*(\\s|$)|[。！？]+[」』）”]*|\\n+")
@@ -528,6 +488,28 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
             return end
         }
 
+        /**
+         * [from, to) partido en frases (las muy cortas, con la siguiente). Lo que
+         * queda sin punto al final va como última frase.
+         */
+        fun sentences(text: String, from: Int, to: Int): List<String> {
+            val out = ArrayList<String>()
+            var start = from
+            for (m in SENTENCE_END.findAll(text.substring(0, to), from)) {
+                val end = m.range.last + 1
+                if (spokenLength(text, start, end) >= MIN_CHUNK) {
+                    out += text.substring(start, end)
+                    start = end
+                }
+            }
+            if (start < to) {
+                val tail = text.substring(start, to)
+                // Un final corto ("¡Suerte!") se une a la frase anterior.
+                if (out.isNotEmpty() && spokenLength(text, start, to) < MIN_CHUNK) out[out.lastIndex] += tail else out += tail
+            }
+            return out
+        }
+
         /** Largo "hablado": un carácter CJK (kana, kanji, hangul) vale ~una sílaba, como tres letras. */
         private fun spokenLength(text: String, from: Int, to: Int): Int {
             var n = 0
@@ -540,9 +522,6 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
             s.replace(URL, " ").replace(MARKUP, " ").replace(EMOJI, "").replace(SPACES, " ").trim()
 
         private const val MIN_CHUNK = 18
-
-        private fun le16(b: ByteArray, o: Int) = (b[o].toInt() and 0xFF) or ((b[o + 1].toInt() and 0xFF) shl 8)
-        private fun le32(b: ByteArray, o: Int) = le16(b, o) or (le16(b, o + 2) shl 16)
     }
 }
 
