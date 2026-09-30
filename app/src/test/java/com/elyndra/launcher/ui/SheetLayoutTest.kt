@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui
 
+import com.elyndra.launcher.ui.components.ArtFallback
 import com.elyndra.launcher.ui.SheetLayout.Move
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -29,7 +30,7 @@ class SheetLayoutTest {
             SheetGroup(null, listOf(refresh)),
             SheetGroup(null, listOf(remove)),
         ),
-        hero = if (hero) SheetHero() else null,
+        hero = if (hero) SheetHero(fallback = ArtFallback("game", "Game")) else null,
     )
 
     @Test
