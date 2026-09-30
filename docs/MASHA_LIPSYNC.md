@@ -221,6 +221,8 @@ cejas, cabeceos, parpadeos). El render las lee en la posición que **se oye** (r
 
 ### Voz: arranque rápido y sin huecos
 
+> Motores de voz (voz natural Supertonic 3 en el dispositivo + voz del sistema de repuesto), normalización del texto y licencias: [MASHA_VOICE.md](MASHA_VOICE.md). La voz natural va a 44,1 kHz y el análisis recibe una copia a 22,05 kHz.
+
 - Cada frase terminada del streaming va al motor en cuanto aparece (como antes). El motor
   sintetiza en su cola: la frase N+1 se sintetiza mientras suena la N.
 - `onAudioAvailable` entrega el PCM a trozos (normalmente mucho más rápido que el tiempo real).
@@ -415,7 +417,7 @@ morphs con los dos GLB y las reglas del contrato).
 
 | Componente | Licencia | Notas |
 |---|---|---|
-| Voz | del sistema | `TextToSpeech` de Android, sin coste, local |
+| Voz | Supertonic 3 (OpenRAIL-M) sobre ONNX Runtime (MIT); repuesto: `TextToSpeech` del sistema | en el dispositivo, sin coste; detalle en [MASHA_VOICE.md](MASHA_VOICE.md) |
 | CMUdict | BSD-2-Clause, © 1993-2015 Carnegie Mellon University | aviso completo en `assets/lipsync/CMUDICT_LICENSE.txt` (va dentro del APK); hay que reproducirlo también en los avisos de licencias de la app |
 | Coarticulación | Cohen & Massaro (1993), modelo publicado | implementación propia |
 | Solo audio | idea de uLipSync (MIT) | implementación propia (LPC/formantes), sin código copiado |
