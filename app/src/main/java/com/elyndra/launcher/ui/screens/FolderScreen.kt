@@ -33,6 +33,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.elyndra.launcher.ui.theme.shapeClickable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -159,7 +164,7 @@ fun FolderScreen(vm: ElyndraViewModel) {
                                 .alpha(if (item.emulatorInstalled) 1f else 0.6f)
                                 .darkGlass(RoundedCornerShape(11.dp))
                                 .consoleFocus(vm.input.isBarFocused(BarItem.Emulator), cornerRadius = 11.dp)
-                                .clickable { vm.pickFolderEmulator(item.folder) }
+                                .shapeClickable(RoundedCornerShape(11.dp)) { vm.pickFolderEmulator(item.folder) }
                                 .padding(horizontal = 11.dp),
                             contentAlignment = Alignment.CenterStart,
                         ) {
@@ -314,6 +319,31 @@ fun FolderScreen(vm: ElyndraViewModel) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ElyText(stringResource(R.string.roms_header), size = 9.5f, weight = FontWeight.SemiBold, color = P.ink2, letterSpacing = tracking(0.24f))
+                // PS4: los .pkg que aún no se han extraído no son juegos; se
+                // cuentan aquí, discretos, y llevan a Bachata para instalarlos.
+                val notInstalled = vm.ps4NotInstalled[item.folder.id] ?: 0
+                if (notInstalled > 0) {
+                    Spacer(Modifier.width(8.dp))
+                    val pillShape = RoundedCornerShape(9.dp)
+                    Box(
+                        Modifier
+                            .weight(1f, fill = false)
+                            .clip(pillShape)
+                            .background(P.chip)
+                            .border(1.dp, P.ink.copy(alpha = 0.12f), pillShape)
+                            .shapeClickable(pillShape) { vm.openBachata() }
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    ) {
+                        ElyText(
+                            pluralStringResource(R.plurals.ps4_pkgs_not_installed, notInstalled, notInstalled),
+                            size = 8.5f,
+                            weight = FontWeight.Medium,
+                            color = P.ink2,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
                 Spacer(Modifier.weight(1f))
                 ElyText(
                     pluralStringResource(R.plurals.roms_summary, roms.size, roms.size, fmtMinutes(item.minutes)),
@@ -373,8 +403,10 @@ fun FolderScreen(vm: ElyndraViewModel) {
                                 onCoverMaterialized = { vm.finishMaterializeArt() },
                                 onTap = { vm.selectRom(r.key) },
                                 onOpen = { vm.openRom(r) },
-                                onLongPress = {
+                                onBounds = vm::noteSelectedCard,
+                                onLongPress = { bounds ->
                                     vm.selectRom(r.key)
+                                    vm.markSheetOrigin(bounds)
                                     vm.romOptions(r)
                                 },
                             )
@@ -412,10 +444,14 @@ private fun RomTile(
     onCoverMaterialized: () -> Unit,
     onTap: () -> Unit,
     onOpen: () -> Unit,
-    onLongPress: () -> Unit,
+    /** Recibe el rectángulo de la card en la ventana: el menú sale de ahí. */
+    onLongPress: (Rect) -> Unit,
+    /** Rectángulo de la card mientras está seleccionada (el menú sale de ahí con el mando). */
+    onBounds: (Rect) -> Unit = {},
 ) {
     val skin = LocalSkin.current
     val shape = RoundedCornerShape(12.dp)
+    val bounds = remember { arrayOf(Rect.Zero) }
     val lift = selectionLift(selected)
     val scale = selectionScale(selected)
     val press = rememberPress()
@@ -439,12 +475,16 @@ private fun RomTile(
             .width(width)
             .offset(y = lift)
             .animPopIn(delayMs = minOf(index, 12) * 35, key = rom.id)
+            .onGloballyPositioned {
+                bounds[0] = it.boundsInWindow()
+                if (selected) onBounds(bounds[0])
+            }
             .pointerInput(rom.id) {
                 detectTapGestures(
                     onPress = { press.track(this) },
                     onTap = { tap() },
                     onDoubleTap = { open() },
-                    onLongPress = { longPress() },
+                    onLongPress = { longPress(bounds[0]) },
                 )
             },
         horizontalAlignment = Alignment.CenterHorizontally,

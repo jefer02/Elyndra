@@ -44,6 +44,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.indication
+import com.elyndra.launcher.ui.theme.focusRing
+import com.elyndra.launcher.ui.theme.shapeClickable
+import com.elyndra.launcher.ui.theme.outerShadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.alpha
@@ -335,8 +340,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                 // "Ordenar por": el criterio en curso hace de etiqueta del botón.
                 Box(
                     Modifier
-                        .clip(RoundedCornerShape(9.dp))
-                        .clickable { vm.sortOptions() }
+                        .shapeClickable(RoundedCornerShape(9.dp)) { vm.sortOptions() }
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                 ) {
                     ElyText(
@@ -394,10 +398,11 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                                         pairIndex = vm.pairIndexOf(item),
                                         onTap = { vm.select(item.key) },
                                         onOpen = { vm.requestOpen(item) },
-                                        onLongPress = { center ->
+                                        onBounds = vm::noteSelectedCard,
+                                        onLongPress = { bounds ->
                                             vm.select(item.key)
                                             // De aquí sale el overlay.
-                                            vm.markSheetOrigin(center)
+                                            vm.markSheetOrigin(bounds)
                                             vm.itemOptions(item)
                                         },
                                     )
@@ -472,7 +477,7 @@ private fun FilterTab(label: String, active: Boolean, onClick: () -> Unit) {
     Column(
         Modifier
             .width(IntrinsicSize.Max)
-            .clickable(onClick = onClick)
+            .shapeClickable(RoundedCornerShape(9.dp), onClick = onClick)
             .padding(start = 9.dp, end = 9.dp, top = 4.dp, bottom = 1.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -638,16 +643,17 @@ private fun MashaFab(vm: ElyndraViewModel, metrics: Metrics, bobClock: FloatCloc
                     translationY = kotlin.math.sin(bobClock.seconds / 4f * 2f * Math.PI.toFloat()) * 3.dp.toPx() * bob.value
                 }
             }
-            .shadow(
+            // Una sola sombra y solo por fuera: el botón es de cristal y una
+            // sombra de elevación se veía a través de él.
+            .outerShadow(
                 if (dragging) 22.dp else 14.dp,
                 shape,
-                clip = false,
                 ambientColor = if (dragging) particleColor else P.shade.copy(alpha = 0.3f),
                 spotColor = if (dragging) particleColor else P.shade.copy(alpha = 0.3f),
             )
-            .glass(shape)
-            .consoleFocus(vm.input.isBarFocused(BarItem.Masha), cornerRadius = MASHA_FAB / 2)
-            .clickable { vm.go(Screen.Masha) }
+            .glass(shape, shadow = 0.dp)
+            .consoleFocus(vm.input.isBarFocused(BarItem.Masha), shape)
+            .shapeClickable(shape) { vm.go(Screen.Masha) }
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = {
@@ -750,11 +756,14 @@ private fun AddTile(metrics: Metrics, focused: Boolean, sparkColor: Color?, onCl
     val sparkFrame = sparkColor?.takeIf { focused }
     val sparks = sparkFrame != null
     val frameColor = sparkFrame ?: skin.a1
+    // Se pulsa toda la columna (tile y rótulo), pero el realce se dibuja solo
+    // en el tile, con su forma: comparten la fuente de interacciones.
+    val interaction = remember { MutableInteractionSource() }
     Column(
         Modifier
             .width(metrics.iconTile)
             .offset(y = lift)
-            .clickable(onClick = onClick),
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
@@ -767,6 +776,7 @@ private fun AddTile(metrics: Metrics, focused: Boolean, sparkColor: Color?, onCl
                 }
                 .neonParticles(sparks, frameColor)
                 .glass(shape, borderColor = skin.a1.copy(alpha = 0.6f))
+                .indication(interaction, focusRing(shape))
                 .then(if (focused) Modifier.border(6.dp, frameColor, shape) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
@@ -797,8 +807,10 @@ private fun LibraryTile(
     pairIndex: Int,
     onTap: () -> Unit,
     onOpen: () -> Unit,
-    /** Recibe el centro de la card en la ventana: el menú de acciones sale de ahí. */
-    onLongPress: (Offset) -> Unit,
+    /** Recibe el rectángulo de la card en la ventana: el menú de acciones sale de ahí. */
+    onLongPress: (Rect) -> Unit,
+    /** Rectángulo de la card mientras está seleccionada (el menú sale de ahí con el mando). */
+    onBounds: (Rect) -> Unit = {},
 ) {
     val skin = LocalSkin.current
     // Juegos Android y carpetas de emulador se representan con icono, no con
@@ -829,7 +841,10 @@ private fun LibraryTile(
         Modifier
             .width(width)
             .offset(y = lift)
-            .onGloballyPositioned { cardBounds = it.boundsInWindow() }
+            .onGloballyPositioned {
+                cardBounds = it.boundsInWindow()
+                if (selected) onBounds(cardBounds)
+            }
             // La escala del tirón se lee en fase de dibujo: mover la card no
             // recompone ni la lista ni la pantalla.
             .graphicsLayer {
@@ -848,7 +863,7 @@ private fun LibraryTile(
                         scope.launch {
                             launch { magnetic.run() }
                             delay(MAGNETIC_PULL_MS.toLong())
-                            longPress(cardBounds.center)
+                            longPress(cardBounds)
                         }
                     },
                 )
@@ -866,10 +881,11 @@ private fun LibraryTile(
                 // Tras la escala (la acompañan) y antes del recorte: las chispas
                 // caen por el marco, encima de la card, y su halo asoma fuera.
                 .neonParticles(sparks, frameColor)
-                .shadow(
+                // Solo por fuera: la card es cristal translúcido y una sombra de
+                // elevación asomaba a través de ella, detrás del icono.
+                .outerShadow(
                     if (press.pressed) 4.dp else if (selected) 16.dp else 8.dp,
                     shape,
-                    clip = false,
                     ambientColor = glowColor,
                     spotColor = glowColor,
                 )

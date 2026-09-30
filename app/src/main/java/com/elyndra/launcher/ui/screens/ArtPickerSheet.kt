@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.elyndra.launcher.ui.theme.shapeClickable
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -157,7 +158,7 @@ private fun CandidateCell(
                 .clip(shape)
                 .background(P.ink.copy(alpha = 0.06f))
                 .border(1.dp, Color.White.copy(alpha = 0.6f), shape)
-                .clickable(enabled = !dimmed && !applying, onClick = onClick),
+                .shapeClickable(shape, enabled = !dimmed && !applying, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
             AsyncImage(
