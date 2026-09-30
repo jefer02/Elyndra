@@ -27,6 +27,8 @@ data class RomRef(
      * entregando sea la carpeta del juego con su .exe.
      */
     val idIsAssigned: Boolean = false,
+    /** Id del juego según el propio juego (TITLE_ID de PS4; ver RomEntry.serial). */
+    val serial: String? = null,
 )
 
 /** Intent descrito sin clases de Android, para poder probarlo en la JVM. */
@@ -59,6 +61,8 @@ sealed interface PlanResult {
      * el propio runtime (ver PcGames.Launcher).
      */
     data object NeedsPcLauncher : PlanResult
+    /** El emulador arranca por id de juego (PS4) y este no tiene uno válido. */
+    data object NeedsTitleId : PlanResult
 }
 
 object LaunchPlanner {
@@ -110,6 +114,10 @@ object LaunchPlanner {
                 ExtraValue.VitaTitleArgs -> {
                     val id = rom.vitaTitleId?.takeIf { it.isNotBlank() } ?: return PlanResult.NeedsVitaTitle
                     arrays[extra.key] = listOf("-r", id)
+                }
+                ExtraValue.TitleId -> {
+                    strings[extra.key] = rom.serial?.takeIf { com.elyndra.launcher.library.Ps4.isTitleId(it) }
+                        ?: return PlanResult.NeedsTitleId
                 }
                 ExtraValue.WinShortcut -> {
                     // El runtime lee el archivo por su cuenta: si no es un

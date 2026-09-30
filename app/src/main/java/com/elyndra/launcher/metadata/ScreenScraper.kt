@@ -236,6 +236,8 @@ class ScreenScraperClient(private val credentials: () -> SsCredentials) {
         crc: String?,
         md5: String?,
         sha1: String?,
+        /** Número de serie del juego (TITLE_ID de PS4, "CUSA00900"): identifica sin hash. */
+        serial: String? = null,
     ): SsGame? = try {
         val root = call(
             "jeuInfos.php",
@@ -247,6 +249,7 @@ class ScreenScraperClient(private val credentials: () -> SsCredentials) {
                 "crc" to crc,
                 "md5" to md5,
                 "sha1" to sha1,
+                "serialnum" to serial,
             ),
         )
         ScreenScraperParser.gameInfo(root)?.takeUnless { it.notGame }
