@@ -19,6 +19,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.indication
+import com.elyndra.launcher.ui.theme.focusRing
+import com.elyndra.launcher.ui.theme.shapeClickable
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -177,16 +182,24 @@ private fun GamesStrip(vm: ElyndraViewModel, a: MashaAttachment.Games) {
 
 @Composable
 private fun GameThumb(ref: MashaGameRef, onClick: () -> Unit) {
-    Column(Modifier.width(74.dp).clickable(onClick = onClick), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    // Se pulsa la miniatura y su título; el realce va solo en la miniatura, con su forma.
+    val interaction = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(10.dp)
+    Column(
+        Modifier.width(74.dp).clickable(interactionSource = interaction, indication = null, onClick = onClick),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
         Box(
             Modifier
                 .width(74.dp)
                 .height(if (ref.packageName != null) 74.dp else 100.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color.White.copy(alpha = 0.08f)),
+                .clip(shape)
+                .background(Color.White.copy(alpha = 0.08f))
+                .indication(interaction, focusRing(shape)),
         ) {
             if (ref.packageName != null) {
-                GameIcon(ref.artPath, ref.packageName, Modifier.fillMaxSize().padding(6.dp), ContentScale.Fit)
+                // El icono llena la miniatura: sin margen ni caja clara alrededor.
+                GameIcon(ref.artPath, ref.packageName, Modifier.fillMaxSize(), ContentScale.Crop)
             } else {
                 ArtImage(ref.artPath, pairIndexFor(ref.title), Modifier.fillMaxSize())
             }
@@ -210,7 +223,7 @@ private fun PlanCard(vm: ElyndraViewModel, plan: MashaAttachment.Plan, glow: Col
     ) {
         items.forEach { (ref, minutes) ->
             Row(
-                Modifier.fillMaxWidth().clickable { vm.showDetails(ref.key) },
+                Modifier.fillMaxWidth().shapeClickable(RoundedCornerShape(8.dp)) { vm.showDetails(ref.key) },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -287,7 +300,7 @@ internal fun HoloButton(label: String, glow: Color, onClick: () -> Unit) {
             .clip(RoundedCornerShape(10.dp))
             .background(glow.copy(alpha = 0.22f))
             .border(1.dp, glow.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
+            .shapeClickable(RoundedCornerShape(10.dp), onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 7.dp),
     ) {
         ElyText(label, size = 11.5f, weight = FontWeight.Bold, color = Holo.text, maxLines = 1)
