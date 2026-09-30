@@ -108,11 +108,18 @@ class LibraryRepository(private val store: LibraryStore, private val scope: Coro
         update { lib ->
             val folder = lib.folders.firstOrNull { it.id == folderId } ?: return@update lib
             val existing = lib.roms.filter { it.folderId == folderId }.associateBy { it.docId }
+            // Un juego con id propio (PS4) sigue siendo el mismo aunque su carpeta
+            // cambie de documento (se vuelve a extraer, se renombra).
+            val bySerial = lib.roms.filter { it.folderId == folderId && it.serial != null }.associateBy { it.serial }
             val added = mutableListOf<String>()
             // Lo que el usuario quitó no vuelve por un reanálisis: el archivo
             // sigue ahí, pero él ya dijo que no lo quiere en la biblioteca.
             val merged = found.filterNot { it.docId in folder.excluded }.map { f ->
-                existing[f.docId]?.copy(
+                (existing[f.docId] ?: f.serial?.let { bySerial[it] })?.copy(
+                    docId = f.docId,
+                    // El título real del juego (PARAM.SFO) se relee en cada análisis.
+                    title = f.title ?: existing[f.docId]?.title ?: bySerial[f.serial]?.title ?: f.name,
+                    serial = f.serial ?: existing[f.docId]?.serial,
                     fileName = f.name,
                     relPath = f.relPath,
                     size = f.size,
@@ -260,7 +267,8 @@ class LibraryRepository(private val store: LibraryStore, private val scope: Coro
         if (key.startsWith("f:")) folder(key.removePrefix("f:")) else null
 
     private fun newRom(folder: RomFolder, f: RomScanner.Found) = RomEntry(
-        id = romId(folder.id, f.docId),
+        // Con id propio (PS4), la identidad es el juego y no su carpeta.
+        id = romId(folder.id, f.serial?.let { "serial:$it" } ?: f.docId),
         folderId = folder.id,
         systemId = folder.systemId,
         docId = f.docId,
@@ -269,7 +277,8 @@ class LibraryRepository(private val store: LibraryStore, private val scope: Coro
         size = f.size,
         modified = f.modified,
         isDirectory = f.isDir,
-        title = Names.cleanTitle(f.name, stripExtension = !f.isDir || f.name.substringAfterLast('.', "").length in 2..5),
+        title = f.title ?: Names.cleanTitle(f.name, stripExtension = !f.isDir || f.name.substringAfterLast('.', "").length in 2..5),
+        serial = f.serial,
         mainDocId = f.mainDocId,
         mainFile = f.mainFile,
         addedAt = System.currentTimeMillis(),
