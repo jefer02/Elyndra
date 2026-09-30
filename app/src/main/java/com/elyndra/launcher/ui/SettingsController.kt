@@ -22,9 +22,13 @@ import com.elyndra.launcher.metadata.FailureKind
 import com.elyndra.launcher.metadata.Service
 import com.elyndra.launcher.ui.masha.lipsync.AudioRoute
 import com.elyndra.launcher.ui.masha.lipsync.AudioRouteOffsets
+import com.elyndra.launcher.ui.masha.voice.NeuralRuntime
+import com.elyndra.launcher.ui.masha.voice.VoicePack
+import com.elyndra.launcher.ui.masha.voice.VoicePreview
 import com.elyndra.launcher.ui.theme.ElyndraSkin
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
@@ -170,6 +174,72 @@ class SettingsController(private val vm: ElyndraViewModel) {
     fun toggleMashaVoice() {
         mashaVoice = !mashaVoice
         store.mashaVoice = mashaVoice
+    }
+
+    /* Voz natural (Supertonic en el móvil): descarga, voz, velocidad y prueba. */
+
+    var mashaVoiceNatural by mutableStateOf(store.mashaVoiceNatural); private set
+    var mashaVoiceSpeaker by mutableIntStateOf(store.mashaVoiceSpeaker); private set
+    var mashaVoiceRate by mutableStateOf(store.mashaVoiceRate); private set
+
+    /** Estado del modelo (descargado, bajando, error…). */
+    val voicePack get() = VoicePack.state
+
+    /** El móvil tiene 64 bits y memoria de sobra para la voz natural. */
+    val voiceHardwareOk: Boolean by lazy { NeuralRuntime.hardwareOk(vm.app) }
+
+    /** La voz natural resultó demasiado lenta en este móvil: habla la del sistema. */
+    /** Se lee al pintar (la medida cambia mientras Masha habla); [voiceTick] fuerza el repintado. */
+    val voiceTooSlow: Boolean get() = voiceTick.let { NeuralRuntime.tooSlow(vm.app) }
+    private var voiceTick by mutableIntStateOf(0)
+
+    /** Olvida la medida de velocidad: la voz natural vuelve a probarse en la próxima conversación. */
+    fun retryVoiceSpeed() {
+        NeuralRuntime.resetRtf(vm.app)
+        voiceTick++
+    }
+
+    private var voiceDownload: Job? = null
+    private val preview by lazy { VoicePreview(vm.app) }
+
+    init {
+        VoicePack.refresh(vm.app)
+    }
+
+    fun toggleMashaVoiceNatural() {
+        mashaVoiceNatural = !mashaVoiceNatural
+        store.mashaVoiceNatural = mashaVoiceNatural
+    }
+
+    fun updateMashaVoiceSpeaker(sid: Int) {
+        mashaVoiceSpeaker = sid.coerceIn(0, 4)
+        store.mashaVoiceSpeaker = mashaVoiceSpeaker
+    }
+
+    fun updateMashaVoiceRate(rate: Float) {
+        // En pasos de 5 %: el deslizador no deja valores raros.
+        mashaVoiceRate = (Math.round(rate * 20f) / 20f).coerceIn(0.8f, 1.25f)
+        store.mashaVoiceRate = mashaVoiceRate
+    }
+
+    fun downloadVoice() {
+        if (voiceDownload?.isActive == true) return
+        voiceDownload = vm.viewModelScope.launch { VoicePack.download(vm.app) }
+    }
+
+    fun cancelVoiceDownload() {
+        voiceDownload?.cancel()
+    }
+
+    fun deleteVoice() {
+        voiceDownload?.cancel()
+        preview.stop()
+        VoicePack.delete(vm.app)
+    }
+
+    /** Una frase de prueba con la voz y la velocidad elegidas, en el idioma de la app. */
+    fun previewVoice(text: String) {
+        preview.play(text, lang, mashaVoiceSpeaker, mashaVoiceRate)
     }
 
     var mashaSoundscape by mutableStateOf(store.mashaSoundscape); private set

@@ -3,8 +3,14 @@ package com.elyndra.launcher.ui
 import android.app.Application
 import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
+import com.elyndra.launcher.data.ArtOrigin
+import com.elyndra.launcher.metadata.LocalImage
+import com.elyndra.launcher.metadata.LocalMedia
+import com.elyndra.launcher.launch.BachataS4
+import com.elyndra.launcher.library.Ps4
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -21,6 +27,7 @@ import com.elyndra.launcher.data.PlaySession
 import com.elyndra.launcher.data.RomEntry
 import com.elyndra.launcher.data.RomFolder
 import com.elyndra.launcher.data.Systems
+import com.elyndra.launcher.data.fmtMinutes
 import com.elyndra.launcher.data.pairIndexFor
 import com.elyndra.launcher.launch.GameLauncher
 import com.elyndra.launcher.library.InstalledApp
@@ -91,13 +98,19 @@ class ElyndraViewModel @Inject constructor(
     var sheet by mutableStateOf<ActionSheetSpec?>(null); private set
 
     /**
-     * Centro de la card que abrió el menú, en coordenadas de ventana.
+     * La card que abrió el menú (su rectángulo en coordenadas de ventana).
      *
-     * El overlay crece desde ahí, así que el menú sale literalmente de lo que
-     * se mantuvo pulsado. Null = no se sabe (mando, menú de la app): entonces
-     * crece desde su propio centro.
+     * El overlay se transforma desde ahí, así que el menú sale literalmente de
+     * lo que se mantuvo pulsado (o de la card señalada, con mando). Null = no
+     * viene de una card (menú de la app, ordenar…): aparece en su sitio.
      */
-    var sheetOrigin by mutableStateOf<Offset?>(null); private set
+    var sheetOrigin by mutableStateOf<Rect?>(null); private set
+
+    /** Rectángulo de la card seleccionada: de ahí sale el menú cuando se abre con el mando. */
+    private var selectedCardBounds: Rect? = null
+
+    /** Rectángulo de la card que se acaba de mantener pulsada (lo consume el siguiente menú). */
+    private var pendingOrigin: Rect? = null
     var detailsKey by mutableStateOf<String?>(null); private set
     var achievements by mutableStateOf<AchievementsState>(AchievementsState.Idle); private set
     var toast by mutableStateOf<UiText?>(null); private set
@@ -487,6 +500,13 @@ class ElyndraViewModel @Inject constructor(
             startSession(rom.key, emuId, pkg)
             return
         }
+        // No se pudo arrancar el juego directamente: el emulador está abierto y
+        // el usuario lo elige dentro. La sesión se mide igual.
+        if (outcome == GameLauncher.Outcome.OpenedApp) {
+            startSession(rom.key, emuId, pkg)
+            showToast(UiText.res(R.string.toast_pick_game_in_app, emuName))
+            return
+        }
         when (outcome) {
             GameLauncher.Outcome.NotInstalled -> emulatorMissing(emuId, emuName, folder, rom)
             GameLauncher.Outcome.NeedsPath -> showDialog(
@@ -531,7 +551,7 @@ class ElyndraViewModel @Inject constructor(
                     dismiss = DialogButton(UiText.res(R.string.close)) {},
                 ),
             )
-            GameLauncher.Outcome.Started -> Unit
+            GameLauncher.Outcome.Started, GameLauncher.Outcome.OpenedApp -> Unit
         }
     }
 
@@ -587,7 +607,7 @@ class ElyndraViewModel @Inject constructor(
 
     /** La línea de Masha en el velo, en palabras. */
     private fun outcomeId(outcome: GameLauncher.Outcome): String = when (outcome) {
-        GameLauncher.Outcome.Started -> LaunchOutcome.STARTED
+        GameLauncher.Outcome.Started, GameLauncher.Outcome.OpenedApp -> LaunchOutcome.STARTED
         GameLauncher.Outcome.NotInstalled -> LaunchOutcome.NOT_INSTALLED
         GameLauncher.Outcome.NeedsPath -> LaunchOutcome.NEEDS_PATH
         GameLauncher.Outcome.NeedsVitaTitle -> LaunchOutcome.NEEDS_VITA_TITLE
@@ -725,7 +745,11 @@ class ElyndraViewModel @Inject constructor(
             refreshInstalled()
             if (library.folders.isNotEmpty() && System.currentTimeMillis() - library.lastAutoScan > AUTO_RESCAN_MS) {
                 repo.markAutoScan(System.currentTimeMillis())
+                lastPs4Scan = System.currentTimeMillis()
                 library.folders.forEach { rescan(it, silent = true) }
+            } else {
+                // Lo que se instaló en Bachata mientras tanto aparece al volver.
+                rescanPs4Folders()
             }
         }
     }
@@ -839,16 +863,100 @@ class ElyndraViewModel @Inject constructor(
     suspend fun rescan(folder: RomFolder, silent: Boolean): LibraryRepository.ScanDiff? {
         if (!app.files.hasPermission(folder.treeUri)) return null
         val system = Systems.byId(folder.systemId) ?: return null
-        val found = runCatching { app.scanner.scan(Uri.parse(folder.treeUri), folder.rootDocId, system) }.getOrNull() ?: return null
+        val tree = Uri.parse(folder.treeUri)
+        val found = if (system.id == Ps4.SYSTEM_ID) {
+            val ps4 = runCatching { app.scanner.scanPs4(tree, folder.rootDocId) }.getOrNull() ?: return null
+            ps4NotInstalled = ps4NotInstalled + (folder.id to ps4.notInstalled.size)
+            ps4.found
+        } else {
+            runCatching { app.scanner.scan(tree, folder.rootDocId, system) }.getOrNull() ?: return null
+        }
         val before = library.roms.count { it.folderId == folder.id }
         if (found.isEmpty() && before > 0) {
             if (!silent) showToast(UiText.res(R.string.toast_folder_unreachable, folder.displayPath))
             return null
         }
         val diff = repo.mergeScan(folder.id, found)
+        if (system.id == Ps4.SYSTEM_ID) importPs4Art(folder)
         if (diff.added.isNotEmpty() && app.settings.autoMeta) engine.start(diff.added, force = false)
         if (!silent) showToast(UiText.res(R.string.toast_rescan, diff.added.size, diff.removed))
         return diff
+    }
+
+    /* ── PlayStation 4 (Bachata S4) ───────────────────────────── */
+
+    /**
+     * Paquetes de juego (.pkg) sin extraer en cada carpeta de PS4, por el id de
+     * la carpeta. Se recalcula en cada análisis; lo enseña la cabecera de la carpeta.
+     */
+    var ps4NotInstalled by mutableStateOf<Map<String, Int>>(emptyMap()); private set
+
+    private var lastPs4Scan = 0L
+
+    /**
+     * Carpetas de PS4 al volver a Elyndra (de Bachata, normalmente): los juegos
+     * que se acaban de instalar aparecen solos y los que desaparecieron se van.
+     * Solo esas carpetas, y como mucho cada [PS4_RESCAN_MS]; el análisis lee
+     * pocas carpetas y cabeceras, y mergeScan + LibraryDiff solo escriben lo que cambia.
+     */
+    private suspend fun rescanPs4Folders() {
+        val now = System.currentTimeMillis()
+        if (now - lastPs4Scan < PS4_RESCAN_MS) return
+        val folders = library.folders.filter { it.systemId == Ps4.SYSTEM_ID }
+        if (folders.isEmpty()) return
+        lastPs4Scan = now
+        folders.forEach { rescan(it, silent = true) }
+    }
+
+    /**
+     * Icono y fondo del propio juego (`sce_sys/icon0.png` y `pic1.png`) para
+     * los que aún no tienen. Van como imagen de origen "local", sin fijar: si
+     * un servicio de metadatos trae la suya, la sustituye; si ninguno trae
+     * nada, se queda esta.
+     */
+    private suspend fun importPs4Art(folder: RomFolder) = withContext(Dispatchers.IO) {
+        val tree = Uri.parse(folder.treeUri)
+        val local = LocalMedia(app.contentResolver)
+        for (rom in library.roms.filter { it.folderId == folder.id && it.serial != null }) {
+            val needIcon = rom.meta.icon == null
+            val needHero = rom.meta.hero == null
+            if (!needIcon && !needHero) continue
+            fun image(vararg names: String): LocalImage? = names.firstNotNullOfOrNull { name ->
+                app.scanner.ps4SystemFile(tree, rom.docId, name)
+                    ?.let { local.readImage(DocumentsContract.buildDocumentUriUsingTree(tree, it)) }
+            }
+            val icon = if (needIcon) image("icon0.png")?.let { app.media.save(it.bytes, rom.key, "icon", it.extension) } else null
+            val hero = if (needHero) image("pic1.png", "pic0.png")?.let { app.media.save(it.bytes, rom.key, "hero", it.extension) } else null
+            if (icon == null && hero == null) continue
+            repo.updateMeta(rom.key) { old ->
+                val origins = old.artOrigins.toMutableMap()
+                if (icon != null && old.icon == null) origins["icon"] = ArtOrigin(LOCAL_SOURCE)
+                if (hero != null && old.hero == null) origins["hero"] = ArtOrigin(LOCAL_SOURCE)
+                old.copy(icon = old.icon ?: icon, hero = old.hero ?: hero, artOrigins = origins)
+            }
+        }
+    }
+
+    /**
+     * Una carpeta recién añadida: si es de PS4, se completa ya lo que el alta
+     * no hace (arte local y paquetes sin instalar) con un análisis silencioso.
+     */
+    fun onFolderAdded(folder: RomFolder) {
+        if (folder.systemId != Ps4.SYSTEM_ID) return
+        viewModelScope.launch {
+            lastPs4Scan = System.currentTimeMillis()
+            rescan(folder, silent = true)
+        }
+    }
+
+    /** Abre Bachata S4 (desde la fila de paquetes sin instalar o el menú de la carpeta). */
+    fun openBachata() {
+        val pkg = BachataS4.PACKAGES.firstOrNull { launcher.isPackageInstalled(it) }
+        if (pkg == null) {
+            Emulators.byId(BachataS4.PROFILE_ID)?.let { openExternal(launcher.storeIntent(it)) }
+            return
+        }
+        if (launcher.launchApp(pkg) != GameLauncher.Outcome.Started) showToast(UiText.res(R.string.dialog_launch_failed_title))
     }
 
     fun rescanFolder(folder: RomFolder) {
@@ -1050,10 +1158,22 @@ class ElyndraViewModel @Inject constructor(
      * quitar— en vez de en una lista seguida: así "Quitar carpeta" no queda a
      * un dedo de "Abrir", y las cuatro clases de imagen se leen juntas.
      */
-    /** Deja apuntado de dónde sale el menú antes de abrirlo. */
-    fun markSheetOrigin(origin: Offset?) {
-        sheetOrigin = origin
+    /** Deja apuntado de qué card sale el menú antes de abrirlo (pulsación larga). */
+    fun markSheetOrigin(bounds: Rect?) {
+        pendingOrigin = bounds
     }
+
+    /**
+     * La card seleccionada se ha colocado en [bounds]: si el menú se abre con
+     * el mando, sale de aquí. No es estado de Compose (cambia al desplazar el
+     * carrusel y nadie lo pinta).
+     */
+    fun noteSelectedCard(bounds: Rect) {
+        selectedCardBounds = bounds
+    }
+
+    /** El origen del menú de una card: la que se mantuvo pulsada o, con mando, la señalada. */
+    private fun cardOrigin(): Rect? = (pendingOrigin ?: selectedCardBounds).also { pendingOrigin = null }
 
     fun itemOptions(item: LibraryItem) {
         val groups = when (item) {
@@ -1061,7 +1181,7 @@ class ElyndraViewModel @Inject constructor(
                 SheetGroup(
                     UiText.res(R.string.sheet_group_play),
                     listOf(
-                        SheetAction(UiText.res(R.string.open), icon = SheetIcon.Play) { open(item) },
+                        SheetAction(UiText.res(R.string.open), icon = SheetIcon.Play, primary = true) { open(item) },
                         SheetAction(
                             UiText.res(R.string.change_emulator),
                             detail = item.emulatorName?.let { UiText.Raw(it) },
@@ -1079,7 +1199,15 @@ class ElyndraViewModel @Inject constructor(
                         SheetAction(UiText.res(R.string.refresh_metadata), icon = SheetIcon.Refresh) {
                             refreshMetadata(library.roms.filter { it.folderId == item.folder.id }.map { it.key })
                         },
-                    ) + restoreAction(item.folder),
+                    ) + restoreAction(item.folder) + listOfNotNull(
+                        // PS4: los .pkg se instalan en Bachata, no aquí.
+                        SheetAction(
+                            UiText.res(R.string.open_bachata),
+                            detail = ps4NotInstalled[item.folder.id]?.takeIf { it > 0 }
+                                ?.let { UiText.plural(R.plurals.ps4_pkgs_not_installed, it, it) },
+                            icon = SheetIcon.App,
+                        ) { openBachata() }.takeIf { item.folder.systemId == Ps4.SYSTEM_ID },
+                    ),
                 ),
                 removalGroup(UiText.res(R.string.remove_folder)) { removeFolder(item.folder) },
             )
@@ -1088,7 +1216,7 @@ class ElyndraViewModel @Inject constructor(
                 SheetGroup(
                     UiText.res(R.string.sheet_group_play),
                     listOf(
-                        SheetAction(UiText.res(R.string.open), icon = SheetIcon.Play) { open(item) },
+                        SheetAction(UiText.res(R.string.sheet_play), icon = SheetIcon.Play, primary = true) { open(item) },
                         SheetAction(UiText.res(R.string.details), icon = SheetIcon.Details, opensSheet = true) { showDetails(item.key) },
                     ),
                 ),
@@ -1108,7 +1236,7 @@ class ElyndraViewModel @Inject constructor(
             is LibraryItem.Folder -> UiText.Raw(item.folder.displayPath)
             is LibraryItem.App -> UiText.Raw(item.app.packageName)
         }
-        showSheet(ActionSheetSpec(UiText.Raw(item.name), subtitle, groups, thumbOf(item)))
+        showSheet(ActionSheetSpec(UiText.Raw(item.name), subtitle, groups, thumbOf(item), heroOf(item)), cardOrigin())
     }
 
     fun romOptions(rom: RomEntry) {
@@ -1120,7 +1248,7 @@ class ElyndraViewModel @Inject constructor(
                     SheetGroup(
                         UiText.res(R.string.sheet_group_play),
                         listOf(
-                            SheetAction(UiText.res(R.string.open), icon = SheetIcon.Play) { openRom(rom) },
+                            SheetAction(UiText.res(R.string.sheet_play), icon = SheetIcon.Play, primary = true) { openRom(rom) },
                             SheetAction(UiText.res(R.string.details), icon = SheetIcon.Details, opensSheet = true) { showDetails(rom.key) },
                             SheetAction(
                                 UiText.res(R.string.emulator_for_game),
@@ -1140,8 +1268,67 @@ class ElyndraViewModel @Inject constructor(
                     removalGroup(UiText.res(R.string.remove_game)) { removeRom(rom) },
                 ),
                 SheetThumb(coverPath = rom.meta.cover, pairIndex = romPairIndex(rom)),
+                heroOf(rom),
+            ),
+            cardOrigin(),
+        )
+    }
+
+    /* ── cabecera de juego del menú ───────────────────────────── */
+
+    private fun heroOf(item: LibraryItem): SheetHero = when (item) {
+        is LibraryItem.Folder -> SheetHero(
+            backgroundPath = item.heroPath,
+            logoPath = item.logoPath,
+            coverPath = item.coverPath,
+            iconPath = item.iconPath,
+            packageName = item.emulatorPackage,
+            pairIndex = pairIndexOf(item),
+            info = listOfNotNull(
+                UiText.Raw(item.system.name),
+                item.emulatorName?.let { UiText.Raw(it) },
+                item.minutes.takeIf { it > 0 }?.let { UiText.Raw(fmtMinutes(it)) },
             ),
         )
+        is LibraryItem.App -> SheetHero(
+            backgroundPath = item.app.meta.hero ?: item.app.meta.screenshot,
+            logoPath = item.app.meta.logo,
+            coverPath = item.app.meta.cover,
+            iconPath = item.app.meta.icon,
+            packageName = item.app.packageName,
+            pairIndex = pairIndexOf(item),
+            info = playInfo(item.app.stats.minutes, item.app.stats.lastPlayed) + UiText.Raw("Android"),
+        )
+    }
+
+    private fun heroOf(rom: RomEntry): SheetHero {
+        val folder = repo.folder(rom.folderId)
+        val emulator = (rom.emulatorId ?: folder?.emulatorId)?.let { emulatorName(it) }
+        return SheetHero(
+            backgroundPath = rom.meta.hero ?: rom.meta.screenshot,
+            logoPath = rom.meta.logo,
+            coverPath = rom.meta.cover,
+            iconPath = rom.meta.icon,
+            pairIndex = romPairIndex(rom),
+            info = playInfo(rom.stats.minutes, rom.stats.lastPlayed) +
+                listOfNotNull(Systems.byId(rom.systemId)?.name?.let { UiText.Raw(it) }, emulator?.let { UiText.Raw(it) }),
+        )
+    }
+
+    /** Tiempo jugado y última partida ("hoy", "ayer", "hace 3 días"); sin jugar, eso. */
+    private fun playInfo(minutes: Int, lastPlayed: Long): List<UiText> {
+        if (minutes <= 0 && lastPlayed <= 0) return listOf(UiText.res(R.string.never_played))
+        val out = ArrayList<UiText>(2)
+        if (minutes > 0) out += UiText.Raw(fmtMinutes(minutes))
+        if (lastPlayed > 0) {
+            val days = ((System.currentTimeMillis() - lastPlayed) / 86_400_000L).toInt().coerceAtLeast(0)
+            out += when (days) {
+                0 -> UiText.res(R.string.masha_today)
+                1 -> UiText.res(R.string.masha_yesterday)
+                else -> UiText.plural(R.plurals.masha_days_ago, days, days)
+            }
+        }
+        return out
     }
 
     /** La carátula (o el icono) que se enseña en la cabecera de la hoja. */
@@ -1198,6 +1385,8 @@ class ElyndraViewModel @Inject constructor(
                     UiText.res(kind.removeLabel()),
                     destructive = true,
                     icon = SheetIcon.Remove,
+                    // Quitar una imagen no pasa por un diálogo: el menú lo protege.
+                    holdToConfirm = true,
                 ) { clearArt(key, kind) }
             }
         }
@@ -1524,7 +1713,9 @@ class ElyndraViewModel @Inject constructor(
 
     fun dismissDialog() { dialog = null }
 
-    fun showSheet(spec: ActionSheetSpec) {
+    /** [origin]: la card de la que sale el menú (ver [sheetOrigin]); null = de ninguna. */
+    fun showSheet(spec: ActionSheetSpec, origin: Rect? = null) {
+        sheetOrigin = origin
         sheet = spec
         input.onSheetShown()
     }
@@ -1576,6 +1767,12 @@ class ElyndraViewModel @Inject constructor(
          */
         private const val MATERIALIZE_TIMEOUT_MS = 2_500L
         private const val AUTO_RESCAN_MS = 6L * 60 * 60 * 1000
+
+        /** Tope entre dos análisis de las carpetas de PS4 al volver a primer plano. */
+        private const val PS4_RESCAN_MS = 10_000L
+
+        /** Origen de las imágenes que salen del propio juego (ver [ArtOrigin]). */
+        private const val LOCAL_SOURCE = "local"
 
         /**
          * Lo que acepta el selector de "Elegir de la galería": cualquier
