@@ -86,6 +86,7 @@ class InputController(private val vm: ElyndraViewModel) {
      */
     fun onSheetShown() {
         sheetFocus = if (active) 0 else -1
+        sheetArmed = -1
     }
 
     fun onDialogShown() {
@@ -307,19 +308,75 @@ class InputController(private val vm: ElyndraViewModel) {
 
     /* ── menú de acciones ─────────────────────────────────────── */
 
+    /**
+     * Cómo está repartido el menú en pantalla: lo publica el propio panel
+     * ([SheetLayoutBinding]), que es quien sabe si va en una o dos columnas.
+     */
+    private var sheetLayout: SheetLayout? = null
+
+    fun bindSheetLayout(layout: SheetLayout?) {
+        sheetLayout = layout
+    }
+
+    /**
+     * Acción del menú a la espera de confirmación (índice en el orden del
+     * foco; -1 = ninguna). Las que borran al momento piden una segunda
+     * pulsación, con el mando o con el dedo.
+     */
+    var sheetArmed by mutableIntStateOf(-1); private set
+
+    fun armSheet(index: Int) {
+        sheetArmed = index
+    }
+
+    fun disarmSheet() {
+        sheetArmed = -1
+    }
+
+    /**
+     * Ejecuta una acción del menú: cierra y la lanza, salvo que pida
+     * confirmación y no esté ya armada (entonces solo se arma).
+     */
+    fun runSheetAction(index: Int, action: SheetAction) {
+        if (action.holdToConfirm && sheetArmed != index) {
+            sheetArmed = index
+            return
+        }
+        sheetArmed = -1
+        vm.dismissSheet()
+        action.action()
+    }
+
     private fun sheet(pad: Pad): Boolean {
-        val actions = vm.sheet?.groups.orEmpty().flatMap { it.actions }
+        val spec = vm.sheet ?: return back(pad)
+        val layout = sheetLayout ?: SheetLayout.of(spec, landscape = false)
+        val actions = layout.actions
         if (actions.isEmpty()) return back(pad)
+        fun go(move: SheetLayout.Move): Boolean {
+            val next = layout.move(sheetFocus, move)
+            if (next != sheetFocus) sheetArmed = -1
+            sheetFocus = next
+            return true
+        }
         return when (pad) {
-            Pad.Up, Pad.PagePrev -> { sheetFocus = step(sheetFocus, -1, actions.size); true }
-            Pad.Down, Pad.PageNext -> { sheetFocus = step(sheetFocus, 1, actions.size); true }
+            Pad.Up -> go(SheetLayout.Move.Up)
+            Pad.Down -> go(SheetLayout.Move.Down)
+            Pad.Left -> go(SheetLayout.Move.Left)
+            Pad.Right -> go(SheetLayout.Move.Right)
+            // L1/R1: al principio y al final del menú.
+            Pad.PagePrev -> { sheetFocus = 0; sheetArmed = -1; true }
+            Pad.PageNext -> { sheetFocus = actions.lastIndex; sheetArmed = -1; true }
             Pad.Confirm -> {
                 val action = actions.getOrNull(sheetFocus) ?: return true
-                vm.dismissSheet()
-                action.action()
+                runSheetAction(sheetFocus, action)
                 true
             }
-            Pad.Back, Pad.Options, Pad.AppMenu -> { vm.dismissSheet(); true }
+            Pad.Back -> {
+                // Con una acción armada, B la desarma antes de cerrar.
+                if (sheetArmed >= 0) sheetArmed = -1 else vm.dismissSheet()
+                true
+            }
+            Pad.Options, Pad.AppMenu -> { vm.dismissSheet(); true }
             else -> true
         }
     }
@@ -386,5 +443,14 @@ fun PadScrollBinding(vm: ElyndraViewModel, state: ScrollState) {
     DisposableEffect(state) {
         vm.input.bindScroll(state)
         onDispose { vm.input.bindScroll(null) }
+    }
+}
+
+/** Cede al mando el reparto del menú que está en pantalla (ver [SheetLayout]). */
+@Composable
+fun SheetLayoutBinding(input: InputController, layout: SheetLayout) {
+    DisposableEffect(layout) {
+        input.bindSheetLayout(layout)
+        onDispose { input.bindSheetLayout(null) }
     }
 }

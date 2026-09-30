@@ -62,6 +62,7 @@ import com.elyndra.launcher.ui.screens.MashaScreen
 import com.elyndra.launcher.ui.screens.SettingsScreen
 import com.elyndra.launcher.ui.screens.VoiceSyncScreen
 import com.elyndra.launcher.ui.theme.ElyndraTheme
+import com.elyndra.launcher.ui.masha.Holo
 
 /**
  * Raíz de la app.
@@ -121,11 +122,30 @@ fun ElyndraApp(vm: ElyndraViewModel) {
             }
         }
 
-        Box(Modifier.fillMaxSize().background(P.paper)) {
+        // Masha y la calibración de voz son oscuras de borde a borde: el fondo de
+        // la raíz también, o la franja de la muesca (fuera del padding de
+        // insets) quedaría clara junto a ellas.
+        val holoScreen = vm.screen == Screen.Masha || vm.screen == Screen.VoiceSync
+        Box(Modifier.fillMaxSize().background(if (holoScreen) Holo.bg else P.paper)) {
+            // Las barras van ocultas (pantalla completa), así que sus insets son 0;
+            // se mantiene el del recorte de pantalla para que en un móvil con muesca
+            // el contenido no quede debajo.
+            // La pantalla entera va dentro del contenedor del menú de
+            // acciones: es él quien la desenfoca y la oscurece cuando el menú
+            // está abierto, y quien monta el overlay por encima.
+            GameActionOverlayContainer(
+                isOverlayVisible = vm.sheet != null,
+                onOverlayDismissed = vm::dismissSheet,
+                spec = vm.sheet,
+                input = vm.input,
+                origin = vm.sheetOrigin,
+                dimForOtherLayer = vm.dialog != null,
+            ) {
             // Fondo de la app (solo de Elyndra, no del sistema), debajo de todo:
-            // el vídeo en bucle o la imagen fija que el usuario haya elegido.
+            // el vídeo en bucle o la imagen fija que el usuario haya elegido. Va
+            // dentro del contenedor para desenfocarse con el resto al abrir el menú.
             val s = vm.settings
-            if (s.backgroundEnabled) {
+            if (s.backgroundEnabled && !holoScreen) {
                 s.backgroundUri?.let { uri ->
                     val opacity = s.backgroundOpacity / 100f
                     if (s.backgroundIsVideo) {
@@ -140,25 +160,6 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                     }
                 }
             }
-
-            // Las barras van ocultas (pantalla completa), así que sus insets son 0;
-            // se mantiene el del recorte de pantalla para que en un móvil con muesca
-            // el contenido no quede debajo.
-            // La pantalla entera va dentro del contenedor del menú de
-            // acciones: es él quien la oscurece y la desenfoca cuando el menú
-            // está abierto, y quien monta el overlay por encima.
-            GameActionOverlayContainer(
-                isOverlayVisible = vm.sheet != null,
-                onOverlayDismissed = vm::dismissSheet,
-                onActionClicked = { action ->
-                    vm.dismissSheet()
-                    action.action()
-                },
-                spec = vm.sheet,
-                origin = vm.sheetOrigin,
-                focus = vm.input.sheetFocus,
-                dimForOtherLayer = vm.dialog != null,
-            ) {
             BoxWithConstraints(
                 Modifier
                     .fillMaxSize()
