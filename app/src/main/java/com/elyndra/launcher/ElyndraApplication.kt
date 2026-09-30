@@ -59,6 +59,13 @@ class ElyndraApplication : Application(), ImageLoaderFactory, Configuration.Prov
         scope.launch { work.schedulePeriodic() }
     }
 
+    /** Con memoria justa, fuera el modelo de la voz natural si nadie lo está usando (~200 MB). */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        @Suppress("DEPRECATION")
+        if (level >= TRIM_MEMORY_RUNNING_LOW) com.elyndra.launcher.ui.masha.voice.NeuralRuntime.closeNow()
+    }
+
     /** WorkManager se inicia a demanda con la fábrica de Hilt (ver el manifiesto). */
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
