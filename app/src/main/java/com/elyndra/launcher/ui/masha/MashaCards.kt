@@ -95,6 +95,7 @@ internal fun HoloMessage(vm: ElyndraViewModel, msg: ChatMessage, glow: Color, la
                         is MashaAttachment.Games -> GamesStrip(vm, a)
                         is MashaAttachment.Plan -> PlanCard(vm, a, glow)
                         is MashaAttachment.ArcCard -> ArcStrip(vm, a)
+                        is MashaAttachment.Confirm -> ConfirmCard(vm, a, glow)
                         is MashaAttachment.Done, null -> msg.game?.let { GameMention(it) { vm.showDetails(it.key) } }
                     }
                     if (msg.offline) {
@@ -210,6 +211,55 @@ private fun GameThumb(ref: MashaGameRef, onClick: () -> Unit) {
 }
 
 /** Plan de sesión: cada juego con sus minutos y el botón para empezar por el primero. */
+/**
+ * Lo que Masha va a cambiar, a la espera del visto bueno: qué es, la lista
+ * (si son varios juegos) y Confirmar / Cancelar. Contestada, solo el estado.
+ */
+@Composable
+private fun ConfirmCard(vm: ElyndraViewModel, c: MashaAttachment.Confirm, glow: Color) {
+    val live = c.state == com.elyndra.launcher.masha.ConfirmState.PENDING && vm.masha.isWritePending(c.id)
+    val title = when (c.kind) {
+        com.elyndra.launcher.masha.ConfirmKind.ADD_GAMES -> pluralStringResource(R.plurals.masha_confirm_add, c.items.size, c.items.size)
+        com.elyndra.launcher.masha.ConfirmKind.RENAME -> stringResource(R.string.masha_confirm_rename, c.items.getOrElse(0) { "?" }, c.items.getOrElse(1) { "?" })
+        com.elyndra.launcher.masha.ConfirmKind.SET_EMULATOR -> stringResource(R.string.masha_confirm_emulator, c.items.getOrElse(0) { "?" }, c.items.getOrElse(1) { "?" })
+        else -> c.kind
+    }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.White.copy(alpha = 0.05f))
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        ElyText(title, size = 11.5f, weight = FontWeight.Bold, color = Holo.text)
+        if (c.kind == com.elyndra.launcher.masha.ConfirmKind.ADD_GAMES) {
+            c.items.take(12).forEach { ElyText("• $it", size = 10f, color = Holo.dim, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            if (c.items.size > 12) ElyText(stringResource(R.string.masha_confirm_more, c.items.size - 12), size = 10f, color = Holo.dim)
+            if (c.skipped > 0) ElyText(stringResource(R.string.masha_confirm_skipped, c.skipped), size = 9.5f, color = Holo.dim)
+        }
+        when {
+            live -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                HoloButton(stringResource(R.string.masha_confirm_ok), glow) { vm.masha.confirmWrite(c.id) }
+                HoloButton(stringResource(R.string.cancel), Holo.dim) { vm.masha.cancelWrite(c.id) }
+            }
+            else -> ElyText(
+                stringResource(
+                    when (c.state) {
+                        com.elyndra.launcher.masha.ConfirmState.DONE -> R.string.masha_confirm_state_done
+                        com.elyndra.launcher.masha.ConfirmState.CANCELLED -> R.string.masha_confirm_state_cancelled
+                        else -> R.string.masha_confirm_state_expired
+                    },
+                ),
+                size = 9f,
+                weight = FontWeight.SemiBold,
+                color = Holo.dim,
+                uppercase = true,
+            )
+        }
+    }
+}
+
 @Composable
 private fun PlanCard(vm: ElyndraViewModel, plan: MashaAttachment.Plan, glow: Color) {
     val items = plan.blocks.mapNotNull { b -> vm.masha.gameRef(b.key)?.let { it to b.minutes } }

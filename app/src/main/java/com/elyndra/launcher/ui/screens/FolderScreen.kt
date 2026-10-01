@@ -1,5 +1,9 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.components.NeedsNameBadge
+import com.elyndra.launcher.library.NameCheck
+import com.elyndra.launcher.ui.heroDescription
+import com.elyndra.launcher.ui.rememberDescription
 import com.elyndra.launcher.ui.components.StatusStrip
 import com.elyndra.launcher.ui.components.ArtFallback
 import com.elyndra.launcher.ui.theme.rememberPress
@@ -82,7 +86,6 @@ import com.elyndra.launcher.ui.components.MaterializingContainer
 import com.elyndra.launcher.ui.components.OpenButton
 import com.elyndra.launcher.ui.components.neonParticles
 import com.elyndra.launcher.ui.components.metrics
-import com.elyndra.launcher.ui.components.rememberGameDescription
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.theme.HeroTitleShadow
 import com.elyndra.launcher.ui.theme.LocalSkin
@@ -278,15 +281,10 @@ fun FolderScreen(vm: ElyndraViewModel) {
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    val description = rememberGameDescription(
-                        title = rom?.displayTitle,
-                        stored = rom?.meta?.description,
-                        lang = vm.settings.lang,
-                        short = true,
-                    )
+                    val description = rememberDescription(vm, rom?.key, rom?.meta)
                     if (description != null) {
                         ElyText(
-                            description,
+                            heroDescription(description, vm.settings.lang),
                             modifier = Modifier
                                 .padding(top = if (m.landscape) 4.dp else 6.dp)
                                 .fillMaxWidth(0.86f)
@@ -554,6 +552,9 @@ private fun RomTile(
             ) {
                 ElyText(rom.extension.ifEmpty { "DIR" }, size = 7f, weight = FontWeight.SemiBold, color = P.shade, letterSpacing = tracking(0.1f))
             }
+            // Sin un nombre que sirva para buscarlo: se marca, sin más avisos.
+            val unnamed = remember(rom.displayTitle) { !NameCheck.isNameUsable(rom.displayTitle) }
+            if (unnamed) NeedsNameBadge(Modifier.align(Alignment.TopStart).padding(5.dp), onDark = true)
 
             if (selected) {
                 Box(
