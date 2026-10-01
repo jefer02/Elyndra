@@ -17,6 +17,7 @@ import com.elyndra.launcher.metadata.LocalMedia
 import com.elyndra.launcher.metadata.MediaCache
 import com.elyndra.launcher.metadata.MetadataEngine
 import com.elyndra.launcher.metadata.ServiceCredentials
+import com.elyndra.launcher.ui.intro.IntroGate
 import com.elyndra.launcher.work.ElyndraWork
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -49,6 +50,9 @@ class ElyndraApplication : Application(), ImageLoaderFactory, Configuration.Prov
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var work: ElyndraWork
+
+    /** La intro se ve una vez por proceso (ver [IntroGate]). */
+    val introGate = IntroGate()
 
     override fun onCreate() {
         // Hilt inyecta los campos en `super.onCreate()`.

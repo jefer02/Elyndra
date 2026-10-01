@@ -65,8 +65,9 @@ object BrandTokens {
      */
     const val SHADE = 0xFF1A1D2B.toInt()
 
-    /** El negro de la consola apagada: arranque, splash del sistema y fondo del widget. */
-    const val CONSOLE_BLACK = 0xFF05070A.toInt()
+    /** Fondo de la intro en claro (perla cálida) y en oscuro (ámbar ahumado casi negro); también el del splash del sistema. */
+    const val INTRO_PEARL = 0xFFF8F4EC.toInt()
+    const val INTRO_SMOKE = 0xFF0C0906.toInt()
 
     /** Fondo del widget: la tinta física casi opaca. */
     const val WIDGET_BG = 0xF01A1D2B.toInt()

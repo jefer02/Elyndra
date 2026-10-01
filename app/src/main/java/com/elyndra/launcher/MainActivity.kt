@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color as AndroidColor
 import android.graphics.drawable.ColorDrawable
 import android.hardware.input.InputManager
 import android.net.Uri
@@ -16,6 +17,7 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -103,19 +105,25 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Splash del sistema sin icono (ver Theme.Elyndra.Starting): solo el
-        // fondo oscuro, que empalma sin costura con el arranque de consola que
-        // pinta Compose (BootSplash). Se retira solo con el primer fotograma.
+        // fondo de la intro, que empalma sin costura con su primer fotograma
+        // (BootIntro). Se retira solo con el primer fotograma.
         installSplashScreen()
+        val app = application as ElyndraApplication
+        val dark = app.settings.darkMode
         // Borde a borde: el fondo "papel" y el hero llegan hasta el filo de la
         // pantalla, como en el diseño. Los insets se aplican en ElyndraApp.
-        enableEdgeToEdge()
+        enableEdgeToEdge(barStyle(dark), barStyle(dark))
         super.onCreate(savedInstanceState)
+
+        // La intro, solo en un arranque en frío: ni al girar ni al volver a
+        // una Activity que el sistema recreó tras matar el proceso.
+        val intro = app.introGate.claim(app.settings.introEnabled, restored = savedInstanceState != null)
+        if (intro) vm.intro.start()
 
         // El modo oscuro es una opción de la app, no del sistema, así que no
         // puede venir de un `values-night`: se pinta aquí el fondo de ventana
-        // para que el primer fotograma (antes de Compose) no dé un destello claro.
-        val dark = (application as ElyndraApplication).settings.darkMode
-        window.setBackgroundDrawable(ColorDrawable(if (dark) BrandTokens.DARK.paper else BrandTokens.LIGHT.paper))
+        // para que el primer fotograma (antes de Compose) no dé un destello.
+        window.setBackgroundDrawable(ColorDrawable(windowColor(dark, intro)))
 
         hideSystemBars()
         askForNotifications()
@@ -136,6 +144,9 @@ class MainActivity : ComponentActivity() {
             // En la pantalla de Masha, 60 salvo "alta fluidez" (ver SettingsController.frameRateFor).
             val fps = vm.settings.frameRateFor(vm.screen)
             LaunchedEffect(fps) { FrameRate.apply(this@MainActivity, fps) }
+            val dark = vm.settings.darkMode
+            val intro = vm.intro.visible
+            LaunchedEffect(dark, intro) { applyTheme(dark, intro) }
             CompositionLocalProvider(LocalReducedMotion provides reducedMotion()) { ElyndraApp(vm) }
         }
 
@@ -171,6 +182,29 @@ class MainActivity : ComponentActivity() {
         super.onPause()
     }
 
+    /**
+     * Lo que el sistema pinta fuera de Compose sigue al tema de la app: el
+     * fondo de la ventana, el color de los iconos de las barras (al deslizarlas)
+     * y, desde Android 13, el splash del próximo arranque. Antes de Android 13
+     * el splash sale de los recursos, así que sigue al tema del sistema.
+     */
+    private fun applyTheme(dark: Boolean, intro: Boolean) {
+        window.setBackgroundDrawable(ColorDrawable(windowColor(dark, intro)))
+        enableEdgeToEdge(barStyle(dark), barStyle(dark))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            splashScreen.setSplashScreenTheme(if (dark) R.style.Theme_Elyndra_Starting_Dark else R.style.Theme_Elyndra_Starting_Light)
+        }
+    }
+
+    private fun windowColor(dark: Boolean, intro: Boolean): Int = when {
+        intro -> if (dark) BrandTokens.INTRO_SMOKE else BrandTokens.INTRO_PEARL
+        else -> if (dark) BrandTokens.DARK.paper else BrandTokens.LIGHT.paper
+    }
+
+    /** Iconos claros sobre el tema oscuro y oscuros sobre el claro. */
+    private fun barStyle(dark: Boolean): SystemBarStyle =
+        if (dark) SystemBarStyle.dark(AndroidColor.TRANSPARENT) else SystemBarStyle.light(AndroidColor.TRANSPARENT, LIGHT_BARS_FALLBACK_SCRIM)
+
     /** "Quitar animaciones" del sistema: escala de animador a 0. */
     private fun reducedMotion(): Boolean =
         android.provider.Settings.Global.getFloat(contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
@@ -182,6 +216,8 @@ class MainActivity : ComponentActivity() {
 
     /** Lo que piden el widget y los avisos: lanzar un juego, abrir su ficha o hablar con Masha. */
     private fun handleShortcut(intent: Intent?) {
+        // Se llega a algo concreto: la intro no se interpone.
+        if (intent?.action in SHORTCUT_ACTIONS) vm.intro.cancel()
         when (intent?.action) {
             ACTION_LAUNCH_GAME -> intent.getStringExtra(EXTRA_GAME_KEY)?.let { vm.launchFromShortcut(it) }
             ACTION_SHOW_GAME -> intent.getStringExtra(EXTRA_GAME_KEY)?.let { vm.showFromShortcut(it) }
@@ -342,6 +378,11 @@ class MainActivity : ComponentActivity() {
         const val ACTION_SHOW_GAME = "com.elyndra.launcher.SHOW_GAME"
         const val ACTION_OPEN_MASHA = "com.elyndra.launcher.OPEN_MASHA"
         const val EXTRA_GAME_KEY = "gameKey"
+
+        private val SHORTCUT_ACTIONS = setOf(ACTION_LAUNCH_GAME, ACTION_SHOW_GAME, ACTION_OPEN_MASHA)
+
+        /** Velo de las barras donde el sistema no sabe pintar iconos oscuros (navegación en Android 8.0). */
+        private const val LIGHT_BARS_FALLBACK_SCRIM = 0x801B1B1B.toInt()
 
         private fun base(context: Context, action: String) = Intent(context, MainActivity::class.java)
             .setAction(action)

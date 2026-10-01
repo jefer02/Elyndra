@@ -217,7 +217,8 @@ Piezas que había que construir a mano porque Compose no las trae:
   parpadeo.
 
 **Tipografía.** Poppins va incluida (`res/font/`, licencia OFL en
-`POPPINS-OFL.txt`). Para japonés Android usa la fuente CJK del sistema.
+`POPPINS-OFL.txt`). El rótulo de la intro usa Cinzel Bold (subconjunto latino,
+licencia OFL en `CINZEL-OFL.txt`). Para japonés Android usa la fuente CJK del sistema.
 
 **Liquid glass.** Compose no tiene backdrop-filter; se replican tinte,
 opacidad, borde, sombra y realce, y el desenfoque se traduce en lechosidad.
