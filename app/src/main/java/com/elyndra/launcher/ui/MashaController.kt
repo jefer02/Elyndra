@@ -1,5 +1,8 @@
 package com.elyndra.launcher.ui
 
+import com.elyndra.launcher.masha.ConfirmState
+import com.elyndra.launcher.masha.MashaWriteRules
+import com.elyndra.launcher.masha.MashaWrites
 import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -72,7 +75,9 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
      */
     var insightRevision by mutableIntStateOf(0); private set
 
-    private val actions = MashaActions(vm, brain)
+    /** Lo que Masha propone cambiar y espera confirmación, y la pila de deshacer. */
+    val writes = MashaWrites()
+    private val actions = MashaActions(vm, brain, writes)
     private var job: Job? = null
     private var historyLoaded = false
 
@@ -126,6 +131,16 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     fun send(uiLanguage: String, cacheable: Boolean = false) {
         val text = draft.trim()
         if (text.isEmpty() || busy) return
+        // "Sí" / "no" con una propuesta a la espera: se contesta aquí, sin IA.
+        val pendingWrite = writes.latest()
+        val answer = pendingWrite?.let { MashaWriteRules.answer(text) }
+        if (pendingWrite != null && answer != null) {
+            messages += ChatMessage(fromMasha = false, text = text)
+            draft = ""
+            persist(StoredMessage(MashaTurn.Role.User, text, null, null, System.currentTimeMillis()))
+            if (answer) confirmWrite(pendingWrite.id) else cancelWrite(pendingWrite.id)
+            return
+        }
         // El hilo que ve el modelo es el de antes de este mensaje, sin el saludo de cortesía.
         val history = messages.filterNot { it.pending || it.greeting || it.text.isBlank() }
             .map { MashaTurn(if (it.fromMasha) MashaTurn.Role.Masha else MashaTurn.Role.User, it.text) }
@@ -145,6 +160,40 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                 working = null
             }
         }
+    }
+
+    /* ── confirmaciones ───────────────────────────────────────── */
+
+    /** ¿Sigue a la espera esta tarjeta? (tras reiniciar, ya no). */
+    fun isWritePending(id: String): Boolean = writes.isPending(id)
+
+    /** "Confirmar" en la tarjeta (o "sí" escrito): se hace y se cuenta en el chat. */
+    fun confirmWrite(id: String) {
+        if (!writes.isPending(id)) return
+        vm.viewModelScope.launch {
+            val out = writes.confirm(id) ?: return@launch
+            markConfirm(id, if (out.ok) ConfirmState.DONE else ConfirmState.CANCELLED)
+            val ctx = localized()
+            val text = ctx.getString(if (out.ok) R.string.masha_write_done else R.string.masha_write_failed, out.label)
+            messages += ChatMessage(fromMasha = true, text = text, done = listOf(out.label))
+            persist(StoredMessage(MashaTurn.Role.Masha, text, null, MashaAttachment.Done(out.label, out.ok), System.currentTimeMillis()))
+        }
+    }
+
+    /** "Cancelar": no se toca nada. */
+    fun cancelWrite(id: String) {
+        if (!writes.cancel(id)) return
+        markConfirm(id, ConfirmState.CANCELLED)
+        val text = localized().getString(R.string.masha_write_cancelled)
+        messages += ChatMessage(fromMasha = true, text = text)
+        persist(StoredMessage(MashaTurn.Role.Masha, text, null, null, System.currentTimeMillis()))
+    }
+
+    private fun markConfirm(id: String, state: String) {
+        val i = messages.indexOfLast { (it.attachment as? MashaAttachment.Confirm)?.id == id }
+        if (i < 0) return
+        val a = messages[i].attachment as MashaAttachment.Confirm
+        messages[i] = messages[i].copy(attachment = a.copy(state = state))
     }
 
     /** Corta la respuesta en curso (la petición a la IA se cancela de verdad). */
@@ -280,6 +329,30 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                     val title = brain.knowledge.snapshot().game(step.gameKey)?.title ?: "?"
                     attachment = MashaAttachment.ArcCard(first.arc.id, first.arc.title, first.arc.steps.map { it.gameKey }, first.doneSteps, first.totalSteps)
                     ctx.getString(R.string.masha_off_arc, first.arc.title, first.doneSteps + 1, first.totalSteps, title)
+                }
+            }
+            OfflineIntent.AddInstalled -> {
+                val result = actions.execute(ToolCall("local", MashaTools.ADD_GAMES, buildJsonObject { put("all", true) }))
+                (result.attachment as? MashaAttachment.Confirm)?.let { attachment = it }
+                when {
+                    !result.ok -> ctx.getString(R.string.masha_off_nothing_to_add)
+                    attachment != null -> ctx.getString(R.string.masha_off_add_confirm)
+                    else -> ctx.getString(R.string.masha_write_done, (result.attachment as? MashaAttachment.Done)?.label.orEmpty())
+                }
+            }
+            is OfflineIntent.Rename -> {
+                val focused = vm.focusName() ?: vm.selected()?.name
+                if (focused == null) {
+                    ctx.getString(R.string.masha_off_rename_which)
+                } else {
+                    val result = actions.execute(
+                        ToolCall("local", MashaTools.RENAME_GAME, buildJsonObject {
+                            put("game", focused)
+                            put("name", intent.name)
+                            put("user_dictated", true)
+                        }),
+                    )
+                    if (result.ok) ctx.getString(R.string.masha_off_renamed, focused, intent.name) else ctx.getString(R.string.masha_off_rename_bad, intent.name)
                 }
             }
             OfflineIntent.Unknown -> ctx.getString(if (brain.config.hasKey) R.string.masha_off_unknown else R.string.masha_off_unknown_nokey)

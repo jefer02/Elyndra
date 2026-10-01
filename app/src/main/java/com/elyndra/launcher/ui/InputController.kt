@@ -128,6 +128,8 @@ class InputController(private val vm: ElyndraViewModel) {
             vm.dialog != null -> dialog(pad)
             vm.sheet != null -> sheet(pad)
             vm.artPicker != null -> back(pad)
+            // El diálogo de nombre se maneja con el foco de Compose (campo, resultados, botones).
+            vm.identify.state != null -> back(pad)
             vm.detailsKey != null -> details(pad)
             vm.screen == Screen.Library -> library(pad)
             vm.screen == Screen.Folder -> folder(pad)
@@ -270,7 +272,7 @@ class InputController(private val vm: ElyndraViewModel) {
     }
 
     private fun cycleFilter(delta: Int): Boolean {
-        val all = LibraryFilter.entries
+        val all = vm.availableFilters()
         val next = all[(all.indexOf(vm.filter) + delta + all.size) % all.size]
         addFocus = false
         vm.updateFilter(next)
