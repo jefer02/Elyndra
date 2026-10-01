@@ -138,6 +138,21 @@ class SettingsStore(context: Context) {
     /* ── tema y fondo ─────────────────────────────────────────── */
 
     /** Modo oscuro de la interfaz (independiente del tema del sistema). */
+    /** Fuentes sin clave (libretro, Steam): encendidas de serie. */
+    fun keylessEnabled(id: String): Boolean = prefs.getBoolean("keyless.$id", true)
+
+    fun setKeylessEnabled(id: String, enabled: Boolean) = prefs.edit { putBoolean("keyless.$id", enabled) }
+
+    /** Traducir sola la descripción cuando no está en el idioma de la app (solo con modelos ya bajados). */
+    var autoTranslate: Boolean
+        get() = prefs.getBoolean("translate.auto", false)
+        set(v) = prefs.edit { putBoolean("translate.auto", v) }
+
+    /** Bajar los modelos de traducción solo por Wi-Fi. */
+    var translateWifiOnly: Boolean
+        get() = prefs.getBoolean("translate.wifiOnly", true)
+        set(v) = prefs.edit { putBoolean("translate.wifiOnly", v) }
+
     /** Píldora de hora y batería en Biblioteca y Carpeta. */
     var statusVisible: Boolean
         get() = prefs.getBoolean("status.visible", true)

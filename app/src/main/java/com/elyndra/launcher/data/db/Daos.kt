@@ -218,3 +218,15 @@ interface AiCacheDao {
     @Query("DELETE FROM ai_cache")
     suspend fun clear()
 }
+
+@Dao
+interface TranslationDao {
+    @Query("SELECT * FROM description_translations WHERE game_key = :key AND target_lang = :target")
+    suspend fun get(key: String, target: String): DescriptionTranslationEntity?
+
+    @Upsert
+    suspend fun put(row: DescriptionTranslationEntity)
+
+    @Query("DELETE FROM description_translations WHERE game_key = :key")
+    suspend fun deleteGame(key: String)
+}
