@@ -60,6 +60,11 @@ data class SsGame(
     fun description(languages: List<String>): String? = pick(synopsis, languages + listOf("en"))
         ?.let(ScreenScraperParser::cleanText)
 
+    /** Todas las sinopsis, cada una con su idioma tal como lo etiqueta ScreenScraper ("es", "en", "jp"…). */
+    fun descriptions(): List<Pair<String, String>> = synopsis
+        .filter { it.text.isNotBlank() }
+        .map { it.key to ScreenScraperParser.cleanText(it.text) }
+
     fun releaseDate(regions: List<String>): String? = pick(dates, regions + listOf("wor", "us", "eu", "jp"))
 
     fun genre(languages: List<String>): String? = genres
