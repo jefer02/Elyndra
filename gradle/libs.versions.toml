@@ -12,6 +12,7 @@ serialization = "1.7.3"
 coroutines = "1.8.1"
 coil = "2.7.0"
 media3 = "1.4.1"
+mlkitTranslate = "17.0.3"
 # SceneView 2.3.0 es la última compilada con Kotlin 2.0.21 (la 2.3.1+ pide 2.2, la 4.x pide 2.4):
 # trae Filament 1.56 y Compose 1.7, que es lo que ya usa el proyecto.
 sceneview = "2.3.0"
@@ -25,6 +26,7 @@ splashscreen = "1.0.1"
 junit = "4.13.2"
 
 [libraries]
+mlkit-translate = { group = "com.google.mlkit", name = "translate", version.ref = "mlkitTranslate" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashscreen" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }

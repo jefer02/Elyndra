@@ -73,7 +73,8 @@ class MetadataPriorityTest {
     @Test
     fun storedOrdersAreRepairedNotTrusted() {
         assertEquals(
-            listOf(Service.SteamGridDb, Service.ScreenScraper, Service.Igdb, Service.RetroAchievements),
+            // Lo que falta se añade detrás, en el orden de partida (con las fuentes sin clave).
+            listOf(Service.SteamGridDb, Service.ScreenScraper, Service.Igdb, Service.Steam, Service.Libretro, Service.RetroAchievements),
             MetadataPriority.parse("sgdb,ss,ss,bogus", MetadataPriority.DEFAULT.art),
         )
         assertEquals(MetadataPriority.DEFAULT.text, MetadataPriority.parse(null, MetadataPriority.DEFAULT.text))
