@@ -5,12 +5,20 @@ import com.elyndra.launcher.data.SecretKeys
 import com.elyndra.launcher.data.SecretStore
 import com.elyndra.launcher.data.SettingsStore
 
-/** Los cuatro servicios de metadatos. */
-enum class Service(val id: String) {
+/**
+ * Los servicios de metadatos. [keyless]: no piden cuenta ni clave y vienen
+ * encendidos de serie (se apagan en Ajustes), así que hay carátulas e
+ * información desde el primer arranque.
+ */
+enum class Service(val id: String, val keyless: Boolean = false) {
     ScreenScraper("ss"),
     Igdb("igdb"),
     SteamGridDb("sgdb"),
     RetroAchievements("ra"),
+    /** thumbnails.libretro.com: carátulas, capturas y pantallas de título de consolas. */
+    Libretro("libretro", keyless = true),
+    /** Tienda de Steam: descripción traducida e imágenes de juegos de PC (y de Android que estén en Steam). */
+    Steam("steam", keyless = true),
 }
 
 /**
@@ -52,6 +60,7 @@ class ServiceCredentials(
         Service.Igdb -> igdb().isComplete
         Service.SteamGridDb -> sgdbKey().isNotEmpty()
         Service.RetroAchievements -> ra().isComplete
+        Service.Libretro, Service.Steam -> settings.keylessEnabled(service.id)
     }
 
     fun anyConfigured(): Boolean = Service.entries.any { isConfigured(it) }
