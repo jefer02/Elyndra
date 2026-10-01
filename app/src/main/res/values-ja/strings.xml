@@ -623,4 +623,74 @@
     <string name="status_a11y_battery">バッテリー %1$d%%</string>
     <string name="status_a11y_charging">、充電中</string>
     <string name="status_a11y_low">、残量低下</string>
+
+    <!-- Descripciones: idioma y traducción -->
+    <string name="description_translate">翻訳</string>
+    <string name="description_show_original">原文を表示</string>
+    <string name="description_translated_from">%1$sから翻訳</string>
+    <string name="description_translating">翻訳中…</string>
+    <string name="translate_model_title">翻訳モデルをダウンロードしますか？</string>
+    <string name="translate_model_msg">翻訳には %1$s の言語モデル（合計約 %2$d MB）が必要です。一度だけダウンロードされ、翻訳はこの端末内で行われます。テキストが外部に送信されることはありません。%3$s</string>
+    <string name="translate_model_wifi">Wi-Fi 接続時のみダウンロードします。</string>
+    <string name="translate_model_any">モバイルデータを使用する場合があります。</string>
+    <string name="translate_download">ダウンロード</string>
+    <string name="translate_failed">翻訳できませんでした。後でもう一度お試しください。</string>
+    <string name="translate_unsupported">この言語は端末内で翻訳できません。</string>
+    <string name="translate_needs_wifi">翻訳モデルをダウンロードするには Wi-Fi に接続してください（または設定で「Wi-Fi のみ」をオフにしてください）。</string>
+    <string name="section_translation">説明文の翻訳</string>
+    <string name="auto_translate">説明文を自動で翻訳</string>
+    <string name="auto_translate_desc">ダウンロード済みの言語モデルがある場合のみ。確認なしに何かをダウンロードすることはありません。</string>
+    <string name="translate_wifi_only">モデルは Wi-Fi 接続時のみダウンロード</string>
+    <string name="translate_models">ダウンロード済みのモデル</string>
+    <string name="translate_models_none">なし</string>
+    <string name="translate_model_delete">削除</string>
+
+    <!-- Fuentes sin cuenta -->
+    <string name="keyless_status_ok">アカウント不要</string>
+    <string name="keyless_title">アカウント不要のソース</string>
+    <string name="keyless_desc">設定なしでカバー・スクリーンショット・説明文を取得します。アカウントが必要なサービスを設定すると、そちらが優先されます。</string>
+    <string name="keyless_libretro_desc">ゲーム機のカバー、スクリーンショット、タイトル画面。</string>
+    <string name="keyless_steam_desc">PC ゲームと、Steam でも配信されている Android ゲームの説明文（あなたの言語）と画像。</string>
+    <string name="keyless_privacy">接続先：thumbnails.libretro.com と store.steampowered.com。送信するのはゲーム名と機種のみで、パス・アカウント・端末情報は送信しません。</string>
+
+    <!-- Identificar juego / sin nombre -->
+    <string name="identify_action">名前を編集 / ゲームを特定</string>
+    <string name="identify_title">ゲームを特定</string>
+    <string name="identify_raw">検出された名前: %1$s</string>
+    <string name="identify_field">ゲーム名</string>
+    <string name="identify_use_name">この名前を使う</string>
+    <string name="identify_reset">自動に戻す</string>
+    <string name="identify_searching">検索中…</string>
+    <string name="identify_results">候補</string>
+    <string name="identify_no_results">候補がありません。入力した名前をそのまま使うこともできます。</string>
+    <string name="identify_saved">名前を保存しました。メタデータを更新しています…</string>
+    <string name="needs_name_badge">名前なし</string>
+    <string name="filter_unnamed">名前なし</string>
+
+    <!-- Imágenes elegidas a mano -->
+    <string name="art_reset">自動に戻す</string>
+    <string name="art_reset_done">自動の画像に戻しました</string>
+    <string name="art_failed_network">接続がありません。前の画像のままです。</string>
+    <string name="art_failed_image">その画像を読み込めませんでした。別の画像を試してください。</string>
+
+    <!-- Masha: nombres, añadir juegos y emuladores -->
+    <string name="masha_write_done">完了：%1$s</string>
+    <string name="masha_write_failed">できませんでした：%1$s</string>
+    <string name="masha_write_cancelled">キャンセルしました。何も変更していません。</string>
+    <string name="masha_off_nothing_to_add">追加するものはありません。インストール済みのものはすべてライブラリにあります。</string>
+    <string name="masha_off_add_confirm">これらのインストール済みゲームはライブラリにありません。追加しますか？</string>
+    <string name="masha_off_rename_which">どのゲームですか？先に詳細を開くか、選択してください。</string>
+    <string name="masha_off_renamed">完了：「%1$s」の名前を「%2$s」にしました。</string>
+    <string name="masha_off_rename_bad">「%1$s」はゲーム名には見えません。</string>
+    <string name="masha_confirm_rename">「%1$s」の名前を「%2$s」に変更</string>
+    <string name="masha_confirm_emulator">%2$s のゲームに %1$s を使う</string>
+    <string name="masha_confirm_more">ほか %1$d 件</string>
+    <string name="masha_confirm_skipped">ほか %1$d 件はこの回に入りません（最大 50）</string>
+    <string name="masha_confirm_ok">確定</string>
+    <string name="masha_confirm_state_done">完了</string>
+    <string name="masha_confirm_state_cancelled">キャンセル済み</string>
+    <string name="masha_confirm_state_expired">期限切れ</string>
+    <plurals name="masha_confirm_add">
+        <item quantity="other">%d 本のゲームをライブラリに追加</item>
+    </plurals>
 </resources>

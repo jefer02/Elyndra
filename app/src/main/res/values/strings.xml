@@ -647,4 +647,75 @@
     <string name="status_a11y_battery">Battery %1$d%%</string>
     <string name="status_a11y_charging">, charging</string>
     <string name="status_a11y_low">, low</string>
+
+    <!-- Descripciones: idioma y traducción -->
+    <string name="description_translate">Translate</string>
+    <string name="description_show_original">Show original</string>
+    <string name="description_translated_from">Translated from %1$s</string>
+    <string name="description_translating">Translating…</string>
+    <string name="translate_model_title">Download the translator?</string>
+    <string name="translate_model_msg">Translating needs the language models for %1$s (about %2$d MB in total). They are downloaded once and translation then happens on this device; the text never leaves it. %3$s</string>
+    <string name="translate_model_wifi">It will only download over Wi-Fi.</string>
+    <string name="translate_model_any">It may use mobile data.</string>
+    <string name="translate_download">Download</string>
+    <string name="translate_failed">Couldn\'t translate. Try again later.</string>
+    <string name="translate_unsupported">This language can\'t be translated on the device.</string>
+    <string name="translate_needs_wifi">Connect to Wi-Fi to download the translator (or turn off "Wi-Fi only" in Settings).</string>
+    <string name="section_translation">Description translation</string>
+    <string name="auto_translate">Translate descriptions automatically</string>
+    <string name="auto_translate_desc">Only with language models already downloaded. Nothing is ever downloaded without asking.</string>
+    <string name="translate_wifi_only">Download models over Wi-Fi only</string>
+    <string name="translate_models">Downloaded models</string>
+    <string name="translate_models_none">None</string>
+    <string name="translate_model_delete">Delete</string>
+
+    <!-- Fuentes sin cuenta -->
+    <string name="keyless_status_ok">No account needed</string>
+    <string name="keyless_title">Sources without an account</string>
+    <string name="keyless_desc">Covers, screenshots and descriptions with no setup. Services with an account keep priority when you configure them.</string>
+    <string name="keyless_libretro_desc">Console covers, screenshots and title screens.</string>
+    <string name="keyless_steam_desc">Descriptions in your language and art for PC games, and for Android games that are also on Steam.</string>
+    <string name="keyless_privacy">Contacted: thumbnails.libretro.com and store.steampowered.com. Only the game name and its system are sent; never paths, accounts or device data.</string>
+
+    <!-- Identificar juego / sin nombre -->
+    <string name="identify_action">Edit name / Identify game</string>
+    <string name="identify_title">Identify game</string>
+    <string name="identify_raw">Detected as: %1$s</string>
+    <string name="identify_field">Game name</string>
+    <string name="identify_use_name">Use this name</string>
+    <string name="identify_reset">Reset to automatic</string>
+    <string name="identify_searching">Searching…</string>
+    <string name="identify_results">Matches</string>
+    <string name="identify_no_results">No matches. You can still use the name as typed.</string>
+    <string name="identify_saved">Name saved. Updating its metadata…</string>
+    <string name="needs_name_badge">Needs name</string>
+    <string name="filter_unnamed">Without name</string>
+
+    <!-- Imágenes elegidas a mano -->
+    <string name="art_reset">Reset to automatic</string>
+    <string name="art_reset_done">Back to the automatic image</string>
+    <string name="art_failed_network">No connection. The previous image stays.</string>
+    <string name="art_failed_image">That image could not be loaded, try another.</string>
+
+    <!-- Masha: nombres, añadir juegos y emuladores -->
+    <string name="masha_write_done">Done: %1$s</string>
+    <string name="masha_write_failed">Couldn\'t do it: %1$s</string>
+    <string name="masha_write_cancelled">Cancelled. I didn\'t change anything.</string>
+    <string name="masha_off_nothing_to_add">There\'s nothing new to add: everything installed is already in your library.</string>
+    <string name="masha_off_add_confirm">These installed games aren\'t in your library yet. Shall I add them?</string>
+    <string name="masha_off_rename_which">Which game? Open its details or select it first.</string>
+    <string name="masha_off_renamed">Done: «%1$s» is now called «%2$s».</string>
+    <string name="masha_off_rename_bad">«%1$s» doesn\'t look like a game name.</string>
+    <string name="masha_confirm_rename">Rename «%1$s» to «%2$s»</string>
+    <string name="masha_confirm_emulator">Use %1$s for %2$s games</string>
+    <string name="masha_confirm_more">and %1$d more</string>
+    <string name="masha_confirm_skipped">%1$d more don\'t fit in this batch (50 max)</string>
+    <string name="masha_confirm_ok">Confirm</string>
+    <string name="masha_confirm_state_done">Done</string>
+    <string name="masha_confirm_state_cancelled">Cancelled</string>
+    <string name="masha_confirm_state_expired">Expired</string>
+    <plurals name="masha_confirm_add">
+        <item quantity="one">Add %d game to the library</item>
+        <item quantity="other">Add %d games to the library</item>
+    </plurals>
 </resources>
