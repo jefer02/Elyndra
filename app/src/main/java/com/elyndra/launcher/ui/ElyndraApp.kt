@@ -23,11 +23,7 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.snap
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -48,7 +44,6 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.components.GameActionOverlayContainer
-import com.elyndra.launcher.ui.components.BootSplash
 import com.elyndra.launcher.ui.components.ElyDialogView
 import com.elyndra.launcher.ui.components.LocalScreenSize
 import com.elyndra.launcher.ui.components.ToastView
@@ -63,7 +58,11 @@ import com.elyndra.launcher.ui.screens.MashaScreen
 import com.elyndra.launcher.ui.screens.SettingsScreen
 import com.elyndra.launcher.ui.screens.VoiceSyncScreen
 import com.elyndra.launcher.ui.theme.ElyndraTheme
+import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.masha.Holo
+import com.elyndra.launcher.ui.intro.BootIntro
+import androidx.compose.runtime.key
+import com.elyndra.launcher.data.argb
 
 /**
  * Raíz de la app.
@@ -236,11 +235,12 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                 )
             }
 
-            // Arranque de consola, encima de todo y solo una vez por arranque
-            // (sobrevive a la recreación por cambio de idioma). La biblioteca
-            // ya se compone debajo, así que al irse no hay espera.
-            var booted by rememberSaveable { mutableStateOf(false) }
-            if (!booted) BootSplash(onFinished = { booted = true })
+            // Intro de arranque, encima de todo: una vez por proceso (la decide
+            // MainActivity) o al pedir la vista previa en Ajustes. La biblioteca
+            // ya se compone debajo, así que al fundirse no hay espera.
+            if (vm.intro.visible) {
+                key(vm.intro.run) { BootIntro(vm.intro, vm.settings.introColor.base(LocalSkin.current.a1.argb())) }
+            }
         }
     }
     }

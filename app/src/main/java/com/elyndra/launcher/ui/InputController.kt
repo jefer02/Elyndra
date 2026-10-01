@@ -124,6 +124,8 @@ class InputController(private val vm: ElyndraViewModel) {
             addFocus = false
         }
         return when {
+            // La intro tapa todo: cualquier botón la salta y no llega a lo de debajo.
+            vm.intro.visible -> { vm.intro.skip(); true }
             // Mientras se lanza un juego no se toca nada: el velo se va solo.
             vm.dialog != null -> dialog(pad)
             vm.sheet != null -> sheet(pad)

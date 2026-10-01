@@ -22,6 +22,7 @@ import com.elyndra.launcher.masha.MashaError
 import com.elyndra.launcher.metadata.ApiException
 import com.elyndra.launcher.metadata.FailureKind
 import com.elyndra.launcher.metadata.Service
+import com.elyndra.launcher.ui.intro.IntroColor
 import com.elyndra.launcher.ui.masha.lipsync.AudioRoute
 import com.elyndra.launcher.ui.masha.lipsync.AudioRouteOffsets
 import com.elyndra.launcher.ui.masha.voice.NeuralRuntime
@@ -88,6 +89,23 @@ class SettingsController(private val vm: ElyndraViewModel) {
         store.darkMode = darkMode
         P.isDark = darkMode
     }
+
+    /* ── intro de arranque ────────────────────────────────────── */
+
+    var introEnabled by mutableStateOf(store.introEnabled); private set
+    var introColor by mutableStateOf(IntroColor.byId(store.introColor)); private set
+
+    fun toggleIntro() {
+        introEnabled = !introEnabled
+        store.introEnabled = introEnabled
+    }
+
+    fun updateIntroColor(color: IntroColor) {
+        introColor = color
+        store.introColor = color.id
+    }
+
+    fun previewIntro() = vm.intro.preview()
 
     /* ── fondo de la interfaz: vídeo o imagen ─────────────────── */
 
