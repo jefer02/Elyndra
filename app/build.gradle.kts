@@ -119,6 +119,8 @@ dependencies {
 
     // Fondo animado de la interfaz (Ajustes → "Vídeo de fondo") y ambiente sonoro de Masha.
     implementation(libs.androidx.media3.exoplayer)
+    // Traducción de descripciones en el dispositivo, a demanda (modelos ~30 MB por idioma).
+    implementation(libs.mlkit.translate)
     implementation(libs.androidx.media3.ui)
 
     // Masha en 3D: SceneView (Compose) sobre Filament.

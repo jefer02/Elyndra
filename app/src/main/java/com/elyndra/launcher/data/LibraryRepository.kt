@@ -5,7 +5,7 @@ import com.elyndra.launcher.library.RomScanner
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,10 +32,27 @@ class LibraryRepository(private val store: LibraryStore, private val scope: Coro
 
     private val loadedSignal = CompletableDeferred<Unit>()
     private val saveMutex = Mutex()
-    private var saveJob: Job? = null
+
+    /**
+     * Avisos de "hay algo que guardar". Conflado: los que llegan mientras se
+     * espera o se escribe se juntan en uno solo. Un guardado ya empezado no se
+     * cancela nunca: si cada cambio nuevo lo cancelara, una racha de cambios
+     * seguidos —una pasada de metadatos— lo aplazaría sin fin y un cierre
+     * inesperado perdería todo lo hecho desde que empezó.
+     */
+    private val saveRequests = Channel<Unit>(Channel.CONFLATED)
 
     /** Lo último que llegó a la tienda: la base de la siguiente diferencia. */
     private var persisted = Library()
+
+    init {
+        scope.launch(Dispatchers.IO) {
+            for (request in saveRequests) {
+                delay(SAVE_DELAY_MS)
+                writeNow()
+            }
+        }
+    }
 
     val current: Library get() = _state.value
 
@@ -56,22 +73,10 @@ class LibraryRepository(private val store: LibraryStore, private val scope: Coro
 
     fun update(transform: (Library) -> Library) {
         _state.update(transform)
-        scheduleSave()
+        saveRequests.trySend(Unit)
     }
 
-    @Synchronized
-    private fun scheduleSave() {
-        saveJob?.cancel()
-        saveJob = scope.launch(Dispatchers.IO) {
-            delay(400)
-            writeNow()
-        }
-    }
-
-    suspend fun flush() {
-        synchronized(this) { saveJob?.cancel() }
-        writeNow()
-    }
+    suspend fun flush() = writeNow()
 
     private suspend fun writeNow() {
         // Antes de cargar no hay base contra la que calcular la diferencia:
@@ -112,14 +117,24 @@ class LibraryRepository(private val store: LibraryStore, private val scope: Coro
             // cambie de documento (se vuelve a extraer, se renombra).
             val bySerial = lib.roms.filter { it.folderId == folderId && it.serial != null }.associateBy { it.serial }
             val added = mutableListOf<String>()
+            // Un archivo movido dentro de la carpeta cambia de documento pero es
+            // el mismo juego: se reconoce por nombre y tamaño entre los que ya no
+            // están donde estaban, y conserva su clave (y su nombre puesto a mano).
+            val keptDocs = found.map { it.docId }.toSet()
+            val moved = lib.roms
+                .filter { it.folderId == folderId && it.docId !in keptDocs }
+                .groupBy { it.fileName to it.size }
+                .filterValues { it.size == 1 }
+                .mapValues { it.value.single() }
+                .toMutableMap()
             // Lo que el usuario quitó no vuelve por un reanálisis: el archivo
             // sigue ahí, pero él ya dijo que no lo quiere en la biblioteca.
             val merged = found.filterNot { it.docId in folder.excluded }.map { f ->
-                (existing[f.docId] ?: f.serial?.let { bySerial[it] })?.copy(
+                (existing[f.docId] ?: f.serial?.let { bySerial[it] } ?: moved.remove(f.name to f.size))?.let { prev -> prev.copy(
                     docId = f.docId,
                     // El título real del juego (PARAM.SFO) se relee en cada análisis.
-                    title = f.title ?: existing[f.docId]?.title ?: bySerial[f.serial]?.title ?: f.name,
-                    serial = f.serial ?: existing[f.docId]?.serial,
+                    title = f.title ?: prev.title,
+                    serial = f.serial ?: prev.serial,
                     fileName = f.name,
                     relPath = f.relPath,
                     size = f.size,
@@ -129,8 +144,8 @@ class LibraryRepository(private val store: LibraryStore, private val scope: Coro
                     // actualización del juego puede haberlo movido o renombrado.
                     mainDocId = f.mainDocId,
                     mainFile = f.mainFile,
-                    hashes = existing[f.docId]?.hashes?.takeIf { it.size == f.size && it.modified == f.modified },
-                ) ?: newRom(folder, f).also { added += it.key }
+                    hashes = prev.hashes?.takeIf { it.size == f.size && it.modified == f.modified },
+                ) } ?: newRom(folder, f).also { added += it.key }
             }
             val removed = existing.size - (merged.size - added.size)
             diff = ScanDiff(added, removed.coerceAtLeast(0), merged.size)
@@ -177,6 +192,27 @@ class LibraryRepository(private val store: LibraryStore, private val scope: Coro
 
     /** Deshace todos los "quitar" de una carpeta; los juegos vuelven al reanalizar. */
     fun restoreRemoved(folderId: String) = updateFolder(folderId) { it.copy(excluded = emptySet()) }
+
+    /**
+     * Añade estos juegos de la carpeta sin tocar los que ya estaban. Si alguno
+     * se había quitado antes, deja de estar en la lista de quitados. Devuelve
+     * las claves de los añadidos (los que ya estaban no se repiten).
+     */
+    fun addRoms(folderId: String, found: List<RomScanner.Found>): List<String> {
+        var keys = emptyList<String>()
+        update { lib ->
+            val folder = lib.folders.firstOrNull { it.id == folderId } ?: return@update lib
+            val present = lib.roms.filter { it.folderId == folderId }.map { it.docId }.toSet()
+            val add = found.distinctBy { it.docId }.filter { it.docId !in present }.map { newRom(folder, it) }
+            keys = add.map { it.key }
+            val docs = add.map { it.docId }.toSet()
+            lib.copy(
+                roms = lib.roms + add,
+                folders = lib.folders.map { if (it.id == folderId) it.copy(excluded = it.excluded - docs) else it },
+            )
+        }
+        return keys
+    }
 
     /** Id del juego dentro del runtime de Windows; null lo borra. */
     fun setPcGameId(romId: String, gameId: String?) = updateRom(romId) { it.copy(pcGameId = gameId) }
@@ -292,6 +328,9 @@ class LibraryRepository(private val store: LibraryStore, private val scope: Coro
          * juego y la elección de emulador. El tope queda como seguro.
          */
         const val MAX_SESSIONS = 20_000
+
+        /** Espera para agrupar cambios seguidos en una sola escritura. */
+        private const val SAVE_DELAY_MS = 400L
 
         fun romId(folderId: String, docId: String): String {
             val digest = MessageDigest.getInstance("SHA-1").digest("$folderId|$docId".toByteArray())

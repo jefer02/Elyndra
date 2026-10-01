@@ -103,7 +103,8 @@ data class RomEntry(
     val addedAt: Long = 0,
 ) {
     val key: String get() = "r:$id"
-    val displayTitle: String get() = meta.name?.takeIf { it.isNotBlank() } ?: title
+    /** El nombre que se enseña: el que puso el usuario manda; luego el de los metadatos y el del archivo. */
+    val displayTitle: String get() = meta.lockedName ?: meta.name?.takeIf { it.isNotBlank() } ?: title
     val extension: String get() = fileName.substringAfterLast('.', "").uppercase()
 }
 
@@ -128,7 +129,7 @@ data class AppEntry(
     val stats: PlayStats = PlayStats(),
 ) {
     val key: String get() = "a:$packageName"
-    val displayTitle: String get() = meta.name?.takeIf { it.isNotBlank() } ?: label
+    val displayTitle: String get() = meta.lockedName ?: meta.name?.takeIf { it.isNotBlank() } ?: label
 }
 
 @Serializable
@@ -146,7 +147,17 @@ data class GameMeta(
     val matched: Boolean = false,
     val sources: List<String> = emptyList(),
     val name: String? = null,
+    /** La descripción principal (la del idioma de la app al descargar, o la que hubiera). */
     val description: String? = null,
+    /** Idioma de [description] ("es", "en"…); null = datos de antes de etiquetar idiomas. */
+    val descriptionLang: String? = null,
+    /** Todas las descripciones conocidas, por idioma (ver `DescriptionPick`). */
+    val descriptions: Map<String, String> = emptyMap(),
+    /**
+     * Idioma de la app en la última vez que se pidieron descripciones: si la
+     * app cambia de idioma, se vuelven a pedir en segundo plano (una vez).
+     */
+    val descriptionCheckedLang: String? = null,
     /** "AAAA-MM-DD" o "AAAA". */
     val releaseDate: String? = null,
     val developer: String? = null,
@@ -166,6 +177,8 @@ data class GameMeta(
     val ssGameId: String? = null,
     val igdbId: Long? = null,
     val sgdbId: Long? = null,
+    /** Appid de la tienda de Steam, una vez emparejado (las pasadas siguientes no buscan por nombre). */
+    val steamAppId: Long? = null,
     val ra: RaInfo? = null,
     /**
      * De dónde salió cada imagen, por su clase ("cover", "hero", "logo",
@@ -173,11 +186,23 @@ data class GameMeta(
      * descargarla sin preguntar a nadie y que Masha sepa qué falta y de dónde.
      */
     val artOrigins: Map<String, ArtOrigin> = emptyMap(),
+    /**
+     * Nombre puesto a mano ("Editar nombre / Identificar juego"). Con
+     * [nameLocked] manda sobre cualquier otro y ninguna pasada de metadatos
+     * lo toca; también es el nombre con el que se busca el juego.
+     */
+    val userName: String? = null,
+    val nameLocked: Boolean = false,
+    /** Nombre exacto en libretro elegido a mano (las pasadas lo usan sin buscar). */
+    val libretroName: String? = null,
     /** Cómo se identificó el juego (ver [MatchMethod]); null = sin identificar. */
     val matchedBy: String? = null,
     /** Confianza de esa identificación, 0…1. */
     val matchConfidence: Float? = null,
-)
+) {
+    /** El nombre del usuario, si lo fijó. */
+    val lockedName: String? get() = userName?.trim()?.takeIf { nameLocked && it.isNotEmpty() }
+}
 
 /** Origen de una imagen: [source] es el id del servicio (`ss`, `igdb`…) o `local` (galería). */
 @Serializable
