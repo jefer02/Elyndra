@@ -21,7 +21,7 @@ data class UiSoundState(val overlays: Int, val errorDialog: Boolean, val screen:
 
     companion object {
         fun of(vm: ElyndraViewModel) = UiSoundState(
-            overlays = listOfNotNull(vm.dialog, vm.sheet, vm.artPicker, vm.detailsKey).size,
+            overlays = listOfNotNull(vm.dialog, vm.sheet, vm.artPicker, vm.identify.state, vm.detailsKey).size,
             errorDialog = vm.dialog?.error == true,
             screen = vm.screen,
         )

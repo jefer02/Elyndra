@@ -581,6 +581,8 @@ class SettingsController(private val vm: ElyndraViewModel) {
                         val p = engine.retroAchievements.profile()
                         UiText.res(R.string.ra_status_detail, p.user, p.points)
                     }
+                    // Sin cuenta: no hay nada que comprobar.
+                    Service.Libretro, Service.Steam -> UiText.res(R.string.keyless_status_ok)
                 }
                 store.setVerified(service.id, true)
                 states[service] = ServiceState(ServiceState.Status.Connected, detail)
@@ -629,6 +631,19 @@ class SettingsController(private val vm: ElyndraViewModel) {
     }
 
     fun cancelMetadata() = engine.cancel()
+
+    /* ── fuentes sin clave ────────────────────────────────────── */
+
+    val keyless = mutableStateMapOf<Service, Boolean>().apply {
+        Service.entries.filter { it.keyless }.forEach { put(it, store.keylessEnabled(it.id)) }
+    }
+
+    fun toggleKeyless(service: Service) {
+        val on = !(keyless[service] ?: true)
+        keyless[service] = on
+        store.setKeylessEnabled(service.id, on)
+        states[service] = idleState(service)
+    }
 
     /* ── biblioteca ───────────────────────────────────────────── */
 
@@ -741,6 +756,8 @@ class SettingsController(private val vm: ElyndraViewModel) {
             Service.ScreenScraper -> "https://www.screenscraper.fr/membreinscription.php"
             Service.Igdb -> "https://dev.twitch.tv/console/apps"
             Service.SteamGridDb -> "https://www.steamgriddb.com/profile/preferences/api"
+            Service.Libretro -> "https://thumbnails.libretro.com/"
+            Service.Steam -> "https://store.steampowered.com/"
             Service.RetroAchievements -> "https://retroachievements.org/settings"
         }
     }

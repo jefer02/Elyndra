@@ -27,6 +27,8 @@ enum class LibraryFilter(@StringRes val label: Int) {
     All(R.string.filter_all),
     Android(R.string.filter_android),
     Consoles(R.string.filter_consoles),
+    /** Juegos sin un nombre que sirva (ver NameCheck): para identificarlos. */
+    Unnamed(R.string.filter_unnamed),
 }
 
 enum class AddTab { Android, Roms }

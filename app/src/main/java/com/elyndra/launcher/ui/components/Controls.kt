@@ -587,3 +587,28 @@ fun PlayGlyph(color: Color = Color.White, size: Dp = 9.dp) {
         },
     )
 }
+
+/**
+ * "Sin nombre": el juego no tiene un nombre que sirva para buscar sus
+ * metadatos. Discreta, sin avisos ni ventanas: solo para encontrarlo.
+ */
+@Composable
+fun NeedsNameBadge(modifier: Modifier = Modifier, onDark: Boolean = false) {
+    val shape = RoundedCornerShape(7.dp)
+    Box(
+        modifier
+            .clip(shape)
+            .background(if (onDark) P.shade.copy(alpha = 0.72f) else P.chip)
+            .border(1.dp, if (onDark) Color.White.copy(alpha = 0.25f) else P.ink.copy(alpha = 0.14f), shape)
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    ) {
+        ElyText(
+            androidx.compose.ui.res.stringResource(com.elyndra.launcher.R.string.needs_name_badge),
+            size = 8f,
+            weight = FontWeight.SemiBold,
+            color = if (onDark) Color.White else P.ink2,
+            uppercase = true,
+            maxLines = 1,
+        )
+    }
+}
