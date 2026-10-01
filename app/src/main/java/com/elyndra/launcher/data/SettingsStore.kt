@@ -168,6 +168,16 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("darkMode", Palettes.DEFAULT_DARK)
         set(v) = prefs.edit { putBoolean("darkMode", v) }
 
+    /** La intro de ELYNDRA en cada arranque en frío. */
+    var introEnabled: Boolean
+        get() = prefs.getBoolean("intro.enabled", true)
+        set(v) = prefs.edit { putBoolean("intro.enabled", v) }
+
+    /** Color de la intro (id de [com.elyndra.launcher.ui.intro.IntroColor]). */
+    var introColor: String?
+        get() = prefs.getString("intro.color", null)
+        set(v) = prefs.edit { putString("intro.color", v) }
+
     /**
      * URI (SAF, con permiso persistente) del fondo de la interfaz.
      *

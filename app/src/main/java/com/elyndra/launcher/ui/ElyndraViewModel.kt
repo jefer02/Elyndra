@@ -139,6 +139,9 @@ class ElyndraViewModel @Inject constructor(
     /** El mando: traduce sus botones a lo que hace cada capa (ver [InputController]). */
     val input = InputController(this)
 
+    /** La intro de arranque, encima de todo mientras se ve. */
+    val intro = IntroController()
+
     val add = AddController(this)
     val settings = SettingsController(this)
     val sounds = SoundsController(this)
@@ -395,10 +398,11 @@ class ElyndraViewModel @Inject constructor(
     }
 
     val canGoBack: Boolean
-        get() = dialog != null || sheet != null || artPicker != null || identify.state != null || detailsKey != null || screen != Screen.Library || searchOpen
+        get() = intro.visible || dialog != null || sheet != null || artPicker != null || identify.state != null || detailsKey != null || screen != Screen.Library || searchOpen
 
     fun back() {
         when {
+            intro.visible -> intro.skip()
             dialog != null -> dialog = null
             sheet != null -> sheet = null
             artPicker != null -> closeArtPicker()

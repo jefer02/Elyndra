@@ -45,9 +45,6 @@ object P {
     /** Tinta física: sombras, velos, fondo del hero y cristal oscuro. Siempre oscura. */
     val shade = Color(BrandTokens.SHADE)
 
-    /** Negro de la consola apagada (arranque). */
-    val consoleBlack = Color(BrandTokens.CONSOLE_BLACK)
-
     /** Fondo neutro de las miniaturas de imagen y de las vistas previas oscuras. */
     val mediaBack = Color(BrandTokens.MEDIA_BACK)
 
