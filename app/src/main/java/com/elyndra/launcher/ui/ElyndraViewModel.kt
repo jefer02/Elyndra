@@ -1,5 +1,11 @@
 package com.elyndra.launcher.ui
 
+import com.elyndra.launcher.library.RomScanner
+import com.elyndra.launcher.metadata.MediaFailure
+import com.elyndra.launcher.metadata.MediaResult
+import com.elyndra.launcher.library.NameCheck
+import com.elyndra.launcher.library.Names
+import com.elyndra.launcher.metadata.TranslationCache
 import android.app.Application
 import android.content.Intent
 import android.net.Uri
@@ -77,6 +83,8 @@ class ElyndraViewModel @Inject constructor(
     val sound: SoundManager,
     /** La música de fondo de la interfaz (ver [BackgroundMusic]). */
     val music: BackgroundMusic,
+    /** Traducciones de descripciones en el dispositivo (ver [TranslationCache]). */
+    val translations: TranslationCache,
 ) : AndroidViewModel(application) {
 
     val app = application as ElyndraApplication
@@ -134,6 +142,9 @@ class ElyndraViewModel @Inject constructor(
     val add = AddController(this)
     val settings = SettingsController(this)
     val sounds = SoundsController(this)
+    val descriptions = DescriptionsController(this)
+    /** "Editar nombre / Identificar juego" (ver [IdentifyController]). */
+    val identify = IdentifyController(this)
     val masha = MashaController(this, brain)
 
     private var launchJob: Job? = null
@@ -221,6 +232,12 @@ class ElyndraViewModel @Inject constructor(
         list = sorted(list)
         if (filter == LibraryFilter.Android) list = list.filterIsInstance<LibraryItem.App>()
         if (filter == LibraryFilter.Consoles) list = list.filterIsInstance<LibraryItem.Folder>()
+        if (filter == LibraryFilter.Unnamed) list = list.filter { item ->
+            when (item) {
+                is LibraryItem.App -> needsName(item.app.displayTitle)
+                is LibraryItem.Folder -> d.roms[item.folder.id].orEmpty().any { needsName(it.displayTitle) }
+            }
+        }
         if (q.isNotEmpty()) {
             list = list.filter { item ->
                 item.name.lowercase().contains(q) ||
@@ -301,7 +318,22 @@ class ElyndraViewModel @Inject constructor(
 
     fun currentFolder(): LibraryItem.Folder? = derived().folders.firstOrNull { it.folder.id == folderId }
 
-    fun folderRoms(id: String?): List<RomEntry> = id?.let { derived().roms[it] }.orEmpty()
+    fun folderRoms(id: String?): List<RomEntry> {
+        val all = id?.let { derived().roms[it] }.orEmpty()
+        // Con el filtro "Sin nombre", dentro de la carpeta solo salen esos.
+        return if (filter == LibraryFilter.Unnamed) all.filter { needsName(it.displayTitle) }.ifEmpty { all } else all
+    }
+
+    /** ¿A este juego le falta un nombre que sirva para buscarlo? (ver [NameCheck]). */
+    fun needsName(title: String): Boolean = !NameCheck.isNameUsable(title)
+
+    /** Hay algún juego sin nombre: solo entonces sale el filtro "Sin nombre". */
+    val anyUnnamed: Boolean
+        get() = library.apps.any { needsName(it.displayTitle) } || library.roms.any { needsName(it.displayTitle) }
+
+    /** Los filtros que se enseñan (y que recorren L1/R1). */
+    fun availableFilters(): List<LibraryFilter> =
+        LibraryFilter.entries.filter { it != LibraryFilter.Unnamed || anyUnnamed || filter == LibraryFilter.Unnamed }
 
     fun selectedRom(): RomEntry? {
         val roms = folderRoms(folderId)
@@ -363,13 +395,14 @@ class ElyndraViewModel @Inject constructor(
     }
 
     val canGoBack: Boolean
-        get() = dialog != null || sheet != null || artPicker != null || detailsKey != null || screen != Screen.Library || searchOpen
+        get() = dialog != null || sheet != null || artPicker != null || identify.state != null || detailsKey != null || screen != Screen.Library || searchOpen
 
     fun back() {
         when {
             dialog != null -> dialog = null
             sheet != null -> sheet = null
             artPicker != null -> closeArtPicker()
+            identify.state != null -> identify.close()
             detailsKey != null -> closeDetails()
             screen.isSettingsPage -> go(Screen.Settings)
             screen != Screen.Library -> go(Screen.Library)
@@ -774,6 +807,9 @@ class ElyndraViewModel @Inject constructor(
         refreshInventory()
         viewModelScope.launch {
             repo.awaitLoaded()
+            // Si cambió el idioma de la app (o hay descripciones sin idioma de antes),
+            // se piden las del idioma de ahora en segundo plano; no hay nada que esperar.
+            engine.refreshDescriptions()
             val session = sessions.finish()
             if (session != null) afterSession(session)
             // Lo que Masha tenga que decir sale ya, con la sesión recién cerrada:
@@ -918,6 +954,68 @@ class ElyndraViewModel @Inject constructor(
         if (diff.added.isNotEmpty() && app.settings.autoMeta) engine.start(diff.added, force = false)
         if (!silent) showToast(UiText.res(R.string.toast_rescan, diff.added.size, diff.removed))
         return diff
+    }
+
+    /* ── lo que hay en el dispositivo y no está en la biblioteca (Masha) ── */
+
+    /** Un juego de una carpeta con acceso que no está en la biblioteca. */
+    data class AddableRom(val folder: RomFolder, val found: RomScanner.Found, val title: String, val removedBefore: Boolean)
+
+    /** Apps instaladas que no están en la biblioteca (los juegos primero). */
+    suspend fun addableApps(): List<InstalledApp> {
+        val inLibrary = library.apps.map { it.packageName }.toSet()
+        return installedApps().filter { it.packageName !in inLibrary && it.packageName != app.packageName }
+            .sortedWith(compareByDescending<InstalledApp> { it.isGame }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.label })
+    }
+
+    /**
+     * ROMs y juegos de PC en carpetas a las que Elyndra ya tiene acceso pero
+     * que no están en la biblioteca: los nuevos (descargados después del
+     * último análisis) y los que el usuario quitó. Solo lee: no añade nada.
+     */
+    suspend fun addableRoms(): List<AddableRom> = withContext(Dispatchers.IO) {
+        library.folders.flatMap { folder ->
+            if (!app.files.hasPermission(folder.treeUri)) return@flatMap emptyList()
+            val system = Systems.byId(folder.systemId) ?: return@flatMap emptyList()
+            val tree = Uri.parse(folder.treeUri)
+            val found = if (system.id == Ps4.SYSTEM_ID) {
+                runCatching { app.scanner.scanPs4(tree, folder.rootDocId).found }.getOrNull()
+            } else {
+                runCatching { app.scanner.scan(tree, folder.rootDocId, system) }.getOrNull()
+            }.orEmpty()
+            val present = library.roms.filter { it.folderId == folder.id }.map { it.docId }.toSet()
+            found.filter { it.docId !in present }.map { f ->
+                AddableRom(folder, f, f.title ?: Names.cleanTitle(f.name, stripExtension = !f.isDir), removedBefore = f.docId in folder.excluded)
+            }
+        }
+    }
+
+    /** Añade juegos de carpetas (ver [addableRoms]); devuelve las claves nuevas. */
+    fun addRomsToLibrary(items: List<AddableRom>): List<String> {
+        val keys = items.groupBy { it.folder.id }.flatMap { (folderId, list) -> repo.addRoms(folderId, list.map { it.found }) }
+        if (keys.isNotEmpty() && app.settings.autoMeta) engine.start(keys, force = false)
+        return keys
+    }
+
+    /** La pantalla Añadir en la pestaña de ROMs (las carpetas las elige el usuario en el selector del sistema). */
+    fun openAddRoms() {
+        go(Screen.Add)
+        add.updateTab(AddTab.Roms)
+    }
+
+    /**
+     * Pone [emulatorId] en todas las carpetas de [systemId]. Devuelve lo que
+     * tenía cada carpeta, para poder deshacerlo.
+     */
+    fun setSystemEmulator(systemId: String, emulatorId: String): Map<String, String?> {
+        val folders = library.folders.filter { it.systemId == systemId }
+        val before = folders.associate { it.id to it.emulatorId }
+        folders.forEach { repo.setFolderEmulator(it.id, emulatorId) }
+        return before
+    }
+
+    fun restoreFolderEmulators(before: Map<String, String?>) {
+        before.forEach { (id, emu) -> repo.setFolderEmulator(id, emu) }
     }
 
     /* ── PlayStation 4 (Bachata S4) ───────────────────────────── */
@@ -1266,6 +1364,7 @@ class ElyndraViewModel @Inject constructor(
                 SheetGroup(
                     UiText.res(R.string.sheet_group_manage),
                     listOf(
+                        SheetAction(UiText.res(R.string.identify_action), icon = SheetIcon.Search, opensSheet = true) { identify.open(item.key) },
                         SheetAction(UiText.res(R.string.refresh_metadata), icon = SheetIcon.Refresh) { refreshMetadata(listOf(item.key)) },
                     ),
                 ),
@@ -1304,6 +1403,7 @@ class ElyndraViewModel @Inject constructor(
                     SheetGroup(
                         UiText.res(R.string.sheet_group_manage),
                         listOf(
+                            SheetAction(UiText.res(R.string.identify_action), icon = SheetIcon.Search, opensSheet = true) { identify.open(rom.key) },
                             SheetAction(UiText.res(R.string.refresh_metadata), icon = SheetIcon.Refresh) { refreshMetadata(listOf(rom.key)) },
                         ),
                     ),
@@ -1466,7 +1566,7 @@ class ElyndraViewModel @Inject constructor(
                         if (!app.credentials.isConfigured(service) || !art.supports(key, service)) continue
                         val url = runCatching { art.candidates(key, kind, service) }
                             .getOrNull()?.firstOrNull()?.url ?: continue
-                        if (runCatching { art.apply(key, kind, url, service) }.getOrDefault(false)) {
+                        if (runCatching { art.apply(key, kind, url, service) is MediaResult.Saved }.getOrDefault(false)) {
                             // Si es la carpeta que se está mirando, la imagen
                             // se monta desde el polvo en cuanto llega; si no,
                             // entra sin más, que no hay nadie delante.
@@ -1490,7 +1590,7 @@ class ElyndraViewModel @Inject constructor(
             if (!app.credentials.isConfigured(service) || !art.supports(key, service)) continue
             val url = runCatching { art.candidates(key, kind, service) }
                 .getOrNull()?.firstOrNull()?.url ?: continue
-            if (runCatching { art.apply(key, kind, url, service) }.getOrDefault(false)) return true
+            if (runCatching { art.apply(key, kind, url, service) is MediaResult.Saved }.getOrDefault(false)) return true
         }
         return false
     }
@@ -1582,12 +1682,19 @@ class ElyndraViewModel @Inject constructor(
         mediaRequest = MediaRequest(IMAGE_MIME_TYPES) { uri ->
             if (uri == null) return@MediaRequest
             viewModelScope.launch {
+                repo.flush()
                 val image = withContext(Dispatchers.IO) { app.localMedia.readImage(uri) }
                 if (image == null) {
                     showToast(UiText.res(R.string.art_local_failed))
                     return@launch
                 }
-                val ok = art.applyLocal(key, kind, image)
+                val ok = try {
+                    art.applyLocal(key, kind, image)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    false
+                }
                 if (ok) materializeArt(key, kind)
                 showToast(UiText.res(if (ok) R.string.art_applied else R.string.art_local_failed))
             }
@@ -1620,12 +1727,15 @@ class ElyndraViewModel @Inject constructor(
             detail = UiText.res(R.string.art_from_gallery_hint),
             icon = SheetIcon.Gallery,
         ) { pickLocalArt(key, kind) }
+        // Si la imagen es una elegida a mano, se puede volver a la automática.
+        val reset = SheetAction(UiText.res(R.string.art_reset), icon = SheetIcon.Refresh) { resetArt(key, kind) }
+            .takeIf { art.isPinned(key, kind) }
         showSheet(
             ActionSheetSpec(
                 UiText.res(kind.label()),
                 UiText.Raw(title),
                 listOf(
-                    SheetGroup(UiText.res(R.string.art_group_yours), listOf(gallery)),
+                    SheetGroup(UiText.res(R.string.art_group_yours), listOfNotNull(gallery, reset)),
                     SheetGroup(UiText.res(R.string.art_group_services), actions),
                 ),
             ),
@@ -1656,10 +1766,40 @@ class ElyndraViewModel @Inject constructor(
         artPicker = state.copy(applying = candidate.url)
         artJob?.cancel()
         artJob = viewModelScope.launch {
-            val ok = art.apply(state.key, state.kind, candidate.url, state.service)
-            if (ok) materializeArt(state.key, state.kind)
-            artPicker = null
-            showToast(UiText.res(if (ok) R.string.art_applied else R.string.art_apply_failed))
+            // Lo pendiente de la biblioteca se escribe antes de descargar nada:
+            // pase lo que pase después, lo hecho hasta aquí ya está en disco.
+            repo.flush()
+            val result = try {
+                art.apply(state.key, state.kind, candidate.url, state.service)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                MediaResult.Failed(MediaFailure.Storage)
+            }
+            if (result is MediaResult.Saved) {
+                materializeArt(state.key, state.kind)
+                artPicker = null
+                showToast(UiText.res(R.string.art_applied))
+            } else {
+                // Se queda la imagen que había y el selector abierto: se puede elegir otra.
+                artPicker = artPicker?.takeIf { it.key == state.key }?.copy(applying = null)
+                showToast(UiText.res(artFailureText((result as MediaResult.Failed).reason)))
+            }
+        }
+    }
+
+    private fun artFailureText(reason: MediaFailure): Int = when (reason) {
+        MediaFailure.Network -> R.string.art_failed_network
+        MediaFailure.Http, MediaFailure.Storage -> R.string.art_apply_failed
+        MediaFailure.TooBig, MediaFailure.TooSmall, MediaFailure.Unsupported, MediaFailure.Undecodable -> R.string.art_failed_image
+    }
+
+    /** "Restablecer automático": fuera la imagen elegida a mano y se vuelve a pedir la de los metadatos. */
+    fun resetArt(key: String, kind: ArtKind) {
+        viewModelScope.launch {
+            art.clear(key, kind)
+            if (key.startsWith("f:")) autoFolderArt(listOf(key)) else engine.refresh(key)
+            showToast(UiText.res(R.string.art_reset_done))
         }
     }
 

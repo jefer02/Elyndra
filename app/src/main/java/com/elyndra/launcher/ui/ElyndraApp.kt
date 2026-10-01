@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui
 
+import com.elyndra.launcher.ui.screens.IdentifySheet
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.scaleIn
@@ -223,6 +224,7 @@ fun ElyndraApp(vm: ElyndraViewModel) {
 
             vm.detailsKey?.let { DetailsSheet(vm, it) }
             vm.artPicker?.let { ArtPickerSheet(vm, it) }
+            if (vm.identify.state != null) IdentifySheet(vm, vm.identify)
             vm.dialog?.let { ElyDialogView(it, onDismiss = vm::dismissDialog, focus = vm.input.dialogFocus) }
             vm.toast?.let {
                 ToastView(
