@@ -60,6 +60,8 @@ fun serviceName(s: Service): String = when (s) {
     Service.Igdb -> "IGDB"
     Service.SteamGridDb -> "SteamGridDB"
     Service.RetroAchievements -> "RetroAchievements"
+    Service.Libretro -> "libretro"
+    Service.Steam -> "Steam"
 }
 
 @Composable
@@ -238,4 +240,32 @@ private fun CredentialField(label: String, value: String, secret: Boolean, onCha
             null
         },
     )
+}
+
+/**
+ * Fuentes sin cuenta (libretro, Steam): encendidas de serie, cada una con su
+ * interruptor, y la línea que dice a quién se pregunta y qué se envía.
+ */
+@Composable
+fun KeylessPanel(vm: ElyndraViewModel) {
+    val s = vm.settings
+    com.elyndra.launcher.ui.components.SettingsGroup {
+        ElyText(stringResource(R.string.keyless_title), size = 12.5f, weight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = com.elyndra.launcher.data.P.ink)
+        androidx.compose.foundation.layout.Spacer(Modifier.height(4.dp))
+        ElyText(stringResource(R.string.keyless_desc), size = 10f, color = com.elyndra.launcher.data.P.ink2, lineHeightRatio = 1.45f)
+        listOf(Service.Libretro to R.string.keyless_libretro_desc, Service.Steam to R.string.keyless_steam_desc).forEach { (service, desc) ->
+            androidx.compose.foundation.layout.Spacer(Modifier.height(12.dp))
+            androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    ElyText(serviceName(service), size = 12f, weight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = com.elyndra.launcher.data.P.ink)
+                    androidx.compose.foundation.layout.Spacer(Modifier.height(2.dp))
+                    ElyText(stringResource(desc), size = 9.5f, color = com.elyndra.launcher.data.P.ink2, lineHeightRatio = 1.4f)
+                }
+                androidx.compose.foundation.layout.Spacer(Modifier.width(12.dp))
+                com.elyndra.launcher.ui.components.GlowingSwitch(s.keyless[service] ?: true, { s.toggleKeyless(service) })
+            }
+        }
+        androidx.compose.foundation.layout.Spacer(Modifier.height(12.dp))
+        ElyText(stringResource(R.string.keyless_privacy), size = 9.5f, color = com.elyndra.launcher.data.P.ink2, lineHeightRatio = 1.45f)
+    }
 }

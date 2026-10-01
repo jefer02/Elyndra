@@ -1,5 +1,9 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.components.NeedsNameBadge
+import com.elyndra.launcher.library.NameCheck
+import com.elyndra.launcher.ui.heroDescription
+import com.elyndra.launcher.ui.rememberDescription
 import com.elyndra.launcher.ui.components.StatusStrip
 import com.elyndra.launcher.ui.components.FallbackArt
 import com.elyndra.launcher.ui.components.ArtVariant
@@ -94,7 +98,6 @@ import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GameIcon
 import com.elyndra.launcher.ui.components.MaterializingContainer
 import com.elyndra.launcher.ui.components.Hero
-import com.elyndra.launcher.ui.components.rememberGameDescription
 import com.elyndra.launcher.ui.components.ConsoleIconButton
 import com.elyndra.launcher.ui.components.HeroBarHeight
 import com.elyndra.launcher.ui.components.ParticleLayer
@@ -288,15 +291,12 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    val description = rememberGameDescription(
-                        title = (sel as? LibraryItem.App)?.name,
-                        stored = (sel as? LibraryItem.App)?.app?.meta?.description,
-                        lang = vm.settings.lang,
-                        short = true,
-                    )
+                    // Solo las apps tienen sinopsis en el hero; las carpetas no.
+                    val app = sel as? LibraryItem.App
+                    val description = rememberDescription(vm, app?.key, app?.app?.meta)
                     if (description != null) {
                         ElyText(
-                            description,
+                            heroDescription(description, vm.settings.lang),
                             modifier = Modifier
                                 .padding(top = if (m.landscape) 4.dp else 6.dp)
                                 .fillMaxWidth(0.86f)
@@ -334,7 +334,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                 Modifier.fillMaxWidth().padding(start = m.pad, end = m.pad, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                LibraryFilter.entries.forEach { f ->
+                vm.availableFilters().forEach { f ->
                     FilterTab(stringResource(f.label), vm.filter == f) { vm.updateFilter(f) }
                 }
                 Spacer(Modifier.weight(1f))
@@ -922,6 +922,8 @@ private fun LibraryTile(
             // centrado, sin dejar huecos y sin deformarse.
             if (icon != null || autoIconPackage != null) {
                 GameIcon(icon, autoIconPackage, Modifier.fillMaxSize(), ContentScale.Fit)
+                val unnamed = item is LibraryItem.App && remember(item.app.displayTitle) { !NameCheck.isNameUsable(item.app.displayTitle) }
+                if (unnamed) NeedsNameBadge(Modifier.align(Alignment.TopStart).padding(6.dp), onDark = true)
             } else if (item is LibraryItem.Folder) {
                 // Carpeta sin icono y sin emulador instalado: rótulo de consola.
                 // Debajo, el arte de reserva de la carpeta; encima, el velo del rótulo.

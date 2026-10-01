@@ -453,8 +453,10 @@ private fun MetadataColumn(vm: ElyndraViewModel) {
 
     Column(Modifier.fillMaxWidth()) {
         SectionLabel(stringResource(R.string.section_metadata_apis))
+        KeylessPanel(vm)
         ApiPanels(vm)
         MetadataPriorityPanel(vm)
+        TranslationSection(vm)
 
         SettingsGroup(padding = 0.dp) {
             Row(
