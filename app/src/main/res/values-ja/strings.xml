@@ -80,7 +80,6 @@
     <string name="intro_color_crimson">クリムゾン</string>
     <string name="intro_color_emerald">エメラルド</string>
     <string name="intro_color_accent">アクセントに合わせる</string>
-    <string name="intro_subtitle">ゲームランチャー</string>
     <string name="section_background">背景</string>
     <string name="background_title">背景をカスタマイズ</string>
     <string name="background_desc">インターフェースの背後に動画または画像を表示します。Elyndra だけに適用され、システムの壁紙は変わりません。</string>

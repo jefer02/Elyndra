@@ -86,7 +86,6 @@
     <string name="intro_color_crimson">Carmesim</string>
     <string name="intro_color_emerald">Esmeralda</string>
     <string name="intro_color_accent">Igual ao destaque</string>
-    <string name="intro_subtitle">LANÇADOR DE JOGOS</string>
     <string name="section_background">Fundo</string>
     <string name="background_title">Personalizar fundo</string>
     <string name="background_desc">Mostra um vídeo ou uma imagem atrás da interface. Afeta apenas o Elyndra, não o papel de parede do sistema.</string>

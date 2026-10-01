@@ -17,7 +17,7 @@ class IntroPaletteTest {
         assertTrue("$what: ${"%.2f".format(ratio)} < $min", ratio >= min)
 
     @Test
-    fun rimsParticlesAndSubtitleKeepThreeToOneInBothThemes() {
+    fun rimsAndParticlesKeepThreeToOneInBothThemes() {
         for (dark in listOf(false, true)) {
             for (base in bases) {
                 val p = IntroPalettes.derive(base, dark)
@@ -27,7 +27,6 @@ class IntroPaletteTest {
                     assertAtLeast("$name filo claro", ColorMath.contrast(p.rimLight, bg), IntroPalettes.MIN_CONTRAST)
                     assertAtLeast("$name filo hondo", ColorMath.contrast(p.rimDeep, bg), IntroPalettes.MIN_CONTRAST)
                     assertAtLeast("$name partículas", ColorMath.contrast(p.particle, bg), IntroPalettes.MIN_CONTRAST)
-                    assertAtLeast("$name subtítulo", ColorMath.contrast(p.subtitle, bg), IntroPalettes.MIN_CONTRAST)
                 }
             }
         }

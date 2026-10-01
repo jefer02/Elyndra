@@ -86,7 +86,6 @@
     <string name="intro_color_crimson">Cramoisi</string>
     <string name="intro_color_emerald">Émeraude</string>
     <string name="intro_color_accent">Comme l\'accent</string>
-    <string name="intro_subtitle">LANCEUR DE JEUX</string>
     <string name="section_background">Arrière-plan</string>
     <string name="background_title">Personnaliser l’arrière-plan</string>
     <string name="background_desc">Affiche une vidéo ou une image derrière l’interface. Cela ne concerne qu’Elyndra, pas le fond d’écran du système.</string>

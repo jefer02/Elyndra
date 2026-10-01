@@ -23,8 +23,8 @@ import kotlin.math.min
 /**
  * Lo caro de la intro, pintado una sola vez fuera del hilo principal: el
  * rótulo (cuerpo, filo metálico y bisel), su resplandor o sombra con el
- * desenfoque ya hecho, la máscara del barrido de luz, el subtítulo y los
- * sprites de las partículas. Cada fotograma solo copia mapas de bits.
+ * desenfoque ya hecho, la máscara del barrido de luz y los sprites de las
+ * partículas. Cada fotograma solo copia mapas de bits.
  *
  * Todas las capas del rótulo comparten tamaño y origen, así que se dibujan
  * en la misma posición.
@@ -34,7 +34,6 @@ class IntroArt private constructor(
     val depth: ImageBitmap,
     val body: ImageBitmap,
     val shine: ImageBitmap,
-    val subtitle: ImageBitmap,
     val particle: ImageBitmap,
     val ember: ImageBitmap,
     /** Ancho y alto de las capas del rótulo. */
@@ -50,7 +49,7 @@ class IntroArt private constructor(
 
     companion object {
 
-        fun render(context: Context, width: Int, height: Int, density: Float, palette: IntroPalette, subtitleText: String): IntroArt {
+        fun render(context: Context, width: Int, height: Int, density: Float, palette: IntroPalette): IntroArt {
             val bitmaps = ArrayList<Bitmap>(6)
             fun bitmap(w: Int, h: Int) = Bitmap.createBitmap(w.coerceAtLeast(1), h.coerceAtLeast(1), Bitmap.Config.ARGB_8888).also { bitmaps += it }
 
@@ -91,7 +90,6 @@ class IntroArt private constructor(
                 drawText(WORD, cx, baseline, p)
             }
 
-            val sub = paintSubtitle(context, subtitleText.uppercase(), palette, size, density, ::bitmap)
             val particle = paintSprite(palette, (10f * density).toInt().coerceAtLeast(12), ::bitmap)
             val ember = paintSprite(palette, (8f * density).toInt().coerceAtLeast(10), ::bitmap)
 
@@ -100,7 +98,6 @@ class IntroArt private constructor(
                 depth = depth.asImageBitmap(),
                 body = body.asImageBitmap(),
                 shine = shine.asImageBitmap(),
-                subtitle = sub.asImageBitmap(),
                 particle = particle.asImageBitmap(),
                 ember = ember.asImageBitmap(),
                 wordWidth = w,
@@ -199,57 +196,6 @@ class IntroArt private constructor(
             p.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
             c.drawText(WORD, cx, baseline - dy, p)
             return band
-        }
-
-        /**
-         * Subtítulo espaciado. Oscuro: en el tono base con un halo suave.
-         * Claro: gris cálido oscuro con un subrayado dorado fino.
-         */
-        private fun paintSubtitle(
-            context: Context,
-            text: String,
-            palette: IntroPalette,
-            wordSize: Float,
-            density: Float,
-            bitmap: (Int, Int) -> Bitmap,
-        ): Bitmap {
-            val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                typeface = ResourcesCompat.getFont(context, R.font.poppins_medium)
-                textSize = (wordSize * 0.15f).coerceAtLeast(11f * density)
-                letterSpacing = 0.42f
-                textAlign = Paint.Align.CENTER
-                color = palette.subtitle
-            }
-            val ink = Rect().also { p.getTextBounds(text, 0, text.length, it) }
-            val pad = p.textSize
-            val w = ceil(p.measureText(text) + pad * 2).toInt()
-            val h = ceil(ink.height() + pad * 2 + p.textSize).toInt()
-            val out = bitmap(w, h)
-            val c = Canvas(out)
-            val baseline = pad - ink.top
-            if (palette.dark) {
-                val glow = Paint(p).apply {
-                    color = ColorMath.withAlpha(palette.subtitleAccent, 0.75f)
-                    maskFilter = BlurMaskFilter(p.textSize * 0.6f, BlurMaskFilter.Blur.NORMAL)
-                }
-                c.drawText(text, w / 2f, baseline, glow)
-            }
-            c.drawText(text, w / 2f, baseline, p)
-            if (!palette.dark) {
-                val lineW = ink.width() * 0.36f
-                val y = baseline + p.textSize * 0.75f
-                val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    strokeWidth = (1.2f * density).coerceAtLeast(1f)
-                    shader = LinearGradient(
-                        w / 2f - lineW / 2f, 0f, w / 2f + lineW / 2f, 0f,
-                        intArrayOf(ColorMath.withAlpha(palette.subtitleAccent, 0f), palette.subtitleAccent, ColorMath.withAlpha(palette.subtitleAccent, 0f)),
-                        null,
-                        Shader.TileMode.CLAMP,
-                    )
-                }
-                c.drawLine(w / 2f - lineW / 2f, y, w / 2f + lineW / 2f, y, line)
-            }
-            return out
         }
 
         /**

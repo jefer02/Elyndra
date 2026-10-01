@@ -55,9 +55,6 @@ class IntroPalette(
     val sheen: Int,
     val particle: Int,
     val particleLight: Int,
-    val subtitle: Int,
-    /** Resplandor del subtítulo (oscuro) o su subrayado dorado (claro). */
-    val subtitleAccent: Int,
 ) {
     /** El fondo con la niebla encima en su punto más denso: el peor caso para el contraste. */
     val fogPeak: Int get() = ColorMath.over(ColorMath.withAlpha(fog, fogAlpha), background)
@@ -65,7 +62,7 @@ class IntroPalette(
 
 object IntroPalettes {
 
-    /** Filos, partículas y subtítulo frente al fondo (WCAG, piezas gráficas). */
+    /** Filos y partículas frente al fondo (WCAG, piezas gráficas). */
     const val MIN_CONTRAST = 3.0
 
     private const val WHITE = 0xFFFFFFFF.toInt()
@@ -107,8 +104,6 @@ object IntroPalettes {
             sheen = ColorMath.mix(vivid, WHITE, 0.7f),
             particle = ColorMath.mix(vivid, WHITE, 0.2f),
             particleLight = ColorMath.mix(vivid, WHITE, 0.8f),
-            subtitle = legible(ColorMath.mix(vivid, WHITE, 0.35f), 4.5),
-            subtitleAccent = vivid,
         )
     }
 
@@ -150,8 +145,6 @@ object IntroPalettes {
             sheen = ColorMath.fromHsl(h, 0.9f, 0.93f),
             particle = metal(l, 3.2),
             particleLight = ColorMath.fromHsl(h, 0.6f, 0.94f),
-            subtitle = ColorMath.ensureContrast(ColorMath.ensureContrast(ColorMath.fromHsl(h, 0.14f, 0.32f), background, 4.5), peak, 4.5),
-            subtitleAccent = rim,
         )
     }
 }

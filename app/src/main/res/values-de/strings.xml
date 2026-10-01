@@ -83,7 +83,6 @@
     <string name="intro_color_crimson">Karmesin</string>
     <string name="intro_color_emerald">Smaragd</string>
     <string name="intro_color_accent">Wie der Akzent</string>
-    <string name="intro_subtitle">SPIELE-LAUNCHER</string>
     <string name="section_background">Hintergrund</string>
     <string name="background_title">Hintergrund anpassen</string>
     <string name="background_desc">Zeigt ein Video oder ein Bild hinter der Oberfläche. Betrifft nur Elyndra, nicht den System-Hintergrund.</string>

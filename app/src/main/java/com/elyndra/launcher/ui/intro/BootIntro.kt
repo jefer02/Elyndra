@@ -33,10 +33,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.runtime.withFrameNanos
-import com.elyndra.launcher.R
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.IntroController
 import com.elyndra.launcher.ui.masha.MashaQuality
@@ -59,7 +57,7 @@ import kotlin.random.Random
    Un único lienzo y un único bucle de fotogramas. El reloj se lee
    solo en la fase de dibujo, así que la intro no recompone mientras
    dura y no roba tiempo a la biblioteca que se monta debajo. Lo caro
-   (rótulo, desenfoques, subtítulo, sprites) se pinta una vez en otro
+   (rótulo, desenfoques, sprites) se pinta una vez en otro
    hilo (IntroArt); cada fotograma solo copia mapas de bits y dibuja
    degradados ya creados, sin crear objetos.
 
@@ -88,13 +86,11 @@ fun BootIntro(intro: IntroController, baseColor: Int) {
             else -> Dust(DUST_HIGH, EMBERS_HIGH)
         }
     }
-    val subtitle = stringResource(R.string.intro_subtitle)
-
     var area by remember { mutableStateOf(IntSize.Zero) }
-    val art by produceState<IntroArt?>(null, area, palette, subtitle) {
+    val art by produceState<IntroArt?>(null, area, palette) {
         if (area.width > 0 && area.height > 0) {
             value = withContext(Dispatchers.Default) {
-                IntroArt.render(context, area.width, area.height, density, palette, subtitle)
+                IntroArt.render(context, area.width, area.height, density, palette)
             }
         }
     }
@@ -199,7 +195,7 @@ private class Scene(size: Size, private val dp: Float, private val p: IntroPalet
     private val w = size.width
     private val h = size.height
     private val minDim = min(w, h)
-    private val c = Offset(w / 2f, h * 0.47f)
+    private val c = Offset(w / 2f, h / 2f)
 
     /** Luz: suma en oscuro; en claro, mezcla normal (Plus sobre perla no se ve). */
     private val light = if (p.dark) BlendMode.Plus else BlendMode.SrcOver
@@ -275,8 +271,6 @@ private class Scene(size: Size, private val dp: Float, private val p: IntroPalet
         endX = bandWidth / 2f,
     )
     private val sweepPaint = Paint().apply { blendMode = light }
-    private val subLeft = art?.let { c.x - it.subtitle.width / 2f } ?: 0f
-    private val subTop = inkBottom + (art?.textSize ?: 0f) * 0.18f
 
     fun draw(s: DrawScope, f: IntroFrame, time: Float, dust: Dust) = with(s) {
         drawRect(bg)
@@ -296,11 +290,6 @@ private class Scene(size: Size, private val dp: Float, private val p: IntroPalet
         if (f.gather > 0f) drawDust(f, time, dust, ready.particle)
         drawWord(f, ready)
         if (f.embers > 0f) drawEmbers(f, time, dust, ready.ember)
-        if (f.subtitle > 0f) {
-            translate(subLeft, subTop + (1f - f.subtitle) * 8f * dp) {
-                drawImage(ready.subtitle, alpha = f.subtitle * f.fadeIn)
-            }
-        }
     }
 
     /** Niebla que deriva despacio y la viñeta. */

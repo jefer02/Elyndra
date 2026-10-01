@@ -31,7 +31,6 @@ class IntroFrame {
     var embers = 0f
     var sweep = 0f
     var sweepAlpha = 0f
-    var subtitle = 0f
     /** El polvo se dispersa hacia fuera al final. */
     var disperse = 0f
     /** Entrada del contenido en la versión reducida (en la completa, 1). */
@@ -48,7 +47,7 @@ class IntroFrame {
  *   0.4–1.4 s  el polvo dorado converge y el núcleo de luz crece;
  *   1.4–1.6 s  destello radial y raya anamórfica;
  *   1.5–2.4 s  el rótulo se abre desde el centro, con ascuas;
- *   2.4–3.0 s  barrido de luz sobre las letras y subtítulo;
+ *   2.4–3.0 s  barrido de luz sobre las letras;
  *   3.0–3.5 s  pausa, el polvo se dispersa y la intro se funde.
  *
  * Con "reducir movimiento", solo un fundido de 0,8 s con el fotograma final.
@@ -100,7 +99,6 @@ object IntroTimeline {
         val s = range(t, 2400f, 3000f)
         o.sweep = EaseInOut.transform(s)
         o.sweepAlpha = sin(PI.toFloat() * s).coerceAtLeast(0f)
-        o.subtitle = Swift.transform(range(t, 2450f, 3000f))
         o.disperse = EaseInOut.transform(range(t, 3050f, 3500f))
         o.alpha = 1f - EaseInOut.transform(range(t, 3150f, 3500f))
     }
@@ -117,7 +115,6 @@ object IntroTimeline {
         o.embers = 0f
         o.sweep = 0f
         o.sweepAlpha = 0f
-        o.subtitle = 1f
         o.disperse = 0f
         o.alpha = 1f - smooth(range(t, 500f, REDUCED_MS))
     }

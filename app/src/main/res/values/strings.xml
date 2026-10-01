@@ -89,7 +89,6 @@
     <string name="intro_color_crimson">Crimson</string>
     <string name="intro_color_emerald">Emerald</string>
     <string name="intro_color_accent">Match accent</string>
-    <string name="intro_subtitle">GAME LAUNCHER</string>
     <string name="section_background">Background</string>
     <string name="background_title">Customize background</string>
     <string name="background_desc">Show a video or an image behind the interface. It only affects Elyndra, not your system wallpaper.</string>

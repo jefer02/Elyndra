@@ -48,13 +48,11 @@ class IntroTimelineTest {
     }
 
     @Test
-    fun sweepCrossesAndSubtitleFadesIn() {
+    fun sweepCrossesTheLetters() {
         assertEquals(0f, at(2400f).sweepAlpha, 1e-4f)
         assertEquals(0f, at(2400f).sweep, 1e-4f)
         assertTrue(at(2700f).sweepAlpha > 0.99f)
         assertEquals(1f, at(3000f).sweep, 1e-4f)
-        assertEquals(0f, at(2400f).subtitle, 0f)
-        assertEquals(1f, at(3000f).subtitle, 1e-4f)
     }
 
     @Test
@@ -75,7 +73,7 @@ class IntroTimelineTest {
         var t = 0f
         while (t <= IntroTimeline.TOTAL_MS) {
             val f = at(t)
-            for (v in listOf(f.atmosphere, f.gather, f.core, f.burst, f.streak, f.reveal, f.embers, f.sweep, f.sweepAlpha, f.subtitle, f.disperse, f.alpha)) {
+            for (v in listOf(f.atmosphere, f.gather, f.core, f.burst, f.streak, f.reveal, f.embers, f.sweep, f.sweepAlpha, f.disperse, f.alpha)) {
                 assertTrue("t=$t valor $v", v in 0f..1f)
             }
             assertTrue(f.reveal >= lastReveal)
@@ -89,7 +87,6 @@ class IntroTimelineTest {
         assertTrue(IntroTimeline.duration(reduced = true) <= 800f)
         val mid = IntroTimeline.at(400f, reduced = true)
         assertEquals(1f, mid.reveal, 0f)
-        assertEquals(1f, mid.subtitle, 0f)
         assertEquals(0f, mid.gather, 0f)
         assertEquals(0f, mid.burst, 0f)
         assertEquals(0f, mid.sweepAlpha, 0f)
