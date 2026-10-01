@@ -147,6 +147,8 @@ private fun AppearanceColumn(vm: ElyndraViewModel) {
             }
         }
 
+        IntroSection(vm)
+
         // Pantalla: 120 o 60 fps. En una pantalla de 60 Hz la opción de 120
         // sale apagada y se explica por qué.
         SectionLabel(stringResource(R.string.section_display))

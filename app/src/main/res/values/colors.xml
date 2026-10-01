@@ -3,6 +3,9 @@
     <!-- Copia de BrandTokens para lo que no puede leer Kotlin (tema de la ventana,
          splash del sistema). Si cambia allí, cambia aquí. -->
     <color name="paper">#F3F4F8</color>
-    <color name="console_black">#05070A</color>
+    <color name="intro_pearl">#F8F4EC</color>
+    <color name="intro_smoke">#0C0906</color>
+    <!-- Splash sin preferencia guardada (o antes de Android 13): el del tema del sistema. -->
+    <color name="intro_bg">@color/intro_pearl</color>
     <color name="brand_primary">#4E56D8</color>
 </resources>
