@@ -1,5 +1,9 @@
 package com.elyndra.launcher.di
 
+import com.elyndra.launcher.metadata.TranslationCache
+import com.elyndra.launcher.metadata.RoomTranslationStore
+import com.elyndra.launcher.metadata.MlKitTranslator
+import com.elyndra.launcher.data.db.TranslationDao
 import android.content.Context
 import com.elyndra.launcher.data.LibraryRepository
 import com.elyndra.launcher.data.LibraryStore
@@ -66,6 +70,10 @@ object AppModule {
     @Provides
     @Singleton
     fun music(@ApplicationContext context: Context, settings: SoundSettings) = BackgroundMusic(context, settings)
+
+    @Provides
+    @Singleton
+    fun translations(dao: TranslationDao) = TranslationCache(RoomTranslationStore(dao), MlKitTranslator())
 
     @Provides
     @Singleton

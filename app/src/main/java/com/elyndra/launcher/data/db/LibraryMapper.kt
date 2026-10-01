@@ -1,5 +1,8 @@
 package com.elyndra.launcher.data.db
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.builtins.MapSerializer
 import com.elyndra.launcher.data.AppEntry
 import com.elyndra.launcher.data.ArtOrigin
 import com.elyndra.launcher.data.FileHashes
@@ -77,6 +80,9 @@ object LibraryMapper {
             gameKey = key,
             name = m.name,
             description = m.description,
+            descriptionLang = m.descriptionLang,
+            descriptions = encodeDescriptions(m.descriptions),
+            descriptionCheckedLang = m.descriptionCheckedLang,
             releaseDate = m.releaseDate,
             developer = m.developer,
             publisher = m.publisher,
@@ -91,6 +97,10 @@ object LibraryMapper {
             ssGameId = m.ssGameId,
             igdbId = m.igdbId,
             sgdbId = m.sgdbId,
+            steamAppId = m.steamAppId,
+            userName = m.userName,
+            nameLocked = m.nameLocked,
+            libretroName = m.libretroName,
             raGameId = m.ra?.gameId,
             raTitle = m.ra?.title,
             raAchievements = m.ra?.achievements,
@@ -223,6 +233,9 @@ object LibraryMapper {
                 sources = m.sources.split(',').filter { it.isNotBlank() },
                 name = m.name,
                 description = m.description,
+                descriptionLang = m.descriptionLang,
+                descriptions = decodeDescriptions(m.descriptions),
+                descriptionCheckedLang = m.descriptionCheckedLang,
                 releaseDate = m.releaseDate,
                 developer = m.developer,
                 publisher = m.publisher,
@@ -232,6 +245,10 @@ object LibraryMapper {
                 ssGameId = m.ssGameId,
                 igdbId = m.igdbId,
                 sgdbId = m.sgdbId,
+                steamAppId = m.steamAppId,
+                userName = m.userName,
+                nameLocked = m.nameLocked,
+                libretroName = m.libretroName,
                 ra = m.raGameId?.let { id ->
                     RaInfo(
                         gameId = id,
@@ -297,4 +314,14 @@ object LibraryMapper {
     )
 
     private val EMPTY_TEXT = GameMeta()
+
+    private val descriptionsSerializer = MapSerializer(String.serializer(), String.serializer())
+    private val json = Json { ignoreUnknownKeys = true }
+
+    fun encodeDescriptions(map: Map<String, String>): String? =
+        if (map.isEmpty()) null else json.encodeToString(descriptionsSerializer, map)
+
+    /** Un JSON roto no tumba la biblioteca: se leen cero descripciones. */
+    fun decodeDescriptions(text: String?): Map<String, String> =
+        if (text.isNullOrBlank()) emptyMap() else runCatching { json.decodeFromString(descriptionsSerializer, text) }.getOrDefault(emptyMap())
 }

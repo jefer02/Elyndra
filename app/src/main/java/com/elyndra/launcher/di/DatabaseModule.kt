@@ -34,4 +34,5 @@ object DatabaseModule {
     @Provides fun smartListDao(db: ElyndraDatabase) = db.smartListDao()
     @Provides fun arcDao(db: ElyndraDatabase) = db.arcDao()
     @Provides fun aiCacheDao(db: ElyndraDatabase) = db.aiCacheDao()
+    @Provides fun translationDao(db: ElyndraDatabase) = db.translationDao()
 }

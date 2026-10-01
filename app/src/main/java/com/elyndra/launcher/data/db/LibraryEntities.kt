@@ -117,6 +117,11 @@ data class GameMetadataEntity(
     @PrimaryKey @ColumnInfo(name = "game_key") val gameKey: String,
     val name: String?,
     val description: String?,
+    /** Idioma de [description]; null = datos de la versión 2 (sin etiquetar). */
+    @ColumnInfo(name = "description_lang") val descriptionLang: String? = null,
+    /** Todas las descripciones por idioma, como objeto JSON {"es": "…", "en": "…"}. */
+    val descriptions: String? = null,
+    @ColumnInfo(name = "description_checked_lang") val descriptionCheckedLang: String? = null,
     @ColumnInfo(name = "release_date") val releaseDate: String?,
     val developer: String?,
     val publisher: String?,
@@ -132,6 +137,11 @@ data class GameMetadataEntity(
     @ColumnInfo(name = "ss_game_id") val ssGameId: String?,
     @ColumnInfo(name = "igdb_id") val igdbId: Long?,
     @ColumnInfo(name = "sgdb_id") val sgdbId: Long?,
+    @ColumnInfo(name = "steam_app_id") val steamAppId: Long? = null,
+    /** Nombre puesto a mano y si está fijado (ninguna pasada lo pisa). */
+    @ColumnInfo(name = "user_name") val userName: String? = null,
+    @ColumnInfo(name = "name_locked", defaultValue = "0") val nameLocked: Boolean = false,
+    @ColumnInfo(name = "libretro_name") val libretroName: String? = null,
     @ColumnInfo(name = "ra_game_id") val raGameId: Int?,
     @ColumnInfo(name = "ra_title") val raTitle: String?,
     @ColumnInfo(name = "ra_achievements") val raAchievements: Int?,
@@ -199,4 +209,19 @@ data class LibraryStateEntity(
     @ColumnInfo(name = "last_auto_scan") val lastAutoScan: Long,
     /** Cuándo se importó el antiguo library.json (0 = no había). */
     @ColumnInfo(name = "imported_at") val importedAt: Long,
+)
+
+/**
+ * Traducción en el dispositivo (ML Kit) de la descripción de un juego a un
+ * idioma. [sourceHash] es el del original traducido: si la descripción
+ * cambia, la traducción deja de valer. El original no se toca.
+ */
+@Entity(tableName = "description_translations", primaryKeys = ["game_key", "target_lang"])
+data class DescriptionTranslationEntity(
+    @ColumnInfo(name = "game_key") val gameKey: String,
+    @ColumnInfo(name = "target_lang") val targetLang: String,
+    @ColumnInfo(name = "source_lang") val sourceLang: String,
+    @ColumnInfo(name = "source_hash") val sourceHash: String,
+    val text: String,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
 )
