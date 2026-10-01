@@ -41,14 +41,23 @@ object MashaTools {
     const val LIST_INSTALLED_APPS = "list_installed_apps"
     const val SET_ACCENT = "set_accent"
     const val SET_DARK_MODE = "set_dark_mode"
+    const val LIST_UNNAMED_GAMES = "list_unnamed_games"
+    const val RENAME_GAME = "rename_game"
+    const val LIST_ADDABLE_GAMES = "list_addable_games"
+    const val ADD_GAMES = "add_games"
+    const val OPEN_ADD_ROMS = "open_add_roms"
+    const val LIST_EMULATORS = "list_emulators"
+    const val SET_PREFERRED_EMULATOR = "set_preferred_emulator"
+    const val UNDO_LAST_ACTION = "undo_last_action"
 
     /** Las que cambian algo: una respuesta que las usó nunca sale de caché. */
     val MUTATING = setOf(
         LAUNCH_GAME, SET_GAME_EMULATOR, CREATE_LIST, CREATE_ARC, UPDATE_METADATA, REMEMBER, FORGET,
         FILTER_LIBRARY, SET_ART, ADD_GAME, REMOVE_GAME, SET_ACCENT, SET_DARK_MODE,
+        RENAME_GAME, ADD_GAMES, OPEN_ADD_ROMS, SET_PREFERRED_EMULATOR, UNDO_LAST_ACTION,
     )
 
-    val ACCENTS = listOf("mandarina", "fuego", "menta", "cobalto", "lila", "coral", "turquesa", "oro", "chicle", "grafito")
+    val ACCENTS = listOf("indigo", "abismo", "medianoche", "mandarina", "fuego", "menta", "cobalto", "lila", "coral", "turquesa", "oro", "chicle", "grafito")
     val ART_KINDS = listOf("cover", "background", "logo", "icon")
     val MOODS = listOf("continue", "light", "new", "any")
     val SORTS = listOf("title", "minutes", "last_played", "added", "rating", "release")
@@ -165,6 +174,37 @@ object MashaTools {
                 boolean("enabled", "true = dark, false = light.")
                 required("enabled")
             },
+            tool(LIST_UNNAMED_GAMES, "Games whose name is not usable to find metadata (package ids, serials like CUSA01715, hashes, raw file names). Returns each current raw name, its source (Android or a system) and a cleaned-up guess.") {},
+            tool(
+                RENAME_GAME,
+                "Set a game's name. The name is locked: metadata syncs never overwrite it, and its metadata is refreshed right away. " +
+                    "If you are proposing the name yourself, the app shows a confirm card: say in one sentence what you will set and ask. " +
+                    "Set user_dictated=true only when the user gave the exact name.",
+            ) {
+                string("game", "Current title of the game in the library.")
+                string("name", "The new name.")
+                boolean("user_dictated", "true if the user dictated this exact name (then no confirmation is needed).")
+                required("game", "name")
+            },
+            tool(LIST_ADDABLE_GAMES, "Games on the device that are not in the library yet: installed Android apps/games, and new ROMs/PC games inside folders Elyndra already has access to (also ones the user removed before). Only names, never paths.") {},
+            tool(
+                ADD_GAMES,
+                "Add games to the library (never deletes anything). For more than one game the app shows the list in a confirm card first. " +
+                    "At most 50 per call; the rest are reported as skipped.",
+            ) {
+                stringArray("titles", "Exact titles from list_addable_games.")
+                boolean("all", "true = every game list_addable_games found (instead of titles).")
+            },
+            tool(OPEN_ADD_ROMS, "Open the Add screen on the ROMs tab so the user can pick a new folder with the system picker (you cannot pick folders yourself). Tell the user which folder to select.") {
+                string("system", "System the folder is for, if known.")
+            },
+            tool(LIST_EMULATORS, "Emulators on this device: the ones Elyndra recognizes (with the systems they run and where they are the preferred emulator), the recognized ones not set up for any system, and installed apps that look like emulators but have no known profile (Elyndra cannot launch those safely).") {},
+            tool(SET_PREFERRED_EMULATOR, "Make a recognized, installed emulator the preferred one for all of a system's folders. The app shows a confirm card first.") {
+                string("system", "System name or id, e.g. 'PlayStation 2', 'psp'.")
+                string("emulator", "Emulator name or id.")
+                required("system", "emulator")
+            },
+            tool(UNDO_LAST_ACTION, "Undo the last rename, add or emulator change made through you. Only when the user asks.") {},
         )
     }
 
