@@ -65,6 +65,15 @@ object BrandTokens {
      */
     const val SHADE = 0xFF1A1D2B.toInt()
 
+    /**
+     * El brillo champán de la intro, como acento de luz de la interfaz: el canto
+     * superior de las superficies y el destello del foco. Decorativo: nunca
+     * lleva texto ni rellena una pieza. En claro, más hondo para que se vea
+     * sobre el perla.
+     */
+    const val CHAMPAGNE = 0xFFF0D7A2.toInt()
+    const val CHAMPAGNE_DEEP = 0xFFC49A4C.toInt()
+
     /** Fondo de la intro en claro (perla cálida) y en oscuro (ámbar ahumado casi negro); también el del splash del sistema. */
     const val INTRO_PEARL = 0xFFF8F4EC.toInt()
     const val INTRO_SMOKE = 0xFF0C0906.toInt()

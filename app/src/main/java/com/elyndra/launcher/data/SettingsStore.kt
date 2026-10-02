@@ -236,12 +236,23 @@ class SettingsStore(context: Context) {
         get() = prefs.getInt("masha.particleColor", DEFAULT_PARTICLE_COLOR)
         set(v) = prefs.edit { putInt("masha.particleColor", v) }
 
-    /** Partículas de neón que caen alrededor del icono o la carátula seleccionados. */
+    /**
+     * Halo del marco de la card seleccionada (filo en degradado, barrido de luz,
+     * resplandor y luz en el estante). Encendido de serie.
+     */
+    var selectionGlow: Boolean
+        get() = prefs.getBoolean("selection.glow", DEFAULT_SELECTION_GLOW)
+        set(v) = prefs.edit { putBoolean("selection.glow", v) }
+
+    /**
+     * Polvo estelar alrededor del icono o la carátula seleccionados. Encendido
+     * si no hay nada guardado; quien ya lo eligió conserva su valor.
+     */
     var selectionParticles: Boolean
-        get() = prefs.getBoolean("selection.particles", true)
+        get() = prefs.getBoolean("selection.particles", DEFAULT_SELECTION_PARTICLES)
         set(v) = prefs.edit { putBoolean("selection.particles", v) }
 
-    /** Color (ARGB) de esas partículas. Por omisión, un magenta de neón. */
+    /** Color (ARGB) de la selección: marco, halo y partículas. */
     var selectionParticleColor: Int
         get() = prefs.getInt("selection.particleColor", DEFAULT_SELECTION_PARTICLE_COLOR)
         set(v) = prefs.edit { putInt("selection.particleColor", v) }
@@ -340,6 +351,9 @@ class SettingsStore(context: Context) {
 
         /** El mismo cian de fósforo, el primero de la paleta de partículas. */
         const val DEFAULT_SELECTION_PARTICLE_COLOR = DEFAULT_PARTICLE_COLOR
+
+        const val DEFAULT_SELECTION_GLOW = true
+        const val DEFAULT_SELECTION_PARTICLES = true
 
         /*
          * Las claves siguen diciendo "lucy" a propósito, como las de "videoBg":

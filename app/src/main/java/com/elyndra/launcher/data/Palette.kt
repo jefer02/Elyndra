@@ -48,6 +48,9 @@ object P {
     /** Fondo neutro de las miniaturas de imagen y de las vistas previas oscuras. */
     val mediaBack = Color(BrandTokens.MEDIA_BACK)
 
+    /** El brillo champán de la intro (cantos y foco), según el tema. */
+    val champagne: Color get() = Color(if (isDark) BrandTokens.CHAMPAGNE else BrandTokens.CHAMPAGNE_DEEP)
+
     /* ── Dependientes del tema ───────────────────────────────── */
 
     /** Fondo general de la app. */
