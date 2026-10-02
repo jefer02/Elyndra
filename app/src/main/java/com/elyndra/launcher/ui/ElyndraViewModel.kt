@@ -393,7 +393,7 @@ class ElyndraViewModel @Inject constructor(
 
     fun go(target: Screen) {
         if (target == Screen.Add) add.onOpen()
-        if (target == Screen.Settings) settings.onOpen()
+        if (target == Screen.Settings) settings.onOpen(fromPage = screen.isSettingsPage)
         screen = target
     }
 
@@ -408,6 +408,9 @@ class ElyndraViewModel @Inject constructor(
             artPicker != null -> closeArtPicker()
             identify.state != null -> identify.close()
             detailsKey != null -> closeDetails()
+            // En Ajustes, atrás suelta la fuente cogida y, en ventana estrecha, vuelve a la lista.
+            screen == Screen.Settings && settings.priorityGrab != null -> settings.releaseGrab()
+            screen == Screen.Settings && settings.compact && settings.detailOpen -> settings.closeCategory()
             screen.isSettingsPage -> go(Screen.Settings)
             screen != Screen.Library -> go(Screen.Library)
             searchOpen -> toggleSearch()
