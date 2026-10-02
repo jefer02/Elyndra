@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.components.SwitchRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,22 +37,9 @@ internal fun TranslationSection(vm: ElyndraViewModel) {
 
     SectionLabel(stringResource(R.string.section_translation))
     SettingsGroup {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                ElyText(stringResource(R.string.auto_translate), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
-                Spacer(Modifier.height(4.dp))
-                ElyText(stringResource(R.string.auto_translate_desc), size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
-            }
-            Spacer(Modifier.width(12.dp))
-            GlowingSwitch(c.autoTranslate, c::toggleAuto)
-        }
-        Spacer(Modifier.height(14.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ElyText(stringResource(R.string.translate_wifi_only), Modifier.weight(1f), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
-            Spacer(Modifier.width(12.dp))
-            GlowingSwitch(c.wifiOnly, c::toggleWifiOnly)
-        }
-        Spacer(Modifier.height(14.dp))
+        SwitchRow(stringResource(R.string.auto_translate), stringResource(R.string.auto_translate_desc), c.autoTranslate, c::toggleAuto)
+        SwitchRow(stringResource(R.string.translate_wifi_only), null, c.wifiOnly, c::toggleWifiOnly)
+        Spacer(Modifier.height(6.dp))
         ElyText(stringResource(R.string.translate_models), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
         if (c.models.isEmpty()) {
             Spacer(Modifier.height(4.dp))

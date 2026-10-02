@@ -108,7 +108,7 @@ fun VoiceSyncScreen(vm: ElyndraViewModel) {
             Modifier.align(Alignment.TopStart).padding(m.pad),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            GlassIconButton(onClick = { vm.go(Screen.Settings) }) { BackChevron() }
+            GlassIconButton(onClick = { vm.go(Screen.Settings) }, size = com.elyndra.launcher.ui.theme.MinTouch, cornerRadius = 15.dp, contentDescription = stringResource(R.string.hint_back)) { BackChevron() }
             Spacer(Modifier.width(11.dp))
             ElyText(stringResource(R.string.dev_voice_sync), size = 16f, weight = FontWeight.SemiBold, color = Holo.text)
         }
