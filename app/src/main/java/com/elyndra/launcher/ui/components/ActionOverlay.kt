@@ -111,6 +111,10 @@ import com.elyndra.launcher.ui.theme.consoleFocus
 import com.elyndra.launcher.ui.theme.motion
 import com.elyndra.launcher.ui.theme.outerShadow
 import com.elyndra.launcher.ui.theme.shapeClickable
+import com.elyndra.launcher.ui.theme.pressFeedback
+import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -170,14 +174,23 @@ fun GameActionOverlayContainer(
     val reduced = LocalReducedMotion.current
     // Un solo progreso 0→1 gobierna velo y panel: entran y salen acompasados.
     // Se lee en fase de dibujo (graphicsLayer), así la animación no recompone.
+    // Se abre con muelle y se cierra más deprisa: lo que se va no se hace esperar.
     val open = animateFloatAsState(
         targetValue = if (isOverlayVisible) 1f else 0f,
-        animationSpec = if (reduced) tween(REDUCED_FADE_MS) else Springs.enter(),
+        animationSpec = when {
+            reduced -> tween(REDUCED_FADE_MS)
+            isOverlayVisible -> Springs.enter()
+            else -> Springs.exit()
+        },
         label = "overlay",
     )
     val backdrop = animateFloatAsState(
         targetValue = if (isOverlayVisible || dimForOtherLayer) 1f else 0f,
-        animationSpec = if (reduced) tween(REDUCED_FADE_MS) else Springs.fade(),
+        animationSpec = when {
+            reduced -> tween(REDUCED_FADE_MS)
+            isOverlayVisible || dimForOtherLayer -> Springs.fade()
+            else -> Springs.exit()
+        },
         label = "backdrop",
     )
     // Lo último que se enseñó: al cerrar, `spec` pasa a null enseguida y el
@@ -407,93 +420,115 @@ private fun HeroContent(
     val run: (SheetAction) -> Unit = { a -> input.runSheetAction(layout.indexOf(a), a) }
     val artHeader = spec.groups.firstOrNull { it.style == GroupStyle.Thumbnails }?.header
 
-    Box {
-        Column(Modifier.fillMaxWidth().verticalScroll(scroll)) {
-            HeroBanner(
-                spec = spec,
-                hero = hero,
-                height = if (layout.twoColumns) BANNER_WIDE else BANNER_TALL,
-                tone = tone,
-                open = open,
-                reduced = reduced,
-                modifier = Modifier.staggered(open, 0, reduced),
-            )
-            val play: @Composable () -> Unit = {
-                Column(Modifier.staggered(open, 1, reduced)) {
-                    InfoLine(hero.info, accent)
-                    layout.primary?.let { primary ->
-                        Spacer(Modifier.height(10.dp))
-                        PlayButton(primary, focused = focus == layout.indexOf(primary), accent = accent, gamepad = input.active) { run(primary) }
+    Column {
+        Box(Modifier.weight(1f, fill = false)) {
+            Column(Modifier.fillMaxWidth().verticalScroll(scroll)) {
+                HeroBanner(
+                    spec = spec,
+                    hero = hero,
+                    height = if (layout.twoColumns) BANNER_WIDE else BANNER_TALL,
+                    tone = tone,
+                    open = open,
+                    reduced = reduced,
+                    modifier = Modifier.staggered(open, 0, reduced),
+                )
+                val play: @Composable () -> Unit = {
+                    Column(Modifier.staggered(open, 1, reduced)) {
+                        InfoLine(hero.info, accent)
+                        layout.primary?.let { primary ->
+                            Spacer(Modifier.height(10.dp))
+                            PlayButton(primary, focused = focus == layout.indexOf(primary), accent = accent, gamepad = input.active) { run(primary) }
+                        }
                     }
                 }
-            }
-            val tiles: @Composable () -> Unit = {
-                if (layout.tiles.isNotEmpty()) {
-                    Column(Modifier.staggered(open, 2, reduced), verticalArrangement = Arrangement.spacedBy(GAP)) {
-                        layout.tileRows().forEach { row ->
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(GAP)) {
-                                row.forEach { a ->
-                                    ActionTile(a, focused = focus == layout.indexOf(a), accent = accent, modifier = Modifier.weight(1f)) { run(a) }
+                val tiles: @Composable () -> Unit = {
+                    if (layout.tiles.isNotEmpty()) {
+                        Column(Modifier.staggered(open, 2, reduced), verticalArrangement = Arrangement.spacedBy(GAP)) {
+                            layout.tileRows().forEach { row ->
+                                // Todas las piezas de una fila, igual de altas: la del
+                                // rótulo de dos líneas manda.
+                                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(GAP)) {
+                                    row.forEach { a ->
+                                        ActionTile(a, focused = focus == layout.indexOf(a), accent = accent, modifier = Modifier.weight(1f).fillMaxHeight()) { run(a) }
+                                    }
+                                    // La última fila incompleta no estira sus piezas.
+                                    repeat(layout.tileColumns - row.size) { Spacer(Modifier.weight(1f)) }
                                 }
                             }
                         }
                     }
                 }
-            }
-            val images: @Composable () -> Unit = {
-                if (layout.art.isNotEmpty()) {
-                    Column(Modifier.staggered(open, 3, reduced)) {
-                        artHeader?.let { SectionLabel(it.resolve()) }
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(GAP)) {
-                            layout.art.forEach { a ->
-                                ArtTile(a, hero, focused = focus == layout.indexOf(a), accent = accent, reduced = reduced, modifier = Modifier.weight(1f)) { run(a) }
+                val images: @Composable () -> Unit = {
+                    if (layout.art.isNotEmpty()) {
+                        Column(Modifier.staggered(open, 3, reduced)) {
+                            artHeader?.let { SectionLabel(it.resolve()) }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(GAP)) {
+                                layout.art.forEach { a ->
+                                    ArtTile(a, hero, focused = focus == layout.indexOf(a), accent = accent, reduced = reduced, modifier = Modifier.weight(1f)) { run(a) }
+                                }
                             }
                         }
                     }
                 }
-            }
-            val danger: @Composable () -> Unit = {
-                if (layout.danger.isNotEmpty()) {
-                    Column(Modifier.staggered(open, 4, reduced), verticalArrangement = Arrangement.spacedBy(GAP)) {
-                        // La zona de borrado se separa con un filo rojo: no se llega a ella por inercia.
-                        Box(Modifier.fillMaxWidth().padding(vertical = 2.dp).height(1.dp).background(P.red.copy(alpha = 0.2f)))
-                        layout.danger.forEach { a ->
-                            val i = layout.indexOf(a)
-                            DangerRow(a, i, focused = focus == i, armed = armed == i, input = input)
+                // La zona de borrado es un pie aparte, a lo ancho del panel y tras un
+                // filo rojo: no se llega a ella por inercia desde ninguna columna.
+                val danger: @Composable () -> Unit = {
+                    if (layout.danger.isNotEmpty()) {
+                        Column(
+                            Modifier.fillMaxWidth().staggered(open, 4, reduced).padding(start = PAD, end = PAD, bottom = PAD),
+                            verticalArrangement = Arrangement.spacedBy(GAP),
+                        ) {
+                            Box(Modifier.fillMaxWidth().padding(bottom = 4.dp).height(1.dp).background(P.red.copy(alpha = 0.22f)))
+                            layout.danger.forEach { a ->
+                                val i = layout.indexOf(a)
+                                DangerRow(a, i, focused = focus == i, armed = armed == i, input = input)
+                            }
                         }
                     }
                 }
-            }
 
-            if (layout.twoColumns) {
-                Row(
-                    Modifier.fillMaxWidth().padding(start = PAD, end = PAD, bottom = PAD),
-                    horizontalArrangement = Arrangement.spacedBy(PAD),
-                ) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SECTION_GAP)) {
+                if (layout.twoColumns) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = PAD, end = PAD, bottom = PAD),
+                        horizontalArrangement = Arrangement.spacedBy(PAD),
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SECTION_GAP)) {
+                            play()
+                            tiles()
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SECTION_GAP)) {
+                            images()
+                        }
+                    }
+                } else {
+                    Column(
+                        Modifier.fillMaxWidth().padding(start = PAD, end = PAD, bottom = PAD),
+                        verticalArrangement = Arrangement.spacedBy(SECTION_GAP),
+                    ) {
                         play()
                         tiles()
-                    }
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SECTION_GAP)) {
                         images()
-                        danger()
                     }
                 }
-            } else {
-                Column(
-                    Modifier.fillMaxWidth().padding(start = PAD, end = PAD, bottom = PAD),
-                    verticalArrangement = Arrangement.spacedBy(SECTION_GAP),
-                ) {
-                    play()
-                    tiles()
-                    images()
-                    danger()
-                }
+                danger()
             }
+            ScrollHints(scroll, tone, accent)
         }
-        ScrollHints(scroll, tone, accent)
+        MenuPadHints(input)
     }
 }
+
+/** Pistas del mando al pie de cualquier menú: A elige y B cierra. */
+@Composable
+private fun MenuPadHints(input: InputController) {
+    PadHints(
+        hints = MENU_HINTS,
+        visible = input.gamepadPresent,
+        modifier = Modifier.fillMaxWidth().padding(start = PAD, end = PAD, bottom = 10.dp),
+    )
+}
+
+private val MENU_HINTS = listOf(PadHint("A", R.string.hint_select), PadHint("B", R.string.close))
 
 /**
  * La banda del arte: el fondo del juego a sangre por arriba (se acerca un
@@ -698,30 +733,34 @@ private fun PadHint(label: String, color: Color, strong: Boolean = true) {
 @Composable
 private fun ActionTile(action: SheetAction, focused: Boolean, accent: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val shape = RoundedCornerShape(TILE_RADIUS)
+    val interaction = remember { MutableInteractionSource() }
     Column(
         modifier
-            .height(TILE_H)
+            .heightIn(min = TILE_H)
             .revealWhen(focused)
+            .pressFeedback(interaction)
             .clip(shape)
             .background(tileFill())
             .border(1.dp, P.hairline.copy(alpha = 0.8f), shape)
             .consoleFocus(focused, shape, accent)
-            .shapeClickable(shape, color = accent, onClick = onClick)
+            .shapeClickable(shape, interactionSource = interaction, color = accent, onClick = onClick)
             .alpha(if (action.dimmed) 0.5f else 1f)
-            .padding(horizontal = 6.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         action.icon?.let { SheetGlyph(it, accent, size = 20.dp) }
-        Spacer(Modifier.height(5.dp))
+        Spacer(Modifier.height(6.dp))
+        // Dos líneas: "Editar nombre / Identificar juego" cabe entero en los seis idiomas.
         ElyText(
             action.label.resolve(),
-            size = 9.5f,
+            size = 10f,
             weight = FontWeight.SemiBold,
             color = P.ink,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             align = TextAlign.Center,
+            lineHeightRatio = 1.2f,
         )
         action.detail?.let {
             ElyText(
@@ -823,15 +862,29 @@ private fun ArtTile(
             ElyText(
                 action.label.resolve(),
                 modifier = Modifier.weight(1f),
-                size = 9f,
+                size = 9.5f,
                 weight = FontWeight.SemiBold,
                 color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            // Puesta a mano: un punto del acento.
-            if (preview != null) Box(Modifier.size(6.dp).clip(CircleShape).background(accent))
+            // El estado se lee sin adivinar: sin imagen, "Añadir"; con ella, "Cambiar".
+            ArtStateChip(if (preview != null) R.string.change else R.string.art_state_add, set = preview != null, accent = accent)
         }
+    }
+}
+
+@Composable
+private fun ArtStateChip(@StringRes label: Int, set: Boolean, accent: Color) {
+    val shape = RoundedCornerShape(6.dp)
+    Box(
+        Modifier
+            .clip(shape)
+            .background(if (set) Color.White.copy(alpha = 0.18f) else accent.copy(alpha = 0.85f))
+            .border(1.dp, Color.White.copy(alpha = if (set) 0.45f else 0.25f), shape)
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    ) {
+        ElyText(stringResource(label), size = 8f, weight = FontWeight.Bold, color = Color.White, maxLines = 1, uppercase = true, letterSpacing = tracking(0.06f))
     }
 }
 
@@ -1001,6 +1054,7 @@ private fun ListContent(
             }
             ScrollHints(scroll, tone, accent)
         }
+        MenuPadHints(input)
     }
 }
 
@@ -1207,7 +1261,7 @@ private val PAD = 16.dp
 private val TILE_RADIUS = PANEL_RADIUS - PAD
 private val GAP = 8.dp
 private val SECTION_GAP = 14.dp
-private val TILE_H = 68.dp
+private val TILE_H = 76.dp
 private val ART_TILE_H = 76.dp
 private val BANNER_TALL = 152.dp
 private val BANNER_WIDE = 112.dp

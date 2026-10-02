@@ -46,6 +46,7 @@ import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.components.GameActionOverlayContainer
 import com.elyndra.launcher.ui.components.ElyDialogView
 import com.elyndra.launcher.ui.components.LocalScreenSize
+import com.elyndra.launcher.ui.components.LocalPadHints
 import com.elyndra.launcher.ui.components.ToastView
 import com.elyndra.launcher.ui.components.VideoBackdrop
 import com.elyndra.launcher.ui.screens.AddScreen
@@ -170,7 +171,10 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                     .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)),
             ) {
                 // Las métricas reparten este alto entre hero y cards (móvil y tableta).
-                CompositionLocalProvider(LocalScreenSize provides DpSize(maxWidth, maxHeight)) {
+                CompositionLocalProvider(
+                    LocalScreenSize provides DpSize(maxWidth, maxHeight),
+                    LocalPadHints provides vm.input.gamepadPresent,
+                ) {
                     // Cambiar de pantalla se ve: la que entra llega deslizando
                     // desde el lado al que se va, y la que sale se aparta por
                     // el contrario. Volver a la biblioteca invierte el sentido,

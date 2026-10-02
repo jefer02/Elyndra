@@ -16,7 +16,8 @@ package com.elyndra.launcher.ui
  * cada acción es una fila, en el orden de sus bloques.
  *
  * En horizontal, el menú de juego va en dos columnas: a la izquierda arte,
- * "Jugar" y las piezas; a la derecha imágenes y zona de borrado.
+ * "Jugar" y las piezas; a la derecha las imágenes. La zona de borrado es un
+ * pie a lo ancho de las dos, aparte de todo lo demás.
  */
 class SheetLayout private constructor(
     val primary: SheetAction?,
@@ -32,7 +33,7 @@ class SheetLayout private constructor(
     val actions: List<SheetAction> =
         if (list.isNotEmpty()) list.flatMap { it.actions } else listOfNotNull(primary) + tiles + art + danger
 
-    /** Filas de navegación: índices en [actions] y la columna (0/1) en la que están. */
+    /** Filas de navegación: índices en [actions] y la columna (0/1, o [SPAN] si ocupa las dos). */
     val rows: List<Row> = buildRows()
 
     class Row(val column: Int, val items: IntArray)
@@ -61,7 +62,7 @@ class SheetLayout private constructor(
             i += art.size
         }
         for (d in danger) {
-            out += Row(right, intArrayOf(i))
+            out += Row(if (twoColumns) SPAN else 0, intArrayOf(i))
             i++
         }
         return out
@@ -87,19 +88,21 @@ class SheetLayout private constructor(
         }
     }
 
-    /** Fila de arriba o de abajo en la misma columna, en la posición más parecida. */
+    /** Fila de arriba o de abajo en la misma columna (o en el pie), en la posición más parecida. */
     private fun vertical(r: Int, p: Int, delta: Int): Int? {
         val column = rows[r].column
         var k = r + delta
-        while (k in rows.indices && rows[k].column != column) k += delta
+        while (k in rows.indices && !sameColumn(rows[k].column, column)) k += delta
         if (k !in rows.indices) return null
         return rows[k].items[nearest(p, rows[r].items.size, rows[k].items.size)]
     }
 
-    /** Salto a la otra columna (horizontal), a la fila de la misma altura relativa. */
+    private fun sameColumn(a: Int, b: Int): Boolean = a == b || a == SPAN || b == SPAN
+
+    /** Salto a la otra columna (horizontal), a la fila de la misma altura relativa. El pie no salta. */
     private fun jumpColumn(r: Int, target: Int, toStart: Boolean): Int? {
         val from = rows[r].column
-        if (from == target) return null
+        if (from == target || from == SPAN) return null
         val mine = rows.filter { it.column == from }
         val theirs = rows.filter { it.column == target }
         if (theirs.isEmpty()) return null
@@ -113,8 +116,19 @@ class SheetLayout private constructor(
         else Math.round(p * (to - 1) / (from - 1).toFloat()).coerceIn(0, to - 1)
 
     companion object {
-        /** Piezas por fila: todas en una si caben 4; si no, en dos filas parejas. */
-        fun columnsFor(count: Int): Int = if (count <= 4) count.coerceAtLeast(1) else (count + 1) / 2
+        /** Columna de una fila que ocupa el ancho entero (el pie de borrado). */
+        const val SPAN = -1
+
+        /**
+         * Piezas por fila: hasta tres en una; cuatro, en dos filas de dos; más,
+         * de tres en tres. Así ningún rótulo se queda con menos de un tercio
+         * del ancho y caben en dos líneas en cualquier idioma.
+         */
+        fun columnsFor(count: Int): Int = when {
+            count <= 3 -> count.coerceAtLeast(1)
+            count == 4 -> 2
+            else -> 3
+        }
 
         fun of(spec: ActionSheetSpec, landscape: Boolean): SheetLayout {
             if (spec.hero == null) {
