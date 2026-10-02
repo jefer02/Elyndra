@@ -28,7 +28,13 @@ import com.elyndra.launcher.ui.theme.LocalLandscape
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.SelectionLift
 import com.elyndra.launcher.ui.theme.SelectionScale
-import com.elyndra.launcher.ui.theme.animHeroIn
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.graphics.graphicsLayer
+import com.elyndra.launcher.ui.theme.LocalReducedMotion
+import com.elyndra.launcher.ui.theme.Springs
+import com.elyndra.launcher.ui.theme.motion
 import com.elyndra.launcher.ui.theme.heroEdgeScrimBrush
 import com.elyndra.launcher.ui.theme.heroScrimBrush
 import com.elyndra.launcher.ui.theme.liquidGlass
@@ -129,16 +135,22 @@ const val COVER_RATIO = 2f / 3f
 /** Espacio útil de la ventana (sin barras del sistema); lo provee ElyndraApp. */
 val LocalScreenSize = staticCompositionLocalOf { DpSize(412.dp, 892.dp) }
 
+/** Hay un mando conectado: Biblioteca y Carpeta reservan el alto de la barra de pistas. */
+val LocalPadHints = staticCompositionLocalOf { false }
+
+/** Alto de la barra de pistas del mando al pie de Biblioteca y Carpeta. */
+val PAD_HINTS_HEIGHT = 30.dp
+
 @Composable
 fun metrics(): Metrics {
     val l = LocalLandscape.current
     val screen = LocalScreenSize.current
     val w = screen.width.value
     val h = screen.height.value
-    // Alto fijo que no es ni hero ni card: la fila de filtros, el nombre bajo la
-    // card y el aire entre medias.
-    val fixed = if (l) 62f else 74f
-    val bottom = if (l) 6f else 10f
+    // Alto fijo que no es ni hero ni card: la fila de filtros (pestañas con
+    // zona táctil de 40 dp), el nombre bajo la card y el aire entre medias.
+    val fixed = if (l) 66f else 78f
+    val bottom = (if (l) 6f else 10f) + if (LocalPadHints.current) PAD_HINTS_HEIGHT.value else 0f
     // La card seleccionada sube [SelectionLift] y se amplía [SelectionScale]
     // desde su centro, o sea que la mitad de lo que crece se le va por arriba.
     // Ese hueco lo reserva el carrusel; sin él la card elegida se metía encima
@@ -233,54 +245,76 @@ fun Hero(
 ) {
     val skin = LocalSkin.current
     val context = LocalContext.current
+    val reduced = LocalReducedMotion.current
+    // Un fondo que *acaba de llegar* —lo ha bajado el motor de metadatos, o lo
+    // acaba de poner el usuario— se monta desde el polvo. Uno que solo cambia
+    // porque se ha seleccionado otro juego no: ahí el fondo no es una novedad,
+    // es otro juego (ver [rememberArtArrival]).
+    val arriving = rememberArtArrival(imagePath, heroKey)
+    val target = HeroBackdrop(imagePath, fallback, heroKey)
     Box(
         modifier
             .fillMaxWidth()
             .height(height)
             .clipToBounds(),
     ) {
-        if (imagePath != null) {
-            val file = remember(imagePath) { File(context.filesDir, imagePath) }
-            // Un fondo que *acaba de llegar* —lo ha bajado el motor de
-            // metadatos, o lo acaba de poner el usuario— se monta desde el
-            // polvo. Uno que solo cambia porque se ha seleccionado otro juego
-            // no: ahí el fondo no es una novedad, es otro juego (ver
-            // [rememberArtArrival]).
-            val arriving = rememberArtArrival(imagePath, heroKey)
-            MaterializingContainer(
-                isMaterializing = arriving.active,
-                onAnimationEnd = arriving::done,
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                DisintegratingContainer(
-                    isDisintegrating = backgroundVanishing,
-                    onAnimationEnd = onBackgroundVanished,
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    AsyncImage(
-                        model = file,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .animHeroIn(key = heroKey),
-                    )
+        // Cambiar de juego funde un fondo en otro, y el nuevo se asienta con un
+        // acercamiento muy lento (en la capa: no recompone nada).
+        Crossfade(targetState = target, animationSpec = motion(Springs.fade()), label = "heroBackdrop") { bg ->
+            val current = bg == target
+            Box(Modifier.fillMaxSize().slowSettle(reduced)) {
+                if (bg.imagePath != null) {
+                    val file = remember(bg.imagePath) { File(context.filesDir, bg.imagePath) }
+                    MaterializingContainer(
+                        isMaterializing = current && arriving.active,
+                        onAnimationEnd = arriving::done,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        DisintegratingContainer(
+                            isDisintegrating = current && backgroundVanishing,
+                            onAnimationEnd = onBackgroundVanished,
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            AsyncImage(
+                                model = file,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                    }
+                } else if (bg.fallback != null) {
+                    FallbackArt(bg.fallback, ArtVariant.Banner, Modifier.fillMaxSize(), drift = true)
+                } else {
+                    // El cristal es material de la pantalla, no del juego.
+                    Box(Modifier.fillMaxSize().liquidGlass(RectangleShape, Color.Transparent))
                 }
             }
-            Box(Modifier.fillMaxSize().drawBehind { drawRect(heroEdgeScrimBrush(skin.scrim, size)) })
-        } else {
-            if (fallback != null) {
-                FallbackArt(fallback, ArtVariant.Banner, Modifier.fillMaxSize(), drift = true)
-            } else {
-                // Sin animar: el cristal es material de la pantalla, no del juego,
-                // y encenderlo en cada cambio de selección se lee como parpadeo.
-                Box(Modifier.fillMaxSize().liquidGlass(RectangleShape, Color.Transparent))
-            }
-            // `heroScrim`
-            Box(Modifier.fillMaxSize().drawBehind { drawRect(heroScrimBrush(skin.scrim, size)) })
+            // Con fondo, solo los cantos; sin él, el velo entero del diseño.
+            Box(
+                Modifier.fillMaxSize().drawBehind {
+                    drawRect(if (bg.imagePath != null) heroEdgeScrimBrush(skin.scrim, size) else heroScrimBrush(skin.scrim, size))
+                },
+            )
         }
         topBar()
         info()
+    }
+}
+
+/** Lo que pinta el fondo del hero: cambia (y se funde) cuando cambia cualquiera de los tres. */
+private data class HeroBackdrop(val imagePath: String?, val fallback: ArtFallback?, val key: Any)
+
+/** Acercamiento de 1,04 a 1 muy lento al llegar un fondo; con "reducir movimiento", quieto. */
+@Composable
+private fun Modifier.slowSettle(reduced: Boolean): Modifier {
+    val zoom = remember { Animatable(if (reduced) 1f else 1.04f) }
+    LaunchedEffect(Unit) {
+        if (!reduced) zoom.animateTo(1f, spring(dampingRatio = 1f, stiffness = 10f))
+    }
+    return graphicsLayer {
+        scaleX = zoom.value
+        scaleY = zoom.value
     }
 }
 

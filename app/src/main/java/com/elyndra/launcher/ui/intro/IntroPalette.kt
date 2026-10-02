@@ -18,9 +18,14 @@ enum class IntroColor(val id: String, @StringRes val nameRes: Int, private val a
     fun base(accent: Int): Int = argb ?: accent
 
     companion object {
-        val DEFAULT = Gold
+        /**
+         * El de partida según el tema: oro sobre el ámbar ahumado del oscuro; en
+         * claro, el acento (el índigo de serie), que es el que luce sobre el perla.
+         */
+        fun defaultFor(dark: Boolean): IntroColor = if (dark) Gold else Accent
 
-        fun byId(id: String?): IntroColor = entries.firstOrNull { it.id == id } ?: DEFAULT
+        /** El elegido en Ajustes; sin elegir (o uno que ya no existe), el de partida del tema. */
+        fun resolve(id: String?, dark: Boolean): IntroColor = entries.firstOrNull { it.id == id } ?: defaultFor(dark)
     }
 }
 
