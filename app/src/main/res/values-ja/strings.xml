@@ -522,8 +522,12 @@
     <string name="masha_particles_desc">Masha をドラッグしたときに残る光の軌跡です。</string>
     <string name="masha_particles_hue">色相</string>
     <string name="masha_particles_preview">プレビュー</string>
+    <string name="section_selection">選択</string>
+    <string name="selection_fx_desc">選択中のアイコンやカバーの光り方です。グローとパーティクルは同じ色を使います。</string>
+    <string name="selection_glow_title">選択グロー</string>
+    <string name="selection_glow_desc">選択中のアイコンやカバーを、やわらかなグローとゆっくり流れる光沢の枠で囲みます。</string>
     <string name="selection_particles_title">選択パーティクル</string>
-    <string name="selection_particles_desc">選択中のアイコンやカバーの周りを、ネオンの光がゆっくりと舞い落ちます。</string>
+    <string name="selection_particles_desc">選択中のアイコンやカバーの縁から、細かな星屑がふわりと舞い上がります。</string>
     <string name="masha_status_online">オンライン</string>
     <string name="masha_status_offline">オフラインモード</string>
     <string name="masha_status_listening">聞いています…</string>
@@ -704,4 +708,59 @@
     <plurals name="masha_confirm_add">
         <item quantity="other">%d 本のゲームをライブラリに追加</item>
     </plurals>
+    <string name="a11y_expand">展開</string>
+    <string name="a11y_collapse">折りたたむ</string>
+    <string name="hint_select">決定</string>
+    <string name="hint_back">戻る</string>
+    <string name="hint_options">オプション</string>
+    <string name="hint_section">セクション</string>
+    <string name="hint_category">カテゴリ</string>
+    <string name="hint_move">移動</string>
+    <string name="empty_filter_title">まだ何もありません</string>
+    <string name="empty_library_message">Android ゲームや ROM フォルダーを追加すると、ここに表示されます。</string>
+    <string name="art_state_add">追加</string>
+    <string name="settings_cat_display">画面とテーマ</string>
+    <string name="settings_cat_sound">サウンド</string>
+    <string name="settings_cat_music">音楽と背景</string>
+    <string name="settings_cat_appearance">外観</string>
+    <string name="settings_cat_library">ライブラリ</string>
+    <string name="settings_cat_metadata">メタデータ</string>
+    <string name="settings_cat_masha">Masha</string>
+    <string name="settings_cat_about">情報</string>
+    <string name="settings_cat_display_desc">テーマ、イントロ、フレームレート、言語</string>
+    <string name="settings_cat_sound_desc">インターフェース音とカスタムサウンド</string>
+    <string name="settings_cat_music_desc">メニュー音楽とカスタム背景</string>
+    <string name="settings_cat_appearance_desc">アクセントカラー、リキッドグラス、パーティクル</string>
+    <string name="settings_cat_library_desc">並べ替え、再スキャン、ダウンロード画像</string>
+    <string name="settings_cat_metadata_desc">ソース、アカウント、優先順位、翻訳</string>
+    <string name="settings_cat_masha_desc">AI、音声、表示、プライバシー</string>
+    <string name="settings_cat_about_desc">バージョンとライセンス</string>
+    <plurals name="sound_events_count">
+        <item quantity="other">%d 件のイベント</item>
+    </plurals>
+    <plurals name="sound_custom_count">
+        <item quantity="other">%d 件がカスタム</item>
+    </plurals>
+    <string name="priority_summary">テキスト: %1$s · 画像: %2$s</string>
+    <string name="priority_tab_text">テキスト</string>
+    <string name="priority_tab_art">画像</string>
+    <string name="priority_drag">ドラッグして並べ替え</string>
+    <string name="priority_hint">ハンドルでソースをドラッグするか、タップして矢印で移動します(コントローラーでは LB/RB)。</string>
+    <string name="particle_custom_hue">カスタムカラー</string>
+    <string name="add_search_apps">アプリを検索</string>
+    <string name="add_select_all">すべて選択</string>
+    <string name="add_deselect_all">選択を解除</string>
+    <plurals name="add_selected_count">
+        <item quantity="other">%d 件を選択中</item>
+    </plurals>
+    <string name="add_pick_reason">ゲームを 1 つ以上選んでください</string>
+    <string name="add_no_app_match">一致するアプリはありません</string>
+    <string name="add_search_systems">システムを検索</string>
+    <string name="add_no_system_match">一致するシステムはありません</string>
+    <string name="maker_nintendo">Nintendo</string>
+    <string name="maker_sony">Sony</string>
+    <string name="maker_microsoft">Microsoft</string>
+    <string name="maker_sega">Sega</string>
+    <string name="maker_others">Atari ほか</string>
+    <string name="maker_pc">PC</string>
 </resources>
