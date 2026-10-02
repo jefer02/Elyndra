@@ -539,8 +539,12 @@
     <string name="masha_particles_desc">Die leuchtende Spur, die Masha beim Ziehen hinterlässt.</string>
     <string name="masha_particles_hue">Farbton</string>
     <string name="masha_particles_preview">Vorschau</string>
+    <string name="section_selection">Auswahl</string>
+    <string name="selection_fx_desc">Wie das ausgewählte Symbol oder Cover aufleuchtet. Leuchten und Partikel teilen sich diese Farbe.</string>
+    <string name="selection_glow_title">Auswahlleuchten</string>
+    <string name="selection_glow_desc">Ein polierter Lichtrahmen mit sanftem Leuchten und langsamem Glanz um das ausgewählte Symbol oder Cover.</string>
     <string name="selection_particles_title">Auswahlpartikel</string>
-    <string name="selection_particles_desc">Leuchtende Neonfunken, die langsam um das ausgewählte Symbol oder Cover herabfallen.</string>
+    <string name="selection_particles_desc">Feiner Sternenstaub, der vom Rand des ausgewählten Symbols oder Covers aufsteigt.</string>
     <string name="masha_status_online">Online</string>
     <string name="masha_status_offline">Offline-Modus</string>
     <string name="masha_status_listening">Hört zu…</string>
@@ -723,4 +727,62 @@
         <item quantity="one">%d Spiel zur Bibliothek hinzufügen</item>
         <item quantity="other">%d Spiele zur Bibliothek hinzufügen</item>
     </plurals>
+    <string name="a11y_expand">Aufklappen</string>
+    <string name="a11y_collapse">Zuklappen</string>
+    <string name="hint_select">Auswählen</string>
+    <string name="hint_back">Zurück</string>
+    <string name="hint_options">Optionen</string>
+    <string name="hint_section">Bereich</string>
+    <string name="hint_category">Kategorie</string>
+    <string name="hint_move">Verschieben</string>
+    <string name="empty_filter_title">Hier ist noch nichts</string>
+    <string name="empty_library_message">Füge deine Android-Spiele oder einen ROM-Ordner hinzu, dann erscheinen sie hier.</string>
+    <string name="art_state_add">Hinzufügen</string>
+    <string name="settings_cat_display">Anzeige &amp; Design</string>
+    <string name="settings_cat_sound">Ton</string>
+    <string name="settings_cat_music">Musik &amp; Hintergrund</string>
+    <string name="settings_cat_appearance">Erscheinungsbild</string>
+    <string name="settings_cat_library">Bibliothek</string>
+    <string name="settings_cat_metadata">Metadaten</string>
+    <string name="settings_cat_masha">Masha</string>
+    <string name="settings_cat_about">Info</string>
+    <string name="settings_cat_display_desc">Design, Intro, Bildrate und Sprache</string>
+    <string name="settings_cat_sound_desc">Oberflächentöne und eigene Töne</string>
+    <string name="settings_cat_music_desc">Menümusik und eigener Hintergrund</string>
+    <string name="settings_cat_appearance_desc">Akzentfarbe, Liquid Glass und Partikel</string>
+    <string name="settings_cat_library_desc">Sortierung, Neuscans und geladene Bilder</string>
+    <string name="settings_cat_metadata_desc">Quellen, Konten, Priorität und Übersetzung</string>
+    <string name="settings_cat_masha_desc">KI, Stimme, Präsenz und Datenschutz</string>
+    <string name="settings_cat_about_desc">Version und Lizenzen</string>
+    <plurals name="sound_events_count">
+        <item quantity="one">%d Ereignis</item>
+        <item quantity="other">%d Ereignisse</item>
+    </plurals>
+    <plurals name="sound_custom_count">
+        <item quantity="one">%d eigener</item>
+        <item quantity="other">%d eigene</item>
+    </plurals>
+    <string name="priority_summary">Texte: %1$s · Bilder: %2$s</string>
+    <string name="priority_tab_text">Texte</string>
+    <string name="priority_tab_art">Bilder</string>
+    <string name="priority_drag">Zum Umsortieren ziehen</string>
+    <string name="priority_hint">Ziehe eine Quelle am Griff oder tippe sie an und verschiebe sie mit den Pfeilen (LB/RB am Controller).</string>
+    <string name="particle_custom_hue">Eigene Farbe</string>
+    <string name="add_search_apps">Apps suchen</string>
+    <string name="add_select_all">Alle auswählen</string>
+    <string name="add_deselect_all">Auswahl aufheben</string>
+    <plurals name="add_selected_count">
+        <item quantity="one">%d ausgewählt</item>
+        <item quantity="other">%d ausgewählt</item>
+    </plurals>
+    <string name="add_pick_reason">Wähle mindestens ein Spiel</string>
+    <string name="add_no_app_match">Keine App passt</string>
+    <string name="add_search_systems">System suchen</string>
+    <string name="add_no_system_match">Kein System passt</string>
+    <string name="maker_nintendo">Nintendo</string>
+    <string name="maker_sony">Sony</string>
+    <string name="maker_microsoft">Microsoft</string>
+    <string name="maker_sega">Sega</string>
+    <string name="maker_others">Atari und andere</string>
+    <string name="maker_pc">PC</string>
 </resources>
