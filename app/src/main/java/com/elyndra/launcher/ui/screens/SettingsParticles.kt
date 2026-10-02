@@ -1,5 +1,13 @@
 package com.elyndra.launcher.ui.screens
 
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.elyndra.launcher.ui.components.ConsoleGlyph
+import com.elyndra.launcher.ui.components.ConsoleGlyphIcon
+import com.elyndra.launcher.ui.components.Expandable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -60,9 +68,17 @@ import com.elyndra.launcher.R
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.components.ElyText
-import com.elyndra.launcher.ui.components.GlowingSwitch
+import com.elyndra.launcher.ui.components.SettingsDivider
 import com.elyndra.launcher.ui.components.SettingsGroup
-import com.elyndra.launcher.ui.components.neonParticles
+import com.elyndra.launcher.ui.components.SwitchRow
+import com.elyndra.launcher.ui.selection.SelectionFx
+import com.elyndra.launcher.ui.selection.SelectionInks
+import com.elyndra.launcher.ui.selection.drawStar
+import com.elyndra.launcher.ui.selection.rememberSelectionLook
+import com.elyndra.launcher.ui.selection.selectionFrame
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.zIndex
+import kotlinx.coroutines.delay
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.LocalReducedMotion
 import com.elyndra.launcher.ui.theme.consoleFocus
@@ -107,36 +123,51 @@ internal fun ParticleColorGroup(vm: ElyndraViewModel) {
 }
 
 /**
- * Ajustes → Masha → partículas de la selección: las chispas de neón que caen
- * alrededor del icono o la carátula seleccionados. Mismo selector de color que
- * la estela de Masha, más un interruptor para apagarlas.
+ * Ajustes → Apariencia → selección: cómo se enciende la card seleccionada
+ * (icono o carátula). Dos interruptores —el halo del marco y el polvo
+ * estelar— que comparten el color de abajo; la vista previa enseña los dos
+ * sobre una card de icono y otra de carátula.
  */
 @Composable
-internal fun SelectionParticlesGroup(vm: ElyndraViewModel) {
+internal fun SelectionFxGroup(vm: ElyndraViewModel) {
     val s = vm.settings
-    ParticleColorPicker(
-        title = stringResource(R.string.selection_particles_title),
-        desc = stringResource(R.string.selection_particles_desc),
-        argb = s.selectionParticleColor,
-        onPick = s::updateSelectionParticleColor,
-        enabled = s.selectionParticles,
-        onToggle = s::toggleSelectionParticles,
-    ) { color -> SelectionPreview(color, s.selectionParticles) }
+    SettingsGroup(padding = 0.dp) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            ElyText(
+                stringResource(R.string.selection_fx_desc),
+                size = 10f,
+                color = P.ink2,
+                lineHeightRatio = 1.45f,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(12.dp))
+            SelectionPreview(s.selectionParticleColor, s.selectionGlow, s.selectionParticles)
+        }
+        SwitchRow(
+            stringResource(R.string.selection_glow_title),
+            stringResource(R.string.selection_glow_desc),
+            s.selectionGlow,
+            s::toggleSelectionGlow,
+        )
+        SettingsDivider()
+        SwitchRow(
+            stringResource(R.string.selection_particles_title),
+            stringResource(R.string.selection_particles_desc),
+            s.selectionParticles,
+            s::toggleSelectionParticles,
+        )
+        Spacer(Modifier.height(4.dp))
+        ColorChoices(s.selectionParticleColor, s::updateSelectionParticleColor)
+    }
 }
 
-/**
- * El bloque común de color de partículas: título con su vista previa (y su
- * interruptor, si lo tiene), colores de partida y deslizador de tono. Apagado,
- * el color se sigue pudiendo elegir, pero se lee como en reposo.
- */
+/** El bloque de color de la estela de Masha: título con su vista previa y los colores. */
 @Composable
 private fun ParticleColorPicker(
     title: String,
     desc: String,
     argb: Int,
     onPick: (Int) -> Unit,
-    enabled: Boolean = true,
-    onToggle: (() -> Unit)? = null,
     preview: @Composable (Color) -> Unit,
 ) {
     SettingsGroup(padding = 0.dp) {
@@ -148,20 +179,35 @@ private fun ParticleColorPicker(
             }
             Spacer(Modifier.width(12.dp))
             preview(Color(argb))
-            if (onToggle != null) {
-                Spacer(Modifier.width(12.dp))
-                GlowingSwitch(enabled, onToggle)
-            }
         }
-        Column(Modifier.alpha(if (enabled) 1f else 0.45f)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PRESETS.forEach { preset ->
-                    ColorDot(Color(preset), selected = preset == argb, modifier = Modifier.weight(1f)) { onPick(preset) }
-                }
+        ColorChoices(argb, onPick)
+    }
+}
+
+/**
+ * La fila de colores de partida. La última muestra es el color personalizado:
+ * despliega el deslizador de tono, que también sale solo si el color elegido
+ * no es uno de partida.
+ */
+@Composable
+private fun ColorChoices(argb: Int, onPick: (Int) -> Unit) {
+    val custom = argb !in PRESETS
+    var customOpen by rememberSaveable { mutableStateOf(false) }
+    Column {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            PRESETS.forEach { preset ->
+                ColorDot(Color(preset), selected = preset == argb, modifier = Modifier.weight(1f)) { onPick(preset) }
             }
-            Spacer(Modifier.height(12.dp))
+            CustomHueDot(
+                selected = custom,
+                expanded = customOpen || custom,
+                modifier = Modifier.weight(1f),
+            ) { customOpen = !customOpen }
+        }
+        Expandable(customOpen || custom) {
+            Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                ElyText(stringResource(R.string.masha_particles_hue), size = 11.5f, weight = FontWeight.Medium, color = P.ink)
+                ElyText(stringResource(R.string.particle_custom_hue), size = 11.5f, weight = FontWeight.Medium, color = P.ink)
                 Spacer(Modifier.weight(1f))
                 ElyText("${hueOf(argb).roundToInt()}°", size = 11.5f, weight = FontWeight.Medium, color = P.ink2)
             }
@@ -169,7 +215,33 @@ private fun ParticleColorPicker(
             HueSlider(hueOf(argb)) { hue ->
                 onPick(Color.hsv(hue, PICK_SATURATION, PICK_VALUE).toArgb())
             }
-            Spacer(Modifier.height(12.dp))
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+}
+
+/**
+ * La muestra del color personalizado: un aro con el arcoíris de tonos. Toca
+ * para desplegar (o recoger) el deslizador; seleccionada si el color actual
+ * no es uno de partida.
+ */
+@Composable
+private fun CustomHueDot(selected: Boolean, expanded: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val label = stringResource(R.string.particle_custom_hue)
+    val action = stringResource(if (expanded) R.string.a11y_collapse else R.string.a11y_expand)
+    val sweep = remember { Brush.sweepGradient((0..6).map { Color.hsv(it * 60f % 360f, PICK_SATURATION, PICK_VALUE) }) }
+    Box(modifier.height(44.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .size(26.dp)
+                .clip(CircleShape)
+                .drawBehind { drawCircle(sweep) }
+                .border(if (selected) 2.5.dp else 1.dp, if (selected) P.ink else P.ink.copy(alpha = 0.15f), CircleShape)
+                .semantics { contentDescription = label }
+                .shapeClickable(CircleShape, onClickLabel = action, onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            ConsoleGlyphIcon(ConsoleGlyph.Plus, Color.White, size = 12.dp)
         }
     }
 }
@@ -183,7 +255,7 @@ private fun hueOf(argb: Int): Float {
 /** Una muestra redonda de color; seleccionada, con aro de tinta. */
 @Composable
 private fun ColorDot(color: Color, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Box(modifier.height(30.dp), contentAlignment = Alignment.Center) {
+    Box(modifier.height(44.dp), contentAlignment = Alignment.Center) {
         Box(
             Modifier
                 .size(26.dp)
@@ -198,12 +270,17 @@ private fun ColorDot(color: Color, selected: Boolean, modifier: Modifier = Modif
 }
 
 /**
- * Vista previa: Masha con su estela girando alrededor, en el color elegido.
- * La animación se lee en la fase de dibujo (no recompone los Ajustes).
+ * Vista previa: Masha con su estela girando alrededor, en el color elegido y
+ * con el mismo polvo fino que la estela de verdad. La caja es oscura en los
+ * dos temas, así que la luz se suma como en el tema oscuro. La animación se
+ * lee en la fase de dibujo (no recompone los Ajustes).
  */
 @Composable
 private fun ParticlePreview(color: Color) {
     val reduced = LocalReducedMotion.current
+    val density = LocalDensity.current.density
+    val argb = color.toArgb()
+    val ink = remember(argb, density) { SelectionInks.of(argb, dark = true, density = density) }
     val transition = rememberInfiniteTransition(label = "particlePreview")
     val turn = transition.animateFloat(0f, 1f, infiniteRepeatable(tween(2400, easing = LinearEasing), RepeatMode.Restart), label = "turn")
     Box(
@@ -215,16 +292,13 @@ private fun ParticlePreview(color: Color) {
                 val c = Offset(size.width / 2f, size.height / 2f)
                 val orbit = size.minDimension * 0.34f
                 val head = if (reduced) 0.15f else turn.value
-                // Estela: 14 chispas detrás de la cabeza, cada vez más tenues.
-                for (i in 0 until 14) {
-                    val t = head - i * 0.022f
+                // Estela: 18 motas detrás de la cabeza, cada vez más tenues y finas.
+                for (i in 0 until 18) {
+                    val t = head - i * 0.018f
                     val a = t * 2f * PI.toFloat()
-                    val p = Offset(c.x + cos(a) * orbit, c.y + sin(a) * orbit)
-                    val f = 1f - i / 14f
-                    val r = (1.2f + 2.4f * f) * density
-                    drawCircle(color, radius = r * 3f, center = p, alpha = 0.14f * f)
-                    drawCircle(color, radius = r * 1.5f, center = p, alpha = 0.4f * f)
-                    drawCircle(Color.White, radius = r * 0.5f, center = p, alpha = 0.9f * f)
+                    val f = 1f - i / 18f
+                    val core = (SelectionFx.MIN_SIZE_DP + (SelectionFx.MAX_SIZE_DP - SelectionFx.MIN_SIZE_DP) * f) * density
+                    drawStar(ink.atlas, i % SelectionFx.VARIANTS, i == 5, c.x + cos(a) * orbit, c.y + sin(a) * orbit, core, f, ink.blend)
                 }
             },
         contentAlignment = Alignment.Center,
@@ -238,29 +312,60 @@ private fun ParticlePreview(color: Color) {
     }
 }
 
+/** Cada cuánto salta la selección entre las dos cards de la vista previa. */
+private const val PREVIEW_HOP_MS = 2_600L
+
 /**
- * Vista previa de la selección: una card en miniatura con su marco de acento
- * y las mismas chispas de neón que la card seleccionada de verdad.
+ * Vista previa de la selección: una card de icono y otra de carátula con el
+ * marco de verdad ([selectionFrame]). La selección salta de una a otra, así
+ * se ve el encendido, y solo una anima a la vez. Caja oscura en los dos temas:
+ * se pinta con la luz del tema oscuro.
  */
 @Composable
-private fun SelectionPreview(color: Color, enabled: Boolean) {
+private fun SelectionPreview(argb: Int, glow: Boolean, particles: Boolean) {
     val skin = LocalSkin.current
-    val shape = RoundedCornerShape(8.dp)
+    val reduced = LocalReducedMotion.current
+    val look = rememberSelectionLook(argb, glow, particles, dark = true)
+    var onCover by remember { mutableStateOf(false) }
+    LaunchedEffect(reduced) {
+        if (reduced) {
+            onCover = false
+            return@LaunchedEffect
+        }
+        while (true) {
+            delay(PREVIEW_HOP_MS)
+            onCover = !onCover
+        }
+    }
+    val label = stringResource(R.string.masha_particles_preview)
     Box(
         Modifier
-            .size(64.dp)
+            .size(width = 104.dp, height = 64.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(P.mediaBack),
+            .background(P.mediaBack)
+            .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
-        Box(
-            Modifier
-                .size(26.dp)
-                .neonParticles(enabled, color, frame = 2.5.dp, sparkScale = 0.6f)
-                .clip(shape)
-                .background(Brush.linearGradient(listOf(skin.a1, skin.fillEnd)))
-                .border(2.5.dp, if (enabled) color else skin.a1, shape),
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            val icon = RoundedCornerShape(7.dp)
+            Box(
+                Modifier
+                    .zIndex(if (onCover) 0f else 1f)
+                    .size(28.dp)
+                    .selectionFrame(!onCover, look, icon)
+                    .clip(icon)
+                    .background(Brush.linearGradient(listOf(skin.a1, skin.fillEnd))),
+            )
+            val cover = RoundedCornerShape(5.dp)
+            Box(
+                Modifier
+                    .zIndex(if (onCover) 1f else 0f)
+                    .size(width = 24.dp, height = 36.dp)
+                    .selectionFrame(onCover, look, cover)
+                    .clip(cover)
+                    .background(Brush.verticalGradient(listOf(Color(0xFF2B3550), Color(0xFF6A4C7E), Color(0xFFE3A15C)))),
+            )
+        }
     }
 }
 

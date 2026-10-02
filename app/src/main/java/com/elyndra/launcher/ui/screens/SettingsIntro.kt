@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.components.SwitchRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -41,17 +42,9 @@ internal fun IntroSection(vm: ElyndraViewModel) {
 
     SectionLabel(stringResource(R.string.section_intro))
     SettingsGroup {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                ElyText(stringResource(R.string.intro_enabled), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
-                Spacer(Modifier.height(4.dp))
-                ElyText(stringResource(R.string.intro_enabled_desc), size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
-            }
-            Spacer(Modifier.width(12.dp))
-            GlowingSwitch(s.introEnabled, s::toggleIntro)
-        }
+        SwitchRow(stringResource(R.string.intro_enabled), stringResource(R.string.intro_enabled_desc), s.introEnabled, s::toggleIntro)
 
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(6.dp))
         ElyText(stringResource(R.string.intro_color), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
         Spacer(Modifier.height(8.dp))
         CssGrid(
