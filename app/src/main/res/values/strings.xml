@@ -545,8 +545,12 @@
     <string name="masha_particles_desc">The glowing trail Masha leaves behind when you drag her.</string>
     <string name="masha_particles_hue">Hue</string>
     <string name="masha_particles_preview">Preview</string>
+    <string name="section_selection">Selection</string>
+    <string name="selection_fx_desc">How the selected icon or cover lights up. The glow and the particles share this color.</string>
+    <string name="selection_glow_title">Selection glow</string>
+    <string name="selection_glow_desc">A polished light frame with a soft glow and a slow sheen around the selected icon or cover.</string>
     <string name="selection_particles_title">Selection particles</string>
-    <string name="selection_particles_desc">Glowing neon sparks that drift slowly down around the selected icon or cover.</string>
+    <string name="selection_particles_desc">Fine stardust that drifts up from the edge of the selected icon or cover.</string>
     <string name="masha_status_online">Online</string>
     <string name="masha_status_offline">Offline mode</string>
     <string name="masha_status_listening">Listening…</string>
@@ -729,4 +733,62 @@
         <item quantity="one">Add %d game to the library</item>
         <item quantity="other">Add %d games to the library</item>
     </plurals>
+    <string name="a11y_expand">Expand</string>
+    <string name="a11y_collapse">Collapse</string>
+    <string name="hint_select">Select</string>
+    <string name="hint_back">Back</string>
+    <string name="hint_options">Options</string>
+    <string name="hint_section">Section</string>
+    <string name="hint_category">Category</string>
+    <string name="hint_move">Move</string>
+    <string name="empty_filter_title">Nothing here yet</string>
+    <string name="empty_library_message">Add your Android games or a folder of ROMs and they will show up here.</string>
+    <string name="art_state_add">Add</string>
+    <string name="settings_cat_display">Display &amp; theme</string>
+    <string name="settings_cat_sound">Sound</string>
+    <string name="settings_cat_music">Music &amp; background</string>
+    <string name="settings_cat_appearance">Appearance</string>
+    <string name="settings_cat_library">Library</string>
+    <string name="settings_cat_metadata">Metadata</string>
+    <string name="settings_cat_masha">Masha</string>
+    <string name="settings_cat_about">About</string>
+    <string name="settings_cat_display_desc">Theme, intro, frame rate and language</string>
+    <string name="settings_cat_sound_desc">Interface sounds and custom sounds</string>
+    <string name="settings_cat_music_desc">Menu music and custom background</string>
+    <string name="settings_cat_appearance_desc">Accent color, liquid glass and particles</string>
+    <string name="settings_cat_library_desc">Sorting, rescans and downloaded images</string>
+    <string name="settings_cat_metadata_desc">Sources, accounts, priority and translation</string>
+    <string name="settings_cat_masha_desc">AI, voice, presence and privacy</string>
+    <string name="settings_cat_about_desc">Version and licenses</string>
+    <plurals name="sound_events_count">
+        <item quantity="one">%d event</item>
+        <item quantity="other">%d events</item>
+    </plurals>
+    <plurals name="sound_custom_count">
+        <item quantity="one">%d custom</item>
+        <item quantity="other">%d custom</item>
+    </plurals>
+    <string name="priority_summary">Text: %1$s · Images: %2$s</string>
+    <string name="priority_tab_text">Text</string>
+    <string name="priority_tab_art">Images</string>
+    <string name="priority_drag">Drag to reorder</string>
+    <string name="priority_hint">Drag a source by its handle, or tap it and move it with the arrows (LB/RB on a gamepad).</string>
+    <string name="particle_custom_hue">Custom color</string>
+    <string name="add_search_apps">Search apps</string>
+    <string name="add_select_all">Select all</string>
+    <string name="add_deselect_all">Deselect all</string>
+    <plurals name="add_selected_count">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <string name="add_pick_reason">Select at least one game</string>
+    <string name="add_no_app_match">No app matches</string>
+    <string name="add_search_systems">Search systems</string>
+    <string name="add_no_system_match">No system matches</string>
+    <string name="maker_nintendo">Nintendo</string>
+    <string name="maker_sony">Sony</string>
+    <string name="maker_microsoft">Microsoft</string>
+    <string name="maker_sega">Sega</string>
+    <string name="maker_others">Atari and others</string>
+    <string name="maker_pc">PC</string>
 </resources>

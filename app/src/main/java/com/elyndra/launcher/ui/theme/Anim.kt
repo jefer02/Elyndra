@@ -64,6 +64,10 @@ object Springs {
     fun <T> snappy(): SpringSpec<T> = spring(dampingRatio = 0.8f, stiffness = 700f)
     /** Fundidos: críticamente amortiguado. */
     fun <T> fade(): SpringSpec<T> = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 600f)
+    /** Salidas: más cortas que la entrada; lo que se va no se hace esperar. */
+    fun <T> exit(): SpringSpec<T> = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 1_100f)
+    /** Acordeones y paneles que se abren: firme y sin rebote. */
+    fun <T> expand(): SpringSpec<T> = spring(dampingRatio = 0.92f, stiffness = 420f)
 }
 
 /** El muelle pedido, o un salto instantáneo si el usuario quiere menos movimiento. */
@@ -293,16 +297,17 @@ fun auroraOffset(periodMs: Int, reverse: Boolean): Triple<Float, Float, Float> {
 }
 
 /**
- * Lo que sube la card seleccionada. El diseño subía 8px; aquí sube más para
- * que la selección se lea de un vistazo desde lejos (modo salón).
+ * Lo que sube la card seleccionada: con la escala, el marco y el halo, la
+ * selección se lee de un vistazo desde lejos (modo salón) sin tapar a las
+ * vecinas.
  *
  * Público porque el carrusel tiene que reservar este hueco por encima de las
  * cards (ver `metrics` en Layout.kt); si no, la elegida se sale por arriba.
  */
-val SelectionLift = 14.dp
+val SelectionLift = 10.dp
 
-/** Ampliación de la card seleccionada (el diseño usaba 1.08). */
-const val SelectionScale = 1.14f
+/** Ampliación de la card seleccionada: un muelle corto, como el foco de una consola. */
+const val SelectionScale = 1.05f
 
 /** Elevación en dp de la card seleccionada. */
 @Composable
