@@ -1,6 +1,16 @@
 package com.elyndra.launcher.ui.screens
 
 import com.elyndra.launcher.ui.components.NeedsNameBadge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.layout.heightIn
+import com.elyndra.launcher.ui.components.ConsoleGlyph
+import com.elyndra.launcher.ui.components.EmptyState
+import com.elyndra.launcher.ui.components.PAD_HINTS_HEIGHT
+import com.elyndra.launcher.ui.components.PadHint
+import com.elyndra.launcher.ui.components.PadHints
+import com.elyndra.launcher.ui.components.SlidingTabs
+import com.elyndra.launcher.ui.theme.heroInfoTransition
+import com.elyndra.launcher.ui.theme.shelfSurface
 import com.elyndra.launcher.library.NameCheck
 import com.elyndra.launcher.ui.heroDescription
 import com.elyndra.launcher.ui.rememberDescription
@@ -67,6 +77,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -106,7 +117,6 @@ import com.elyndra.launcher.ui.components.LocalScreenSize
 import com.elyndra.launcher.ui.components.MashaInsightBubble
 import com.elyndra.launcher.ui.components.LogoImage
 import com.elyndra.launcher.ui.components.OpenButton
-import com.elyndra.launcher.ui.components.neonParticles
 import com.elyndra.launcher.ui.components.Metrics
 import com.elyndra.launcher.ui.resolve
 import com.elyndra.launcher.ui.components.MAGNETIC_PULL_MS
@@ -129,6 +139,10 @@ import com.elyndra.launcher.ui.theme.liquidGlass
 import com.elyndra.launcher.ui.theme.pulseHintAlpha
 import com.elyndra.launcher.ui.theme.ringProgress
 import com.elyndra.launcher.ui.theme.selectionLift
+import com.elyndra.launcher.ui.selection.SelectionLook
+import com.elyndra.launcher.ui.selection.rememberSelectionLook
+import com.elyndra.launcher.ui.selection.selectionFrame
+import androidx.compose.ui.zIndex
 import com.elyndra.launcher.ui.theme.selectionScale
 import com.elyndra.launcher.ui.theme.FloatClock
 import com.elyndra.launcher.ui.theme.LocalReducedMotion
@@ -143,6 +157,7 @@ import kotlinx.coroutines.launch
 fun LibraryScreen(vm: ElyndraViewModel) {
     val m = metrics()
     val skin = LocalSkin.current
+    val reduced = LocalReducedMotion.current
     val items = vm.items()
     val sel = vm.selected()
     // Con mando la selección se mueve sin tocar el carrusel, así que el
@@ -156,8 +171,11 @@ fun LibraryScreen(vm: ElyndraViewModel) {
     }
     // Un solo reloj para la flotación de todos los logos de juego de la pantalla.
     val floatClock = rememberFloatClock()
-    // Chispas de neón del icono seleccionado (Ajustes → Masha); null = apagadas.
-    val sparkColor = if (vm.settings.selectionParticles) Color(vm.settings.selectionParticleColor) else null
+    // El marco de la selección (Ajustes → Apariencia): halo, partículas y su color.
+    val look = rememberSelectionLook(vm.settings.selectionParticleColor, vm.settings.selectionGlow, vm.settings.selectionParticles)
+    val searchEmpty = vm.query.isNotBlank() && items.isEmpty() && vm.loaded
+    // Sin nada en la sección (y sin estar buscando): el estado vacío ocupa el estante.
+    val showEmpty = vm.loaded && items.isEmpty() && vm.query.isBlank()
     Box(Modifier.fillMaxSize()) {
         // Fondo vivo: el arte de la selección, desenfocado y teñido con su color.
         DynamicBackdrop(
@@ -216,224 +234,280 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                     }
                 },
                 info = {
-                    Column(
-                        Modifier
-                            .align(Alignment.BottomStart)
-                            .fillMaxWidth()
-                            .padding(start = m.pad, end = m.pad, bottom = if (m.landscape) 8.dp else 18.dp),
-                    ) {
-                        if (sel != null) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(bottom = if (m.landscape) 3.dp else 6.dp),
-                            ) {
-                                HeroChip(
-                                    stringResource(
-                                        if (sel is LibraryItem.Folder) R.string.chip_emulator_folder else R.string.chip_android_app,
-                                    ),
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                ElyText(
-                                    heroSubline(sel),
-                                    size = 9.5f,
-                                    weight = FontWeight.Medium,
-                                    color = Color.White.copy(alpha = 0.85f),
-                                    letterSpacing = tracking(0.1f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                        val logo = when (sel) {
-                            is LibraryItem.App -> sel.app.meta.logo
-                            is LibraryItem.Folder -> sel.logoPath
-                            null -> null
-                        }
-                        // El `sel != null` es para el compilador: el `when` de arriba no le
-                        // basta para deducir que si hay logo entonces hay elemento.
-                        if (sel != null && logo != null) {
-                            // Al quitar el logo se deshace en el sitio donde
-                            // se está viendo, en vez de desaparecer de golpe.
-                            MaterializingContainer(
-                            isMaterializing = vm.isMaterializingArt(sel.key, ArtKind.Logo),
-                            onAnimationEnd = { vm.finishMaterializeArt() },
-                        ) {
-                            DisintegratingContainer(
-                                isDisintegrating = vm.isVanishingArt(sel.key, ArtKind.Logo),
-                                onAnimationEnd = { vm.finishVanish() },
-                            ) {
-                                LogoImage(
-                                    logo,
-                                    Modifier
-                                        .animTitleIn(key = sel.key)
-                                        .floating(floatClock, floatPhaseOf(sel.key), amplitude = 3.dp, periodSeconds = 4.2f)
-                                        .fillMaxWidth(0.72f)
-                                        .height(m.logoH),
-                                )
-                            }
-                        }
-                    } else {
-                        ElyText(
-                            when {
-                                sel != null -> sel.name
-                                vm.loaded -> stringResource(R.string.empty_library_title)
-                                else -> ""
-                            },
-                            modifier = Modifier.animTitleIn(key = sel?.key ?: "none"),
-                            size = m.titleSize,
-                            weight = FontWeight.ExtraBold,
-                            color = Color.White,
-                            letterSpacing = tracking(-0.03f),
-                            lineHeightRatio = 0.92f,
-                            shadow = HeroTitleShadow,
-                            uppercase = true,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                    // El bloque de título cambia con la selección: el nuevo entra
+                    // con un fundido y una subida corta (ver heroInfoTransition).
+                    AnimatedContent(
+                        targetState = sel,
+                        contentKey = { it?.key },
+                        modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth(),
+                        contentAlignment = Alignment.BottomStart,
+                        transitionSpec = { heroInfoTransition(reduced) },
+                        label = "heroInfo",
+                    ) { item ->
+                        HeroInfo(vm, item, m, floatClock, searching = vm.query.isNotBlank())
                     }
-                    // Solo las apps tienen sinopsis en el hero; las carpetas no.
-                    val app = sel as? LibraryItem.App
-                    val description = rememberDescription(vm, app?.key, app?.app?.meta)
-                    if (description != null) {
-                        ElyText(
-                            heroDescription(description, vm.settings.lang),
-                            modifier = Modifier
-                                .padding(top = if (m.landscape) 4.dp else 6.dp)
-                                .fillMaxWidth(0.86f)
-                                .animFadeUp(key = sel?.key ?: "none"),
-                            size = 10f,
-                            weight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.72f),
-                            letterSpacing = tracking(0.02f),
-                            lineHeightRatio = 1.28f,
-                            maxLines = if (m.landscape) 2 else 3,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    } else {
-                        ElyText(
-                            stringResource(if (sel == null) R.string.empty_library_hint else R.string.hint_gestures),
-                            modifier = Modifier
-                                .padding(top = if (m.landscape) 4.dp else 7.dp)
-                                .alpha(pulseHintAlpha()),
-                            size = 9f,
-                            weight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.8f),
-                            letterSpacing = tracking(0.14f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            uppercase = true,
-                        )
-                    }
-                }
-            },
-        )
+                },
+            )
 
-        // ── CARRUSEL ──
-        Column(Modifier.weight(1f).padding(top = 10.dp)) {
-            Row(
-                Modifier.fillMaxWidth().padding(start = m.pad, end = m.pad, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                vm.availableFilters().forEach { f ->
-                    FilterTab(stringResource(f.label), vm.filter == f) { vm.updateFilter(f) }
-                }
-                Spacer(Modifier.weight(1f))
-                ElyText(
-                    pluralStringResource(R.plurals.items_count, items.size, items.size),
-                    size = 9f,
-                    weight = FontWeight.Medium,
-                    color = P.ink2.copy(alpha = 0.8f),
-                    letterSpacing = tracking(0.18f),
-                    uppercase = true,
-                )
-                Spacer(Modifier.width(8.dp))
-                // "Ordenar por": el criterio en curso hace de etiqueta del botón.
-                Box(
-                    Modifier
-                        .shapeClickable(RoundedCornerShape(9.dp)) { vm.sortOptions() }
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+            // ── ESTANTE ──
+            Column(Modifier.weight(1f).shelfSurface().padding(top = 8.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = m.pad - 10.dp, end = m.pad, bottom = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    val filters = vm.availableFilters()
+                    SlidingTabs(
+                        labels = filters.map { stringResource(it.label) },
+                        selected = filters.indexOf(vm.filter),
+                        onSelect = { vm.updateFilter(filters[it]) },
+                    )
+                    Spacer(Modifier.weight(1f))
                     ElyText(
-                        stringResource(vm.settings.sortMode.label),
+                        pluralStringResource(R.plurals.items_count, items.size, items.size),
                         size = 9f,
-                        weight = FontWeight.SemiBold,
-                        color = skin.a2,
-                        letterSpacing = tracking(0.1f),
-                        maxLines = 1,
+                        weight = FontWeight.Medium,
+                        color = P.ink2.copy(alpha = 0.8f),
+                        letterSpacing = tracking(0.18f),
                         uppercase = true,
                     )
+                    Spacer(Modifier.width(8.dp))
+                    // "Ordenar por": el criterio en curso hace de etiqueta del botón.
+                    Box(
+                        Modifier
+                            .heightIn(min = 40.dp)
+                            .shapeClickable(RoundedCornerShape(9.dp)) { vm.sortOptions() }
+                            .padding(horizontal = 8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        ElyText(
+                            stringResource(vm.settings.sortMode.label),
+                            size = 9f,
+                            weight = FontWeight.SemiBold,
+                            color = skin.a2,
+                            letterSpacing = tracking(0.1f),
+                            maxLines = 1,
+                            uppercase = true,
+                        )
+                    }
                 }
-            }
 
-            val searchEmpty = vm.query.isNotBlank() && items.isEmpty() && vm.loaded
-            if (searchEmpty) {
-                Box(Modifier.fillMaxWidth().weight(1f).padding(horizontal = m.pad), contentAlignment = Alignment.Center) {
-                    ElyText(stringResource(R.string.no_results), size = 11f, color = P.ink2, align = TextAlign.Center)
-                }
-            } else {
-                LazyRow(
-                    Modifier.fillMaxWidth().weight(1f),
-                    state = carousel,
-                    contentPadding = PaddingValues(
-                        start = m.pad,
-                        end = m.pad,
-                        // Hueco para la card seleccionada, que sube y se amplía: sin él
-                        // se metía sobre la fila de filtros.
-                        top = m.carouselTop,
-                        bottom = m.carouselBottom,
-                    ),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    itemsIndexed(items, key = { _, it -> it.key }) { _, item ->
-                        val materializing = item.key in vm.materializing
-                        // Las dos caras de lo mismo: un juego recién
-                        // añadido se monta desde el polvo al entrar, y al
-                        // quitarlo se deshace en polvo antes de salir de
-                        // la lista (`finishVanish` es quien borra).
-                        MaterializingContainer(
-                                isMaterializing = materializing,
-                                onAnimationEnd = { vm.finishMaterialize(item.key) },
-                            ) {
-                                DisintegratingContainer(
-                                    isDisintegrating = vm.vanishing == item.key,
-                                    onAnimationEnd = { vm.finishVanish() },
+                Box(Modifier.fillMaxWidth().weight(1f)) {
+                    when {
+                        searchEmpty -> Box(Modifier.fillMaxSize().padding(horizontal = m.pad), contentAlignment = Alignment.Center) {
+                            ElyText(stringResource(R.string.no_results), size = 11f, color = P.ink2, align = TextAlign.Center)
+                        }
+                        showEmpty -> Box(Modifier.fillMaxSize().padding(bottom = if (vm.input.gamepadPresent) PAD_HINTS_HEIGHT else 0.dp), contentAlignment = Alignment.Center) {
+                            EmptyState(
+                                title = null,
+                                message = stringResource(R.string.empty_library_message),
+                                actionLabel = stringResource(R.string.add_long),
+                                onAction = { vm.go(Screen.Add) },
+                                glyph = ConsoleGlyph.Gamepad,
+                                focused = addFocused,
+                            )
+                        }
+                        else -> LazyRow(
+                            Modifier.fillMaxSize(),
+                            state = carousel,
+                            contentPadding = PaddingValues(
+                                start = m.pad,
+                                end = m.pad,
+                                // Hueco para la card seleccionada, que sube y se amplía: sin él
+                                // se metía sobre la fila de filtros.
+                                top = m.carouselTop,
+                                bottom = m.carouselBottom,
+                            ),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            itemsIndexed(items, key = { _, it -> it.key }) { _, item ->
+                                val materializing = item.key in vm.materializing
+                                // Las dos caras de lo mismo: un juego recién
+                                // añadido se monta desde el polvo al entrar, y al
+                                // quitarlo se deshace en polvo antes de salir de
+                                // la lista (`finishVanish` es quien borra).
+                                val selected = item.key == sel?.key && !addFocused
+                                MaterializingContainer(
+                                    isMaterializing = materializing,
+                                    onAnimationEnd = { vm.finishMaterialize(item.key) },
+                                    // La seleccionada, por encima de sus vecinas: su halo no queda debajo.
+                                    modifier = Modifier.zIndex(if (selected) 1f else 0f),
                                 ) {
-                                    LibraryTile(
-                                        item = item,
-                                        // Con la card de "Añadir" señalada, la selección es ella.
-                                        selected = item.key == sel?.key && !addFocused,
-                                        sparkColor = sparkColor,
-                                        metrics = m,
-                                        fallback = vm.fallbackOf(item),
-                                        onTap = { vm.select(item.key) },
-                                        onOpen = { vm.requestOpen(item) },
-                                        onBounds = vm::noteSelectedCard,
-                                        onLongPress = { bounds ->
-                                            vm.select(item.key)
-                                            // De aquí sale el overlay.
-                                            vm.markSheetOrigin(bounds)
-                                            vm.itemOptions(item)
-                                        },
-                                    )
+                                    DisintegratingContainer(
+                                        isDisintegrating = vm.vanishing == item.key,
+                                        onAnimationEnd = { vm.finishVanish() },
+                                    ) {
+                                        LibraryTile(
+                                            item = item,
+                                            // Con la card de "Añadir" señalada, la selección es ella.
+                                            selected = selected,
+                                            look = look,
+                                            metrics = m,
+                                            fallback = vm.fallbackOf(item),
+                                            onTap = { vm.select(item.key) },
+                                            onOpen = { vm.requestOpen(item) },
+                                            onBounds = vm::noteSelectedCard,
+                                            onLongPress = { bounds ->
+                                                vm.select(item.key)
+                                                // De aquí sale el overlay.
+                                                vm.markSheetOrigin(bounds)
+                                                vm.itemOptions(item)
+                                            },
+                                        )
+                                    }
                                 }
                             }
-                        }
-                        // "Añadir" es una card más y va al final de la fila: con la
-                        // biblioteca (o el filtro) vacíos es la única que hay, y en
-                        // cuanto entra un juego se corre detrás de todos sin dejar
-                        // de estar a mano. El `loaded` evita que la card asome
-                        // mientras se lee la biblioteca del disco, con el carrusel
-                        // todavía vacío.
-                        if (vm.loaded) {
-                            item(key = "add") { AddTile(m, addFocused, sparkColor) { vm.go(Screen.Add) } }
+                            // "Añadir" es una card más y va al final de la fila: en
+                            // cuanto entra un juego se corre detrás de todos sin dejar
+                            // de estar a mano. El `loaded` evita que la card asome
+                            // mientras se lee la biblioteca del disco.
+                            if (vm.loaded) {
+                                item(key = "add") { AddTile(m, addFocused, look) { vm.go(Screen.Add) } }
+                            }
                         }
                     }
+                    PadHints(
+                        hints = if (showEmpty) EMPTY_HINTS else LIBRARY_HINTS,
+                        visible = vm.input.gamepadPresent,
+                        modifier = Modifier.align(Alignment.BottomStart).padding(start = m.pad - 10.dp, bottom = 2.dp),
+                    )
                 }
             }
         }
 
         MashaFab(vm, m, floatClock)
+    }
+}
+
+/** Las pistas del mando al pie de la biblioteca. */
+private val LIBRARY_HINTS = listOf(
+    PadHint("A", R.string.open),
+    PadHint("X", R.string.details),
+    PadHint("Y", R.string.hint_options),
+    PadHint("LB / RB", R.string.hint_section),
+)
+
+/** Con la sección vacía no hay juego que abrir: A pulsa "Añadir" y LB/RB cambian de sección. */
+private val EMPTY_HINTS = listOf(
+    PadHint("A", R.string.hint_select),
+    PadHint("LB / RB", R.string.hint_section),
+)
+
+/**
+ * El bloque de título del hero de una selección: chip y línea de datos, logo
+ * (o titular) y la sinopsis o la pista de gestos. Sin selección, el titular
+ * dice qué pasa: biblioteca vacía, sección vacía o búsqueda sin resultados.
+ */
+@Composable
+private fun HeroInfo(vm: ElyndraViewModel, sel: LibraryItem?, m: Metrics, floatClock: FloatClock, searching: Boolean) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = m.pad, end = m.pad, bottom = if (m.landscape) 8.dp else 18.dp),
+    ) {
+        if (sel != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = if (m.landscape) 3.dp else 6.dp),
+            ) {
+                HeroChip(
+                    stringResource(
+                        if (sel is LibraryItem.Folder) R.string.chip_emulator_folder else R.string.chip_android_app,
+                    ),
+                )
+                Spacer(Modifier.width(8.dp))
+                ElyText(
+                    heroSubline(sel),
+                    size = 9.5f,
+                    weight = FontWeight.Medium,
+                    color = Color.White.copy(alpha = 0.85f),
+                    letterSpacing = tracking(0.1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        val logo = when (sel) {
+            is LibraryItem.App -> sel.app.meta.logo
+            is LibraryItem.Folder -> sel.logoPath
+            null -> null
+        }
+        // El `sel != null` es para el compilador: el `when` de arriba no le
+        // basta para deducir que si hay logo entonces hay elemento.
+        if (sel != null && logo != null) {
+            // Al quitar el logo se deshace en el sitio donde se está viendo,
+            // en vez de desaparecer de golpe.
+            MaterializingContainer(
+                isMaterializing = vm.isMaterializingArt(sel.key, ArtKind.Logo),
+                onAnimationEnd = { vm.finishMaterializeArt() },
+            ) {
+                DisintegratingContainer(
+                    isDisintegrating = vm.isVanishingArt(sel.key, ArtKind.Logo),
+                    onAnimationEnd = { vm.finishVanish() },
+                ) {
+                    LogoImage(
+                        logo,
+                        Modifier
+                            .floating(floatClock, floatPhaseOf(sel.key), amplitude = 3.dp, periodSeconds = 4.2f)
+                            .fillMaxWidth(0.72f)
+                            .height(m.logoH),
+                    )
+                }
+            }
+        } else {
+            val libraryEmpty = vm.library.apps.isEmpty() && vm.library.folders.isEmpty()
+            ElyText(
+                when {
+                    sel != null -> sel.name
+                    !vm.loaded -> ""
+                    searching -> stringResource(R.string.no_results)
+                    libraryEmpty -> stringResource(R.string.empty_library_title)
+                    else -> stringResource(R.string.empty_filter_title)
+                },
+                size = m.titleSize,
+                weight = FontWeight.ExtraBold,
+                color = Color.White,
+                letterSpacing = tracking(-0.03f),
+                lineHeightRatio = 0.92f,
+                shadow = HeroTitleShadow,
+                uppercase = true,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        // Solo las apps tienen sinopsis en el hero; las carpetas no.
+        val app = sel as? LibraryItem.App
+        val description = rememberDescription(vm, app?.key, app?.app?.meta)
+        if (description != null) {
+            ElyText(
+                heroDescription(description, vm.settings.lang),
+                modifier = Modifier
+                    .padding(top = if (m.landscape) 4.dp else 6.dp)
+                    .fillMaxWidth(0.86f),
+                size = 10f,
+                weight = FontWeight.Medium,
+                color = Color.White.copy(alpha = 0.72f),
+                letterSpacing = tracking(0.02f),
+                lineHeightRatio = 1.28f,
+                maxLines = if (m.landscape) 2 else 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        } else if (sel != null && !vm.input.gamepadPresent) {
+            // Con mando, las pistas de sus botones ya van al pie del estante.
+            ElyText(
+                stringResource(R.string.hint_gestures),
+                modifier = Modifier
+                    .padding(top = if (m.landscape) 4.dp else 7.dp)
+                    .alpha(pulseHintAlpha()),
+                size = 9f,
+                weight = FontWeight.Medium,
+                color = Color.White.copy(alpha = 0.8f),
+                letterSpacing = tracking(0.14f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                uppercase = true,
+            )
+        }
     }
 }
 
@@ -474,40 +548,6 @@ internal fun HeroChip(label: String) {
             letterSpacing = tracking(0.16f),
             maxLines = 1,
             uppercase = true,
-        )
-    }
-}
-
-/** Pestaña de filtro: texto + subrayado de acento de 2dp. */
-@Composable
-private fun FilterTab(label: String, active: Boolean, onClick: () -> Unit) {
-    val skin = LocalSkin.current
-    // El ancho lo fija el propio rótulo (IntrinsicSize.Max): sin esto la
-    // primera pestaña se llevaría todo el ancho de la fila.
-    Column(
-        Modifier
-            .width(IntrinsicSize.Max)
-            .shapeClickable(RoundedCornerShape(9.dp), onClick = onClick)
-            .padding(start = 9.dp, end = 9.dp, top = 4.dp, bottom = 1.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        ElyText(
-            label,
-            size = 11f,
-            weight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (active) P.ink else P.ink2.copy(alpha = 0.6f),
-            maxLines = 1,
-        )
-        Spacer(Modifier.height(3.dp))
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(2.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .then(
-                    if (active) Modifier.drawBehind { drawRect(accentGradient(skin, 90f, size)) }
-                    else Modifier,
-                ),
         )
     }
 }
@@ -758,19 +798,17 @@ private const val MASHA_BUBBLE_MS = 14_000L
  * pasando del último juego ([focused]) y se abre con A, como cualquier otra.
  */
 @Composable
-private fun AddTile(metrics: Metrics, focused: Boolean, sparkColor: Color?, onClick: () -> Unit) {
+private fun AddTile(metrics: Metrics, focused: Boolean, look: SelectionLook, onClick: () -> Unit) {
     val skin = LocalSkin.current
     val lift = selectionLift(focused)
     val scale = selectionScale(focused)
     val shape = RoundedCornerShape(16.dp)
-    val sparkFrame = sparkColor?.takeIf { focused }
-    val sparks = sparkFrame != null
-    val frameColor = sparkFrame ?: skin.a1
     // Se pulsa toda la columna (tile y rótulo), pero el realce se dibuja solo
     // en el tile, con su forma: comparten la fuente de interacciones.
     val interaction = remember { MutableInteractionSource() }
     Column(
         Modifier
+            .zIndex(if (focused) 1f else 0f)
             .width(metrics.iconTile)
             .offset(y = lift)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick),
@@ -784,10 +822,9 @@ private fun AddTile(metrics: Metrics, focused: Boolean, sparkColor: Color?, onCl
                     scaleX = scale
                     scaleY = scale
                 }
-                .neonParticles(sparks, frameColor)
+                .selectionFrame(focused, look, shape)
                 .glass(shape, borderColor = skin.a1.copy(alpha = 0.6f))
-                .indication(interaction, focusRing(shape))
-                .then(if (focused) Modifier.border(6.dp, frameColor, shape) else Modifier),
+                .indication(interaction, focusRing(shape)),
             contentAlignment = Alignment.Center,
         ) {
             ElyText("+", size = 28f, weight = FontWeight.SemiBold, color = skin.a2)
@@ -811,8 +848,7 @@ private fun AddTile(metrics: Metrics, focused: Boolean, sparkColor: Color?, onCl
 private fun LibraryTile(
     item: LibraryItem,
     selected: Boolean,
-    /** Color de las chispas de neón de la selección; null = sin chispas. */
-    sparkColor: Color?,
+    look: SelectionLook,
     metrics: Metrics,
     fallback: ArtFallback,
     onTap: () -> Unit,
@@ -822,7 +858,6 @@ private fun LibraryTile(
     /** Rectángulo de la card mientras está seleccionada (el menú sale de ahí con el mando). */
     onBounds: (Rect) -> Unit = {},
 ) {
-    val skin = LocalSkin.current
     // Juegos Android y carpetas de emulador se representan con icono, no con
     // carátula: su contenedor es cuadrado.
     val width: Dp = metrics.iconTile
@@ -837,11 +872,8 @@ private fun LibraryTile(
     var cardBounds by remember { mutableStateOf(Rect.Zero) }
     val scope = rememberCoroutineScope()
     val dimmed = item is LibraryItem.App && !item.installed
-    // Con las chispas encendidas, el marco (y su resplandor) toman su color.
-    val sparkFrame = sparkColor?.takeIf { selected }
-    val sparks = sparkFrame != null
-    val frameColor = sparkFrame ?: skin.a1
-    val glowColor = if (sparks) frameColor.copy(alpha = 0.6f) else P.shade.copy(alpha = if (selected) 0.32f else 0.2f)
+    // La luz de la selección la pone el marco; la sombra es siempre neutra.
+    val shadowColor = P.shade.copy(alpha = 0.2f)
     // Mismo motivo que en RomTile: el detector vive más que una composición.
     val tap by rememberUpdatedState(onTap)
     val open by rememberUpdatedState(onOpen)
@@ -860,8 +892,10 @@ private fun LibraryTile(
             .graphicsLayer {
                 scaleX = magnetic.value
                 scaleY = magnetic.value
+                // Atenuada sin capa aparte: una capa recortaría el halo de la selección.
+                alpha = if (dimmed) 0.5f else 1f
+                compositingStrategy = CompositingStrategy.ModulateAlpha
             }
-            .alpha(if (dimmed) 0.5f else 1f)
             .pointerInput(item.key) {
                 detectTapGestures(
                     onPress = { press.track(this) },
@@ -888,22 +922,20 @@ private fun LibraryTile(
                     scaleX = scale * pressed.value
                     scaleY = scale * pressed.value
                 }
-                // Tras la escala (la acompañan) y antes del recorte: las chispas
-                // caen por el marco, encima de la card, y su halo asoma fuera.
-                .neonParticles(sparks, frameColor)
                 // Solo por fuera: la card es cristal translúcido y una sombra de
                 // elevación asomaba a través de ella, detrás del icono.
                 .outerShadow(
-                    if (press.pressed) 4.dp else if (selected) 16.dp else 8.dp,
+                    if (press.pressed) 4.dp else if (selected) 12.dp else 8.dp,
                     shape,
-                    ambientColor = glowColor,
-                    spotColor = glowColor,
+                    ambientColor = shadowColor,
+                    spotColor = shadowColor,
                 )
+                // Tras la escala (la acompaña) y antes del recorte del cristal:
+                // halo, luz en el estante y partículas asoman por fuera.
+                .selectionFrame(selected, look, shape)
                 // Sin fondo de serie: cristal semitransparente, que deja ver la
                 // aurora de la pantalla por detrás del icono.
-                .liquidGlass(shape, if (selected) frameColor else P.hairline)
-                // Marco más grueso: la selección tiene que leerse de lejos.
-                .then(if (selected) Modifier.border(6.dp, frameColor, shape) else Modifier),
+                .liquidGlass(shape, P.hairline),
         ) {
             // Ni un juego Android ni una carpeta de emulador usan carátula: se
             // representan con su icono — el elegido en "Personalizar icono" o, si

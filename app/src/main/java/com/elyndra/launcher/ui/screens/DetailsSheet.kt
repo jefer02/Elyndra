@@ -1,6 +1,10 @@
 package com.elyndra.launcher.ui.screens
 
 import com.elyndra.launcher.ui.components.NeedsNameBadge
+import com.elyndra.launcher.ui.components.ConsoleGlyph
+import com.elyndra.launcher.ui.components.IconAction
+import com.elyndra.launcher.ui.components.PadHint
+import com.elyndra.launcher.ui.components.PadHints
 import com.elyndra.launcher.ui.rememberDescription
 import android.text.format.Formatter
 import androidx.compose.foundation.background
@@ -147,9 +151,7 @@ fun DetailsSheet(vm: ElyndraViewModel, key: String) {
                     }
                 }
                 Spacer(Modifier.width(8.dp))
-                GlassIconButton(onClick = vm::closeDetails, size = 32.dp, cornerRadius = 11.dp) {
-                    ElyText("✕", size = 12f, color = P.ink)
-                }
+                IconAction(ConsoleGlyph.Close, stringResource(R.string.close), vm::closeDetails)
             }
 
             // ── Cuerpo desplazable ──
@@ -254,6 +256,11 @@ fun DetailsSheet(vm: ElyndraViewModel, key: String) {
                     }
                 }
             }
+            PadHints(
+                hints = listOf(PadHint("A", R.string.hint_select), PadHint("B", R.string.close)),
+                visible = vm.input.gamepadPresent,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+            )
         }
     }
 }

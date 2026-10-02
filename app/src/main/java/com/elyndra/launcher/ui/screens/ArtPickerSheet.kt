@@ -1,5 +1,7 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.components.PadHint
+import com.elyndra.launcher.ui.components.PadHints
 import androidx.compose.runtime.remember
 import com.elyndra.launcher.ui.components.FallbackArt
 import com.elyndra.launcher.ui.components.ArtVariant
@@ -123,6 +125,11 @@ fun ArtPickerSheet(vm: ElyndraViewModel, state: ArtPickerState) {
                     }
                 }
             }
+            PadHints(
+                hints = listOf(PadHint("B", R.string.close)),
+                visible = vm.input.gamepadPresent,
+                modifier = Modifier.padding(start = 18.dp, top = 8.dp),
+            )
         }
     }
 }

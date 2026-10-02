@@ -149,7 +149,7 @@ fun LicensesScreen(vm: ElyndraViewModel) {
                 .padding(start = m.pad, end = m.pad, top = m.pad, bottom = 34.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                GlassIconButton(onClick = { vm.go(Screen.Settings) }) { BackChevron() }
+                GlassIconButton(onClick = { vm.go(Screen.Settings) }, size = com.elyndra.launcher.ui.theme.MinTouch, cornerRadius = 15.dp, contentDescription = stringResource(R.string.hint_back)) { BackChevron() }
                 Spacer(Modifier.width(11.dp))
                 ElyText(stringResource(R.string.licenses_title), size = 19f, weight = FontWeight.SemiBold, color = P.ink)
             }

@@ -41,6 +41,11 @@ import com.elyndra.launcher.ui.ServiceState
 import com.elyndra.launcher.ui.SettingsController
 import com.elyndra.launcher.ui.SettingsController.Field
 import com.elyndra.launcher.ui.components.ArcSpinner
+import com.elyndra.launcher.ui.components.AccordionHeader
+import com.elyndra.launcher.ui.components.Expandable
+import com.elyndra.launcher.ui.components.SettingRow
+import com.elyndra.launcher.ui.components.SwitchRow
+import androidx.compose.runtime.saveable.rememberSaveable
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GhostButton
 import com.elyndra.launcher.ui.components.SettingsGroup
@@ -50,9 +55,9 @@ import com.elyndra.launcher.ui.resolve
 import com.elyndra.launcher.ui.theme.LocalSkin
 
 /* ─────────────────────────────────────────────────────────────
-   Paneles de credenciales de los cuatro servicios de metadatos.
-   Cada uno: estado, qué aporta, campos, "Probar conexión", enlace
-   a la página donde se consiguen las claves y una ayuda breve.
+   Los cuatro servicios de metadatos con cuenta, en acordeón: cerrados,
+   estado y qué aporta cada uno; abiertos, sus campos, "Probar
+   conexión", el enlace a la página de las claves y una ayuda breve.
    ───────────────────────────────────────────────────────────── */
 
 fun serviceName(s: Service): String = when (s) {
@@ -67,25 +72,20 @@ fun serviceName(s: Service): String = when (s) {
 @Composable
 fun ApiPanels(vm: ElyndraViewModel) {
     val s = vm.settings
-    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        ApiPanel(vm, Service.ScreenScraper, R.string.ss_desc, R.string.ss_help, R.string.test_connection) {
+    Column {
+        ApiAccordion(vm, Service.ScreenScraper, R.string.ss_desc, R.string.ss_help, R.string.test_connection) {
             CredentialField(stringResource(R.string.field_username), s.value(Field.SsUser), secret = false) { s.update(Field.SsUser, it) }
             Spacer(Modifier.height(8.dp))
             CredentialField(stringResource(R.string.field_password), s.value(Field.SsPassword), secret = true) { s.update(Field.SsPassword, it) }
-            Spacer(Modifier.height(8.dp))
-            val expanded = s.showSsDev || !s.builtInSsDev
-            Row(
-                Modifier.clickable { s.toggleSsDev() }.padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                ElyText(
-                    (if (expanded) "▾ " else "▸ ") + stringResource(R.string.ss_dev_toggle),
-                    size = 10f,
-                    weight = FontWeight.SemiBold,
-                    color = LocalSkin.current.a2,
-                )
-            }
-            if (expanded) {
+            // Las credenciales de desarrollador, plegadas aparte: casi nadie las
+            // necesita. Sin las de serie no se pueden plegar (sin ellas no hay servicio).
+            val devOpen = s.showSsDev || !s.builtInSsDev
+            AccordionHeader(
+                title = stringResource(R.string.ss_dev_toggle),
+                expanded = devOpen,
+                onToggle = s::toggleSsDev,
+            )
+            Expandable(devOpen) {
                 ElyText(
                     stringResource(if (s.builtInSsDev) R.string.ss_dev_builtin else R.string.ss_dev_missing),
                     size = 9.5f,
@@ -98,15 +98,15 @@ fun ApiPanels(vm: ElyndraViewModel) {
                 CredentialField(stringResource(R.string.field_dev_password), s.value(Field.SsDevPassword), secret = true) { s.update(Field.SsDevPassword, it) }
             }
         }
-        ApiPanel(vm, Service.Igdb, R.string.igdb_desc, R.string.igdb_help, R.string.connect) {
+        ApiAccordion(vm, Service.Igdb, R.string.igdb_desc, R.string.igdb_help, R.string.connect) {
             CredentialField(stringResource(R.string.field_client_id), s.value(Field.IgdbClientId), secret = false) { s.update(Field.IgdbClientId, it) }
             Spacer(Modifier.height(8.dp))
             CredentialField(stringResource(R.string.field_client_secret), s.value(Field.IgdbClientSecret), secret = true) { s.update(Field.IgdbClientSecret, it) }
         }
-        ApiPanel(vm, Service.SteamGridDb, R.string.sgdb_desc, R.string.sgdb_help, R.string.test_connection) {
+        ApiAccordion(vm, Service.SteamGridDb, R.string.sgdb_desc, R.string.sgdb_help, R.string.test_connection) {
             CredentialField(stringResource(R.string.field_api_key), s.value(Field.SgdbKey), secret = true) { s.update(Field.SgdbKey, it) }
         }
-        ApiPanel(vm, Service.RetroAchievements, R.string.ra_desc, R.string.ra_help, R.string.test_connection) {
+        ApiAccordion(vm, Service.RetroAchievements, R.string.ra_desc, R.string.ra_help, R.string.test_connection) {
             CredentialField(stringResource(R.string.field_username), s.value(Field.RaUser), secret = false) { s.update(Field.RaUser, it) }
             Spacer(Modifier.height(8.dp))
             CredentialField(stringResource(R.string.field_web_api_key), s.value(Field.RaKey), secret = true) { s.update(Field.RaKey, it) }
@@ -114,8 +114,13 @@ fun ApiPanels(vm: ElyndraViewModel) {
     }
 }
 
+/**
+ * Un servicio como acordeón. Cerrado: estado, nombre, qué aporta en una línea
+ * y el chip ("Conectado", "Sin configurar"…). Abierto: los campos, probar o
+ * conectar, el enlace para conseguir las claves y la ayuda.
+ */
 @Composable
-private fun ApiPanel(
+private fun ApiAccordion(
     vm: ElyndraViewModel,
     service: Service,
     @StringRes desc: Int,
@@ -124,17 +129,19 @@ private fun ApiPanel(
     fields: @Composable ColumnScope.() -> Unit,
 ) {
     val state = vm.settings.state(service)
+    var open by rememberSaveable(service) { mutableStateOf(false) }
     SettingsGroup(padding = 0.dp) {
-        Column(Modifier.padding(vertical = 12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                StatusDot(state.status)
-                Spacer(Modifier.width(8.dp))
-                ElyText(serviceName(service), modifier = Modifier.weight(1f), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
-                StatusBadge(state.status)
-            }
-            Spacer(Modifier.height(5.dp))
+        AccordionHeader(
+            title = serviceName(service),
+            expanded = open,
+            onToggle = { open = !open },
+            summary = if (open) null else stringResource(desc),
+            leading = { StatusDot(state.status) },
+            trailing = { StatusBadge(state.status) },
+        )
+        Expandable(open) {
             ElyText(stringResource(desc), size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
-            Spacer(Modifier.height(9.dp))
+            Spacer(Modifier.height(10.dp))
             fields()
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -158,12 +165,13 @@ private fun ApiPanel(
             }
             Spacer(Modifier.height(8.dp))
             ElyText(stringResource(help), size = 9f, color = P.ink2.copy(alpha = 0.85f), lineHeightRatio = 1.45f)
+            Spacer(Modifier.height(12.dp))
         }
     }
 }
 
 @Composable
-private fun StatusDot(status: ServiceState.Status) {
+internal fun StatusDot(status: ServiceState.Status) {
     val color = when (status) {
         ServiceState.Status.Connected -> P.success
         ServiceState.Status.Error -> P.red
@@ -249,23 +257,12 @@ private fun CredentialField(label: String, value: String, secret: Boolean, onCha
 @Composable
 fun KeylessPanel(vm: ElyndraViewModel) {
     val s = vm.settings
-    com.elyndra.launcher.ui.components.SettingsGroup {
-        ElyText(stringResource(R.string.keyless_title), size = 12.5f, weight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = com.elyndra.launcher.data.P.ink)
-        androidx.compose.foundation.layout.Spacer(Modifier.height(4.dp))
-        ElyText(stringResource(R.string.keyless_desc), size = 10f, color = com.elyndra.launcher.data.P.ink2, lineHeightRatio = 1.45f)
+    SettingsGroup {
+        SettingRow(stringResource(R.string.keyless_title), description = stringResource(R.string.keyless_desc))
         listOf(Service.Libretro to R.string.keyless_libretro_desc, Service.Steam to R.string.keyless_steam_desc).forEach { (service, desc) ->
-            androidx.compose.foundation.layout.Spacer(Modifier.height(12.dp))
-            androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    ElyText(serviceName(service), size = 12f, weight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = com.elyndra.launcher.data.P.ink)
-                    androidx.compose.foundation.layout.Spacer(Modifier.height(2.dp))
-                    ElyText(stringResource(desc), size = 9.5f, color = com.elyndra.launcher.data.P.ink2, lineHeightRatio = 1.4f)
-                }
-                androidx.compose.foundation.layout.Spacer(Modifier.width(12.dp))
-                com.elyndra.launcher.ui.components.GlowingSwitch(s.keyless[service] ?: true, { s.toggleKeyless(service) })
-            }
+            SwitchRow(serviceName(service), stringResource(desc), s.keyless[service] ?: true, { s.toggleKeyless(service) })
         }
-        androidx.compose.foundation.layout.Spacer(Modifier.height(12.dp))
-        ElyText(stringResource(R.string.keyless_privacy), size = 9.5f, color = com.elyndra.launcher.data.P.ink2, lineHeightRatio = 1.45f)
+        ElyText(stringResource(R.string.keyless_privacy), size = 9.5f, color = P.ink2, lineHeightRatio = 1.45f)
+        Spacer(Modifier.height(8.dp))
     }
 }
