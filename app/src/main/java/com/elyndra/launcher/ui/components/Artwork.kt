@@ -10,49 +10,67 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.graphics.drawable.toBitmap
 import coil.compose.AsyncImage
-import com.elyndra.launcher.ui.theme.art
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Carátula: la procedural del diseño siempre debajo y, encima, la imagen
- * descargada si existe. Mientras carga (o si falla) se ve la procedural.
+ * Carátula: la imagen descargada si existe y, si no hay (o no se puede
+ * leer), el arte de reserva del juego ([FallbackArt]). Mientras la imagen
+ * carga, y en los márgenes de una imagen encajada con `Fit`, se ve la
+ * superficie de reserva sin icono ni título.
  */
 @Composable
 fun ArtImage(
     path: String?,
-    pairIndex: Int,
+    fallback: ArtFallback,
     modifier: Modifier = Modifier,
+    variant: ArtVariant = ArtVariant.Cover,
     contentScale: ContentScale = ContentScale.Crop,
     alignment: Alignment = Alignment.Center,
     scale: Float = 1f,
+    /** El título solo cuando no hay imagen (en portada). */
+    showTitle: Boolean = variant == ArtVariant.Cover,
+    iconModifier: Modifier = Modifier,
 ) {
-    Box(modifier.art(pairIndex)) {
-        if (path != null) {
-            val context = LocalContext.current
-            val file = remember(path) { File(context.filesDir, path) }
-            AsyncImage(
-                model = file,
-                contentDescription = null,
-                contentScale = contentScale,
-                alignment = alignment,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(if (scale != 1f) Modifier.graphicsLayer { scaleX = scale; scaleY = scale } else Modifier),
-            )
-        }
+    if (path == null) {
+        FallbackArt(fallback, variant, modifier, showTitle = showTitle, iconModifier = iconModifier)
+        return
+    }
+    var failed by remember(path) { mutableStateOf(false) }
+    if (failed) {
+        FallbackArt(fallback, variant, modifier, showTitle = showTitle, iconModifier = iconModifier)
+        return
+    }
+    Box(modifier) {
+        // Debajo, solo el color del juego: no hace falta leer su icono.
+        FallbackArt(fallback.colorOnly(), variant, Modifier.fillMaxSize(), showTitle = false, showIcon = false)
+        val context = LocalContext.current
+        val file = remember(path) { File(context.filesDir, path) }
+        AsyncImage(
+            model = file,
+            contentDescription = null,
+            contentScale = contentScale,
+            alignment = alignment,
+            onError = { failed = true },
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (scale != 1f) Modifier.graphicsLayer { scaleX = scale; scaleY = scale } else Modifier),
+        )
     }
 }
 
@@ -111,6 +129,21 @@ fun AppIconImage(
         value = icon
     }
     bitmap?.let { Image(it, contentDescription = null, modifier = modifier, contentScale = contentScale) }
+}
+
+/** Acento del icono de una app instalada (ver [ArtPalette]); null si es gris o no está. */
+internal suspend fun appIconAccent(context: Context, packageName: String): Int? =
+    appIconPixels(context, packageName)?.let { withContext(Dispatchers.Default) { ArtPalette.accentOf(it) } }
+
+/** El icono de una app instalada reducido a [side]×[side] píxeles ARGB; null si no está. */
+internal suspend fun appIconPixels(context: Context, packageName: String, side: Int = 32): IntArray? = withContext(Dispatchers.Default) {
+    val icon = iconCache.get(packageName) ?: runCatching { loadAppIcon(context, packageName) }.getOrNull()?.also { iconCache.put(packageName, it) }
+    icon?.let { bitmap ->
+        val small = Bitmap.createScaledBitmap(bitmap.asAndroidBitmap(), side, side, true)
+        val px = IntArray(side * side)
+        small.getPixels(px, 0, side, 0, 0, side, side)
+        px
+    }
 }
 
 private const val ICON_PX = 384

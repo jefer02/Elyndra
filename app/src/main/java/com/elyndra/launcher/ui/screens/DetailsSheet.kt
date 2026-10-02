@@ -1,5 +1,7 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.components.NeedsNameBadge
+import com.elyndra.launcher.ui.rememberDescription
 import android.text.format.Formatter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -39,7 +41,7 @@ import com.elyndra.launcher.R
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.data.fmtMinutes
-import com.elyndra.launcher.data.pairIndexFor
+import com.elyndra.launcher.ui.components.ArtFallback
 import com.elyndra.launcher.metadata.RaAchievement
 import com.elyndra.launcher.metadata.RetroAchievementsClient
 import com.elyndra.launcher.metadata.Service
@@ -57,7 +59,6 @@ import com.elyndra.launcher.ui.components.GlassIconButton
 import com.elyndra.launcher.ui.components.MashaMemoryBlock
 import com.elyndra.launcher.ui.components.ScrimLayer
 import com.elyndra.launcher.ui.components.consumeClicks
-import com.elyndra.launcher.ui.components.rememberGameDescription
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.accentGradient
@@ -81,14 +82,14 @@ fun DetailsSheet(vm: ElyndraViewModel, key: String) {
     val meta = rom?.meta ?: app!!.meta
     val stats = rom?.stats ?: app!!.stats
     val title = rom?.displayTitle ?: app!!.displayTitle
-    val pair = rom?.let { vm.romPairIndex(it) } ?: pairIndexFor(app!!.packageName)
+    val fallback = rom?.let { vm.romFallback(it) } ?: ArtFallback(app!!.key, app.displayTitle, app.meta.icon, app.packageName)
     val system = rom?.let { Systems.byId(it.systemId) }
     val folder = rom?.let { r -> vm.library.folders.firstOrNull { it.id == r.folderId } }
     val emulator = rom?.let { it.emulatorId ?: folder?.emulatorId }?.let { vm.emulatorName(it) }
     val lang = vm.settings.lang
     val dateFormat = remember(lang) { DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.forLanguageTag(lang)) }
     val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.88f).dp
-    val description = rememberGameDescription(title, meta.description, lang, short = false)
+    val description = rememberDescription(vm, key, meta)
 
     ScrimLayer(onDismiss = vm::closeDetails, alignment = Alignment.BottomCenter, key = key) {
         Column(
@@ -106,10 +107,11 @@ fun DetailsSheet(vm: ElyndraViewModel, key: String) {
                 Box(Modifier.size(78.dp, 104.dp).clip(RoundedCornerShape(12.dp))) {
                     // Un juego Android se representa con su icono; la carátula solo
                     // se usa en las ROMs.
-                    val headerCover = if (app != null) null else meta.cover
-                    ArtImage(headerCover, pair, Modifier.fillMaxSize())
-                    if (headerCover == null && (app != null || meta.icon != null)) {
-                        GameIcon(meta.icon, app?.packageName, Modifier.fillMaxSize(), ContentScale.Crop)
+                    // El título ya va al lado: la reserva lleva solo el icono.
+                    if (app != null) {
+                        GameIcon(meta.icon, app.packageName, Modifier.fillMaxSize(), ContentScale.Crop)
+                    } else {
+                        ArtImage(meta.cover, fallback, Modifier.fillMaxSize(), showTitle = false)
                     }
                 }
                 Spacer(Modifier.width(12.dp))
@@ -136,6 +138,12 @@ fun DetailsSheet(vm: ElyndraViewModel, key: String) {
                             }
                         }, fontSize = 11.5f)
                         GhostButton(stringResource(R.string.refresh_metadata), { vm.refreshMetadata(listOf(key)) })
+                    }
+                    // Sin nombre que sirva (o identificado mal): ponérselo a mano.
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        GhostButton(stringResource(R.string.identify_action), { vm.identify.open(key) })
+                        if (vm.needsName(title)) NeedsNameBadge()
                     }
                 }
                 Spacer(Modifier.width(8.dp))
@@ -194,11 +202,13 @@ fun DetailsSheet(vm: ElyndraViewModel, key: String) {
                     }
                 }
 
-                // La sinopsis, en el idioma de la app (o en el de por defecto si
-                // no hay traducción): ver GameDescriptions.
-                description?.let {
+                // La sinopsis en el idioma de la app; si solo la hay en otro, con su
+                // etiqueta y "Traducir" (ver DescriptionPick). Sin sinopsis, nada:
+                // ni hueco ni texto de relleno.
+                description?.let { d ->
                     Spacer(Modifier.height(10.dp))
-                    ElyText(it, size = 11f, color = P.ink, lineHeightRatio = 1.6f)
+                    ElyText(d.text, size = 11f, color = P.ink, lineHeightRatio = 1.6f)
+                    DescriptionLanguageRow(vm, key, meta, d)
                 }
 
                 meta.ra?.let { ra ->
@@ -286,5 +296,35 @@ private fun AchievementRow(a: RaAchievement) {
         }
         Spacer(Modifier.width(8.dp))
         ElyText("${a.points}", size = 11f, weight = FontWeight.Bold, color = if (a.earnedHardcore) LocalSkin.current.a2 else P.ink2)
+    }
+}
+
+/**
+ * Debajo de una sinopsis que no está en el idioma de la app: su idioma, en
+ * pequeño, y "Traducir"; o, ya traducida, de qué idioma viene y "Ver original".
+ */
+@Composable
+private fun DescriptionLanguageRow(vm: ElyndraViewModel, key: String, meta: com.elyndra.launcher.data.GameMeta, d: com.elyndra.launcher.metadata.DescriptionView) {
+    val lang = vm.settings.lang
+    val c = vm.descriptions
+    val original = d.originalLang ?: return
+    // En el idioma de la app (o sin idioma conocido): nada que etiquetar.
+    if (!d.foreign && !d.translated) return
+    Spacer(Modifier.height(6.dp))
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        val name = com.elyndra.launcher.ui.DescriptionsController.languageName(original, lang)
+        ElyText(
+            if (d.translated) stringResource(R.string.description_translated_from, name) else name,
+            size = 9f,
+            weight = FontWeight.SemiBold,
+            color = P.ink2,
+            letterSpacing = tracking(0.08f),
+            uppercase = true,
+        )
+        when {
+            c.busy == key -> ElyText(stringResource(R.string.description_translating), size = 9.5f, color = P.ink2)
+            d.translated -> GhostButton(stringResource(R.string.description_show_original), { c.showOriginal(key, true) })
+            else -> GhostButton(stringResource(R.string.description_translate), { c.translate(key, meta) })
+        }
     }
 }

@@ -20,7 +20,9 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun database(@ApplicationContext context: Context): ElyndraDatabase =
-        Room.databaseBuilder(context, ElyndraDatabase::class.java, ElyndraDatabase.NAME).build()
+        Room.databaseBuilder(context, ElyndraDatabase::class.java, ElyndraDatabase.NAME)
+            .addMigrations(*ElyndraDatabase.MIGRATIONS)
+            .build()
 
     @Provides
     @Singleton
@@ -32,4 +34,5 @@ object DatabaseModule {
     @Provides fun smartListDao(db: ElyndraDatabase) = db.smartListDao()
     @Provides fun arcDao(db: ElyndraDatabase) = db.arcDao()
     @Provides fun aiCacheDao(db: ElyndraDatabase) = db.aiCacheDao()
+    @Provides fun translationDao(db: ElyndraDatabase) = db.translationDao()
 }

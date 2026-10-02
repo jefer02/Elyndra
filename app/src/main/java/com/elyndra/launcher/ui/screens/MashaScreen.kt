@@ -48,6 +48,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.elyndra.launcher.data.P
+import com.elyndra.launcher.ui.masha.MashaFraming
+import com.elyndra.launcher.ui.theme.shapeClickable
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -70,6 +77,7 @@ import androidx.core.content.ContextCompat
 import com.elyndra.launcher.R
 import com.elyndra.launcher.data.fmtMinutes
 import com.elyndra.launcher.ui.ElyndraViewModel
+import com.elyndra.launcher.ui.MashaQuietsSounds
 import com.elyndra.launcher.ui.Screen
 import com.elyndra.launcher.ui.UiText
 import com.elyndra.launcher.ui.components.BackChevron
@@ -118,9 +126,19 @@ fun MashaScreen(vm: ElyndraViewModel) {
     val context = LocalContext.current
 
     val presence = remember { MashaPresence() }
+    // Mientras Masha habla o escucha, la interfaz no suena.
+    MashaQuietsSounds(vm, presence)
     val quality = remember { MashaQuality.detect(context) }
     var stage by remember { mutableStateOf(StageStatus.Loading) }
+    // Al entrar, cuerpo entero (en vertical y en horizontal); el botón de
+    // encuadre acerca al primer plano y vuelve (ver MashaFraming.shotFor). Se
+    // recuerda solo mientras se está en la pantalla; al girar, se reencuadra el
+    // mismo plano para la nueva orientación.
+    var alternate by remember { mutableStateOf(false) }
     var recenter by remember { mutableIntStateOf(0) }
+    val shot = MashaFraming.shotFor(m.landscape, alternate)
+    // El hueco que deja libre la interfaz para su cara (coordenadas de la raíz).
+    val area = remember { FaceAreaProbe() }
     var chatOpen by rememberSaveable { mutableStateOf(true) }
     var soundOpen by remember { mutableStateOf(false) }
 
@@ -201,7 +219,14 @@ fun MashaScreen(vm: ElyndraViewModel) {
         if (stage == StageStatus.Failed) {
             HoloFallback(presence, Modifier.fillMaxSize().padding(bottom = 180.dp))
         } else {
-            MashaStage(presence, quality, recenter, m.landscape, Modifier.fillMaxSize()) { stage = it }
+            MashaStage(
+                presence,
+                quality,
+                shot,
+                Modifier.fillMaxSize().onGloballyPositioned { area.stage = it.boundsInRoot() },
+                recenter = recenter,
+                faceArea = area.faceArea(m.landscape),
+            ) { stage = it }
         }
         HoloAtmosphere(presence)
         // Oscurece abajo para que el panel se lea sobre el holograma.
@@ -239,7 +264,10 @@ fun MashaScreen(vm: ElyndraViewModel) {
                 chatOpen = chatOpen,
                 onToggleChat = { chatOpen = !chatOpen },
                 onSound = { soundOpen = !soundOpen },
-                onRecenter = { recenter++ },
+                onRecenter = {
+                    alternate = !alternate
+                    recenter++
+                },
                 onNewChat = {
                     voice.stop()
                     masha.clearConversation(greeting)
@@ -248,14 +276,14 @@ fun MashaScreen(vm: ElyndraViewModel) {
             if (m.landscape) {
                 Row(Modifier.weight(1f).fillMaxWidth()) {
                     // A la izquierda queda ella; la conversación, a la derecha.
-                    Spacer(Modifier.weight(0.5f))
+                    Spacer(Modifier.weight(0.5f).fillMaxHeight().onGloballyPositioned { area.side = it.boundsInRoot() })
                     Column(Modifier.weight(0.5f).fillMaxHeight().padding(end = m.pad)) {
-                        Conversation(vm, presence, glow, chatOpen, landscape = true, onMic = ::toggleMic)
+                        Conversation(vm, presence, glow, chatOpen, landscape = true, onMic = ::toggleMic, area = area)
                     }
                 }
             } else {
                 Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = m.pad)) {
-                    Conversation(vm, presence, glow, chatOpen, landscape = false, onMic = ::toggleMic)
+                    Conversation(vm, presence, glow, chatOpen, landscape = false, onMic = ::toggleMic, area = area)
                 }
             }
         }
@@ -330,10 +358,11 @@ private fun ColumnScope.Conversation(
     open: Boolean,
     landscape: Boolean,
     onMic: () -> Unit,
+    area: FaceAreaProbe,
 ) {
     val masha = vm.masha
     val lang = vm.settings.lang
-    StatsRow(vm, glow)
+    Box(Modifier.onGloballyPositioned { area.statsBottom = it.boundsInRoot().bottom }) { StatsRow(vm, glow) }
     // En vertical, el hueco de arriba es para verla a ella; en horizontal ella
     // está a la izquierda y la conversación ocupa toda su columna.
     if (!landscape || !open) Spacer(Modifier.weight(1f))
@@ -366,7 +395,9 @@ private fun ColumnScope.Conversation(
         }
     }
     Spacer(Modifier.height(8.dp))
-    Suggestions(vm, glow) { masha.sendSuggestion(it, lang) }
+    Box(Modifier.onGloballyPositioned { area.chipsTop = it.boundsInRoot().top }) {
+        Suggestions(vm, glow) { masha.sendSuggestion(it, lang) }
+    }
     Spacer(Modifier.height(8.dp))
     Dock(vm, presence, glow, onMic)
     Spacer(Modifier.height(if (landscape) 10.dp else 16.dp))
@@ -476,8 +507,8 @@ private fun Dock(vm: ElyndraViewModel, presence: MashaPresence, glow: Color, onM
             Modifier
                 .size(46.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(Brush.linearGradient(listOf(glow, Color(0xFF3A5BFF))))
-                .clickable { if (masha.busy) masha.stop() else masha.send(lang) },
+                .background(Brush.linearGradient(listOf(glow, P.primary)))
+                .shapeClickable(RoundedCornerShape(16.dp)) { if (masha.busy) masha.stop() else masha.send(lang) },
             contentAlignment = Alignment.Center,
         ) {
             if (masha.busy) Box(Modifier.size(13.dp).clip(RoundedCornerShape(3.dp)).background(Color.White)) else SendArrow()
@@ -503,7 +534,7 @@ private fun MicButton(presence: MashaPresence, glow: Color, onClick: () -> Unit)
                     drawCircle(glow.copy(alpha = 0.35f), r)
                 }
             }
-            .clickable(onClick = onClick),
+            .shapeClickable(CircleShape, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         MicGlyph()
@@ -663,4 +694,29 @@ private fun ChatGlyph(open: Boolean) {
                 drawLine(Color.White, Offset(w * 0.3f, h * 0.7f), Offset(w * 0.22f, h * 0.98f), t, cap = StrokeCap.Round)
             },
     )
+}
+
+/**
+ * Dónde queda libre la pantalla para la cara de Masha: en vertical, entre las
+ * tarjetas de arriba y las sugerencias; en horizontal, la mitad izquierda.
+ * Las medidas llegan de la maquetación (coordenadas de la raíz) y se leen en
+ * estado, así el escenario se vuelve a encuadrar si cambian (teclado, giro).
+ */
+private class FaceAreaProbe {
+    var stage by mutableStateOf(Rect.Zero)
+    var statsBottom by mutableFloatStateOf(0f)
+    var chipsTop by mutableFloatStateOf(0f)
+    var side by mutableStateOf(Rect.Zero)
+
+    /** El hueco en coordenadas del escenario; null mientras no se ha medido. */
+    fun faceArea(landscape: Boolean): Rect? {
+        val s = stage
+        if (s.width <= 0f) return null
+        val r = if (landscape) {
+            side.takeIf { it.width > 0f && it.height > 0f }
+        } else {
+            if (chipsTop > statsBottom && statsBottom > 0f) Rect(s.left, statsBottom, s.right, chipsTop) else null
+        } ?: return null
+        return Rect(r.left - s.left, r.top - s.top, r.right - s.left, r.bottom - s.top)
+    }
 }

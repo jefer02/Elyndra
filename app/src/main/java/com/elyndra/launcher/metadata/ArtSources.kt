@@ -44,6 +44,9 @@ class ArtSources(
     /** RetroAchievements solo cubre ROMs de sistemas con logros. */
     fun supports(key: String, service: Service): Boolean = when (service) {
         Service.RetroAchievements -> repo.romByKey(key)?.let { Systems.byId(it.systemId)?.raId } != null
+        // libretro solo tiene ROMs de los sistemas que cataloga; Steam, juegos (no carpetas).
+        Service.Libretro -> repo.romByKey(key)?.let { LibretroNames.folderFor(it.systemId) } != null
+        Service.Steam -> repo.folderByKey(key) == null
         else -> true
     }
 
@@ -94,6 +97,8 @@ class ArtSources(
             Service.Igdb -> igdb(meta, name, system, isApp, kind)
             Service.SteamGridDb -> steamGridDb(meta, name, isApp, kind)
             Service.RetroAchievements -> retroAchievements(meta, name, system, kind)
+            Service.Libretro -> libretro(rom?.fileName, name, system, kind)
+            Service.Steam -> steam(meta, name, kind)
         }.distinctBy { it.url }.take(MAX_CANDIDATES)
     }
 
@@ -101,9 +106,18 @@ class ArtSources(
      * Descarga la imagen elegida y la fija para que "Actualizar metadatos" no la
      * sustituya. [service] es de dónde sale, para que la imagen recuerde su origen.
      */
-    suspend fun apply(key: String, kind: ArtKind, url: String, service: Service? = null): Boolean {
-        val path = media.download(url, key, kind.media) ?: return false
-        return store(key, kind, path, service?.let { ArtOrigin(it.id, url) })
+    suspend fun apply(key: String, kind: ArtKind, url: String, service: Service? = null): MediaResult {
+        // Se descarga y se comprueba antes de tocar nada: si falla, la imagen anterior se queda.
+        val result = media.fetch(url, key, kind.media)
+        if (result is MediaResult.Saved) store(key, kind, result.path, service?.let { ArtOrigin(it.id, url) })
+        return result
+    }
+
+    /** ¿Esta imagen la eligió el usuario? (las pasadas no la tocan). */
+    fun isPinned(key: String, kind: ArtKind): Boolean {
+        repo.folderByKey(key)?.let { return false }
+        val meta = repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta ?: return false
+        return kind.media in meta.pinned
     }
 
     /**
@@ -113,7 +127,7 @@ class ArtSources(
      * metadatos" no la pisará.
      */
     suspend fun applyLocal(key: String, kind: ArtKind, image: LocalImage): Boolean {
-        val path = withContext(Dispatchers.IO) { media.save(image.bytes, key, kind.media, image.extension) } ?: return false
+        val path = (withContext(Dispatchers.IO) { media.saveChecked(image.bytes, key, kind.media) } as? MediaResult.Saved)?.path ?: return false
         return store(key, kind, path, ArtOrigin(LOCAL_SOURCE))
     }
 
@@ -223,6 +237,38 @@ class ArtSources(
                 ArtKind.Logo -> sgdb.logos(id)
                 ArtKind.Icon -> sgdb.icons(id)
             }.take(PER_GAME).map { ArtCandidate(it.url, it.thumb, title) }
+        }
+    }
+
+    /** libretro: los títulos más parecidos de la carpeta del sistema (aquí elige el usuario). */
+    private suspend fun libretro(fileName: String?, name: String, system: GameSystem?, kind: ArtKind): List<ArtCandidate> {
+        val folder = system?.id?.let { LibretroNames.folderFor(it) } ?: return emptyList()
+        val lr = engine.libretro
+        val names = lr.names(folder)
+        val exact = fileName?.let { LibretroNames.exactCandidate(it) }?.takeIf { it in names }
+        val picks = (listOfNotNull(exact) + LibretroNames.candidates(name, names)).distinct().take(SGDB_GAMES * PER_GAME)
+        return picks.flatMap { n ->
+            val art = lr.art(folder, n)
+            when (kind) {
+                ArtKind.Cover -> listOf(art.boxart)
+                ArtKind.Background -> listOf(art.title, art.snap)
+                ArtKind.Logo, ArtKind.Icon -> emptyList()
+            }.map { ArtCandidate(it, it, n) }
+        }
+    }
+
+    /** Steam: las imágenes de su CDN para los resultados del buscador que son juegos. */
+    private suspend fun steam(meta: GameMeta, name: String, kind: ArtKind): List<ArtCandidate> {
+        val games = meta.steamAppId?.let { listOf(SteamSearchItem(it, name)) }
+            ?: engine.steam.search(name, "en").filter { SteamParser.bestMatch(it.name, listOf(it)) != null }.take(SGDB_GAMES)
+        return games.flatMap { g ->
+            when (kind) {
+                ArtKind.Cover -> listOf(SteamParser.cover(g.id) to "${SteamParser.cover(g.id).substringBefore("_2x")}.jpg")
+                ArtKind.Background -> listOf(SteamParser.hero(g.id) to SteamParser.header(g.id))
+                ArtKind.Logo -> listOf(SteamParser.logo(g.id) to SteamParser.logo(g.id))
+                // Los iconos de Steam son diminutos: no sirven de icono de juego.
+                ArtKind.Icon -> emptyList()
+            }.map { (url, thumb) -> ArtCandidate(url, thumb, g.name) }
         }
     }
 

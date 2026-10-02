@@ -9,19 +9,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.layer.setOutline
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.data.P
-import com.elyndra.launcher.data.PAIRS
 import kotlin.math.max
 import kotlin.math.min
 
@@ -43,6 +49,37 @@ import kotlin.math.min
 
 /** Velo blanco con el que se sustituye el `backdrop-filter: blur(N)`. */
 private fun hazeFor(blur: Int): Float = (blur / 40f) * 0.20f
+
+/**
+ * Sombra que solo se ve por **fuera** de la pieza, como `box-shadow` en CSS.
+ *
+ * `Modifier.shadow` de Compose es una sombra de elevación de Android: se
+ * calcula como si la pieza fuese opaca y se pinta también debajo de ella. En
+ * una lámina translúcida esa sombra se transparenta —desplazada hacia abajo por
+ * la luz de arriba— y se lee como una segunda caja, más oscura y con otro
+ * radio, detrás del contenido. Aquí la sombra sale de una capa aparte con la
+ * misma forma, recortada para que no pinte nada dentro del contorno.
+ */
+fun Modifier.outerShadow(
+    elevation: Dp,
+    shape: Shape,
+    ambientColor: Color = Color.Black,
+    spotColor: Color = Color.Black,
+): Modifier = if (elevation <= 0.dp) this else drawWithCache {
+    val outline = shape.createOutline(size, layoutDirection, this)
+    val hole = Path().apply { addOutline(outline) }
+    val layer = obtainGraphicsLayer().apply {
+        record { drawOutline(outline, Color.Black) }
+        setOutline(outline)
+        shadowElevation = elevation.toPx()
+        this.ambientShadowColor = ambientColor
+        this.spotShadowColor = spotColor
+    }
+    onDrawWithContent {
+        clipPath(hole, ClipOp.Difference) { drawLayer(layer) }
+        drawContent()
+    }
+}
 
 /** Lado a partir del cual una pieza recibe el reflejo entero (ver [liquidSheen]). */
 private val SHEEN_REFERENCE = 140.dp
@@ -165,7 +202,7 @@ fun Modifier.glass(
     val dark = P.isDark
     val rim = rimBrush(borderColor)
     return this
-        .shadow(shadow, shape, clip = false, ambientColor = P.shade.copy(alpha = 0.10f), spotColor = P.shade.copy(alpha = 0.10f))
+        .outerShadow(shadow, shape, ambientColor = P.shade.copy(alpha = 0.10f), spotColor = P.shade.copy(alpha = 0.10f))
         .clip(shape)
         .then(if (solid) Modifier.background(P.surface) else Modifier)
         // En oscuro el cristal NO puede blanquearse. Los tintes del diseño son
@@ -250,24 +287,6 @@ private fun Modifier.insetHighlight(): Modifier = drawBehind {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   Carátulas procedurales (`art()`)
-   ───────────────────────────────────────────────────────────── */
-
-/** Pinta la carátula del par [pairIndex]: base a 150deg + trama de rayas a 115deg. */
-fun DrawScope.drawArt(pairIndex: Int) {
-    val pair = PAIRS[((pairIndex % PAIRS.size) + PAIRS.size) % PAIRS.size]
-    drawRect(artBaseBrush(pair, size))
-    val period = 9.dp.toPx()
-    val width = 2.dp.toPx()
-    artStripeSegments(size, period).forEach { (a, b) ->
-        drawLine(ArtStripeColor, a, b, strokeWidth = width)
-    }
-}
-
-/** La carátula como modificador de fondo. */
-fun Modifier.art(pairIndex: Int): Modifier = drawBehind { drawArt(pairIndex) }
-
-/* ─────────────────────────────────────────────────────────────
    Aurora — los dos blobs difuminados del fondo de las hojas.
 
    El CSS los define como elipses sólidas dentro de un contenedor
@@ -291,7 +310,7 @@ fun AuroraBackdrop(modifier: Modifier = Modifier) {
             )
             // blobB: right 0%, bottom 6%, 54% × 32%, color a2 al 22%
             drawBlob(
-                color = skin.a2.copy(alpha = 0.22f * 0.85f),
+                color = skin.secondary.copy(alpha = 0.22f * 0.85f),
                 left = 1f - 0.54f + dxB, top = 1f - 0.06f - 0.32f + dyB,
                 w = 0.54f, h = 0.32f, scale = scaleB,
             )

@@ -198,6 +198,12 @@ internal class HoloRig(
         stopped = true
     }
 
+    /**
+     * Dónde está su cara ahora (punto entre los ojos, en el mundo), para que la
+     * cámara la encuadre. Escribe en [out]; false si aún no hay pose. No crea objetos.
+     */
+    fun faceWorld(out: FloatArray): Boolean = !stopped && motion?.faceWorld(out) == true
+
     fun frame(frameTimeNanos: Long) {
         if (stopped) return
         if (start < 0) {

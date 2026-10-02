@@ -169,4 +169,19 @@ sealed interface MashaAttachment {
     @Serializable
     @SerialName("done")
     data class Done(val label: String, val ok: Boolean = true) : MashaAttachment
+
+    /**
+     * Algo que Masha quiere cambiar y espera el visto bueno del usuario
+     * (ver MashaWrites): qué es ([kind], [items]) y si ya se contestó.
+     */
+    @Serializable
+    @SerialName("confirm")
+    data class Confirm(
+        val id: String,
+        val kind: String,
+        val items: List<String>,
+        /** Lo que no entró en el lote (se cuenta, no se lista). */
+        val skipped: Int = 0,
+        val state: String = ConfirmState.PENDING,
+    ) : MashaAttachment
 }

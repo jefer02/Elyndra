@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.elyndra.launcher.ui.theme.shapeClickable
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -191,7 +192,7 @@ private fun ColorDot(color: Color, selected: Boolean, modifier: Modifier = Modif
                     drawCircle(Brush.radialGradient(listOf(Color.White, color, color.copy(alpha = 0.7f)), radius = size.minDimension * 0.7f))
                 }
                 .border(if (selected) 2.5.dp else 1.dp, if (selected) P.ink else P.ink.copy(alpha = 0.15f), CircleShape)
-                .clickable(onClick = onClick),
+                .shapeClickable(CircleShape, onClick = onClick),
         )
     }
 }
@@ -209,7 +210,7 @@ private fun ParticlePreview(color: Color) {
         Modifier
             .size(64.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF0B0E13))
+            .background(P.mediaBack)
             .drawBehind {
                 val c = Offset(size.width / 2f, size.height / 2f)
                 val orbit = size.minDimension * 0.34f
@@ -249,7 +250,7 @@ private fun SelectionPreview(color: Color, enabled: Boolean) {
         Modifier
             .size(64.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF0B0E13)),
+            .background(P.mediaBack),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -257,7 +258,7 @@ private fun SelectionPreview(color: Color, enabled: Boolean) {
                 .size(26.dp)
                 .neonParticles(enabled, color, frame = 2.5.dp, sparkScale = 0.6f)
                 .clip(shape)
-                .background(Brush.linearGradient(listOf(skin.a1, skin.a2)))
+                .background(Brush.linearGradient(listOf(skin.a1, skin.fillEnd)))
                 .border(2.5.dp, if (enabled) color else skin.a1, shape),
         )
     }

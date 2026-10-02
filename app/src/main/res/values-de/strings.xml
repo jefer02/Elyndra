@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Akzente -->
+    <string name="accent_indigo">Indigo</string>
+    <string name="accent_abismo">Abgrund</string>
+    <string name="accent_medianoche">Mitternacht</string>
     <string name="accent_mandarina">Mandarine</string>
     <string name="accent_fuego">Feuer</string>
     <string name="accent_menta">Minze</string>
@@ -69,6 +72,17 @@
     <string name="section_theme">Design</string>
     <string name="dark_mode">Dunkles Design</string>
     <string name="dark_mode_desc">Nutzt eine dunkle Oberfläche, unabhängig vom Systemdesign.</string>
+    <string name="section_intro">Startintro</string>
+    <string name="intro_enabled">Intro beim Start zeigen</string>
+    <string name="intro_enabled_desc">Spielt beim Öffnen der App das ELYNDRA-Intro ab. Tippe auf den Bildschirm oder drücke eine beliebige Taste, um es zu überspringen.</string>
+    <string name="intro_color">Intro-Farbe</string>
+    <string name="intro_color_label">Intro-Farbe: %1$s</string>
+    <string name="intro_color_gold">Gold</string>
+    <string name="intro_color_cyan">Cyan</string>
+    <string name="intro_color_violet">Violett</string>
+    <string name="intro_color_crimson">Karmesin</string>
+    <string name="intro_color_emerald">Smaragd</string>
+    <string name="intro_color_accent">Wie der Akzent</string>
     <string name="section_background">Hintergrund</string>
     <string name="background_title">Hintergrund anpassen</string>
     <string name="background_desc">Zeigt ein Video oder ein Bild hinter der Oberfläche. Betrifft nur Elyndra, nicht den System-Hintergrund.</string>
@@ -309,6 +323,14 @@
     <string name="sheet_group_play">Spielen</string>
     <string name="sheet_group_artwork">Bilder</string>
     <string name="sheet_group_manage">Verwalten</string>
+    <string name="sheet_play">Spielen</string>
+    <string name="confirm_again">Gedrückt halten oder erneut drücken zum Bestätigen</string>
+    <string name="toast_pick_game_in_app">%1$s wird geöffnet; wähle das Spiel dort aus</string>
+    <string name="open_bachata">Bachata S4 öffnen</string>
+    <plurals name="ps4_pkgs_not_installed">
+        <item quantity="one">%1$d Paket nicht installiert · Bachata öffnen</item>
+        <item quantity="other">%1$d Pakete nicht installiert · Bachata öffnen</item>
+    </plurals>
     <string name="art_kind_cover">Cover</string>
     <string name="art_kind_background">Hintergrund</string>
     <string name="art_kind_logo">Logo</string>
@@ -463,6 +485,24 @@
     <string name="settings_masha_ambient">Vorschläge über dem Karussell</string>
     <string name="settings_masha_nudges">Gelegentliche Hinweise</string>
     <string name="settings_masha_nudges_desc">Höchstens einer alle paar Tage, nie nachts.</string>
+    <string name="settings_masha_voice_natural">Natürliche Stimme</string>
+    <string name="settings_masha_voice_natural_desc">Eine menschlich klingende Stimme, direkt auf deinem Gerät erzeugt: ohne Verbindung, ohne Kosten. Ist sie nicht geladen oder schafft es das Gerät nicht, nutzt Masha die Systemstimme.</string>
+    <string name="settings_masha_voice_missing">Nicht heruntergeladen (%1$d MB, einmalig)</string>
+    <string name="settings_masha_voice_downloading">Wird geladen … %1$d %%</string>
+    <string name="settings_masha_voice_installed">Installiert: Masha spricht damit</string>
+    <string name="settings_masha_voice_failed">Download fehlgeschlagen: %1$s</string>
+    <string name="settings_masha_voice_unsupported">Dieses Gerät hat nicht genug Speicher für die natürliche Stimme: Masha nutzt die Systemstimme.</string>
+    <string name="settings_masha_voice_slow">Dieses Gerät ist zu langsam für die natürliche Stimme: Masha nutzt die Systemstimme.</string>
+    <string name="settings_masha_voice_off">Heruntergeladen, aber ausgeschaltet: Masha nutzt die Systemstimme.</string>
+    <string name="settings_masha_voice_retry">Erneut versuchen</string>
+    <string name="settings_masha_voice_download">Herunterladen</string>
+    <string name="settings_masha_voice_delete">Löschen</string>
+    <string name="settings_masha_voice_choice">Stimme</string>
+    <string name="settings_masha_voice_n">Stimme %1$d</string>
+    <string name="settings_masha_voice_speed">Tempo</string>
+    <string name="settings_masha_voice_test">Anhören</string>
+    <string name="settings_masha_voice_sample">Hallo, ich bin Masha. Worauf hast du heute Lust zu spielen?</string>
+    <string name="settings_masha_voice_notice">Die natürliche Stimme ist synthetisch (KI-generiert) und wird auf deinem Gerät mit dem Modell Supertonic 3 (Lizenz OpenRAIL-M) erzeugt.</string>
     <string name="settings_masha_usage">Genaue Spielzeit</string>
     <string name="settings_masha_usage_desc">Lässt Elyndra sehen, wie lange jeder Emulator wirklich offen war (Nutzungszugriff). Optional.</string>
     <string name="settings_masha_usage_on">Aktiv</string>
@@ -554,5 +594,133 @@
     <plurals name="dev_taps_left">
         <item quantity="one">Noch %d Mal tippen bis zu den Entwickleroptionen</item>
         <item quantity="other">Noch %d Mal tippen bis zu den Entwickleroptionen</item>
+    </plurals>
+
+    <!-- Sonidos de la interfaz -->
+    <string name="section_sounds">Töne</string>
+    <string name="sound_enabled">Oberflächentöne</string>
+    <string name="sound_enabled_desc">Kurze, eigene Töne im Konsolenstil. Sie halten deine Musik nie an und bleiben stumm im Lautlos- oder Vibrationsmodus und während Masha spricht oder zuhört.</string>
+    <string name="sound_volume">Lautstärke</string>
+    <string name="sound_navigation">Navigationston</string>
+    <string name="sound_navigation_desc">Ein leises Ticken bei jeder Bewegung der Auswahl.</string>
+    <string name="sound_pack">Tonpaket</string>
+    <string name="sound_pack_console">Konsole</string>
+    <string name="sound_pack_soft">Sanft</string>
+    <string name="sound_pack_retro">Retro</string>
+    <string name="sound_pack_off">Aus</string>
+    <string name="sound_custom_title">Eigene Töne</string>
+    <string name="sound_custom_desc">Wähle für jedes Ereignis eine kurze Audiodatei: bis %1$d KB und %2$s s (der Startton bis %3$s s). Sie wird in Elyndra kopiert.</string>
+    <string name="sound_event_navigate">Bewegen</string>
+    <string name="sound_event_select">Bestätigen</string>
+    <string name="sound_event_back">Zurück</string>
+    <string name="sound_event_toggle_on">Einschalten</string>
+    <string name="sound_event_toggle_off">Ausschalten</string>
+    <string name="sound_event_open">Menü öffnen</string>
+    <string name="sound_event_close">Menü schließen</string>
+    <string name="sound_event_error">Fehler</string>
+    <string name="sound_event_launch">Spiel starten</string>
+    <string name="sound_preview">Anhören</string>
+    <string name="sound_choose">Auswählen…</string>
+    <string name="sound_reset">Zurücksetzen</string>
+    <string name="sound_source_custom">Eigener</string>
+    <string name="sound_checking">Wird geprüft…</string>
+    <string name="sound_custom_ok">%1$s: eigener Ton gesetzt</string>
+    <string name="sound_custom_failed">Die Datei konnte nicht gelesen werden</string>
+    <string name="sound_custom_too_big">Zu groß: bis %1$d KB</string>
+    <string name="sound_custom_too_long">Zu lang: bis %1$s s</string>
+    <string name="sound_custom_too_short">Zu kurz, um hörbar zu sein</string>
+    <string name="sound_custom_not_audio">Diese Datei ist kein Audio, das dieses Gerät abspielen kann</string>
+
+    <!-- Música de fondo -->
+    <string name="section_music">Hintergrundmusik</string>
+    <string name="music_enabled">Menümusik</string>
+    <string name="music_enabled_desc">Eine ruhige, eigene Konsolenmenü-Atmosphäre beim Stöbern. Sie stoppt beim Spielstart, wird leiser, wenn Masha spricht, und spielt nie über die Musik einer anderen App.</string>
+    <string name="music_volume">Musiklautstärke</string>
+    <string name="music_source">Musik</string>
+    <string name="music_source_builtin">Elyndra-Atmosphäre</string>
+    <string name="music_choose">Aus dem Speicher wählen…</string>
+    <string name="music_use_builtin">Elyndras Musik verwenden</string>
+    <string name="music_custom_failed">Die Datei konnte nicht abgespielt werden; zurück zu Elyndras Musik</string>
+
+    <!-- Hora y batería -->
+    <string name="status_title">Uhrzeit und Akku</string>
+    <string name="status_desc">Eine kleine Pille oben rechts in der Bibliothek und in Ordnern.</string>
+    <string name="status_mode_both">Beides</string>
+    <string name="status_mode_time">Uhrzeit</string>
+    <string name="status_mode_battery">Akku</string>
+    <string name="status_a11y_time">Uhrzeit %1$s</string>
+    <string name="status_a11y_battery">Akku %1$d %%</string>
+    <string name="status_a11y_charging">, wird geladen</string>
+    <string name="status_a11y_low">, schwach</string>
+
+    <!-- Descripciones: idioma y traducción -->
+    <string name="description_translate">Übersetzen</string>
+    <string name="description_show_original">Original anzeigen</string>
+    <string name="description_translated_from">Übersetzt aus dem %1$s</string>
+    <string name="description_translating">Wird übersetzt…</string>
+    <string name="translate_model_title">Übersetzer herunterladen?</string>
+    <string name="translate_model_msg">Zum Übersetzen werden die Sprachmodelle für %1$s benötigt (insgesamt etwa %2$d MB). Sie werden einmal geladen, danach wird auf diesem Gerät übersetzt: Der Text verlässt es nicht. %3$s</string>
+    <string name="translate_model_wifi">Nur über WLAN.</string>
+    <string name="translate_model_any">Mobile Daten können verwendet werden.</string>
+    <string name="translate_download">Herunterladen</string>
+    <string name="translate_failed">Übersetzung fehlgeschlagen. Versuche es später erneut.</string>
+    <string name="translate_unsupported">Diese Sprache kann auf dem Gerät nicht übersetzt werden.</string>
+    <string name="translate_needs_wifi">Verbinde dich mit einem WLAN, um den Übersetzer zu laden (oder schalte „Nur WLAN“ in den Einstellungen aus).</string>
+    <string name="section_translation">Übersetzung der Beschreibungen</string>
+    <string name="auto_translate">Beschreibungen automatisch übersetzen</string>
+    <string name="auto_translate_desc">Nur mit bereits geladenen Sprachmodellen. Nichts wird ohne Nachfrage geladen.</string>
+    <string name="translate_wifi_only">Modelle nur über WLAN laden</string>
+    <string name="translate_models">Geladene Modelle</string>
+    <string name="translate_models_none">Keine</string>
+    <string name="translate_model_delete">Löschen</string>
+
+    <!-- Fuentes sin cuenta -->
+    <string name="keyless_status_ok">Kein Konto nötig</string>
+    <string name="keyless_title">Quellen ohne Konto</string>
+    <string name="keyless_desc">Cover, Screenshots und Beschreibungen ohne Einrichtung. Dienste mit Konto haben Vorrang, sobald sie eingerichtet sind.</string>
+    <string name="keyless_libretro_desc">Cover, Screenshots und Titelbildschirme von Konsolen.</string>
+    <string name="keyless_steam_desc">Beschreibungen in deiner Sprache und Bilder für PC-Spiele sowie für Android-Spiele, die es auch auf Steam gibt.</string>
+    <string name="keyless_privacy">Kontaktiert: thumbnails.libretro.com und store.steampowered.com. Gesendet werden nur Spielname und System, nie Pfade, Konten oder Gerätedaten.</string>
+
+    <!-- Identificar juego / sin nombre -->
+    <string name="identify_action">Namen bearbeiten / Spiel erkennen</string>
+    <string name="identify_title">Spiel erkennen</string>
+    <string name="identify_raw">Erkannt als: %1$s</string>
+    <string name="identify_field">Spielname</string>
+    <string name="identify_use_name">Diesen Namen verwenden</string>
+    <string name="identify_reset">Auf automatisch zurücksetzen</string>
+    <string name="identify_searching">Suche…</string>
+    <string name="identify_results">Treffer</string>
+    <string name="identify_no_results">Keine Treffer. Du kannst den Namen trotzdem so verwenden, wie du ihn eingegeben hast.</string>
+    <string name="identify_saved">Name gespeichert. Metadaten werden aktualisiert…</string>
+    <string name="needs_name_badge">Ohne Namen</string>
+    <string name="filter_unnamed">Ohne Namen</string>
+
+    <!-- Imágenes elegidas a mano -->
+    <string name="art_reset">Auf automatisch zurücksetzen</string>
+    <string name="art_reset_done">Wieder das automatische Bild</string>
+    <string name="art_failed_network">Keine Verbindung. Das vorherige Bild bleibt.</string>
+    <string name="art_failed_image">Dieses Bild konnte nicht geladen werden, versuche ein anderes.</string>
+
+    <!-- Masha: nombres, añadir juegos y emuladores -->
+    <string name="masha_write_done">Erledigt: %1$s</string>
+    <string name="masha_write_failed">Ging nicht: %1$s</string>
+    <string name="masha_write_cancelled">Abgebrochen. Ich habe nichts geändert.</string>
+    <string name="masha_off_nothing_to_add">Nichts Neues zum Hinzufügen: Alles Installierte ist schon in deiner Bibliothek.</string>
+    <string name="masha_off_add_confirm">Diese installierten Spiele sind noch nicht in deiner Bibliothek. Soll ich sie hinzufügen?</string>
+    <string name="masha_off_rename_which">Welches Spiel? Öffne zuerst seine Details oder wähle es aus.</string>
+    <string name="masha_off_renamed">Erledigt: „%1$s“ heißt jetzt „%2$s“.</string>
+    <string name="masha_off_rename_bad">„%1$s“ sieht nicht nach einem Spielnamen aus.</string>
+    <string name="masha_confirm_rename">„%1$s“ in „%2$s“ umbenennen</string>
+    <string name="masha_confirm_emulator">%1$s für %2$s-Spiele verwenden</string>
+    <string name="masha_confirm_more">und %1$d weitere</string>
+    <string name="masha_confirm_skipped">%1$d weitere passen nicht in diesen Durchgang (max. 50)</string>
+    <string name="masha_confirm_ok">Bestätigen</string>
+    <string name="masha_confirm_state_done">Erledigt</string>
+    <string name="masha_confirm_state_cancelled">Abgebrochen</string>
+    <string name="masha_confirm_state_expired">Abgelaufen</string>
+    <plurals name="masha_confirm_add">
+        <item quantity="one">%d Spiel zur Bibliothek hinzufügen</item>
+        <item quantity="other">%d Spiele zur Bibliothek hinzufügen</item>
     </plurals>
 </resources>

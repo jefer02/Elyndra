@@ -128,6 +128,8 @@ class MashaBrain @Inject constructor(
         Service.Igdb -> "IGDB"
         Service.SteamGridDb -> "SteamGridDB"
         Service.RetroAchievements -> "RetroAchievements"
+        Service.Libretro -> "libretro"
+        Service.Steam -> "Steam"
     }
 
     private companion object {

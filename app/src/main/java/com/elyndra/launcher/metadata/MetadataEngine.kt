@@ -71,6 +71,9 @@ class MetadataEngine(
     val igdb = IgdbClient({ credentials.igdb() }, credentials)
     val steamGridDb = SteamGridDbClient { credentials.sgdbKey() }
     val retroAchievements = RetroAchievementsClient({ credentials.ra() }, context.cacheDir)
+    /** Sin clave: arte de consolas (libretro) y ficha de la tienda de Steam. */
+    val libretro = LibretroClient(context.cacheDir)
+    val steam = SteamStoreClient(context.cacheDir)
 
     data class Progress(
         val running: Boolean = false,
@@ -89,6 +92,8 @@ class MetadataEngine(
 
     private var job: Job? = null
     private val pending = LinkedHashSet<String>()
+    /** Juegos a los que solo les falta la descripción en el idioma de ahora. */
+    private val pendingDescriptions = LinkedHashSet<String>()
 
     val isRunning: Boolean get() = job?.isActive == true
 
@@ -102,14 +107,16 @@ class MetadataEngine(
      * el proceso) y, desde segundo plano, Android no dejaría arrancarlo.
      */
     @Synchronized
-    fun start(keys: List<String>?, force: Boolean, foreground: Boolean = true): Boolean {
+    fun start(keys: List<String>?, force: Boolean, foreground: Boolean = true, descriptionsOnly: Boolean = false): Boolean {
         if (!credentials.anyConfigured()) return false
         if (job?.isActive == true) {
-            if (keys != null) pending += keys
+            if (keys != null) {
+                if (descriptionsOnly) pendingDescriptions += keys else pending += keys
+            }
             return true
         }
         _progress.value = Progress(running = true)
-        job = scope.launch(Dispatchers.IO) { runPass(keys, force) }
+        job = scope.launch(Dispatchers.IO) { runPass(keys, force, descriptionsOnly) }
         if (foreground) ScrapeService.start(context)
         return true
     }
@@ -122,7 +129,10 @@ class MetadataEngine(
     }
 
     fun cancel() {
-        synchronized(this) { pending.clear() }
+        synchronized(this) {
+            pending.clear()
+            pendingDescriptions.clear()
+        }
         job?.cancel()
     }
 
@@ -133,9 +143,10 @@ class MetadataEngine(
         return meta.scrapedAt == 0L || !meta.matched || (if (isApp) meta.icon == null else meta.cover == null)
     }
 
-    private suspend fun runPass(keys: List<String>?, force: Boolean) {
+    private suspend fun runPass(keys: List<String>?, force: Boolean, descriptionsOnlyAtStart: Boolean = false) {
         repo.awaitLoaded()
         var batch: List<String>? = keys
+        var descriptionsOnly = descriptionsOnlyAtStart
         var total = 0
         var done = 0
         val failures = LinkedHashMap<Service, FailureKind>()
@@ -144,14 +155,14 @@ class MetadataEngine(
                 val lib = repo.current
                 val targets = (batch ?: (lib.roms.map { it.key } + lib.apps.map { it.key }))
                     .distinct()
-                    .filter { force || needsWork(it) }
+                    .filter { force || (if (descriptionsOnly) needsDescription(it) else needsWork(it)) }
                 total += targets.size
                 _progress.update { it.copy(running = true, total = total) }
                 for (key in targets) {
                     coroutineContext.ensureActive()
                     _progress.update { it.copy(current = titleOf(key), done = done) }
                     val matched = try {
-                        scrapeKey(key, force, failures)
+                        scrapeKey(key, force, failures, descriptionsOnly)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
@@ -167,9 +178,17 @@ class MetadataEngine(
                         )
                     }
                 }
-                val next = synchronized(this) { pending.toList().also { pending.clear() } }
+                // Lo encolado completo va antes que lo que solo busca descripción.
+                val (next, onlyText) = synchronized(this) {
+                    if (pending.isNotEmpty()) {
+                        pending.toList().also { pending.clear() } to false
+                    } else {
+                        pendingDescriptions.toList().also { pendingDescriptions.clear() } to true
+                    }
+                }
                 if (next.isEmpty()) break
                 batch = next
+                descriptionsOnly = onlyText
             }
             _progress.update { it.copy(running = false, current = "", finishedAt = System.currentTimeMillis(), failures = failures.toMap()) }
         } catch (e: CancellationException) {
@@ -182,6 +201,49 @@ class MetadataEngine(
 
     private fun titleOf(key: String): String =
         repo.romByKey(key)?.displayTitle ?: repo.appByKey(key)?.displayTitle ?: ""
+
+    /**
+     * ¿Hay que volver a pedir la descripción de este juego? Sí cuando la app
+     * está en un idioma para el que no se preguntó todavía, no hay ya una en
+     * ese idioma y alguna fuente configurada puede darla en él. Con datos de
+     * antes de etiquetar idiomas (descripción sin idioma) también, una vez.
+     */
+    fun needsDescription(key: String): Boolean {
+        val lang = AppLocale.current(context)
+        val meta = repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta ?: return false
+        if (meta.scrapedAt == 0L) return false
+        if (meta.descriptionCheckedLang == lang || lang in meta.descriptions) return false
+        return canDescribe(key, lang, meta)
+    }
+
+    /** ¿Alguna fuente configurada puede dar la descripción de [key] en [lang]? */
+    private fun canDescribe(key: String, lang: String, meta: GameMeta): Boolean {
+        val igdbEnglish = lang == DescriptionLangs.FALLBACK && DescriptionLangs.FALLBACK !in meta.descriptions &&
+            credentials.isConfigured(Service.Igdb)
+        // Steam solo si ya se sabe que el juego está en la tienda: no se busca a ciegas cada vez.
+        val steam = credentials.isConfigured(Service.Steam) && meta.steamAppId != null
+        return when {
+            key.startsWith("r:") -> {
+                val system = repo.romByKey(key)?.let { Systems.byId(it.systemId) }
+                (credentials.isConfigured(Service.ScreenScraper) && system?.ssId != null) || igdbEnglish || steam
+            }
+            // IGDB solo sabe inglés: para otro idioma no hay a quién preguntar.
+            key.startsWith("a:") -> igdbEnglish || steam
+            else -> false
+        }
+    }
+
+    /**
+     * Tras cambiar el idioma de la app (o al actualizar desde una versión sin
+     * idiomas): pide en segundo plano la descripción en el idioma nuevo de los
+     * juegos que la puedan tener. No toca imágenes ni nombres.
+     */
+    fun refreshDescriptions(): Boolean {
+        val lib = repo.current
+        val keys = (lib.roms.map { it.key } + lib.apps.map { it.key }).filter { needsDescription(it) }
+        if (keys.isEmpty()) return false
+        return start(keys, force = false, foreground = false, descriptionsOnly = true)
+    }
 
     /** Actualiza solo este juego (ficha de detalles → "Actualizar metadatos"). */
     fun refresh(key: String) = start(listOf(key), force = true)
@@ -214,7 +276,12 @@ class MetadataEngine(
 
     private fun languagesFor(lang: String): List<String> = if (lang == "ja") listOf("ja", "jp", "en") else listOf(lang, "en")
 
-    private suspend fun scrapeKey(key: String, force: Boolean, failures: MutableMap<Service, FailureKind>): Boolean {
+    private suspend fun scrapeKey(
+        key: String,
+        force: Boolean,
+        failures: MutableMap<Service, FailureKind>,
+        descriptionsOnly: Boolean = false,
+    ): Boolean {
         val lang = AppLocale.current(context)
         val priority = priorityStore.get()
         return when {
@@ -222,19 +289,21 @@ class MetadataEngine(
                 val rom = repo.romByKey(key) ?: return false
                 val folder = repo.folder(rom.folderId) ?: return false
                 val system = Systems.byId(rom.systemId) ?: return false
-                save(key, scrapeRom(rom, folder, system, lang, priority, failures), priority)
+                val results = scrapeRom(rom, folder, system, lang, priority, failures, descriptionsOnly)
+                if (descriptionsOnly) saveDescriptions(key, results, priority, lang) else save(key, results, priority, lang)
             }
             key.startsWith("a:") -> {
                 val app = repo.appByKey(key) ?: return false
-                save(key, scrapeApp(app, priority, failures), priority)
+                val results = scrapeApp(app, priority, failures, descriptionsOnly)
+                if (descriptionsOnly) saveDescriptions(key, results, priority, lang) else save(key, results, priority, lang)
             }
             else -> false
         }
     }
 
     /** El mejor nombre conocido: el que dio quien identificó el juego o, si nadie, el del archivo. */
-    private fun bestName(results: Map<Service, SourceData>, fallback: String): String =
-        results[Service.ScreenScraper]?.text?.get(MetaField.Name)
+    private fun bestName(results: Map<Service, SourceData>, fallback: String, locked: String? = null): String =
+        locked ?: results[Service.ScreenScraper]?.text?.get(MetaField.Name)
             ?: results.values.firstNotNullOfOrNull { it.text[MetaField.Name] }
             ?: fallback
 
@@ -245,11 +314,15 @@ class MetadataEngine(
         lang: String,
         priority: MetadataPriority,
         failures: MutableMap<Service, FailureKind>,
+        descriptionsOnly: Boolean = false,
     ): Map<Service, SourceData> {
         val results = LinkedHashMap<Service, SourceData>()
-        val searchName = rom.title
+        // El nombre fijado a mano es la búsqueda; si no, el del archivo.
+        val locked = rom.meta.lockedName
+        val searchName = locked ?: rom.title
         val wantSs = usable(Service.ScreenScraper, failures) && system.ssId != null
-        val wantRa = usable(Service.RetroAchievements, failures) && system.raId != null
+        // Solo descripción: RetroAchievements no la tiene.
+        val wantRa = !descriptionsOnly && usable(Service.RetroAchievements, failures) && system.raId != null
         val hashes = ensureHashes(rom, folder, system, wantSs, wantRa)
 
         // ScreenScraper identifica por hash: va primero siempre, sea cual sea la prioridad.
@@ -259,36 +332,54 @@ class MetadataEngine(
             when (service) {
                 Service.ScreenScraper -> Unit
                 Service.Igdb -> if (usable(Service.Igdb, failures) && MetadataMerge.wanted(Service.Igdb, results, priority).isNotEmpty()) {
-                    igdbInto(results, bestName(results, searchName), system.igdbIds.ifEmpty { null }, failures)
+                    igdbInto(results, bestName(results, searchName, locked), system.igdbIds.ifEmpty { null }, failures)
                 }
-                Service.SteamGridDb -> if (usable(Service.SteamGridDb, failures) && MetadataMerge.wanted(Service.SteamGridDb, results, priority).isNotEmpty()) {
-                    sgdbInto(results, bestName(results, searchName), SteamGridDbClient.PORTRAIT, failures)
+                Service.SteamGridDb -> if (!descriptionsOnly && usable(Service.SteamGridDb, failures) && MetadataMerge.wanted(Service.SteamGridDb, results, priority).isNotEmpty()) {
+                    sgdbInto(results, bestName(results, searchName, locked), SteamGridDbClient.PORTRAIT, failures)
                 }
                 // Siempre que se pueda: aunque no aporte ningún campo, trae los logros.
-                Service.RetroAchievements -> if (wantRa) raInto(results, hashes, bestName(results, searchName), system, failures)
+                Service.RetroAchievements -> if (wantRa) raInto(results, hashes, bestName(results, searchName, locked), system, failures)
+                Service.Libretro -> if (!descriptionsOnly && usable(Service.Libretro, failures) && MetadataMerge.wanted(Service.Libretro, results, priority).isNotEmpty()) {
+                    libretroInto(results, rom, system, bestName(results, searchName, locked), lang)
+                }
+                // La tienda de Steam cubre los juegos de PC.
+                Service.Steam -> if (system.id == PC_SYSTEM && usable(Service.Steam, failures) && wantsSteam(results, priority, lang)) {
+                    steamInto(results, bestName(results, searchName, locked), lang, rom.meta.steamAppId)
+                }
             }
         }
         return results
     }
 
+    /** Steam se pregunta si puede ganar algún campo o falta la descripción en el idioma de la app. */
+    private fun wantsSteam(results: Map<Service, SourceData>, priority: MetadataPriority, lang: String): Boolean =
+        MetadataMerge.wanted(Service.Steam, results, priority).isNotEmpty() ||
+            results.values.none { lang in it.descriptions }
+
     private suspend fun scrapeApp(
         app: AppEntry,
         priority: MetadataPriority,
         failures: MutableMap<Service, FailureKind>,
+        descriptionsOnly: Boolean = false,
     ): Map<Service, SourceData> {
         val results = LinkedHashMap<Service, SourceData>()
-        val name = app.label
+        val locked = app.meta.lockedName
+        val name = locked ?: app.label
         for (service in priority.queryOrder()) {
             when (service) {
                 Service.Igdb -> if (usable(Service.Igdb, failures)) {
                     igdbInto(results, name, listOf(ANDROID_IGDB), failures)
                     if (results[Service.Igdb]?.igdbId == null) igdbInto(results, name, null, failures, minSimilarity = 0.9)
                 }
-                Service.SteamGridDb -> if (usable(Service.SteamGridDb, failures) && MetadataMerge.wanted(Service.SteamGridDb, results, priority).isNotEmpty()) {
-                    sgdbInto(results, bestName(results, name), SteamGridDbClient.SQUARE + SteamGridDbClient.PORTRAIT, failures)
+                Service.SteamGridDb -> if (!descriptionsOnly && usable(Service.SteamGridDb, failures) && MetadataMerge.wanted(Service.SteamGridDb, results, priority).isNotEmpty()) {
+                    sgdbInto(results, bestName(results, name, locked), SteamGridDbClient.SQUARE + SteamGridDbClient.PORTRAIT, failures)
                 }
-                // ScreenScraper y RetroAchievements no catalogan juegos Android.
-                Service.ScreenScraper, Service.RetroAchievements -> Unit
+                // Muchos juegos Android también están en Steam (solo con coincidencia alta).
+                Service.Steam -> if (usable(Service.Steam, failures) && wantsSteam(results, priority, AppLocale.current(context))) {
+                    steamInto(results, bestName(results, name, locked), AppLocale.current(context), app.meta.steamAppId)
+                }
+                // ScreenScraper, RetroAchievements y libretro no catalogan juegos Android.
+                Service.ScreenScraper, Service.RetroAchievements, Service.Libretro -> Unit
             }
         }
         return results
@@ -319,10 +410,13 @@ class MetadataEngine(
                 crc = hashes?.crc,
                 md5 = hashes?.md5,
                 sha1 = hashes?.sha1,
+                serial = rom.serial,
             )
             if (game != null) {
-                // jeuInfos casa por hash si se le dio; si no, por nombre de archivo y tamaño.
-                if (hashes?.md5 != null || hashes?.crc != null) data.matched(MatchMethod.HASH, 1.0) else data.matched(MatchMethod.NAME, 0.9)
+                // jeuInfos casa por hash o número de serie si se le dio; si no,
+                // por nombre de archivo y tamaño.
+                if (hashes?.md5 != null || hashes?.crc != null || rom.serial != null) data.matched(MatchMethod.HASH, 1.0)
+                else data.matched(MatchMethod.NAME, 0.9)
             } else if (searchName.length >= 4) {
                 val found = screenScraper.search(system.ssId, searchName)
                     .map { g -> g to Names.similarity(searchName, g.name(regions).orEmpty()) }
@@ -336,7 +430,9 @@ class MetadataEngine(
             if (game == null) return
             data.ssId = game.id
             data.setText(MetaField.Name, game.name(regions))
-            data.setText(MetaField.Description, game.description(languages))
+            // Cada sinopsis con su idioma real: ya no se rellena con la inglesa
+            // haciéndola pasar por la del idioma de la app.
+            game.descriptions().forEach { (l, t) -> data.addDescription(l, t) }
             data.setText(MetaField.ReleaseDate, game.releaseDate(regions))
             data.setText(MetaField.Developer, game.developer)
             data.setText(MetaField.Publisher, game.publisher)
@@ -372,7 +468,8 @@ class MetadataEngine(
             data.matched(MetadataMerge.nameMethod(similarity), similarity)
             data.igdbId = best.id
             data.setText(MetaField.Name, best.name)
-            data.setText(MetaField.Description, best.summary)
+            // IGDB solo tiene la sinopsis en inglés.
+            data.addDescription(DescriptionLangs.FALLBACK, best.summary)
             data.setText(
                 MetaField.ReleaseDate,
                 best.firstRelease?.let { Instant.ofEpochSecond(it).atZone(ZoneOffset.UTC).toLocalDate().toString() },
@@ -459,6 +556,48 @@ class MetadataEngine(
         }
     }
 
+    /** libretro: carátula, captura y pantalla de título por nombre No-Intro (ver [LibretroNames]). */
+    private suspend fun libretroInto(results: MutableMap<Service, SourceData>, rom: RomEntry, system: GameSystem, name: String, lang: String) {
+        try {
+            val art = rom.meta.libretroName?.let { picked -> LibretroNames.folderFor(system.id)?.let { libretro.art(it, picked) } }
+                ?: libretro.find(system.id, rom.fileName, name, lang) ?: return
+            val data = SourceData(Service.Libretro)
+            val exact = art.name.equals(LibretroNames.exactCandidate(rom.fileName), ignoreCase = true)
+            data.matched(if (exact) MatchMethod.NAME else MatchMethod.FUZZY, if (exact) 0.95 else LibretroNames.FUZZY_THRESHOLD)
+            data.setArt(MetaField.Cover, art.boxart)
+            data.setArt(MetaField.Screenshot, art.snap)
+            data.setArt(MetaField.Hero, art.title)
+            results[Service.Libretro] = data
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Sin clave no hay credenciales que invalidar: un fallo es "no hay".
+        }
+    }
+
+    /** Steam: ficha en el idioma de la app (y en inglés) e imágenes de su CDN, solo con coincidencia alta. */
+    private suspend fun steamInto(results: MutableMap<Service, SourceData>, name: String, lang: String, knownId: Long?) {
+        try {
+            val game = steam.find(name, lang, knownId) ?: return
+            val data = SourceData(Service.Steam)
+            data.matched(MetadataMerge.nameMethod(game.similarity), game.similarity)
+            data.steamAppId = game.details.id
+            data.setText(MetaField.Name, game.details.name)
+            game.descriptions.forEach { (l, t) -> data.addDescription(l, t) }
+            data.setText(MetaField.Developer, game.details.developers.firstOrNull())
+            data.setText(MetaField.Publisher, game.details.publishers.firstOrNull())
+            data.setText(MetaField.Genre, game.details.genres.take(3).joinToString(", "))
+            data.setArt(MetaField.Cover, SteamParser.cover(game.details.id))
+            data.setArt(MetaField.Hero, SteamParser.hero(game.details.id))
+            data.setArt(MetaField.Logo, SteamParser.logo(game.details.id))
+            results[Service.Steam] = data
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Igual que libretro: fallar es no tener datos.
+        }
+    }
+
     private fun raInfo(p: RaGameProgress, matchedBy: String) = RaInfo(
         gameId = p.id,
         title = p.title,
@@ -472,7 +611,14 @@ class MetadataEngine(
     )
 
     /** Mezcla lo reunido y lo guarda. Devuelve true si algún servicio reconoció el juego. */
-    private suspend fun save(key: String, results: Map<Service, SourceData>, priority: MetadataPriority): Boolean {
+    /** Solo las descripciones (pasada tras cambiar de idioma): nada de imágenes ni nombres. */
+    private suspend fun saveDescriptions(key: String, results: Map<Service, SourceData>, priority: MetadataPriority, lang: String): Boolean {
+        val merged = MetadataMerge.merge(results, priority)
+        repo.updateMeta(key) { old -> GameDescriptionUpdate.apply(old, merged.descriptions, lang) }
+        return merged.matched
+    }
+
+    private suspend fun save(key: String, results: Map<Service, SourceData>, priority: MetadataPriority, lang: String): Boolean {
         val merged = MetadataMerge.merge(results, priority)
         // Lo elegido a mano en "Personalizar…" no se vuelve a descargar (la descarga borraría el archivo).
         val pinned = (repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta)?.pinned.orEmpty()
@@ -481,6 +627,9 @@ class MetadataEngine(
 
         suspend fun fetch(field: MetaField, allowed: Boolean): String? {
             if (!allowed) return null
+            // Se vuelve a mirar justo antes de bajar: el usuario puede haber elegido una mientras tanto.
+            val kindNow = field.artKind
+            if (kindNow != null && kindNow in (repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta)?.pinned.orEmpty()) return null
             val (service, url) = merged.art[field] ?: return null
             val kind = field.artKind ?: return null
             return media.download(url, key, kind)?.also { origins[kind] = ArtOrigin(service.id, url) }
@@ -493,37 +642,9 @@ class MetadataEngine(
         val hero = fetch(MetaField.Hero, "hero" !in pinned)
         val logo = fetch(MetaField.Logo, "logo" !in pinned)
         val shot = fetch(MetaField.Screenshot, true)
+        val art = ScrapeApply.Art(cover, hero, logo, shot, icon, origins)
+        repo.updateMeta(key) { old -> ScrapeApply.apply(old, merged, lang, art, System.currentTimeMillis()) }
         val matched = merged.matched
-        val text = merged.text
-        repo.updateMeta(key) { old ->
-            GameMeta(
-                scrapedAt = System.currentTimeMillis(),
-                matched = matched || old.matched,
-                sources = if (matched) merged.sources.map { it.id } else old.sources,
-                name = text[MetaField.Name] ?: old.name,
-                description = text[MetaField.Description] ?: old.description,
-                releaseDate = text[MetaField.ReleaseDate] ?: old.releaseDate,
-                developer = text[MetaField.Developer] ?: old.developer,
-                publisher = text[MetaField.Publisher] ?: old.publisher,
-                genre = text[MetaField.Genre] ?: old.genre,
-                players = text[MetaField.Players] ?: old.players,
-                rating = merged.rating ?: old.rating,
-                cover = cover ?: old.cover,
-                hero = hero ?: old.hero,
-                logo = logo ?: old.logo,
-                screenshot = shot ?: old.screenshot,
-                icon = icon ?: old.icon,
-                pinned = old.pinned,
-                ssGameId = merged.ssId ?: old.ssGameId,
-                igdbId = merged.igdbId ?: old.igdbId,
-                sgdbId = merged.sgdbId ?: old.sgdbId,
-                ra = merged.ra ?: old.ra,
-                artOrigins = old.artOrigins + origins,
-                // Una identificación a mano no la corrige una pasada automática.
-                matchedBy = if (old.matchedBy == MatchMethod.MANUAL) old.matchedBy else merged.matchedBy ?: old.matchedBy,
-                matchConfidence = if (old.matchedBy == MatchMethod.MANUAL) old.matchConfidence else merged.confidence ?: old.matchConfidence,
-            )
-        }
         return matched
     }
 
@@ -634,3 +755,6 @@ class MetadataEngine(
         const val ANDROID_IGDB = 34
     }
 }
+
+/** El sistema de los juegos de PC (los que cubre la tienda de Steam). */
+private const val PC_SYSTEM = "pc"

@@ -35,7 +35,14 @@ class RomScanner(private val resolver: ContentResolver) {
          */
         val mainDocId: String? = null,
         val mainFile: String? = null,
+        /** Título real leído del propio juego (PARAM.SFO de PS4); null = se saca del nombre. */
+        val title: String? = null,
+        /** Id estable del juego (TITLE_ID de PS4, "CUSA00900"). */
+        val serial: String? = null,
     )
+
+    /** Análisis de una carpeta de PS4: los juegos y los paquetes aún sin extraer. */
+    data class Ps4Scan(val found: List<Found>, val notInstalled: List<Ps4.PkgFile>)
 
     data class Progress(val scanned: Int, val found: Int, val current: String)
 
@@ -96,6 +103,8 @@ class RomScanner(private val resolver: ContentResolver) {
     ): List<Found> = withContext(Dispatchers.IO) {
         // El PC no se analiza por extensión: una carpeta por juego (ver abajo).
         if (system.folderGames) return@withContext scanFolderGames(treeUri, rootDocId, system, onProgress)
+        // PS4: juegos extraídos por Bachata, reconocidos por su contenido.
+        if (system.id == Ps4.SYSTEM_ID) return@withContext scanPs4(treeUri, rootDocId, onProgress).found
 
         val results = ArrayList<Found>()
         val queue = ArrayDeque<Triple<String, String, Int>>()
@@ -256,6 +265,133 @@ class RomScanner(private val resolver: ContentResolver) {
     }
 
     /**
+     * Análisis de una carpeta de PS4 (ver [Ps4]).
+     *
+     * Una carpeta con `sce_sys/` y `eboot.bin` es un juego: se lee su
+     * PARAM.SFO y no se baja más (los archivos de dentro no son juegos). Las
+     * carpetas ocultas y las temporales de Bachata no se miran. De cada .pkg se
+     * leen solo los primeros [PkgHeader.HEADER_BYTES] bytes. Al final
+     * [Ps4.resolve] junta bases, actualizaciones y paquetes.
+     */
+    suspend fun scanPs4(
+        treeUri: Uri,
+        rootDocId: String,
+        onProgress: (Progress) -> Unit = {},
+    ): Ps4Scan = withContext(Dispatchers.IO) {
+        val dirs = ArrayList<Ps4.GameDir>()
+        val pkgs = ArrayList<Ps4.PkgFile>()
+        val queue = ArrayDeque<Triple<String, String, Int>>()
+        var scanned = 0
+        // La carpeta elegida puede ser el propio juego (CUSA01715/ con sce_sys dentro).
+        val rootGame = ps4GameDir(treeUri, rootDocId, SafPaths.lastSegment(rootDocId), "", 0L)
+        if (rootGame != null) dirs += rootGame else queue += Triple(rootDocId, "", 0)
+        while (queue.isNotEmpty() && dirs.size < MAX_RESULTS) {
+            coroutineContext.ensureActive()
+            val (dirId, rel, depth) = queue.removeFirst()
+            val kids = runCatching { children(treeUri, dirId) }.getOrDefault(emptyList())
+            scanned += kids.size
+            for (f in kids) {
+                if (f.isDir || f.name.startsWith(".") || f.extension != "pkg") continue
+                val head = readHead(treeUri, f.docId, PkgHeader.HEADER_BYTES)
+                pkgs += Ps4.PkgFile(f.docId, f.name, f.size, f.modified, head?.let(PkgHeader::parse))
+            }
+            for (d in kids) {
+                if (!d.isDir || Ps4.isIgnoredDir(d.name) || d.name.lowercase() in SKIP_DIRS) continue
+                val game = ps4GameDir(treeUri, d.docId, d.name, rel + d.name, d.modified)
+                if (game != null) {
+                    dirs += game
+                    onProgress(Progress(scanned, dirs.size, d.name))
+                    continue
+                }
+                if (depth < MAX_DEPTH) queue += Triple(d.docId, "$rel${d.name}/", depth + 1)
+            }
+            onProgress(Progress(scanned, dirs.size, rel.ifEmpty { "/" }))
+        }
+        val resolved = Ps4.resolve(dirs, pkgs)
+        // Diagnóstico: adb logcat -s Ps4Scan
+        android.util.Log.i(
+            "Ps4Scan",
+            "juegos con PARAM.SFO=${dirs.size} " +
+                dirs.joinToString { "${it.relPath}[${it.params.titleId}/${it.params.category}/eboot=${it.hasEboot}]" } +
+                " · pkg=${pkgs.size} · en biblioteca=${resolved.games.size} · sin instalar=${resolved.notInstalled.size}",
+        )
+        val found = resolved.games.map { g ->
+            Found(
+                docId = g.base.docId,
+                name = g.base.name,
+                relPath = g.base.relPath,
+                size = 0L,
+                modified = g.modified,
+                isDir = true,
+                title = g.title,
+                serial = g.titleId,
+            )
+        }
+        Ps4Scan(found.sortedBy { it.relPath.lowercase() }, resolved.notInstalled)
+    }
+
+    /**
+     * La carpeta [docId] como juego de PS4, si tiene `sce_sys/param.sfo` legible
+     * (y se anota si trae `eboot.bin`). Null si no lo es.
+     */
+    private fun ps4GameDir(treeUri: Uri, docId: String, name: String, relPath: String, modified: Long): Ps4.GameDir? {
+        val inside = runCatching { children(treeUri, docId) }.getOrDefault(emptyList())
+        val sceSys = inside.firstOrNull { it.isDir && it.name.equals("sce_sys", ignoreCase = true) } ?: return null
+        val sfo = runCatching { children(treeUri, sceSys.docId) }.getOrDefault(emptyList())
+            .firstOrNull { !it.isDir && it.name.equals("param.sfo", ignoreCase = true) }
+        if (sfo == null) {
+            android.util.Log.w("Ps4Scan", "$name: sce_sys sin param.sfo")
+            return null
+        }
+        val params = readHead(treeUri, sfo.docId, Sfo.MAX_BYTES)?.let(Sfo::parse)
+        if (params == null) {
+            android.util.Log.w("Ps4Scan", "$name: param.sfo ilegible")
+            return null
+        }
+        val eboot = inside.any { !it.isDir && it.name.equals("eboot.bin", ignoreCase = true) }
+        return Ps4.GameDir(docId, name, relPath.ifEmpty { name }, modified, eboot, params)
+    }
+
+    /**
+     * ¿Hay juegos de PS4 aquí? La carpeta es un juego o alguna de sus
+     * subcarpetas lo es (`play 4/CUSA01715`). Sirve para reconocer la carpeta de
+     * PS4 aunque su nombre no diga nada. Barato: solo lista carpetas.
+     */
+    suspend fun looksLikePs4(treeUri: Uri, docId: String, includeSelf: Boolean = true): Boolean = withContext(Dispatchers.IO) {
+        fun isGame(id: String): Boolean {
+            val kids = runCatching { children(treeUri, id) }.getOrDefault(emptyList())
+            return Ps4.looksLikeGameDir(kids.map { it.name to it.isDir })
+        }
+        if (isGame(docId)) return@withContext includeSelf
+        runCatching { children(treeUri, docId) }.getOrDefault(emptyList())
+            .filter { it.isDir && !Ps4.isIgnoredDir(it.name) }
+            .take(MAX_PS4_PROBE)
+            .any { isGame(it.docId) }
+    }
+
+    /** Los primeros [bytes] de un archivo (cabecera de un .pkg, un PARAM.SFO entero). */
+    fun readHead(treeUri: Uri, docId: String, bytes: Int): ByteArray? = runCatching {
+        val uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+        resolver.openInputStream(uri)?.use { input ->
+            val buffer = ByteArray(bytes)
+            var total = 0
+            while (total < bytes) {
+                val n = input.read(buffer, total, bytes - total)
+                if (n <= 0) break
+                total += n
+            }
+            if (total == bytes) buffer else buffer.copyOf(total)
+        }
+    }.getOrNull()
+
+    /** Documento de `sce_sys/<nombre>` dentro de la carpeta de un juego de PS4, si está. */
+    fun ps4SystemFile(treeUri: Uri, gameDocId: String, name: String): String? = runCatching {
+        val sceSys = children(treeUri, gameDocId).firstOrNull { it.isDir && it.name.equals("sce_sys", ignoreCase = true) }
+            ?: return@runCatching null
+        children(treeUri, sceSys.docId).firstOrNull { !it.isDir && it.name.equals(name, ignoreCase = true) }?.docId
+    }.getOrNull()
+
+    /**
      * Carpetas que son un juego entero: PS3 en formato JB (con `PS3_GAME` dentro)
      * y Wii U desempaquetado (con `code`, `content` y `meta`).
      */
@@ -278,6 +414,9 @@ class RomScanner(private val resolver: ContentResolver) {
             Document.COLUMN_LAST_MODIFIED,
         )
         private const val MAX_DEPTH = 8
+
+        /** Subcarpetas que se miran como mucho para reconocer una carpeta de PS4 por contenido. */
+        private const val MAX_PS4_PROBE = 24
         private const val MAX_RESULTS = 50_000
 
         /** Candidatos a ejecutable que se miran por juego de PC antes de elegir. */

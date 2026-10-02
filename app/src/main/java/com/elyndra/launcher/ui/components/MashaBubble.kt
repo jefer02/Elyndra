@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.elyndra.launcher.ui.theme.shapeClickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
@@ -78,8 +79,7 @@ fun MashaInsightBubble(
             .animPopIn(420, key = key)
             .glass(shape, borderColor = skin.a1.copy(alpha = 0.35f))
             .drawBehind { drawRect(skin.a1, size = Size(2.dp.toPx(), size.height)) }
-            .clip(shape)
-            .clickable(onClick = onTap)
+            .shapeClickable(shape, onClick = onTap)
             .padding(start = 13.dp, end = 11.dp, top = 10.dp, bottom = 9.dp),
     ) {
         ElyText(text, size = 11.5f, color = P.ink, lineHeightRatio = 1.45f, maxLines = 4)
@@ -102,7 +102,7 @@ fun MashaInsightBubble(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .background(P.ink.copy(alpha = 0.06f))
-                    .clickable(onClick = onDismiss)
+                    .shapeClickable(RoundedCornerShape(8.dp), onClick = onDismiss)
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }

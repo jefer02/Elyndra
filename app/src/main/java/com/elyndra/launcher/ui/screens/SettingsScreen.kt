@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.core.device.StatusMode
 import android.Manifest
 import android.app.Activity
 import android.content.Context
@@ -146,6 +147,8 @@ private fun AppearanceColumn(vm: ElyndraViewModel) {
             }
         }
 
+        IntroSection(vm)
+
         // Pantalla: 120 o 60 fps. En una pantalla de 60 Hz la opción de 120
         // sale apagada y se explica por qué.
         SectionLabel(stringResource(R.string.section_display))
@@ -172,6 +175,35 @@ private fun AppearanceColumn(vm: ElyndraViewModel) {
                     onClick = { s.updateFrameRate(FrameRate.STANDARD) },
                 )
             }
+            // Píldora de hora y batería (Biblioteca y Carpeta).
+            Spacer(Modifier.height(14.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    ElyText(stringResource(R.string.status_title), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
+                    Spacer(Modifier.height(4.dp))
+                    ElyText(stringResource(R.string.status_desc), size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
+                }
+                Spacer(Modifier.width(12.dp))
+                GlowingSwitch(s.statusVisible, s::toggleStatus)
+            }
+            if (s.statusVisible) {
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    StatusMode.entries.forEach { mode ->
+                        Pill(
+                            stringResource(
+                                when (mode) {
+                                    StatusMode.Both -> R.string.status_mode_both
+                                    StatusMode.Time -> R.string.status_mode_time
+                                    StatusMode.Battery -> R.string.status_mode_battery
+                                },
+                            ),
+                            active = s.statusMode == mode,
+                            onClick = { s.updateStatusMode(mode) },
+                        )
+                    }
+                }
+            }
             // Masha va aparte: a 60 salvo que se pida alta fluidez (solo tiene sentido con la app a 120).
             if (s.frameRate == FrameRate.HIGH) {
                 Spacer(Modifier.height(14.dp))
@@ -186,6 +218,10 @@ private fun AppearanceColumn(vm: ElyndraViewModel) {
                 }
             }
         }
+
+        // Sonidos de la interfaz (ver SettingsSounds.kt).
+        SoundsSection(vm)
+        MusicSection(vm)
 
         SectionLabel(stringResource(R.string.section_background))
         SettingsGroup {
@@ -273,12 +309,12 @@ private fun AppearanceColumn(vm: ElyndraViewModel) {
                     .fillMaxWidth()
                     .height(70.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    // `linear-gradient(120deg, a1, verde 55%, a2)`
+                    // `linear-gradient(120deg, a1, secundario 55%, fin del relleno)`
                     .drawBehind {
                         drawRect(
                             cssLinearGradient(
                                 120f,
-                                listOf(skin.a1, P.green, skin.a2),
+                                listOf(skin.a1, skin.secondary, skin.fillEnd),
                                 size,
                                 stops = listOf(0f, 0.55f, 1f),
                             ),
@@ -419,8 +455,10 @@ private fun MetadataColumn(vm: ElyndraViewModel) {
 
     Column(Modifier.fillMaxWidth()) {
         SectionLabel(stringResource(R.string.section_metadata_apis))
+        KeylessPanel(vm)
         ApiPanels(vm)
         MetadataPriorityPanel(vm)
+        TranslationSection(vm)
 
         SettingsGroup(padding = 0.dp) {
             Row(
@@ -526,7 +564,7 @@ private fun SwatchGrid(items: List<@Composable () -> Unit>) {
 }
 
 @Composable
-private fun SliderRow(
+internal fun SliderRow(
     label: String,
     value: String,
     current: Int,

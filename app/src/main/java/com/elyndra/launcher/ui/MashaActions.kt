@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui
 
+import com.elyndra.launcher.masha.MashaWrites
 import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.library.Names
 import com.elyndra.launcher.masha.MashaAttachment
@@ -32,7 +33,14 @@ import kotlinx.serialization.json.putJsonArray
  * Los textos de `detail` son para el modelo, no para el usuario: él los cuenta
  * con sus palabras y en el idioma de la conversación.
  */
-class MashaActions(private val vm: ElyndraViewModel, private val brain: MashaBrain) : MashaToolbox {
+class MashaActions(
+    private val vm: ElyndraViewModel,
+    private val brain: MashaBrain,
+    writes: MashaWrites = MashaWrites(),
+) : MashaToolbox {
+
+    /** Nombres, juegos por añadir y emuladores (ver [MashaLibraryActions]). */
+    private val library = MashaLibraryActions(vm, writes)
 
     override val specs: List<ToolSpec> get() = MashaTools.specs
 
@@ -62,6 +70,14 @@ class MashaActions(private val vm: ElyndraViewModel, private val brain: MashaBra
             MashaTools.LIST_INSTALLED_APPS -> listInstalledApps()
             MashaTools.SET_ACCENT -> setAccent(a.str("accent"))
             MashaTools.SET_DARK_MODE -> setDarkMode(a.bool("enabled"))
+            MashaTools.LIST_UNNAMED_GAMES -> library.listUnnamed()
+            MashaTools.RENAME_GAME -> library.rename(a)
+            MashaTools.LIST_ADDABLE_GAMES -> library.listAddable()
+            MashaTools.ADD_GAMES -> library.addGames(a)
+            MashaTools.OPEN_ADD_ROMS -> library.openAddRoms(a)
+            MashaTools.LIST_EMULATORS -> library.listEmulators()
+            MashaTools.SET_PREFERRED_EMULATOR -> library.setPreferred(a)
+            MashaTools.UNDO_LAST_ACTION -> library.undo()
             else -> toolFail("unknown tool ${call.name}")
         }
     }

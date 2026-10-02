@@ -14,6 +14,10 @@ sealed interface OfflineIntent {
     data object UpdateMetadata : OfflineIntent
     data object Cleanup : OfflineIntent
     data object Arcs : OfflineIntent
+    /** "Añade los juegos que tengo instalados". */
+    data object AddInstalled : OfflineIntent
+    /** "Llama a este juego X" / "ponle de nombre X": el juego que se está mirando. */
+    data class Rename(val name: String) : OfflineIntent
     data object Unknown : OfflineIntent
 }
 
@@ -46,6 +50,12 @@ object OfflineIntents {
             }
         }
 
+        RENAME.matchEntire(raw)?.let { m ->
+            val name = m.groupValues.drop(1).firstOrNull { it.isNotBlank() }?.trim()?.trim('"', '«', '»', '“', '”', '.')
+            if (!name.isNullOrBlank()) return OfflineIntent.Rename(name)
+        }
+        if (isAddInstalled(t)) return OfflineIntent.AddInstalled
+
         // "Descarga las carátulas que faltan" es actualizar, aunque nombre una lista: manda el verbo.
         if (isMetadataUpdate(t)) return OfflineIntent.UpdateMetadata
 
@@ -67,6 +77,16 @@ object OfflineIntents {
             else -> OfflineIntent.Unknown
         }
     }
+
+    /** "llama a este juego X", "ponle de nombre X", "rename this game to X", "call this game X"… */
+    private val RENAME = Regex(
+        """^(?:ll[aá]malo|llama a este juego|ponle (?:de )?nombre|c[aá]mbiale el nombre a|renombra(?:lo)? (?:a|como)|rename (?:this game |it )?to|call (?:this game|it)|name (?:this game|it)|chame (?:este jogo |de )?|renomeie (?:para)?|appelle(?:-le)?(?: ce jeu)?|renomme(?:-le)? en|nenne (?:es|das spiel)|benenne (?:es )?um in)\s+(.+)$""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    private fun isAddInstalled(t: String): Boolean =
+        has(t, "anade", "agrega", "mete", "add", "adicion", "ajoute", "hinzufug") &&
+            has(t, "instalad", "installed", "installe", "descargad", "downloaded", "baixad", "telecharg", "heruntergeladen")
 
     private fun isMetadataUpdate(t: String): Boolean =
         has(t, "metadat", "caratula", "portada", "cover", "artwork", "scrap", "capa", "jaquette") &&

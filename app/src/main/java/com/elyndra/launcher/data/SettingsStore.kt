@@ -9,24 +9,25 @@ class SettingsStore(context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
+    /** Acento guardado; sin guardar (instalación nueva), el de partida (ver Palettes). */
     var accentId: String
-        get() = prefs.getString("accent", "lila") ?: "lila"
+        get() = Palettes.accentId(prefs.getString("accent", null), ACCENTS.map { it.id })
         set(v) = prefs.edit { putString("accent", v) }
 
     var tintId: String
-        get() = prefs.getString("tint", "papel") ?: "papel"
+        get() = Palettes.tintId(prefs.getString("tint", null), TINTS.map { it.id })
         set(v) = prefs.edit { putString("tint", v) }
 
     var blur: Int
-        get() = prefs.getInt("blur", 16)
+        get() = prefs.getInt("blur", Palettes.DEFAULT_BLUR)
         set(v) = prefs.edit { putInt("blur", v) }
 
     var alphaPct: Int
-        get() = prefs.getInt("alpha", 55)
+        get() = prefs.getInt("alpha", Palettes.DEFAULT_ALPHA)
         set(v) = prefs.edit { putInt("alpha", v) }
 
     var scrimPct: Int
-        get() = prefs.getInt("scrim", 62)
+        get() = prefs.getInt("scrim", Palettes.DEFAULT_SCRIM)
         set(v) = prefs.edit { putInt("scrim", v) }
 
     /** Descargar metadatos en cuanto se añade algo a la biblioteca. */
@@ -137,9 +138,45 @@ class SettingsStore(context: Context) {
     /* ── tema y fondo ─────────────────────────────────────────── */
 
     /** Modo oscuro de la interfaz (independiente del tema del sistema). */
+    /** Fuentes sin clave (libretro, Steam): encendidas de serie. */
+    fun keylessEnabled(id: String): Boolean = prefs.getBoolean("keyless.$id", true)
+
+    fun setKeylessEnabled(id: String, enabled: Boolean) = prefs.edit { putBoolean("keyless.$id", enabled) }
+
+    /** Traducir sola la descripción cuando no está en el idioma de la app (solo con modelos ya bajados). */
+    var autoTranslate: Boolean
+        get() = prefs.getBoolean("translate.auto", false)
+        set(v) = prefs.edit { putBoolean("translate.auto", v) }
+
+    /** Bajar los modelos de traducción solo por Wi-Fi. */
+    var translateWifiOnly: Boolean
+        get() = prefs.getBoolean("translate.wifiOnly", true)
+        set(v) = prefs.edit { putBoolean("translate.wifiOnly", v) }
+
+    /** Píldora de hora y batería en Biblioteca y Carpeta. */
+    var statusVisible: Boolean
+        get() = prefs.getBoolean("status.visible", true)
+        set(v) = prefs.edit { putBoolean("status.visible", v) }
+
+    /** Qué enseña la píldora: "both", "time" o "battery" (ver StatusMode). */
+    var statusMode: String?
+        get() = prefs.getString("status.mode", null)
+        set(v) = prefs.edit { putString("status.mode", v) }
+
     var darkMode: Boolean
-        get() = prefs.getBoolean("darkMode", true)
+        // Claro es el de partida; lo guardado manda.
+        get() = prefs.getBoolean("darkMode", Palettes.DEFAULT_DARK)
         set(v) = prefs.edit { putBoolean("darkMode", v) }
+
+    /** La intro de ELYNDRA en cada arranque en frío. */
+    var introEnabled: Boolean
+        get() = prefs.getBoolean("intro.enabled", true)
+        set(v) = prefs.edit { putBoolean("intro.enabled", v) }
+
+    /** Color de la intro (id de [com.elyndra.launcher.ui.intro.IntroColor]). */
+    var introColor: String?
+        get() = prefs.getString("intro.color", null)
+        set(v) = prefs.edit { putString("intro.color", v) }
 
     /**
      * URI (SAF, con permiso persistente) del fondo de la interfaz.
@@ -216,6 +253,21 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("masha.voice", true)
         set(v) = prefs.edit { putBoolean("masha.voice", v) }
 
+    /** Voz natural (Supertonic, en el móvil) cuando está descargada; apagada = siempre la del sistema. */
+    var mashaVoiceNatural: Boolean
+        get() = prefs.getBoolean("masha.voice.natural", true)
+        set(v) = prefs.edit { putBoolean("masha.voice.natural", v) }
+
+    /** Cuál de las cinco voces femeninas de la voz natural (0–4). */
+    var mashaVoiceSpeaker: Int
+        get() = prefs.getInt("masha.voice.speaker", 0).coerceIn(0, 4)
+        set(v) = prefs.edit { putInt("masha.voice.speaker", v.coerceIn(0, 4)) }
+
+    /** Velocidad de la voz (0,8–1,25; 1 = normal), para las dos voces. */
+    var mashaVoiceRate: Float
+        get() = prefs.getFloat("masha.voice.rate", 1f).coerceIn(0.8f, 1.25f)
+        set(v) = prefs.edit { putFloat("masha.voice.rate", v.coerceIn(0.8f, 1.25f)) }
+
     /**
      * Masha a 120 Hz en pantallas que lo admiten. Apagado (por defecto), su pantalla
      * pide 60 Hz: el holograma se ve igual de fluido a 60 fps y la GPU trabaja la mitad
@@ -286,8 +338,8 @@ class SettingsStore(context: Context) {
         /** Cian de fósforo: se ve bien sobre el tema claro y sobre el oscuro. */
         const val DEFAULT_PARTICLE_COLOR = 0xFF5CF2FF.toInt()
 
-        /** Magenta de neón: se distingue del cian de Masha y del acento del marco. */
-        const val DEFAULT_SELECTION_PARTICLE_COLOR = 0xFFFF5CD6.toInt()
+        /** El mismo cian de fósforo, el primero de la paleta de partículas. */
+        const val DEFAULT_SELECTION_PARTICLE_COLOR = DEFAULT_PARTICLE_COLOR
 
         /*
          * Las claves siguen diciendo "lucy" a propósito, como las de "videoBg":

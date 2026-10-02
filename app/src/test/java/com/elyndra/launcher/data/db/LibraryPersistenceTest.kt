@@ -15,6 +15,7 @@ import com.elyndra.launcher.data.RomEntry
 import com.elyndra.launcher.data.RomFolder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -195,6 +196,23 @@ class LibraryPersistenceTest {
         // El segundo guardado lleva también lo del primero, que falló.
         assertEquals(library, store.lastPrevious)
         assertEquals(15, store.saved.roms.first { it.id == "r2" }.stats.minutes)
+        job.cancel()
+    }
+
+    @Test
+    fun aSteadyStreamOfChangesIsSavedWhileItLasts() = runBlocking {
+        val job = Job()
+        val store = InMemoryLibraryStore(library)
+        val repo = LibraryRepository(store, CoroutineScope(job))
+        repo.load()
+        repo.awaitLoaded()
+        // Un cambio cada 50 ms durante 1,5 s (lo que hace una pasada de
+        // metadatos): lo guardado tiene que avanzar antes de que la racha pare.
+        repeat(30) { i ->
+            repo.addPlaytime("r:r2", 1, start = 1_000L + i)
+            delay(50)
+        }
+        assertTrue(store.saved.roms.first { it.id == "r2" }.stats.minutes > 0)
         job.cancel()
     }
 

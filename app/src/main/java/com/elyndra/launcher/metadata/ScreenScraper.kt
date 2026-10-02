@@ -60,6 +60,11 @@ data class SsGame(
     fun description(languages: List<String>): String? = pick(synopsis, languages + listOf("en"))
         ?.let(ScreenScraperParser::cleanText)
 
+    /** Todas las sinopsis, cada una con su idioma tal como lo etiqueta ScreenScraper ("es", "en", "jp"…). */
+    fun descriptions(): List<Pair<String, String>> = synopsis
+        .filter { it.text.isNotBlank() }
+        .map { it.key to ScreenScraperParser.cleanText(it.text) }
+
     fun releaseDate(regions: List<String>): String? = pick(dates, regions + listOf("wor", "us", "eu", "jp"))
 
     fun genre(languages: List<String>): String? = genres
@@ -236,6 +241,8 @@ class ScreenScraperClient(private val credentials: () -> SsCredentials) {
         crc: String?,
         md5: String?,
         sha1: String?,
+        /** Número de serie del juego (TITLE_ID de PS4, "CUSA00900"): identifica sin hash. */
+        serial: String? = null,
     ): SsGame? = try {
         val root = call(
             "jeuInfos.php",
@@ -247,6 +254,7 @@ class ScreenScraperClient(private val credentials: () -> SsCredentials) {
                 "crc" to crc,
                 "md5" to md5,
                 "sha1" to sha1,
+                "serialnum" to serial,
             ),
         )
         ScreenScraperParser.gameInfo(root)?.takeUnless { it.notGame }

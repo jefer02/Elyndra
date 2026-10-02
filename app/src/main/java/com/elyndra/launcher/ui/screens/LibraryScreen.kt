@@ -1,5 +1,13 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.components.NeedsNameBadge
+import com.elyndra.launcher.library.NameCheck
+import com.elyndra.launcher.ui.heroDescription
+import com.elyndra.launcher.ui.rememberDescription
+import com.elyndra.launcher.ui.components.StatusStrip
+import com.elyndra.launcher.ui.components.FallbackArt
+import com.elyndra.launcher.ui.components.ArtVariant
+import com.elyndra.launcher.ui.components.ArtFallback
 import com.elyndra.launcher.ui.components.DynamicBackdrop
 import com.elyndra.launcher.ui.theme.rememberPress
 import com.elyndra.launcher.ui.theme.pressScale
@@ -44,6 +52,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.indication
+import com.elyndra.launcher.ui.theme.focusRing
+import com.elyndra.launcher.ui.theme.shapeClickable
+import com.elyndra.launcher.ui.theme.outerShadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.alpha
@@ -85,7 +98,6 @@ import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GameIcon
 import com.elyndra.launcher.ui.components.MaterializingContainer
 import com.elyndra.launcher.ui.components.Hero
-import com.elyndra.launcher.ui.components.rememberGameDescription
 import com.elyndra.launcher.ui.components.ConsoleIconButton
 import com.elyndra.launcher.ui.components.HeroBarHeight
 import com.elyndra.launcher.ui.components.ParticleLayer
@@ -158,7 +170,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
         Column(Modifier.fillMaxSize().animAppEntrance(key = Screen.Library)) {
 
             Hero(
-                pairIndex = sel?.let { vm.pairIndexOf(it) } ?: 0,
+                fallback = sel?.let { vm.fallbackOf(it) },
                 heroKey = sel?.key ?: "none",
                 // Quitar el fondo lo deshace en polvo antes de borrarlo.
                 backgroundVanishing = sel?.let { vm.isVanishingArt(it.key, ArtKind.Background) } == true,
@@ -178,6 +190,12 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Spacer(Modifier.weight(1f))
+                        // Hora y batería, arriba a la derecha junto a la barra. Con el
+                        // buscador abierto se aparta: el campo necesita el ancho.
+                        if (vm.settings.statusVisible && !vm.searchOpen) {
+                            StatusStrip(vm.settings.statusMode)
+                            Spacer(Modifier.width(8.dp))
+                        }
                         // "Abrir" vive aquí, sobre el fondo del juego. Mientras
                         // se busca desaparece: el campo abierto necesita ese
                         // ancho y ahí nadie está lanzando nada.
@@ -273,15 +291,12 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    val description = rememberGameDescription(
-                        title = (sel as? LibraryItem.App)?.name,
-                        stored = (sel as? LibraryItem.App)?.app?.meta?.description,
-                        lang = vm.settings.lang,
-                        short = true,
-                    )
+                    // Solo las apps tienen sinopsis en el hero; las carpetas no.
+                    val app = sel as? LibraryItem.App
+                    val description = rememberDescription(vm, app?.key, app?.app?.meta)
                     if (description != null) {
                         ElyText(
-                            description,
+                            heroDescription(description, vm.settings.lang),
                             modifier = Modifier
                                 .padding(top = if (m.landscape) 4.dp else 6.dp)
                                 .fillMaxWidth(0.86f)
@@ -319,7 +334,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                 Modifier.fillMaxWidth().padding(start = m.pad, end = m.pad, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                LibraryFilter.entries.forEach { f ->
+                vm.availableFilters().forEach { f ->
                     FilterTab(stringResource(f.label), vm.filter == f) { vm.updateFilter(f) }
                 }
                 Spacer(Modifier.weight(1f))
@@ -335,8 +350,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                 // "Ordenar por": el criterio en curso hace de etiqueta del botón.
                 Box(
                     Modifier
-                        .clip(RoundedCornerShape(9.dp))
-                        .clickable { vm.sortOptions() }
+                        .shapeClickable(RoundedCornerShape(9.dp)) { vm.sortOptions() }
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                 ) {
                     ElyText(
@@ -391,13 +405,14 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                                         selected = item.key == sel?.key && !addFocused,
                                         sparkColor = sparkColor,
                                         metrics = m,
-                                        pairIndex = vm.pairIndexOf(item),
+                                        fallback = vm.fallbackOf(item),
                                         onTap = { vm.select(item.key) },
                                         onOpen = { vm.requestOpen(item) },
-                                        onLongPress = { center ->
+                                        onBounds = vm::noteSelectedCard,
+                                        onLongPress = { bounds ->
                                             vm.select(item.key)
                                             // De aquí sale el overlay.
-                                            vm.markSheetOrigin(center)
+                                            vm.markSheetOrigin(bounds)
                                             vm.itemOptions(item)
                                         },
                                     )
@@ -472,7 +487,7 @@ private fun FilterTab(label: String, active: Boolean, onClick: () -> Unit) {
     Column(
         Modifier
             .width(IntrinsicSize.Max)
-            .clickable(onClick = onClick)
+            .shapeClickable(RoundedCornerShape(9.dp), onClick = onClick)
             .padding(start = 9.dp, end = 9.dp, top = 4.dp, bottom = 1.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -638,16 +653,17 @@ private fun MashaFab(vm: ElyndraViewModel, metrics: Metrics, bobClock: FloatCloc
                     translationY = kotlin.math.sin(bobClock.seconds / 4f * 2f * Math.PI.toFloat()) * 3.dp.toPx() * bob.value
                 }
             }
-            .shadow(
+            // Una sola sombra y solo por fuera: el botón es de cristal y una
+            // sombra de elevación se veía a través de él.
+            .outerShadow(
                 if (dragging) 22.dp else 14.dp,
                 shape,
-                clip = false,
                 ambientColor = if (dragging) particleColor else P.shade.copy(alpha = 0.3f),
                 spotColor = if (dragging) particleColor else P.shade.copy(alpha = 0.3f),
             )
-            .glass(shape)
-            .consoleFocus(vm.input.isBarFocused(BarItem.Masha), cornerRadius = MASHA_FAB / 2)
-            .clickable { vm.go(Screen.Masha) }
+            .glass(shape, shadow = 0.dp)
+            .consoleFocus(vm.input.isBarFocused(BarItem.Masha), shape)
+            .shapeClickable(shape) { vm.go(Screen.Masha) }
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = {
@@ -750,11 +766,14 @@ private fun AddTile(metrics: Metrics, focused: Boolean, sparkColor: Color?, onCl
     val sparkFrame = sparkColor?.takeIf { focused }
     val sparks = sparkFrame != null
     val frameColor = sparkFrame ?: skin.a1
+    // Se pulsa toda la columna (tile y rótulo), pero el realce se dibuja solo
+    // en el tile, con su forma: comparten la fuente de interacciones.
+    val interaction = remember { MutableInteractionSource() }
     Column(
         Modifier
             .width(metrics.iconTile)
             .offset(y = lift)
-            .clickable(onClick = onClick),
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
@@ -767,6 +786,7 @@ private fun AddTile(metrics: Metrics, focused: Boolean, sparkColor: Color?, onCl
                 }
                 .neonParticles(sparks, frameColor)
                 .glass(shape, borderColor = skin.a1.copy(alpha = 0.6f))
+                .indication(interaction, focusRing(shape))
                 .then(if (focused) Modifier.border(6.dp, frameColor, shape) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
@@ -794,11 +814,13 @@ private fun LibraryTile(
     /** Color de las chispas de neón de la selección; null = sin chispas. */
     sparkColor: Color?,
     metrics: Metrics,
-    pairIndex: Int,
+    fallback: ArtFallback,
     onTap: () -> Unit,
     onOpen: () -> Unit,
-    /** Recibe el centro de la card en la ventana: el menú de acciones sale de ahí. */
-    onLongPress: (Offset) -> Unit,
+    /** Recibe el rectángulo de la card en la ventana: el menú de acciones sale de ahí. */
+    onLongPress: (Rect) -> Unit,
+    /** Rectángulo de la card mientras está seleccionada (el menú sale de ahí con el mando). */
+    onBounds: (Rect) -> Unit = {},
 ) {
     val skin = LocalSkin.current
     // Juegos Android y carpetas de emulador se representan con icono, no con
@@ -829,7 +851,10 @@ private fun LibraryTile(
         Modifier
             .width(width)
             .offset(y = lift)
-            .onGloballyPositioned { cardBounds = it.boundsInWindow() }
+            .onGloballyPositioned {
+                cardBounds = it.boundsInWindow()
+                if (selected) onBounds(cardBounds)
+            }
             // La escala del tirón se lee en fase de dibujo: mover la card no
             // recompone ni la lista ni la pantalla.
             .graphicsLayer {
@@ -848,7 +873,7 @@ private fun LibraryTile(
                         scope.launch {
                             launch { magnetic.run() }
                             delay(MAGNETIC_PULL_MS.toLong())
-                            longPress(cardBounds.center)
+                            longPress(cardBounds)
                         }
                     },
                 )
@@ -866,10 +891,11 @@ private fun LibraryTile(
                 // Tras la escala (la acompañan) y antes del recorte: las chispas
                 // caen por el marco, encima de la card, y su halo asoma fuera.
                 .neonParticles(sparks, frameColor)
-                .shadow(
+                // Solo por fuera: la card es cristal translúcido y una sombra de
+                // elevación asomaba a través de ella, detrás del icono.
+                .outerShadow(
                     if (press.pressed) 4.dp else if (selected) 16.dp else 8.dp,
                     shape,
-                    clip = false,
                     ambientColor = glowColor,
                     spotColor = glowColor,
                 )
@@ -896,8 +922,12 @@ private fun LibraryTile(
             // centrado, sin dejar huecos y sin deformarse.
             if (icon != null || autoIconPackage != null) {
                 GameIcon(icon, autoIconPackage, Modifier.fillMaxSize(), ContentScale.Fit)
+                val unnamed = item is LibraryItem.App && remember(item.app.displayTitle) { !NameCheck.isNameUsable(item.app.displayTitle) }
+                if (unnamed) NeedsNameBadge(Modifier.align(Alignment.TopStart).padding(6.dp), onDark = true)
             } else if (item is LibraryItem.Folder) {
                 // Carpeta sin icono y sin emulador instalado: rótulo de consola.
+                // Debajo, el arte de reserva de la carpeta; encima, el velo del rótulo.
+                FallbackArt(fallback, ArtVariant.Square, Modifier.fillMaxSize(), showIcon = false)
                 Column(
                     Modifier
                         .fillMaxSize()

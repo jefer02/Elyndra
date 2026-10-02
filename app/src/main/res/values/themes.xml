@@ -10,13 +10,23 @@
         <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
     </style>
 
-    <!-- Splash oficial (API SplashScreen) sin icono: solo el negro de la
-         consola apagada, del mismo color que el primer fotograma del arranque
-         de Compose (BootSplash), así el paso de uno a otro no se ve. -->
+    <!-- Splash oficial (API SplashScreen) sin icono: solo el fondo de la intro,
+         del mismo color que su primer fotograma (BootIntro), así el paso de uno
+         a otro no se ve. El tema claro u oscuro es una opción de la app: desde
+         Android 13 MainActivity elige .Light o .Dark para el siguiente arranque;
+         antes, manda el tema del sistema (values-night). -->
     <style name="Theme.Elyndra.Starting" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#FF05070A</item>
+        <item name="windowSplashScreenBackground">@color/intro_bg</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/splash_blank</item>
         <item name="windowSplashScreenAnimationDuration">0</item>
         <item name="postSplashScreenTheme">@style/Theme.Elyndra</item>
+    </style>
+
+    <style name="Theme.Elyndra.Starting.Light">
+        <item name="windowSplashScreenBackground">@color/intro_pearl</item>
+    </style>
+
+    <style name="Theme.Elyndra.Starting.Dark">
+        <item name="windowSplashScreenBackground">@color/intro_smoke</item>
     </style>
 </resources>

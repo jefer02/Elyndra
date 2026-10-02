@@ -136,7 +136,8 @@ fun ElyDialogView(spec: DialogSpec, onDismiss: () -> Unit, focus: Int = -1) {
                     onDismiss()
                     if (input != null) input.onConfirm(written) else spec.confirm.action()
                 }
-                Box(Modifier.padFocus(focus == 0)) {
+                // El aro abraza el botón de 15 dp: su radio más el hueco de 2 dp.
+                Box(Modifier.padFocus(focus == 0, radius = 17.dp)) {
                     if (spec.destructive) {
                         DangerButton(spec.confirm.label.resolve(), confirm, fontSize = 12f)
                     } else {
@@ -157,10 +158,11 @@ fun ElyDialogView(spec: DialogSpec, onDismiss: () -> Unit, focus: Int = -1) {
  */
 @Composable
 fun Modifier.padFocus(focused: Boolean, radius: Dp = 13.dp): Modifier {
-    if (!focused) return this
     val skin = LocalSkin.current
+    // El hueco del aro está siempre: si solo apareciera con el foco, los botones
+    // saltarían 4 dp cada vez que el mando pasa por ellos.
     return this
-        .border(2.dp, skin.a2, RoundedCornerShape(radius))
+        .border(2.dp, if (focused) skin.a2 else Color.Transparent, RoundedCornerShape(radius))
         .padding(2.dp)
 }
 
@@ -184,7 +186,8 @@ private fun DialogField(input: DialogInput, value: String, onChange: (String) ->
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(Color.White.copy(alpha = 0.7f))
+            // En oscuro, un blanco al 70 % dejaba el texto (casi blanco) ilegible.
+            .background(if (P.isDark) P.chip else Color.White.copy(alpha = 0.7f))
             .border(1.dp, P.ink.copy(alpha = 0.14f), RoundedCornerShape(10.dp))
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {

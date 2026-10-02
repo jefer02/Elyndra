@@ -1,5 +1,7 @@
 package com.elyndra.launcher.ui.theme
 
+import com.elyndra.launcher.data.P
+
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -55,56 +57,9 @@ fun cssLinearGradient(
     }
 }
 
-/** El degradado de acento del diseño: `grad(deg)` → de accent.a a accent.b. */
+/** El degradado de relleno del acento: `grad(deg)` → de accent.a a accent.b (blanco encima). */
 fun accentGradient(skin: ElyndraSkin, angleDeg: Float, size: Size): Brush =
-    cssLinearGradient(angleDeg, listOf(skin.a1, skin.a2), size)
-
-/* ─────────────────────────────────────────────────────────────
-   Carátulas procedurales — `art()` en el diseño:
-
-     repeating-linear-gradient(115deg, rgba(255,255,255,.14) 0 2px,
-                                       transparent 2px 9px),
-     linear-gradient(150deg, a 0%, b 100%)
-
-   Es decir: base diagonal de dos colores + trama fina de rayas.
-   ───────────────────────────────────────────────────────────── */
-
-/** Base de la carátula: el degradado a 150deg del par [pair]. */
-fun artBaseBrush(pair: Pair<Color, Color>, size: Size): Brush =
-    cssLinearGradient(150f, listOf(pair.first, pair.second), size)
-
-/**
- * Posiciones de las rayas de la trama, en coordenadas de la caja.
- * Devuelve, para cada raya, el segmento (inicio, fin) a trazar.
- * Periodo 9 px, grosor 2 px, ángulo 115deg — igual que el CSS.
- */
-fun artStripeSegments(size: Size, periodPx: Float, angleDeg: Float = 115f): List<Pair<Offset, Offset>> {
-    if (size.width <= 0f || size.height <= 0f) return emptyList()
-    val d = cssDirection(angleDeg)
-    val p = Offset(-d.y, d.x) // perpendicular: la dirección en la que corre cada raya
-    val center = Offset(size.width / 2f, size.height / 2f)
-
-    // Proyección de las cuatro esquinas sobre la línea de degradado.
-    val corners = listOf(
-        Offset(0f, 0f), Offset(size.width, 0f),
-        Offset(0f, size.height), Offset(size.width, size.height),
-    )
-    val ts = corners.map { (it - center).let { v -> v.x * d.x + v.y * d.y } }
-    val tMin = ts.min()
-    val tMax = ts.max()
-
-    val half = hypot(size.width, size.height) // sobra para cruzar la caja de lado a lado
-    val out = ArrayList<Pair<Offset, Offset>>()
-    var t = floor(tMin / periodPx) * periodPx
-    while (t <= tMax) {
-        val anchor = center + Offset(d.x * t, d.y * t)
-        out += (anchor - Offset(p.x * half, p.y * half)) to (anchor + Offset(p.x * half, p.y * half))
-        t += periodPx
-    }
-    return out
-}
-
-val ArtStripeColor = Color.White.copy(alpha = 0.14f)
+    cssLinearGradient(angleDeg, listOf(skin.a1, skin.fillEnd), size)
 
 /* ─────────────────────────────────────────────────────────────
    Velos y realces reutilizados
@@ -114,9 +69,9 @@ val ArtStripeColor = Color.White.copy(alpha = 0.14f)
 fun heroScrimBrush(scrim: Float, size: Size): Brush = cssLinearGradient(
     180f,
     listOf(
-        Color(0xFF333333).copy(alpha = scrim * 0.85f),
-        Color(0xFF333333).copy(alpha = scrim * 0.35f),
-        Color(0xFF333333).copy(alpha = minOf(0.96f, scrim + 0.30f)),
+        P.shade.copy(alpha = scrim * 0.85f),
+        P.shade.copy(alpha = scrim * 0.35f),
+        P.shade.copy(alpha = minOf(0.96f, scrim + 0.30f)),
     ),
     size,
     stops = listOf(0f, 0.42f, 1f),
@@ -145,22 +100,10 @@ fun heroEdgeScrimBrush(scrim: Float, size: Size): Brush = cssLinearGradient(
     stops = listOf(0f, 0.30f, 0.58f, 1f),
 )
 
-/** Velo de las carátulas de ROM: claro arriba, tinta abajo para que se lea el título. */
-fun romScrimBrush(size: Size): Brush = cssLinearGradient(
-    180f,
-    listOf(
-        Color.White.copy(alpha = 0.26f),
-        Color.Transparent,
-        Color(0xFF333333).copy(alpha = 0.8f),
-    ),
-    size,
-    stops = listOf(0f, 0.40f, 1f),
-)
-
 /** Velo del rótulo de consola: `linear-gradient(90deg, rgba(51,51,51,.55), rgba(51,51,51,.12))`. */
 fun consoleFaceBrush(size: Size): Brush = cssLinearGradient(
     90f,
-    listOf(Color(0xFF333333).copy(alpha = 0.55f), Color(0xFF333333).copy(alpha = 0.12f)),
+    listOf(P.shade.copy(alpha = 0.55f), P.shade.copy(alpha = 0.12f)),
     size,
 )
 

@@ -17,6 +17,7 @@ import com.elyndra.launcher.metadata.LocalMedia
 import com.elyndra.launcher.metadata.MediaCache
 import com.elyndra.launcher.metadata.MetadataEngine
 import com.elyndra.launcher.metadata.ServiceCredentials
+import com.elyndra.launcher.ui.intro.IntroGate
 import com.elyndra.launcher.work.ElyndraWork
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -50,6 +51,9 @@ class ElyndraApplication : Application(), ImageLoaderFactory, Configuration.Prov
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var work: ElyndraWork
 
+    /** La intro se ve una vez por proceso (ver [IntroGate]). */
+    val introGate = IntroGate()
+
     override fun onCreate() {
         // Hilt inyecta los campos en `super.onCreate()`.
         super.onCreate()
@@ -57,6 +61,13 @@ class ElyndraApplication : Application(), ImageLoaderFactory, Configuration.Prov
         // Iniciar WorkManager (su base de datos, sus planificadores) no puede
         // retrasar el primer fotograma: se programa fuera del hilo principal.
         scope.launch { work.schedulePeriodic() }
+    }
+
+    /** Con memoria justa, fuera el modelo de la voz natural si nadie lo está usando (~200 MB). */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        @Suppress("DEPRECATION")
+        if (level >= TRIM_MEMORY_RUNNING_LOW) com.elyndra.launcher.ui.masha.voice.NeuralRuntime.closeNow()
     }
 
     /** WorkManager se inicia a demanda con la fábrica de Hilt (ver el manifiesto). */

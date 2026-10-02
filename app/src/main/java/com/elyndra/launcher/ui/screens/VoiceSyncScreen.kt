@@ -23,12 +23,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.elyndra.launcher.ui.masha.MashaShot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
 import com.elyndra.launcher.ui.ElyndraViewModel
+import com.elyndra.launcher.ui.MashaQuietsSounds
 import com.elyndra.launcher.ui.Screen
 import com.elyndra.launcher.ui.components.AccentSlider
 import com.elyndra.launcher.ui.components.BackChevron
@@ -66,6 +68,8 @@ fun VoiceSyncScreen(vm: ElyndraViewModel) {
     val context = LocalContext.current
 
     val presence = remember { MashaPresence() }
+    // Mientras Masha habla o escucha, la interfaz no suena.
+    MashaQuietsSounds(vm, presence, hold = true)
     val quality = remember { MashaQuality.detect(context) }
     var stage by remember { mutableStateOf(StageStatus.Loading) }
     val voice = rememberMashaVoice(presence, s.lang, enabled = true)
@@ -96,8 +100,8 @@ fun VoiceSyncScreen(vm: ElyndraViewModel) {
         if (stage == StageStatus.Failed) {
             HoloFallback(presence, Modifier.fillMaxSize().padding(bottom = 220.dp))
         } else {
-            // recenter impar = encuadre de la cara (FACE_HOME): los labios se ven para juzgar la sincronía.
-            MashaStage(presence, quality, 1, m.landscape, Modifier.fillMaxSize()) { stage = it }
+            // Primer plano: los labios se ven para juzgar la sincronía.
+            MashaStage(presence, quality, MashaShot.CloseUp, Modifier.fillMaxSize()) { stage = it }
         }
 
         Row(

@@ -254,6 +254,8 @@ internal class SpeechOutput(private val config: LipSyncConfig) : LipSync.Clock {
         val now = SystemClock.elapsedRealtime()
         if (idleSince < 0) { idleSince = now; return }
         if (now - idleSince > 1500) {
+            // Atascos (el motor no llegó a tiempo): cada uno es un hueco audible. Para la QA de voces.
+            runCatching { Log.i(TAG, "pista en pausa: ${written * 1000 / rate} ms escritos, underruns=${t.underrunCount}") }
             runCatching { t.pause() }
             playing = false
             pausedAt = written

@@ -1,5 +1,9 @@
 package com.elyndra.launcher.ui.screens
 
+import androidx.compose.runtime.remember
+import com.elyndra.launcher.ui.components.FallbackArt
+import com.elyndra.launcher.ui.components.ArtVariant
+import com.elyndra.launcher.ui.components.ArtFallback
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.elyndra.launcher.ui.theme.shapeClickable
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -65,6 +70,9 @@ fun ArtPickerSheet(vm: ElyndraViewModel, state: ArtPickerState) {
         ArtKind.Icon -> 80.dp to 1f
     }
 
+    // Mientras llegan las miniaturas, cada celda enseña el color del juego.
+    val fallback = remember(state.key) { vm.fallbackForKey(state.key, state.title).colorOnly() }
+
     ScrimLayer(onDismiss = vm::closeArtPicker, alignment = Alignment.BottomCenter, key = sheetKey) {
         Column(
             Modifier
@@ -105,6 +113,7 @@ fun ArtPickerSheet(vm: ElyndraViewModel, state: ArtPickerState) {
                     items(state.candidates, key = { it.url }) { c ->
                         CandidateCell(
                             candidate = c,
+                            fallback = fallback,
                             ratio = ratio,
                             // Logo e icono llevan transparencia: se muestran enteros.
                             fit = state.kind == ArtKind.Logo || state.kind == ArtKind.Icon,
@@ -142,6 +151,7 @@ private fun Spinner() {
 @Composable
 private fun CandidateCell(
     candidate: ArtCandidate,
+    fallback: ArtFallback,
     ratio: Float,
     fit: Boolean,
     applying: Boolean,
@@ -155,11 +165,11 @@ private fun CandidateCell(
                 .fillMaxWidth()
                 .aspectRatio(ratio)
                 .clip(shape)
-                .background(P.ink.copy(alpha = 0.06f))
                 .border(1.dp, Color.White.copy(alpha = 0.6f), shape)
-                .clickable(enabled = !dimmed && !applying, onClick = onClick),
+                .shapeClickable(shape, enabled = !dimmed && !applying, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
+            FallbackArt(fallback, if (ratio > 1.2f) ArtVariant.Banner else ArtVariant.Cover, Modifier.fillMaxSize(), showTitle = false, showIcon = false)
             AsyncImage(
                 model = candidate.thumb,
                 contentDescription = null,

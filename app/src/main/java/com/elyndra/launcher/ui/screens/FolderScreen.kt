@@ -1,5 +1,11 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.components.NeedsNameBadge
+import com.elyndra.launcher.library.NameCheck
+import com.elyndra.launcher.ui.heroDescription
+import com.elyndra.launcher.ui.rememberDescription
+import com.elyndra.launcher.ui.components.StatusStrip
+import com.elyndra.launcher.ui.components.ArtFallback
 import com.elyndra.launcher.ui.theme.rememberPress
 import com.elyndra.launcher.ui.theme.pressScale
 import androidx.compose.foundation.background
@@ -33,6 +39,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.elyndra.launcher.ui.theme.shapeClickable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -75,7 +86,6 @@ import com.elyndra.launcher.ui.components.MaterializingContainer
 import com.elyndra.launcher.ui.components.OpenButton
 import com.elyndra.launcher.ui.components.neonParticles
 import com.elyndra.launcher.ui.components.metrics
-import com.elyndra.launcher.ui.components.rememberGameDescription
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.theme.HeroTitleShadow
 import com.elyndra.launcher.ui.theme.LocalSkin
@@ -86,7 +96,6 @@ import com.elyndra.launcher.ui.theme.animTitleIn
 import com.elyndra.launcher.ui.theme.curtainAlpha
 import com.elyndra.launcher.ui.theme.darkGlass
 import com.elyndra.launcher.ui.theme.pulseHintAlpha
-import com.elyndra.launcher.ui.theme.romScrimBrush
 import com.elyndra.launcher.ui.theme.selectionLift
 import com.elyndra.launcher.ui.theme.selectionScale
 import com.elyndra.launcher.ui.theme.sheenBrush
@@ -118,7 +127,7 @@ fun FolderScreen(vm: ElyndraViewModel) {
     Column(Modifier.fillMaxSize().animFadeIn(key = Screen.Folder)) {
 
         Hero(
-            pairIndex = rom?.let { vm.romPairIndex(it) } ?: item.system.pair,
+            fallback = rom?.let { vm.romFallback(it) } ?: vm.fallbackOf(item),
             heroKey = rom?.key ?: item.key,
             // Quitar el fondo lo deshace en polvo antes de borrarlo.
             backgroundVanishing = rom?.let { vm.isVanishingArt(it.key, ArtKind.Background) } == true,
@@ -159,7 +168,7 @@ fun FolderScreen(vm: ElyndraViewModel) {
                                 .alpha(if (item.emulatorInstalled) 1f else 0.6f)
                                 .darkGlass(RoundedCornerShape(11.dp))
                                 .consoleFocus(vm.input.isBarFocused(BarItem.Emulator), cornerRadius = 11.dp)
-                                .clickable { vm.pickFolderEmulator(item.folder) }
+                                .shapeClickable(RoundedCornerShape(11.dp)) { vm.pickFolderEmulator(item.folder) }
                                 .padding(horizontal = 11.dp),
                             contentAlignment = Alignment.CenterStart,
                         ) {
@@ -195,6 +204,11 @@ fun FolderScreen(vm: ElyndraViewModel) {
                                 overflow = TextOverflow.Ellipsis,
                                 align = TextAlign.End,
                             )
+                        }
+                        // Hora y batería, pegadas al borde derecho, tras el nombre de la carpeta.
+                        if (vm.settings.statusVisible) {
+                            Spacer(Modifier.width(10.dp))
+                            StatusStrip(vm.settings.statusMode)
                         }
                     }
                 }
@@ -267,15 +281,10 @@ fun FolderScreen(vm: ElyndraViewModel) {
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    val description = rememberGameDescription(
-                        title = rom?.displayTitle,
-                        stored = rom?.meta?.description,
-                        lang = vm.settings.lang,
-                        short = true,
-                    )
+                    val description = rememberDescription(vm, rom?.key, rom?.meta)
                     if (description != null) {
                         ElyText(
-                            description,
+                            heroDescription(description, vm.settings.lang),
                             modifier = Modifier
                                 .padding(top = if (m.landscape) 4.dp else 6.dp)
                                 .fillMaxWidth(0.86f)
@@ -314,6 +323,31 @@ fun FolderScreen(vm: ElyndraViewModel) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ElyText(stringResource(R.string.roms_header), size = 9.5f, weight = FontWeight.SemiBold, color = P.ink2, letterSpacing = tracking(0.24f))
+                // PS4: los .pkg que aún no se han extraído no son juegos; se
+                // cuentan aquí, discretos, y llevan a Bachata para instalarlos.
+                val notInstalled = vm.ps4NotInstalled[item.folder.id] ?: 0
+                if (notInstalled > 0) {
+                    Spacer(Modifier.width(8.dp))
+                    val pillShape = RoundedCornerShape(9.dp)
+                    Box(
+                        Modifier
+                            .weight(1f, fill = false)
+                            .clip(pillShape)
+                            .background(P.chip)
+                            .border(1.dp, P.ink.copy(alpha = 0.12f), pillShape)
+                            .shapeClickable(pillShape) { vm.openBachata() }
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    ) {
+                        ElyText(
+                            pluralStringResource(R.plurals.ps4_pkgs_not_installed, notInstalled, notInstalled),
+                            size = 8.5f,
+                            weight = FontWeight.Medium,
+                            color = P.ink2,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
                 Spacer(Modifier.weight(1f))
                 ElyText(
                     pluralStringResource(R.plurals.roms_summary, roms.size, roms.size, fmtMinutes(item.minutes)),
@@ -364,7 +398,7 @@ fun FolderScreen(vm: ElyndraViewModel) {
                                 index = i,
                                 selected = r.key == rom?.key,
                                 sparkColor = sparkColor,
-                                pairIndex = vm.romPairIndex(r),
+                                fallback = vm.romFallback(r),
                                 width = m.romW,
                                 height = m.romTileH,
                                 coverVanishing = vm.isVanishingArt(r.key, ArtKind.Cover),
@@ -373,8 +407,10 @@ fun FolderScreen(vm: ElyndraViewModel) {
                                 onCoverMaterialized = { vm.finishMaterializeArt() },
                                 onTap = { vm.selectRom(r.key) },
                                 onOpen = { vm.openRom(r) },
-                                onLongPress = {
+                                onBounds = vm::noteSelectedCard,
+                                onLongPress = { bounds ->
                                     vm.selectRom(r.key)
+                                    vm.markSheetOrigin(bounds)
                                     vm.romOptions(r)
                                 },
                             )
@@ -403,7 +439,7 @@ private fun RomTile(
     selected: Boolean,
     /** Color de las chispas de neón de la selección; null = sin chispas. */
     sparkColor: Color?,
-    pairIndex: Int,
+    fallback: ArtFallback,
     width: Dp,
     height: Dp,
     coverVanishing: Boolean,
@@ -412,10 +448,14 @@ private fun RomTile(
     onCoverMaterialized: () -> Unit,
     onTap: () -> Unit,
     onOpen: () -> Unit,
-    onLongPress: () -> Unit,
+    /** Recibe el rectángulo de la card en la ventana: el menú sale de ahí. */
+    onLongPress: (Rect) -> Unit,
+    /** Rectángulo de la card mientras está seleccionada (el menú sale de ahí con el mando). */
+    onBounds: (Rect) -> Unit = {},
 ) {
     val skin = LocalSkin.current
     val shape = RoundedCornerShape(12.dp)
+    val bounds = remember { arrayOf(Rect.Zero) }
     val lift = selectionLift(selected)
     val scale = selectionScale(selected)
     val press = rememberPress()
@@ -439,12 +479,16 @@ private fun RomTile(
             .width(width)
             .offset(y = lift)
             .animPopIn(delayMs = minOf(index, 12) * 35, key = rom.id)
+            .onGloballyPositioned {
+                bounds[0] = it.boundsInWindow()
+                if (selected) onBounds(bounds[0])
+            }
             .pointerInput(rom.id) {
                 detectTapGestures(
                     onPress = { press.track(this) },
                     onTap = { tap() },
                     onDoubleTap = { open() },
-                    onLongPress = { longPress() },
+                    onLongPress = { longPress(bounds[0]) },
                 )
             },
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -484,36 +528,16 @@ private fun RomTile(
                     onAnimationEnd = onCoverVanished,
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    ArtImage(cover, pairIndex, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                }
-            }
-
-            if (cover == null) {
-                rom.meta.icon?.let { icon ->
-                    GameIcon(
-                        icon,
-                        null,
-                        Modifier
-                            .align(Alignment.Center)
-                            .padding(bottom = height * 0.2f, start = width * 0.1f, end = width * 0.1f)
-                            .fillMaxWidth()
-                            .aspectRatio(1f)
-                            .floating(floatClock, floatPhaseOf(rom.id)),
+                    // Sin carátula, el arte de reserva: el icono del juego (flotando,
+                    // como siempre) y su título.
+                    ArtImage(
+                        cover,
+                        fallback,
+                        Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                        iconModifier = Modifier.floating(floatClock, floatPhaseOf(rom.id)),
                     )
                 }
-                Box(Modifier.fillMaxSize().drawBehind { drawRect(romScrimBrush(size)) })
-                ElyText(
-                    rom.displayTitle,
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(horizontal = 7.dp, vertical = 6.dp),
-                    size = 9.5f,
-                    weight = FontWeight.SemiBold,
-                    color = Color.White,
-                    lineHeightRatio = 1.15f,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
 
             Box(
@@ -528,6 +552,9 @@ private fun RomTile(
             ) {
                 ElyText(rom.extension.ifEmpty { "DIR" }, size = 7f, weight = FontWeight.SemiBold, color = P.shade, letterSpacing = tracking(0.1f))
             }
+            // Sin un nombre que sirva para buscarlo: se marca, sin más avisos.
+            val unnamed = remember(rom.displayTitle) { !NameCheck.isNameUsable(rom.displayTitle) }
+            if (unnamed) NeedsNameBadge(Modifier.align(Alignment.TopStart).padding(5.dp), onDark = true)
 
             if (selected) {
                 Box(

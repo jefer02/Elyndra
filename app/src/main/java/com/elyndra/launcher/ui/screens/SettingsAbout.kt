@@ -123,6 +123,7 @@ private val COMPONENTS = listOf(
     ThirdParty("SceneView", "SceneView contributors", APACHE),
     ThirdParty("Filament", "Google LLC", APACHE),
     ThirdParty("Poppins", "Indian Type Foundry", "SIL Open Font License 1.1"),
+    ThirdParty("Cinzel", "The Cinzel Project Authors", "SIL Open Font License 1.1"),
 )
 
 private const val APACHE = "Apache License 2.0"

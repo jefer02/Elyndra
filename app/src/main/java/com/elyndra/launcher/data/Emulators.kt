@@ -26,6 +26,9 @@ sealed interface ExtraValue {
     /** String[] {"-r", <TITLE ID leído del archivo .psvita>} para Vita3K. */
     data object VitaTitleArgs : ExtraValue
 
+    /** El id del juego según el propio juego (TITLE_ID de PS4, "CUSA00900"; ver RomEntry.serial). */
+    data object TitleId : ExtraValue
+
     /* ── Juegos de PC: lo que entienden los runtimes de Windows ──
        Ninguno acepta la ruta de un .exe. Lo que aceptan es el archivo
        lanzador que ellos mismos exportan (ver PcGames.Launcher). */
@@ -284,6 +287,16 @@ object Emulators {
         EmulatorProfile(
             "emucorev", "EmuCoreV", listOf("com.sbro.emucorev/.core.vita.Emulator"),
             extras = listOf(ExtraSpec("AppStartParameters", ExtraValue.VitaTitleArgs)),
+        ),
+
+        // ── PlayStation 4 ──
+        // Bachata S4 (fork de shadPS4). El lanzamiento, con su plan B, está
+        // entero en launch/BachataS4.kt: su actividad directa no está documentada.
+        EmulatorProfile(
+            com.elyndra.launcher.launch.BachataS4.PROFILE_ID, "Bachata S4",
+            com.elyndra.launcher.launch.BachataS4.PACKAGES.map { "$it/${com.elyndra.launcher.launch.BachataS4.DIRECT_ACTIVITY}" },
+            extras = listOf(ExtraSpec(com.elyndra.launcher.launch.BachataS4.EXTRA_GAME_ID, ExtraValue.TitleId)),
+            storeId = "com.bachatas4.android",
         ),
 
         // ── PlayStation ──

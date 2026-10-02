@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -77,26 +78,18 @@ private const val TAG = "MashaStage"
 enum class StageStatus { Loading, Ready, Failed }
 
 /**
- * Encuadre de conversación: de la cintura a la cabeza, en la mitad de arriba
- * de la pantalla (la de abajo es del panel). Con zoom y órbita se la ve entera.
+ * Posición de la cámara antes del primer fotograma (luego manda [StageCamera]):
+ * delante de ella, a la altura del pecho.
  */
-private val TARGET = Position(0f, 1.10f, 0f)
-private val HOME = Position(0f, 1.30f, 3.4f)
+private val TARGET = Position(0f, 1.40f, 0f)
+private val HOME = Position(0f, 1.40f, 1.6f)
 
-/**
- * Retrato: la cara de cerca (el botón de encuadre alterna entre los dos). El
- * punto de mira queda bajo la barbilla para que la cara caiga en la mitad de
- * arriba, la que no tapa el panel.
- */
-private val FACE_TARGET = Position(0f, 1.52f, 0f)
-private val FACE_HOME = Position(0f, 1.60f, 1.05f)
+/** Distancia focal de la cámara (mm, sensor de 24 mm de Filament). */
+private const val FOCAL_LENGTH = 38.0
 
-/** En horizontal la conversación va a la derecha: la cámara se desplaza para que ella quede en la mitad izquierda. */
-private const val LANDSCAPE_SHIFT = 0.95f
-
-private fun Position.shifted(landscape: Boolean, amount: Float = LANDSCAPE_SHIFT) = if (landscape) Position(x + amount, y, z) else this
+/** Zoom de la órbita a mano: ni meterse en el holograma ni perderla de vista. */
 private const val MIN_DISTANCE = 0.4f
-private const val MAX_DISTANCE = 5.0f
+private const val MAX_DISTANCE = 9.0f
 
 /** Luz ambiental (IBL) y cielo de la sala de control, relativos a la exposición 1. */
 private const val IBL_INTENSITY = 0.9f
@@ -107,16 +100,19 @@ private const val SKY_INTENSITY = 0.32f
  * recorte azul, relleno violeta, niebla, bloom y viñeta; ella animada en
  * tiempo real ([HoloRig]); cámara orbital con zoom y desplazamiento acotados.
  *
- * [recenter] cambia para devolver la cámara a su sitio; alterna entre ella
- * entera (par) y un retrato de la cara (impar).
+ * [shot] es el plano ([MashaFraming]); cambiarlo, o cambiar [recenter] (el
+ * botón de encuadre), vuelve a encuadrar con una transición. [faceArea] es el
+ * hueco que la interfaz deja libre (px, en coordenadas de este escenario):
+ * el plano se coloca dentro, centrado en horizontal.
  */
 @Composable
 fun MashaStage(
     presence: MashaPresence,
     quality: MashaQuality,
-    recenter: Int,
-    landscape: Boolean,
+    shot: MashaShot,
     modifier: Modifier = Modifier,
+    recenter: Int = 0,
+    faceArea: androidx.compose.ui.geometry.Rect? = null,
     onStatus: (StageStatus) -> Unit,
 ) {
     val context = LocalContext.current
@@ -126,14 +122,14 @@ fun MashaStage(
     // en su orden (ver `Gpu.destroy`). Con los `remember*` de SceneView cada
     // pieza se liberaba por su cuenta, en orden inverso al de creación.
     val gpu = remember { Gpu.create(context, quality) }
-    val portrait = recenter % 2 == 1
-    val home = if (portrait) FACE_HOME.shifted(landscape, 0.2f) else HOME.shifted(landscape)
-    val target = if (portrait) FACE_TARGET.shifted(landscape, 0.2f) else TARGET.shifted(landscape)
+    val home = HOME
+    val target = TARGET
+    val reduced = com.elyndra.launcher.ui.theme.LocalReducedMotion.current
     val cameraNode = remember {
         CameraNode(gpu.engine).apply {
             position = home
             lookAt(target)
-            focalLength = 38.0
+            focalLength = FOCAL_LENGTH
             // Exposición 1: los valores de emisión y del HDR se leen tal cual.
             setExposure(1f)
         }
@@ -198,11 +194,25 @@ fun MashaStage(
         status(StageStatus.Ready)
     }
 
-    val manipulator = remember(recenter, landscape) { BoundedOrbit(home, target) }
-    LaunchedEffect(recenter, landscape) {
-        cameraNode.position = home
-        cameraNode.lookAt(target)
+    // La cámara la lleva [StageCamera] (el plano, que sigue su cara, y las
+    // transiciones) hasta que el usuario toca la escena: entonces se le da la
+    // órbita en la posición en la que esté.
+    val stageCamera = remember { StageCamera(cameraNode.camera, FOCAL_LENGTH) }
+    stageCamera.reduced = reduced
+    var manipulator by remember { mutableStateOf<CameraGestureDetector.CameraManipulator>(BoundedOrbit(home, target)) }
+    var framedOnce by remember { mutableStateOf(false) }
+    LaunchedEffect(shot, recenter) {
+        // Al entrar, el plano se pone sin transición; después (botón, giro del
+        // móvil) cada cambio se anima desde donde esté la cámara.
+        stageCamera.show(shot, animate = framedOnce)
+        framedOnce = true
     }
+    SideEffect {
+        val a = faceArea
+        if (a != null) stageCamera.setArea(a.left, a.top, a.right, a.bottom) else stageCamera.setArea(0f, 0f, 0f, 0f)
+    }
+    val takeoverEye = remember { FloatArray(3) }
+    val takeoverTarget = remember { FloatArray(3) }
     // Solo en debug (QA del lip-sync): primer plano de la boca por adb.
     //   adb shell am broadcast -a com.elyndra.launcher.DEBUG_CAM --ef y 1.50 --ef z 0.45 --ef x 0
     if (BuildConfig.DEBUG) {
@@ -229,6 +239,7 @@ fun MashaStage(
                         if (i.hasExtra("springs")) MashaDebugPose.noSprings = !i.getBooleanExtra("springs", true)
                         return
                     }
+                    stageCamera.takeOver()
                     val y = i.getFloatExtra("y", 1.50f)
                     cameraNode.position = Position(i.getFloatExtra("x", 0f), y + 0.02f, i.getFloatExtra("z", 0.45f))
                     cameraNode.lookAt(Position(0f, y, 0f))
@@ -298,7 +309,30 @@ fun MashaStage(
         cameraNode = cameraNode,
         childNodes = childNodes,
         cameraManipulator = manipulator,
-        onFrame = { t -> rig?.frame(t) },
+        onFrame = { t ->
+            val r = rig
+            r?.frame(t)
+            val v = sceneView[0]
+            if (v != null) stageCamera.frame(t, r, v.width, v.height)
+        },
+        onTouchEvent = { e, _ ->
+            // Primer toque en la escena: la cámara pasa a ser del usuario, en
+            // la posición actual (sin salto) y orbitando alrededor de lo que mira.
+            if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN && stageCamera.takeOver()) {
+                stageCamera.eyeOut(takeoverEye)
+                stageCamera.targetOut(takeoverTarget)
+                val orbit = BoundedOrbit(
+                    Position(takeoverEye[0], takeoverEye[1], takeoverEye[2]),
+                    Position(takeoverTarget[0], takeoverTarget[1], takeoverTarget[2]),
+                )
+                sceneView[0]?.let { v ->
+                    orbit.setViewport(v.width, v.height)
+                    v.cameraManipulator = orbit
+                }
+                manipulator = orbit
+            }
+            false
+        },
         onViewCreated = { sceneView[0] = this },
     )
 }

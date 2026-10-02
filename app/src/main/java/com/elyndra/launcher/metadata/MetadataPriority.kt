@@ -59,8 +59,11 @@ data class MetadataPriority(val text: List<Service>, val art: List<Service>) {
          * que quien no toque nada no nota ningún cambio.
          */
         val DEFAULT = MetadataPriority(
-            text = listOf(Service.ScreenScraper, Service.Igdb, Service.RetroAchievements, Service.SteamGridDb),
-            art = listOf(Service.ScreenScraper, Service.Igdb, Service.SteamGridDb, Service.RetroAchievements),
+            // Las fuentes sin clave, detrás: rellenan huecos y mandan cuando no
+            // hay ninguna con cuenta. (La descripción va además por idioma: ver
+            // DescriptionMerge.)
+            text = listOf(Service.ScreenScraper, Service.Igdb, Service.Steam, Service.RetroAchievements, Service.SteamGridDb, Service.Libretro),
+            art = listOf(Service.ScreenScraper, Service.Igdb, Service.SteamGridDb, Service.Steam, Service.Libretro, Service.RetroAchievements),
         )
 
         /** Lista guardada ("ss,igdb,…") a orden completo: lo que falte se añade al final, lo repetido se ignora. */
@@ -97,6 +100,15 @@ class MetadataPriorityStore(private val settings: SettingsStore) {
 /** Lo que un servicio sabe de un juego, antes de mezclarlo con los demás. */
 class SourceData(val service: Service) {
     val text = HashMap<MetaField, String>()
+
+    /** Descripciones que da este servicio, por idioma ("es", "en"…): ver [DescriptionMerge]. */
+    val descriptions = LinkedHashMap<String, String>()
+
+    fun addDescription(lang: String?, value: String?) {
+        val l = DescriptionLangs.normalize(lang) ?: return
+        val v = value?.trim()?.takeIf { it.isNotEmpty() } ?: return
+        if (l !in descriptions) descriptions[l] = v
+    }
     var rating: Float? = null
 
     /** Clase de imagen → URL de descarga. */
@@ -104,6 +116,7 @@ class SourceData(val service: Service) {
     var ssId: String? = null
     var igdbId: Long? = null
     var sgdbId: Long? = null
+    var steamAppId: Long? = null
     var ra: RaInfo? = null
 
     /** Cómo reconoció este servicio el juego (ver [MatchMethod]) y con qué confianza. */
@@ -113,6 +126,7 @@ class SourceData(val service: Service) {
     fun has(field: MetaField): Boolean = when {
         field == MetaField.Rating -> rating != null
         field.isArt -> field in art
+        field == MetaField.Description -> descriptions.isNotEmpty() || field in text
         else -> field in text
     }
 
@@ -133,6 +147,8 @@ class SourceData(val service: Service) {
 /** El resultado de mezclar todas las fuentes según la prioridad. */
 data class MergedMetadata(
     val text: Map<MetaField, String>,
+    /** Todas las descripciones por idioma; en cada idioma gana la fuente con más prioridad. */
+    val descriptions: Map<String, String> = emptyMap(),
     val rating: Float?,
     /** Clase de imagen → (servicio, URL). */
     val art: Map<MetaField, Pair<Service, String>>,
@@ -140,6 +156,7 @@ data class MergedMetadata(
     val ssId: String?,
     val igdbId: Long?,
     val sgdbId: Long?,
+    val steamAppId: Long? = null,
     val ra: RaInfo?,
     val matchedBy: String?,
     val confidence: Float?,
@@ -159,6 +176,13 @@ object MetadataMerge {
         Service.RetroAchievements -> setOf(
             MetaField.Name, MetaField.Developer, MetaField.Publisher, MetaField.Genre,
             MetaField.ReleaseDate, MetaField.Cover, MetaField.Icon,
+        )
+        // Carátula, captura y pantalla de título (como fondo, si no hay otro mejor).
+        Service.Libretro -> setOf(MetaField.Cover, MetaField.Screenshot, MetaField.Hero)
+        // El icono de un juego Android instalado es el suyo: Steam no lo da.
+        Service.Steam -> setOf(
+            MetaField.Name, MetaField.Description, MetaField.Developer, MetaField.Publisher, MetaField.Genre,
+            MetaField.Cover, MetaField.Hero, MetaField.Logo,
         )
     }
 
@@ -188,14 +212,19 @@ object MetadataMerge {
         val art = MetaField.ART.mapNotNull { f -> pick(f) { it.art[f] }?.let { f to it } }.toMap()
         val matched = results.values.filter { it.matchedBy != null }
         val best = matched.maxByOrNull { it.confidence }
+        val descriptions = DescriptionMerge.combine(
+            results.values.sortedBy { priority.rank(it.service, MetaField.Description) }.map { it.descriptions },
+        )
         return MergedMetadata(
             text = text,
+            descriptions = descriptions,
             rating = pick(MetaField.Rating) { it.rating }?.second,
             art = art,
             sources = Service.entries.filter { s -> matched.any { it.service == s } },
             ssId = results[Service.ScreenScraper]?.ssId,
             igdbId = results[Service.Igdb]?.igdbId,
             sgdbId = results[Service.SteamGridDb]?.sgdbId,
+            steamAppId = results[Service.Steam]?.steamAppId,
             ra = results[Service.RetroAchievements]?.ra,
             matchedBy = best?.matchedBy,
             confidence = best?.confidence,

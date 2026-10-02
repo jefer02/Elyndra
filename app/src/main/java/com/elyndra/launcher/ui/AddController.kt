@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewModelScope
 import com.elyndra.launcher.R
+import com.elyndra.launcher.library.Ps4
 import com.elyndra.launcher.data.AppEntry
 import com.elyndra.launcher.data.Emulators
 import com.elyndra.launcher.data.RomFolder
@@ -116,11 +117,23 @@ class AddController(private val vm: ElyndraViewModel) {
         scanJob?.cancel()
         scan = ScanState.Idle
         folder = PickedFolder(uri, rootDocId, display, name)
-        Systems.detect(name)?.let { setSystem(it.id) }
+        val byName = Systems.detect(name)
+        byName?.let { setSystem(it.id) }
 
         vm.viewModelScope.launch {
+            // PS4 se reconoce también por su contenido (una carpeta de juego con
+            // sce_sys y eboot.bin): el nombre de la carpeta puede ser cualquiera.
+            val rootIsPs4 = byName?.id == Ps4.SYSTEM_ID || (byName == null && app.scanner.looksLikePs4(uri, rootDocId))
+            if (byName == null && rootIsPs4 && folder?.rootDocId == rootDocId) setSystem(Ps4.SYSTEM_ID)
             val subs = runCatching { app.scanner.subfolders(uri, rootDocId) }.getOrDefault(emptyList())
-            val detected = subs.mapNotNull { c -> Systems.detect(c.name)?.let { DetectedSub(c.docId, c.name, it) } }
+            val detected = subs.mapNotNull { c ->
+                // Dentro de una carpeta de PS4 sus subcarpetas son juegos (o DLC), no
+                // sistemas: no se ofrecen para "Añadir todos". Fuera, una subcarpeta
+                // cuenta como PS4 si tiene juegos dentro (no si ella misma es uno).
+                val system = Systems.detect(c.name)?.takeUnless { rootIsPs4 && it.id == Ps4.SYSTEM_ID }
+                    ?: Systems.byId(Ps4.SYSTEM_ID)?.takeIf { !rootIsPs4 && app.scanner.looksLikePs4(uri, c.docId, includeSelf = false) }
+                system?.let { DetectedSub(c.docId, c.name, it) }
+            }
             if (folder?.rootDocId == rootDocId) folder = folder?.copy(detected = detected)
         }
     }
@@ -188,6 +201,7 @@ class AddController(private val vm: ElyndraViewModel) {
             lastScan = now,
         )
         val keys = app.library.addFolder(rf, found)
+        vm.onFolderAdded(rf)
         vm.showToast(UiText.plural(R.plurals.toast_folder_added, keys.size, keys.size, sys.name))
         resetRoms()
         vm.go(Screen.Library)
@@ -229,6 +243,7 @@ class AddController(private val vm: ElyndraViewModel) {
                     lastScan = now,
                 )
                 keys += app.library.addFolder(rf, found)
+                vm.onFolderAdded(rf)
                 folderKeys += rf.key
                 systems++
             }

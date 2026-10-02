@@ -1,10 +1,22 @@
 package com.elyndra.launcher.ui
 
+import com.elyndra.launcher.library.RomScanner
+import com.elyndra.launcher.metadata.MediaFailure
+import com.elyndra.launcher.metadata.MediaResult
+import com.elyndra.launcher.library.NameCheck
+import com.elyndra.launcher.library.Names
+import com.elyndra.launcher.metadata.TranslationCache
 import android.app.Application
 import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
+import com.elyndra.launcher.data.ArtOrigin
+import com.elyndra.launcher.metadata.LocalImage
+import com.elyndra.launcher.metadata.LocalMedia
+import com.elyndra.launcher.launch.BachataS4
+import com.elyndra.launcher.library.Ps4
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -16,12 +28,15 @@ import com.elyndra.launcher.data.BannerHub
 import com.elyndra.launcher.data.Emulators
 import com.elyndra.launcher.data.Library
 import com.elyndra.launcher.data.LibraryRepository
-import com.elyndra.launcher.data.PAIRS
 import com.elyndra.launcher.data.PlaySession
 import com.elyndra.launcher.data.RomEntry
 import com.elyndra.launcher.data.RomFolder
 import com.elyndra.launcher.data.Systems
-import com.elyndra.launcher.data.pairIndexFor
+import com.elyndra.launcher.data.fmtMinutes
+import com.elyndra.launcher.ui.components.ArtFallback
+import com.elyndra.launcher.sound.BackgroundMusic
+import com.elyndra.launcher.sound.SoundManager
+import com.elyndra.launcher.sound.UiSound
 import com.elyndra.launcher.launch.GameLauncher
 import com.elyndra.launcher.library.InstalledApp
 import com.elyndra.launcher.library.PcGameIds
@@ -64,6 +79,12 @@ class ElyndraViewModel @Inject constructor(
     private val inventory: EmulatorInventory,
     private val work: ElyndraWork,
     val metadataPriority: MetadataPriorityStore,
+    /** Los sonidos de la interfaz (ver [SoundManager]). */
+    val sound: SoundManager,
+    /** La música de fondo de la interfaz (ver [BackgroundMusic]). */
+    val music: BackgroundMusic,
+    /** Traducciones de descripciones en el dispositivo (ver [TranslationCache]). */
+    val translations: TranslationCache,
 ) : AndroidViewModel(application) {
 
     val app = application as ElyndraApplication
@@ -91,13 +112,19 @@ class ElyndraViewModel @Inject constructor(
     var sheet by mutableStateOf<ActionSheetSpec?>(null); private set
 
     /**
-     * Centro de la card que abrió el menú, en coordenadas de ventana.
+     * La card que abrió el menú (su rectángulo en coordenadas de ventana).
      *
-     * El overlay crece desde ahí, así que el menú sale literalmente de lo que
-     * se mantuvo pulsado. Null = no se sabe (mando, menú de la app): entonces
-     * crece desde su propio centro.
+     * El overlay se transforma desde ahí, así que el menú sale literalmente de
+     * lo que se mantuvo pulsado (o de la card señalada, con mando). Null = no
+     * viene de una card (menú de la app, ordenar…): aparece en su sitio.
      */
-    var sheetOrigin by mutableStateOf<Offset?>(null); private set
+    var sheetOrigin by mutableStateOf<Rect?>(null); private set
+
+    /** Rectángulo de la card seleccionada: de ahí sale el menú cuando se abre con el mando. */
+    private var selectedCardBounds: Rect? = null
+
+    /** Rectángulo de la card que se acaba de mantener pulsada (lo consume el siguiente menú). */
+    private var pendingOrigin: Rect? = null
     var detailsKey by mutableStateOf<String?>(null); private set
     var achievements by mutableStateOf<AchievementsState>(AchievementsState.Idle); private set
     var toast by mutableStateOf<UiText?>(null); private set
@@ -112,8 +139,15 @@ class ElyndraViewModel @Inject constructor(
     /** El mando: traduce sus botones a lo que hace cada capa (ver [InputController]). */
     val input = InputController(this)
 
+    /** La intro de arranque, encima de todo mientras se ve. */
+    val intro = IntroController()
+
     val add = AddController(this)
     val settings = SettingsController(this)
+    val sounds = SoundsController(this)
+    val descriptions = DescriptionsController(this)
+    /** "Editar nombre / Identificar juego" (ver [IdentifyController]). */
+    val identify = IdentifyController(this)
     val masha = MashaController(this, brain)
 
     private var launchJob: Job? = null
@@ -201,6 +235,12 @@ class ElyndraViewModel @Inject constructor(
         list = sorted(list)
         if (filter == LibraryFilter.Android) list = list.filterIsInstance<LibraryItem.App>()
         if (filter == LibraryFilter.Consoles) list = list.filterIsInstance<LibraryItem.Folder>()
+        if (filter == LibraryFilter.Unnamed) list = list.filter { item ->
+            when (item) {
+                is LibraryItem.App -> needsName(item.app.displayTitle)
+                is LibraryItem.Folder -> d.roms[item.folder.id].orEmpty().any { needsName(it.displayTitle) }
+            }
+        }
         if (q.isNotEmpty()) {
             list = list.filter { item ->
                 item.name.lowercase().contains(q) ||
@@ -263,19 +303,40 @@ class ElyndraViewModel @Inject constructor(
         return all.firstOrNull { it.key == selectedKey } ?: all.firstOrNull()
     }
 
-    fun pairIndexOf(item: LibraryItem): Int = when (item) {
-        is LibraryItem.Folder -> item.system.pair
-        is LibraryItem.App -> pairIndexFor(item.app.packageName)
+    /** El arte de reserva de una card del carrusel: su color sale del icono. */
+    fun fallbackOf(item: LibraryItem): ArtFallback = when (item) {
+        is LibraryItem.Folder -> ArtFallback(item.key, item.system.name, item.iconPath, item.emulatorPackage)
+        is LibraryItem.App -> ArtFallback(item.key, item.app.displayTitle, item.app.meta.icon, item.app.packageName)
     }
 
-    fun romPairIndex(rom: RomEntry): Int {
-        val base = Systems.byId(rom.systemId)?.pair ?: 0
-        return (base + pairIndexFor(rom.title)) % PAIRS.size
+    /** El arte de reserva de un juego sin carátula: su icono, si tiene, y su título. */
+    fun romFallback(rom: RomEntry): ArtFallback = ArtFallback(rom.key, rom.displayTitle, rom.meta.icon)
+
+    /** El arte de reserva de cualquier juego de la biblioteca por su clave. */
+    fun fallbackForKey(key: String, title: String): ArtFallback {
+        library.roms.firstOrNull { it.key == key }?.let { return romFallback(it) }
+        library.apps.firstOrNull { it.key == key }?.let { return ArtFallback(it.key, it.displayTitle, it.meta.icon, it.packageName) }
+        return ArtFallback(key, title)
     }
 
     fun currentFolder(): LibraryItem.Folder? = derived().folders.firstOrNull { it.folder.id == folderId }
 
-    fun folderRoms(id: String?): List<RomEntry> = id?.let { derived().roms[it] }.orEmpty()
+    fun folderRoms(id: String?): List<RomEntry> {
+        val all = id?.let { derived().roms[it] }.orEmpty()
+        // Con el filtro "Sin nombre", dentro de la carpeta solo salen esos.
+        return if (filter == LibraryFilter.Unnamed) all.filter { needsName(it.displayTitle) }.ifEmpty { all } else all
+    }
+
+    /** ¿A este juego le falta un nombre que sirva para buscarlo? (ver [NameCheck]). */
+    fun needsName(title: String): Boolean = !NameCheck.isNameUsable(title)
+
+    /** Hay algún juego sin nombre: solo entonces sale el filtro "Sin nombre". */
+    val anyUnnamed: Boolean
+        get() = library.apps.any { needsName(it.displayTitle) } || library.roms.any { needsName(it.displayTitle) }
+
+    /** Los filtros que se enseñan (y que recorren L1/R1). */
+    fun availableFilters(): List<LibraryFilter> =
+        LibraryFilter.entries.filter { it != LibraryFilter.Unnamed || anyUnnamed || filter == LibraryFilter.Unnamed }
 
     fun selectedRom(): RomEntry? {
         val roms = folderRoms(folderId)
@@ -337,13 +398,15 @@ class ElyndraViewModel @Inject constructor(
     }
 
     val canGoBack: Boolean
-        get() = dialog != null || sheet != null || artPicker != null || detailsKey != null || screen != Screen.Library || searchOpen
+        get() = intro.visible || dialog != null || sheet != null || artPicker != null || identify.state != null || detailsKey != null || screen != Screen.Library || searchOpen
 
     fun back() {
         when {
+            intro.visible -> intro.skip()
             dialog != null -> dialog = null
             sheet != null -> sheet = null
             artPicker != null -> closeArtPicker()
+            identify.state != null -> identify.close()
             detailsKey != null -> closeDetails()
             screen.isSettingsPage -> go(Screen.Settings)
             screen != Screen.Library -> go(Screen.Library)
@@ -351,9 +414,20 @@ class ElyndraViewModel @Inject constructor(
         }
     }
 
-    fun select(key: String) { selectedKey = key }
+    /**
+     * Cambiar la selección suena a "moverse", se haga con el dedo o con el
+     * mando (el paso del mando que no cambia nada ya lo filtra el reloj de
+     * [SoundManager]: dos avisos seguidos en menos de 60 ms son uno).
+     */
+    fun select(key: String) {
+        if (selected()?.key != key) sound.play(UiSound.Navigate)
+        selectedKey = key
+    }
 
-    fun selectRom(key: String) { selectedRomKey = key }
+    fun selectRom(key: String) {
+        if (selectedRom()?.key != key) sound.play(UiSound.Navigate)
+        selectedRomKey = key
+    }
 
     fun updateFilter(f: LibraryFilter) { filter = f }
 
@@ -409,11 +483,15 @@ class ElyndraViewModel @Inject constructor(
             val outcome = launcher.launchApp(entry.packageName)
             orchestrator.record(entry.key, null, null, entry.packageName, outcomeId(outcome))
             when (outcome) {
-                GameLauncher.Outcome.Started -> startSession(entry.key, null, entry.packageName)
+                GameLauncher.Outcome.Started -> {
+                    sound.play(UiSound.Launch)
+                    startSession(entry.key, null, entry.packageName)
+                }
                 else -> {
                     opening = null
                     showDialog(
                         DialogSpec(
+                            error = true,
                             title = UiText.res(R.string.dialog_app_missing_title),
                             message = UiText.res(R.string.dialog_app_missing_msg, entry.displayTitle),
                             confirm = DialogButton(UiText.res(R.string.remove)) { repo.removeApp(entry.packageName) },
@@ -438,6 +516,7 @@ class ElyndraViewModel @Inject constructor(
         if (!app.files.hasPermission(folder.treeUri)) {
             showDialog(
                 DialogSpec(
+                    error = true,
                     title = UiText.res(R.string.dialog_permission_lost_title),
                     message = UiText.res(R.string.dialog_permission_lost_msg, folder.displayPath),
                     confirm = DialogButton(UiText.res(R.string.ok)) {},
@@ -456,6 +535,7 @@ class ElyndraViewModel @Inject constructor(
                     if (emuId == null) {
                         showDialog(
                             DialogSpec(
+                                error = true,
                                 title = UiText.res(R.string.dialog_no_emulator_title),
                                 message = UiText.res(R.string.dialog_no_emulator_msg),
                                 confirm = DialogButton(UiText.res(R.string.change_emulator)) { pickFolderEmulator(folder) },
@@ -484,13 +564,23 @@ class ElyndraViewModel @Inject constructor(
         val pkg = orchestrator.packageFor(emuId)
         orchestrator.record(rom.key, rom.systemId, emuId, pkg, outcomeId(outcome))
         if (outcome == GameLauncher.Outcome.Started) {
+            sound.play(UiSound.Launch)
             startSession(rom.key, emuId, pkg)
+            return
+        }
+        // No se pudo arrancar el juego directamente: el emulador está abierto y
+        // el usuario lo elige dentro. La sesión se mide igual.
+        if (outcome == GameLauncher.Outcome.OpenedApp) {
+            sound.play(UiSound.Launch)
+            startSession(rom.key, emuId, pkg)
+            showToast(UiText.res(R.string.toast_pick_game_in_app, emuName))
             return
         }
         when (outcome) {
             GameLauncher.Outcome.NotInstalled -> emulatorMissing(emuId, emuName, folder, rom)
             GameLauncher.Outcome.NeedsPath -> showDialog(
                 DialogSpec(
+                    error = true,
                     title = UiText.res(R.string.dialog_needs_path_title),
                     message = UiText.res(R.string.dialog_needs_path_msg, emuName),
                     confirm = DialogButton(UiText.res(R.string.choose_other)) { pickFolderEmulator(folder) },
@@ -499,6 +589,7 @@ class ElyndraViewModel @Inject constructor(
             )
             GameLauncher.Outcome.NeedsVitaTitle -> showDialog(
                 DialogSpec(
+                    error = true,
                     title = UiText.res(R.string.dialog_vita_title),
                     message = UiText.res(R.string.dialog_vita_msg),
                     confirm = DialogButton(UiText.res(R.string.ok)) {},
@@ -509,6 +600,7 @@ class ElyndraViewModel @Inject constructor(
             // una salida: se ofrece, ya explicado, en vez de hacerlo a ciegas.
             GameLauncher.Outcome.NeedsPcLauncher -> showDialog(
                 DialogSpec(
+                    error = true,
                     title = UiText.res(R.string.dialog_pc_launcher_title, emuName),
                     message = UiText.res(R.string.dialog_pc_launcher_msg, emuName),
                     confirm = DialogButton(UiText.res(R.string.open_runtime, emuName)) { openRuntime(emuId) },
@@ -525,13 +617,14 @@ class ElyndraViewModel @Inject constructor(
             )
             is GameLauncher.Outcome.Failed -> showDialog(
                 DialogSpec(
+                    error = true,
                     title = UiText.res(R.string.dialog_launch_failed_title),
                     message = UiText.res(R.string.dialog_launch_failed_msg, emuName, outcome.reason),
                     confirm = DialogButton(UiText.res(R.string.choose_other)) { pickFolderEmulator(folder) },
                     dismiss = DialogButton(UiText.res(R.string.close)) {},
                 ),
             )
-            GameLauncher.Outcome.Started -> Unit
+            GameLauncher.Outcome.Started, GameLauncher.Outcome.OpenedApp -> Unit
         }
     }
 
@@ -587,7 +680,7 @@ class ElyndraViewModel @Inject constructor(
 
     /** La línea de Masha en el velo, en palabras. */
     private fun outcomeId(outcome: GameLauncher.Outcome): String = when (outcome) {
-        GameLauncher.Outcome.Started -> LaunchOutcome.STARTED
+        GameLauncher.Outcome.Started, GameLauncher.Outcome.OpenedApp -> LaunchOutcome.STARTED
         GameLauncher.Outcome.NotInstalled -> LaunchOutcome.NOT_INSTALLED
         GameLauncher.Outcome.NeedsPath -> LaunchOutcome.NEEDS_PATH
         GameLauncher.Outcome.NeedsVitaTitle -> LaunchOutcome.NEEDS_VITA_TITLE
@@ -673,13 +766,14 @@ class ElyndraViewModel @Inject constructor(
     /** Abrir el runtime de Windows y apartarse: el juego se elige dentro. */
     private fun openRuntime(emuId: String) {
         val pkg = Emulators.byId(emuId)?.let { launcher.installedComponent(it) }?.substringBefore('/') ?: return
-        launcher.launchApp(pkg)
+        if (launcher.launchApp(pkg) == GameLauncher.Outcome.Started) sound.play(UiSound.Launch)
     }
 
     private fun emulatorMissing(emuId: String, emuName: String, folder: RomFolder, rom: RomEntry) {
         val profile = Emulators.byId(emuId)
         showDialog(
             DialogSpec(
+                error = true,
                 title = UiText.res(R.string.dialog_emulator_missing_title, emuName),
                 message = UiText.res(R.string.dialog_emulator_missing_msg),
                 confirm = DialogButton(UiText.res(R.string.choose_other)) {
@@ -717,6 +811,9 @@ class ElyndraViewModel @Inject constructor(
         refreshInventory()
         viewModelScope.launch {
             repo.awaitLoaded()
+            // Si cambió el idioma de la app (o hay descripciones sin idioma de antes),
+            // se piden las del idioma de ahora en segundo plano; no hay nada que esperar.
+            engine.refreshDescriptions()
             val session = sessions.finish()
             if (session != null) afterSession(session)
             // Lo que Masha tenga que decir sale ya, con la sesión recién cerrada:
@@ -725,7 +822,11 @@ class ElyndraViewModel @Inject constructor(
             refreshInstalled()
             if (library.folders.isNotEmpty() && System.currentTimeMillis() - library.lastAutoScan > AUTO_RESCAN_MS) {
                 repo.markAutoScan(System.currentTimeMillis())
+                lastPs4Scan = System.currentTimeMillis()
                 library.folders.forEach { rescan(it, silent = true) }
+            } else {
+                // Lo que se instaló en Bachata mientras tanto aparece al volver.
+                rescanPs4Folders()
             }
         }
     }
@@ -839,16 +940,167 @@ class ElyndraViewModel @Inject constructor(
     suspend fun rescan(folder: RomFolder, silent: Boolean): LibraryRepository.ScanDiff? {
         if (!app.files.hasPermission(folder.treeUri)) return null
         val system = Systems.byId(folder.systemId) ?: return null
-        val found = runCatching { app.scanner.scan(Uri.parse(folder.treeUri), folder.rootDocId, system) }.getOrNull() ?: return null
+        val tree = Uri.parse(folder.treeUri)
+        val found = if (system.id == Ps4.SYSTEM_ID) {
+            val ps4 = runCatching { app.scanner.scanPs4(tree, folder.rootDocId) }.getOrNull() ?: return null
+            ps4NotInstalled = ps4NotInstalled + (folder.id to ps4.notInstalled.size)
+            ps4.found
+        } else {
+            runCatching { app.scanner.scan(tree, folder.rootDocId, system) }.getOrNull() ?: return null
+        }
         val before = library.roms.count { it.folderId == folder.id }
         if (found.isEmpty() && before > 0) {
             if (!silent) showToast(UiText.res(R.string.toast_folder_unreachable, folder.displayPath))
             return null
         }
         val diff = repo.mergeScan(folder.id, found)
+        if (system.id == Ps4.SYSTEM_ID) importPs4Art(folder)
         if (diff.added.isNotEmpty() && app.settings.autoMeta) engine.start(diff.added, force = false)
         if (!silent) showToast(UiText.res(R.string.toast_rescan, diff.added.size, diff.removed))
         return diff
+    }
+
+    /* ── lo que hay en el dispositivo y no está en la biblioteca (Masha) ── */
+
+    /** Un juego de una carpeta con acceso que no está en la biblioteca. */
+    data class AddableRom(val folder: RomFolder, val found: RomScanner.Found, val title: String, val removedBefore: Boolean)
+
+    /** Apps instaladas que no están en la biblioteca (los juegos primero). */
+    suspend fun addableApps(): List<InstalledApp> {
+        val inLibrary = library.apps.map { it.packageName }.toSet()
+        return installedApps().filter { it.packageName !in inLibrary && it.packageName != app.packageName }
+            .sortedWith(compareByDescending<InstalledApp> { it.isGame }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.label })
+    }
+
+    /**
+     * ROMs y juegos de PC en carpetas a las que Elyndra ya tiene acceso pero
+     * que no están en la biblioteca: los nuevos (descargados después del
+     * último análisis) y los que el usuario quitó. Solo lee: no añade nada.
+     */
+    suspend fun addableRoms(): List<AddableRom> = withContext(Dispatchers.IO) {
+        library.folders.flatMap { folder ->
+            if (!app.files.hasPermission(folder.treeUri)) return@flatMap emptyList()
+            val system = Systems.byId(folder.systemId) ?: return@flatMap emptyList()
+            val tree = Uri.parse(folder.treeUri)
+            val found = if (system.id == Ps4.SYSTEM_ID) {
+                runCatching { app.scanner.scanPs4(tree, folder.rootDocId).found }.getOrNull()
+            } else {
+                runCatching { app.scanner.scan(tree, folder.rootDocId, system) }.getOrNull()
+            }.orEmpty()
+            val present = library.roms.filter { it.folderId == folder.id }.map { it.docId }.toSet()
+            found.filter { it.docId !in present }.map { f ->
+                AddableRom(folder, f, f.title ?: Names.cleanTitle(f.name, stripExtension = !f.isDir), removedBefore = f.docId in folder.excluded)
+            }
+        }
+    }
+
+    /** Añade juegos de carpetas (ver [addableRoms]); devuelve las claves nuevas. */
+    fun addRomsToLibrary(items: List<AddableRom>): List<String> {
+        val keys = items.groupBy { it.folder.id }.flatMap { (folderId, list) -> repo.addRoms(folderId, list.map { it.found }) }
+        if (keys.isNotEmpty() && app.settings.autoMeta) engine.start(keys, force = false)
+        return keys
+    }
+
+    /** La pantalla Añadir en la pestaña de ROMs (las carpetas las elige el usuario en el selector del sistema). */
+    fun openAddRoms() {
+        go(Screen.Add)
+        add.updateTab(AddTab.Roms)
+    }
+
+    /**
+     * Pone [emulatorId] en todas las carpetas de [systemId]. Devuelve lo que
+     * tenía cada carpeta, para poder deshacerlo.
+     */
+    fun setSystemEmulator(systemId: String, emulatorId: String): Map<String, String?> {
+        val folders = library.folders.filter { it.systemId == systemId }
+        val before = folders.associate { it.id to it.emulatorId }
+        folders.forEach { repo.setFolderEmulator(it.id, emulatorId) }
+        return before
+    }
+
+    fun restoreFolderEmulators(before: Map<String, String?>) {
+        before.forEach { (id, emu) -> repo.setFolderEmulator(id, emu) }
+    }
+
+    /* ── PlayStation 4 (Bachata S4) ───────────────────────────── */
+
+    /**
+     * Paquetes de juego (.pkg) sin extraer en cada carpeta de PS4, por el id de
+     * la carpeta. Se recalcula en cada análisis; lo enseña la cabecera de la carpeta.
+     */
+    var ps4NotInstalled by mutableStateOf<Map<String, Int>>(emptyMap()); private set
+
+    private var lastPs4Scan = 0L
+
+    /**
+     * Carpetas de PS4 al volver a Elyndra (de Bachata, normalmente): los juegos
+     * que se acaban de instalar aparecen solos y los que desaparecieron se van.
+     * Solo esas carpetas, y como mucho cada [PS4_RESCAN_MS]; el análisis lee
+     * pocas carpetas y cabeceras, y mergeScan + LibraryDiff solo escriben lo que cambia.
+     */
+    private suspend fun rescanPs4Folders() {
+        val now = System.currentTimeMillis()
+        if (now - lastPs4Scan < PS4_RESCAN_MS) return
+        val folders = library.folders.filter { it.systemId == Ps4.SYSTEM_ID }
+        if (folders.isEmpty()) return
+        lastPs4Scan = now
+        folders.forEach { rescan(it, silent = true) }
+    }
+
+    /**
+     * Icono y fondo del propio juego (`sce_sys/icon0.png` y `pic1.png`) para
+     * los que aún no tienen. Van como imagen de origen "local", sin fijar: si
+     * un servicio de metadatos trae la suya, la sustituye; si ninguno trae
+     * nada, se queda esta.
+     */
+    private suspend fun importPs4Art(folder: RomFolder) = withContext(Dispatchers.IO) {
+        val tree = Uri.parse(folder.treeUri)
+        val local = LocalMedia(app.contentResolver)
+        for (rom in library.roms.filter { it.folderId == folder.id && it.serial != null }) {
+            val needIcon = rom.meta.icon == null
+            val needHero = rom.meta.hero == null
+            if (!needIcon && !needHero) continue
+            fun image(vararg names: String): LocalImage? = names.firstNotNullOfOrNull { name ->
+                app.scanner.ps4SystemFile(tree, rom.docId, name)
+                    ?.let { local.readImage(DocumentsContract.buildDocumentUriUsingTree(tree, it)) }
+            }
+            val icon = if (needIcon) image("icon0.png")?.let { app.media.save(it.bytes, rom.key, "icon", it.extension) } else null
+            val hero = if (needHero) image("pic1.png", "pic0.png")?.let { app.media.save(it.bytes, rom.key, "hero", it.extension) } else null
+            if (icon == null && hero == null) continue
+            repo.updateMeta(rom.key) { old ->
+                val origins = old.artOrigins.toMutableMap()
+                if (icon != null && old.icon == null) origins["icon"] = ArtOrigin(LOCAL_SOURCE)
+                if (hero != null && old.hero == null) origins["hero"] = ArtOrigin(LOCAL_SOURCE)
+                old.copy(icon = old.icon ?: icon, hero = old.hero ?: hero, artOrigins = origins)
+            }
+        }
+    }
+
+    /**
+     * Una carpeta recién añadida: si es de PS4, se completa ya lo que el alta
+     * no hace (arte local y paquetes sin instalar) con un análisis silencioso.
+     */
+    fun onFolderAdded(folder: RomFolder) {
+        if (folder.systemId != Ps4.SYSTEM_ID) return
+        viewModelScope.launch {
+            lastPs4Scan = System.currentTimeMillis()
+            rescan(folder, silent = true)
+        }
+    }
+
+    /** Abre Bachata S4 (desde la fila de paquetes sin instalar o el menú de la carpeta). */
+    fun openBachata() {
+        val pkg = BachataS4.PACKAGES.firstOrNull { launcher.isPackageInstalled(it) }
+        if (pkg == null) {
+            Emulators.byId(BachataS4.PROFILE_ID)?.let { openExternal(launcher.storeIntent(it)) }
+            return
+        }
+        if (launcher.launchApp(pkg) == GameLauncher.Outcome.Started) {
+            sound.play(UiSound.Launch)
+        } else {
+            sound.play(UiSound.Error)
+            showToast(UiText.res(R.string.dialog_launch_failed_title))
+        }
     }
 
     fun rescanFolder(folder: RomFolder) {
@@ -1050,10 +1302,22 @@ class ElyndraViewModel @Inject constructor(
      * quitar— en vez de en una lista seguida: así "Quitar carpeta" no queda a
      * un dedo de "Abrir", y las cuatro clases de imagen se leen juntas.
      */
-    /** Deja apuntado de dónde sale el menú antes de abrirlo. */
-    fun markSheetOrigin(origin: Offset?) {
-        sheetOrigin = origin
+    /** Deja apuntado de qué card sale el menú antes de abrirlo (pulsación larga). */
+    fun markSheetOrigin(bounds: Rect?) {
+        pendingOrigin = bounds
     }
+
+    /**
+     * La card seleccionada se ha colocado en [bounds]: si el menú se abre con
+     * el mando, sale de aquí. No es estado de Compose (cambia al desplazar el
+     * carrusel y nadie lo pinta).
+     */
+    fun noteSelectedCard(bounds: Rect) {
+        selectedCardBounds = bounds
+    }
+
+    /** El origen del menú de una card: la que se mantuvo pulsada o, con mando, la señalada. */
+    private fun cardOrigin(): Rect? = (pendingOrigin ?: selectedCardBounds).also { pendingOrigin = null }
 
     fun itemOptions(item: LibraryItem) {
         val groups = when (item) {
@@ -1061,7 +1325,7 @@ class ElyndraViewModel @Inject constructor(
                 SheetGroup(
                     UiText.res(R.string.sheet_group_play),
                     listOf(
-                        SheetAction(UiText.res(R.string.open), icon = SheetIcon.Play) { open(item) },
+                        SheetAction(UiText.res(R.string.open), icon = SheetIcon.Play, primary = true) { open(item) },
                         SheetAction(
                             UiText.res(R.string.change_emulator),
                             detail = item.emulatorName?.let { UiText.Raw(it) },
@@ -1079,7 +1343,15 @@ class ElyndraViewModel @Inject constructor(
                         SheetAction(UiText.res(R.string.refresh_metadata), icon = SheetIcon.Refresh) {
                             refreshMetadata(library.roms.filter { it.folderId == item.folder.id }.map { it.key })
                         },
-                    ) + restoreAction(item.folder),
+                    ) + restoreAction(item.folder) + listOfNotNull(
+                        // PS4: los .pkg se instalan en Bachata, no aquí.
+                        SheetAction(
+                            UiText.res(R.string.open_bachata),
+                            detail = ps4NotInstalled[item.folder.id]?.takeIf { it > 0 }
+                                ?.let { UiText.plural(R.plurals.ps4_pkgs_not_installed, it, it) },
+                            icon = SheetIcon.App,
+                        ) { openBachata() }.takeIf { item.folder.systemId == Ps4.SYSTEM_ID },
+                    ),
                 ),
                 removalGroup(UiText.res(R.string.remove_folder)) { removeFolder(item.folder) },
             )
@@ -1088,7 +1360,7 @@ class ElyndraViewModel @Inject constructor(
                 SheetGroup(
                     UiText.res(R.string.sheet_group_play),
                     listOf(
-                        SheetAction(UiText.res(R.string.open), icon = SheetIcon.Play) { open(item) },
+                        SheetAction(UiText.res(R.string.sheet_play), icon = SheetIcon.Play, primary = true) { open(item) },
                         SheetAction(UiText.res(R.string.details), icon = SheetIcon.Details, opensSheet = true) { showDetails(item.key) },
                     ),
                 ),
@@ -1096,6 +1368,7 @@ class ElyndraViewModel @Inject constructor(
                 SheetGroup(
                     UiText.res(R.string.sheet_group_manage),
                     listOf(
+                        SheetAction(UiText.res(R.string.identify_action), icon = SheetIcon.Search, opensSheet = true) { identify.open(item.key) },
                         SheetAction(UiText.res(R.string.refresh_metadata), icon = SheetIcon.Refresh) { refreshMetadata(listOf(item.key)) },
                     ),
                 ),
@@ -1108,7 +1381,7 @@ class ElyndraViewModel @Inject constructor(
             is LibraryItem.Folder -> UiText.Raw(item.folder.displayPath)
             is LibraryItem.App -> UiText.Raw(item.app.packageName)
         }
-        showSheet(ActionSheetSpec(UiText.Raw(item.name), subtitle, groups, thumbOf(item)))
+        showSheet(ActionSheetSpec(UiText.Raw(item.name), subtitle, groups, thumbOf(item), heroOf(item)), cardOrigin())
     }
 
     fun romOptions(rom: RomEntry) {
@@ -1120,7 +1393,7 @@ class ElyndraViewModel @Inject constructor(
                     SheetGroup(
                         UiText.res(R.string.sheet_group_play),
                         listOf(
-                            SheetAction(UiText.res(R.string.open), icon = SheetIcon.Play) { openRom(rom) },
+                            SheetAction(UiText.res(R.string.sheet_play), icon = SheetIcon.Play, primary = true) { openRom(rom) },
                             SheetAction(UiText.res(R.string.details), icon = SheetIcon.Details, opensSheet = true) { showDetails(rom.key) },
                             SheetAction(
                                 UiText.res(R.string.emulator_for_game),
@@ -1134,14 +1407,74 @@ class ElyndraViewModel @Inject constructor(
                     SheetGroup(
                         UiText.res(R.string.sheet_group_manage),
                         listOf(
+                            SheetAction(UiText.res(R.string.identify_action), icon = SheetIcon.Search, opensSheet = true) { identify.open(rom.key) },
                             SheetAction(UiText.res(R.string.refresh_metadata), icon = SheetIcon.Refresh) { refreshMetadata(listOf(rom.key)) },
                         ),
                     ),
                     removalGroup(UiText.res(R.string.remove_game)) { removeRom(rom) },
                 ),
-                SheetThumb(coverPath = rom.meta.cover, pairIndex = romPairIndex(rom)),
+                SheetThumb(coverPath = rom.meta.cover, fallback = romFallback(rom)),
+                heroOf(rom),
+            ),
+            cardOrigin(),
+        )
+    }
+
+    /* ── cabecera de juego del menú ───────────────────────────── */
+
+    private fun heroOf(item: LibraryItem): SheetHero = when (item) {
+        is LibraryItem.Folder -> SheetHero(
+            backgroundPath = item.heroPath,
+            logoPath = item.logoPath,
+            coverPath = item.coverPath,
+            iconPath = item.iconPath,
+            packageName = item.emulatorPackage,
+            fallback = fallbackOf(item),
+            info = listOfNotNull(
+                UiText.Raw(item.system.name),
+                item.emulatorName?.let { UiText.Raw(it) },
+                item.minutes.takeIf { it > 0 }?.let { UiText.Raw(fmtMinutes(it)) },
             ),
         )
+        is LibraryItem.App -> SheetHero(
+            backgroundPath = item.app.meta.hero ?: item.app.meta.screenshot,
+            logoPath = item.app.meta.logo,
+            coverPath = item.app.meta.cover,
+            iconPath = item.app.meta.icon,
+            packageName = item.app.packageName,
+            fallback = fallbackOf(item),
+            info = playInfo(item.app.stats.minutes, item.app.stats.lastPlayed) + UiText.Raw("Android"),
+        )
+    }
+
+    private fun heroOf(rom: RomEntry): SheetHero {
+        val folder = repo.folder(rom.folderId)
+        val emulator = (rom.emulatorId ?: folder?.emulatorId)?.let { emulatorName(it) }
+        return SheetHero(
+            backgroundPath = rom.meta.hero ?: rom.meta.screenshot,
+            logoPath = rom.meta.logo,
+            coverPath = rom.meta.cover,
+            iconPath = rom.meta.icon,
+            fallback = romFallback(rom),
+            info = playInfo(rom.stats.minutes, rom.stats.lastPlayed) +
+                listOfNotNull(Systems.byId(rom.systemId)?.name?.let { UiText.Raw(it) }, emulator?.let { UiText.Raw(it) }),
+        )
+    }
+
+    /** Tiempo jugado y última partida ("hoy", "ayer", "hace 3 días"); sin jugar, eso. */
+    private fun playInfo(minutes: Int, lastPlayed: Long): List<UiText> {
+        if (minutes <= 0 && lastPlayed <= 0) return listOf(UiText.res(R.string.never_played))
+        val out = ArrayList<UiText>(2)
+        if (minutes > 0) out += UiText.Raw(fmtMinutes(minutes))
+        if (lastPlayed > 0) {
+            val days = ((System.currentTimeMillis() - lastPlayed) / 86_400_000L).toInt().coerceAtLeast(0)
+            out += when (days) {
+                0 -> UiText.res(R.string.masha_today)
+                1 -> UiText.res(R.string.masha_yesterday)
+                else -> UiText.plural(R.plurals.masha_days_ago, days, days)
+            }
+        }
+        return out
     }
 
     /** La carátula (o el icono) que se enseña en la cabecera de la hoja. */
@@ -1150,13 +1483,13 @@ class ElyndraViewModel @Inject constructor(
             coverPath = item.coverPath,
             iconPath = item.iconPath ?: item.logoPath,
             packageName = item.emulatorPackage,
-            pairIndex = pairIndexOf(item),
+            fallback = fallbackOf(item),
         )
         is LibraryItem.App -> SheetThumb(
             coverPath = item.app.meta.cover,
             iconPath = item.app.meta.icon,
             packageName = item.app.packageName,
-            pairIndex = pairIndexOf(item),
+            fallback = fallbackOf(item),
         )
     }
 
@@ -1198,6 +1531,8 @@ class ElyndraViewModel @Inject constructor(
                     UiText.res(kind.removeLabel()),
                     destructive = true,
                     icon = SheetIcon.Remove,
+                    // Quitar una imagen no pasa por un diálogo: el menú lo protege.
+                    holdToConfirm = true,
                 ) { clearArt(key, kind) }
             }
         }
@@ -1235,7 +1570,7 @@ class ElyndraViewModel @Inject constructor(
                         if (!app.credentials.isConfigured(service) || !art.supports(key, service)) continue
                         val url = runCatching { art.candidates(key, kind, service) }
                             .getOrNull()?.firstOrNull()?.url ?: continue
-                        if (runCatching { art.apply(key, kind, url, service) }.getOrDefault(false)) {
+                        if (runCatching { art.apply(key, kind, url, service) is MediaResult.Saved }.getOrDefault(false)) {
                             // Si es la carpeta que se está mirando, la imagen
                             // se monta desde el polvo en cuanto llega; si no,
                             // entra sin más, que no hay nadie delante.
@@ -1259,7 +1594,7 @@ class ElyndraViewModel @Inject constructor(
             if (!app.credentials.isConfigured(service) || !art.supports(key, service)) continue
             val url = runCatching { art.candidates(key, kind, service) }
                 .getOrNull()?.firstOrNull()?.url ?: continue
-            if (runCatching { art.apply(key, kind, url, service) }.getOrDefault(false)) return true
+            if (runCatching { art.apply(key, kind, url, service) is MediaResult.Saved }.getOrDefault(false)) return true
         }
         return false
     }
@@ -1351,12 +1686,19 @@ class ElyndraViewModel @Inject constructor(
         mediaRequest = MediaRequest(IMAGE_MIME_TYPES) { uri ->
             if (uri == null) return@MediaRequest
             viewModelScope.launch {
+                repo.flush()
                 val image = withContext(Dispatchers.IO) { app.localMedia.readImage(uri) }
                 if (image == null) {
                     showToast(UiText.res(R.string.art_local_failed))
                     return@launch
                 }
-                val ok = art.applyLocal(key, kind, image)
+                val ok = try {
+                    art.applyLocal(key, kind, image)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    false
+                }
                 if (ok) materializeArt(key, kind)
                 showToast(UiText.res(if (ok) R.string.art_applied else R.string.art_local_failed))
             }
@@ -1389,12 +1731,15 @@ class ElyndraViewModel @Inject constructor(
             detail = UiText.res(R.string.art_from_gallery_hint),
             icon = SheetIcon.Gallery,
         ) { pickLocalArt(key, kind) }
+        // Si la imagen es una elegida a mano, se puede volver a la automática.
+        val reset = SheetAction(UiText.res(R.string.art_reset), icon = SheetIcon.Refresh) { resetArt(key, kind) }
+            .takeIf { art.isPinned(key, kind) }
         showSheet(
             ActionSheetSpec(
                 UiText.res(kind.label()),
                 UiText.Raw(title),
                 listOf(
-                    SheetGroup(UiText.res(R.string.art_group_yours), listOf(gallery)),
+                    SheetGroup(UiText.res(R.string.art_group_yours), listOfNotNull(gallery, reset)),
                     SheetGroup(UiText.res(R.string.art_group_services), actions),
                 ),
             ),
@@ -1425,10 +1770,40 @@ class ElyndraViewModel @Inject constructor(
         artPicker = state.copy(applying = candidate.url)
         artJob?.cancel()
         artJob = viewModelScope.launch {
-            val ok = art.apply(state.key, state.kind, candidate.url, state.service)
-            if (ok) materializeArt(state.key, state.kind)
-            artPicker = null
-            showToast(UiText.res(if (ok) R.string.art_applied else R.string.art_apply_failed))
+            // Lo pendiente de la biblioteca se escribe antes de descargar nada:
+            // pase lo que pase después, lo hecho hasta aquí ya está en disco.
+            repo.flush()
+            val result = try {
+                art.apply(state.key, state.kind, candidate.url, state.service)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                MediaResult.Failed(MediaFailure.Storage)
+            }
+            if (result is MediaResult.Saved) {
+                materializeArt(state.key, state.kind)
+                artPicker = null
+                showToast(UiText.res(R.string.art_applied))
+            } else {
+                // Se queda la imagen que había y el selector abierto: se puede elegir otra.
+                artPicker = artPicker?.takeIf { it.key == state.key }?.copy(applying = null)
+                showToast(UiText.res(artFailureText((result as MediaResult.Failed).reason)))
+            }
+        }
+    }
+
+    private fun artFailureText(reason: MediaFailure): Int = when (reason) {
+        MediaFailure.Network -> R.string.art_failed_network
+        MediaFailure.Http, MediaFailure.Storage -> R.string.art_apply_failed
+        MediaFailure.TooBig, MediaFailure.TooSmall, MediaFailure.Unsupported, MediaFailure.Undecodable -> R.string.art_failed_image
+    }
+
+    /** "Restablecer automático": fuera la imagen elegida a mano y se vuelve a pedir la de los metadatos. */
+    fun resetArt(key: String, kind: ArtKind) {
+        viewModelScope.launch {
+            art.clear(key, kind)
+            if (key.startsWith("f:")) autoFolderArt(listOf(key)) else engine.refresh(key)
+            showToast(UiText.res(R.string.art_reset_done))
         }
     }
 
@@ -1524,7 +1899,9 @@ class ElyndraViewModel @Inject constructor(
 
     fun dismissDialog() { dialog = null }
 
-    fun showSheet(spec: ActionSheetSpec) {
+    /** [origin]: la card de la que sale el menú (ver [sheetOrigin]); null = de ninguna. */
+    fun showSheet(spec: ActionSheetSpec, origin: Rect? = null) {
+        sheetOrigin = origin
         sheet = spec
         input.onSheetShown()
     }
@@ -1576,6 +1953,12 @@ class ElyndraViewModel @Inject constructor(
          */
         private const val MATERIALIZE_TIMEOUT_MS = 2_500L
         private const val AUTO_RESCAN_MS = 6L * 60 * 60 * 1000
+
+        /** Tope entre dos análisis de las carpetas de PS4 al volver a primer plano. */
+        private const val PS4_RESCAN_MS = 10_000L
+
+        /** Origen de las imágenes que salen del propio juego (ver [ArtOrigin]). */
+        private const val LOCAL_SOURCE = "local"
 
         /**
          * Lo que acepta el selector de "Elegir de la galería": cualquier

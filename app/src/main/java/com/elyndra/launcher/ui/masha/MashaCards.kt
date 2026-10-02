@@ -19,6 +19,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.elyndra.launcher.data.BrandTokens
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.indication
+import com.elyndra.launcher.ui.theme.focusRing
+import com.elyndra.launcher.ui.theme.shapeClickable
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -31,11 +37,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
-import com.elyndra.launcher.data.pairIndexFor
 import com.elyndra.launcher.masha.MashaAttachment
 import com.elyndra.launcher.ui.ChatMessage
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.MashaGameRef
+import com.elyndra.launcher.ui.components.ArtFallback
 import com.elyndra.launcher.ui.components.ArtImage
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GameIcon
@@ -49,12 +55,12 @@ import com.elyndra.launcher.ui.theme.animMsgIn
  * holograma necesita oscuridad, así que no sigue al tema claro/oscuro.
  */
 internal object Holo {
-    val bg = Color(0xFF040913)
-    val panel = Color(0xFF0A1630)
-    val line = Color(0xFF5CE1FF)
-    val text = Color(0xFFE9F4FF)
-    val dim = Color(0xFF8EA6C8)
-    val user = Color(0xFF1B3B7A)
+    val bg = Color(BrandTokens.HOLO_BG)
+    val panel = Color(BrandTokens.HOLO_PANEL)
+    val line = Color(BrandTokens.HOLO_LINE)
+    val text = Color(BrandTokens.HOLO_TEXT)
+    val dim = Color(BrandTokens.HOLO_DIM)
+    val user = Color(BrandTokens.HOLO_USER)
 }
 
 internal fun Modifier.holoPanel(shape: RoundedCornerShape, glow: Color, alpha: Float = 0.72f): Modifier =
@@ -89,6 +95,7 @@ internal fun HoloMessage(vm: ElyndraViewModel, msg: ChatMessage, glow: Color, la
                         is MashaAttachment.Games -> GamesStrip(vm, a)
                         is MashaAttachment.Plan -> PlanCard(vm, a, glow)
                         is MashaAttachment.ArcCard -> ArcStrip(vm, a)
+                        is MashaAttachment.Confirm -> ConfirmCard(vm, a, glow)
                         is MashaAttachment.Done, null -> msg.game?.let { GameMention(it) { vm.showDetails(it.key) } }
                     }
                     if (msg.offline) {
@@ -177,18 +184,26 @@ private fun GamesStrip(vm: ElyndraViewModel, a: MashaAttachment.Games) {
 
 @Composable
 private fun GameThumb(ref: MashaGameRef, onClick: () -> Unit) {
-    Column(Modifier.width(74.dp).clickable(onClick = onClick), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    // Se pulsa la miniatura y su título; el realce va solo en la miniatura, con su forma.
+    val interaction = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(10.dp)
+    Column(
+        Modifier.width(74.dp).clickable(interactionSource = interaction, indication = null, onClick = onClick),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
         Box(
             Modifier
                 .width(74.dp)
                 .height(if (ref.packageName != null) 74.dp else 100.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color.White.copy(alpha = 0.08f)),
+                .clip(shape)
+                .background(Color.White.copy(alpha = 0.08f))
+                .indication(interaction, focusRing(shape)),
         ) {
             if (ref.packageName != null) {
-                GameIcon(ref.artPath, ref.packageName, Modifier.fillMaxSize().padding(6.dp), ContentScale.Fit)
+                // El icono llena la miniatura: sin margen ni caja clara alrededor.
+                GameIcon(ref.artPath, ref.packageName, Modifier.fillMaxSize(), ContentScale.Crop)
             } else {
-                ArtImage(ref.artPath, pairIndexFor(ref.title), Modifier.fillMaxSize())
+                ArtImage(ref.artPath, ArtFallback(ref.key, ref.title), Modifier.fillMaxSize(), showTitle = false)
             }
         }
         ElyText(ref.title, size = 9.5f, weight = FontWeight.SemiBold, color = Holo.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -196,6 +211,55 @@ private fun GameThumb(ref: MashaGameRef, onClick: () -> Unit) {
 }
 
 /** Plan de sesión: cada juego con sus minutos y el botón para empezar por el primero. */
+/**
+ * Lo que Masha va a cambiar, a la espera del visto bueno: qué es, la lista
+ * (si son varios juegos) y Confirmar / Cancelar. Contestada, solo el estado.
+ */
+@Composable
+private fun ConfirmCard(vm: ElyndraViewModel, c: MashaAttachment.Confirm, glow: Color) {
+    val live = c.state == com.elyndra.launcher.masha.ConfirmState.PENDING && vm.masha.isWritePending(c.id)
+    val title = when (c.kind) {
+        com.elyndra.launcher.masha.ConfirmKind.ADD_GAMES -> pluralStringResource(R.plurals.masha_confirm_add, c.items.size, c.items.size)
+        com.elyndra.launcher.masha.ConfirmKind.RENAME -> stringResource(R.string.masha_confirm_rename, c.items.getOrElse(0) { "?" }, c.items.getOrElse(1) { "?" })
+        com.elyndra.launcher.masha.ConfirmKind.SET_EMULATOR -> stringResource(R.string.masha_confirm_emulator, c.items.getOrElse(0) { "?" }, c.items.getOrElse(1) { "?" })
+        else -> c.kind
+    }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.White.copy(alpha = 0.05f))
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        ElyText(title, size = 11.5f, weight = FontWeight.Bold, color = Holo.text)
+        if (c.kind == com.elyndra.launcher.masha.ConfirmKind.ADD_GAMES) {
+            c.items.take(12).forEach { ElyText("• $it", size = 10f, color = Holo.dim, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            if (c.items.size > 12) ElyText(stringResource(R.string.masha_confirm_more, c.items.size - 12), size = 10f, color = Holo.dim)
+            if (c.skipped > 0) ElyText(stringResource(R.string.masha_confirm_skipped, c.skipped), size = 9.5f, color = Holo.dim)
+        }
+        when {
+            live -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                HoloButton(stringResource(R.string.masha_confirm_ok), glow) { vm.masha.confirmWrite(c.id) }
+                HoloButton(stringResource(R.string.cancel), Holo.dim) { vm.masha.cancelWrite(c.id) }
+            }
+            else -> ElyText(
+                stringResource(
+                    when (c.state) {
+                        com.elyndra.launcher.masha.ConfirmState.DONE -> R.string.masha_confirm_state_done
+                        com.elyndra.launcher.masha.ConfirmState.CANCELLED -> R.string.masha_confirm_state_cancelled
+                        else -> R.string.masha_confirm_state_expired
+                    },
+                ),
+                size = 9f,
+                weight = FontWeight.SemiBold,
+                color = Holo.dim,
+                uppercase = true,
+            )
+        }
+    }
+}
+
 @Composable
 private fun PlanCard(vm: ElyndraViewModel, plan: MashaAttachment.Plan, glow: Color) {
     val items = plan.blocks.mapNotNull { b -> vm.masha.gameRef(b.key)?.let { it to b.minutes } }
@@ -210,7 +274,7 @@ private fun PlanCard(vm: ElyndraViewModel, plan: MashaAttachment.Plan, glow: Col
     ) {
         items.forEach { (ref, minutes) ->
             Row(
-                Modifier.fillMaxWidth().clickable { vm.showDetails(ref.key) },
+                Modifier.fillMaxWidth().shapeClickable(RoundedCornerShape(8.dp)) { vm.showDetails(ref.key) },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -218,7 +282,7 @@ private fun PlanCard(vm: ElyndraViewModel, plan: MashaAttachment.Plan, glow: Col
                     if (ref.packageName != null) {
                         GameIcon(ref.artPath, ref.packageName, Modifier.fillMaxSize(), ContentScale.Crop)
                     } else {
-                        ArtImage(ref.artPath, pairIndexFor(ref.title), Modifier.fillMaxSize())
+                        ArtImage(ref.artPath, ArtFallback(ref.key, ref.title), Modifier.fillMaxSize(), showTitle = false)
                     }
                 }
                 Column(Modifier.weight(1f)) {
@@ -287,7 +351,7 @@ internal fun HoloButton(label: String, glow: Color, onClick: () -> Unit) {
             .clip(RoundedCornerShape(10.dp))
             .background(glow.copy(alpha = 0.22f))
             .border(1.dp, glow.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
+            .shapeClickable(RoundedCornerShape(10.dp), onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 7.dp),
     ) {
         ElyText(label, size = 11.5f, weight = FontWeight.Bold, color = Holo.text, maxLines = 1)

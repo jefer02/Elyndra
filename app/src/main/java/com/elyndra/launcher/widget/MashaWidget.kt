@@ -1,5 +1,6 @@
 package com.elyndra.launcher.widget
 
+import com.elyndra.launcher.data.FallbackPalette
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -40,6 +41,11 @@ import androidx.glance.unit.ColorProvider
 import com.elyndra.launcher.MainActivity
 import com.elyndra.launcher.R
 import com.elyndra.launcher.data.AppLocale
+import com.elyndra.launcher.data.argb
+import com.elyndra.launcher.data.SettingsStore
+import com.elyndra.launcher.data.ColorMath
+import com.elyndra.launcher.data.BrandTokens
+import com.elyndra.launcher.data.ACCENTS
 import com.elyndra.launcher.domain.session.SessionMood
 import com.elyndra.launcher.domain.session.SessionPlanner
 import com.elyndra.launcher.library.AppCatalog
@@ -109,9 +115,45 @@ class MashaWidget : GlanceAppWidget() {
             } else {
                 decode(context, g.meta.cover ?: g.meta.icon)
             }
-            WidgetPick(g.key, g.title, g.system?.short ?: "Android", art)
+            // Sin arte, la versión simplificada del arte de reserva (sin grano ni icono).
+            WidgetPick(g.key, g.title, g.system?.short ?: "Android", art ?: fallbackBitmap(g.key))
         }
         return WidgetState(line, picks)
+    }
+
+    /**
+     * El arte de reserva del widget: la base del juego con los blobs claro y
+     * profundo, viñeta y reflejo. Un bitmap pequeño, como las carátulas.
+     */
+    private fun fallbackBitmap(key: String): Bitmap {
+        val w = FALLBACK_W
+        val h = FALLBACK_H
+        val t = FallbackPalette.of(null, key)
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val c = android.graphics.Canvas(bmp)
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        c.drawColor(ColorMath.mix(t.base, t.deep, 0.35f))
+        fun blob(cx: Float, cy: Float, r: Float, color: Int, alpha: Float) {
+            paint.shader = android.graphics.RadialGradient(
+                cx, cy, r, ColorMath.withAlpha(color, alpha), ColorMath.withAlpha(color, 0f), android.graphics.Shader.TileMode.CLAMP,
+            )
+            c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+        }
+        val side = maxOf(w, h).toFloat()
+        blob(w * (0.65f + 0.3f * FallbackPalette.unit(key, 3)), h * 0.85f, side * 0.9f, t.deep, 0.95f)
+        blob(w * (0.55f + 0.35f * FallbackPalette.unit(key, 6)), h * 0.3f, side * 0.55f, t.base, 0.9f)
+        blob(w * (0.1f + 0.3f * FallbackPalette.unit(key, 0)), h * 0.1f, side * 0.75f, t.light, 0.85f)
+        paint.shader = android.graphics.RadialGradient(
+            w / 2f, h / 2f, side * 0.62f,
+            intArrayOf(0, 0, ColorMath.withAlpha(BrandTokens.SHADE, 0.5f)), floatArrayOf(0f, 0.55f, 1f),
+            android.graphics.Shader.TileMode.CLAMP,
+        )
+        c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+        paint.shader = android.graphics.LinearGradient(
+            0f, 0f, w * 0.7f, h * 0.7f, ColorMath.withAlpha(0xFFFFFFFF.toInt(), 0.16f), 0, android.graphics.Shader.TileMode.CLAMP,
+        )
+        c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+        return bmp
     }
 
     /** Carátula reducida: un RemoteViews con imágenes grandes no se llega a pintar. */
@@ -127,11 +169,15 @@ class MashaWidget : GlanceAppWidget() {
     @Composable
     private fun Content(context: Context, state: WidgetState) {
         val white = ColorProvider(Color.White)
+        // El acento del usuario, como texto sobre el fondo oscuro del widget (AA).
+        val accentId = SettingsStore(context).accentId
+        val accent = ACCENTS.firstOrNull { it.id == accentId } ?: ACCENTS.first()
+        val accentText = Color(ColorMath.ensureContrast(accent.content(dark = true).argb(), BrandTokens.WIDGET_BG, 4.5))
         Column(
             GlanceModifier
                 .fillMaxSize()
                 .cornerRadius(22.dp)
-                .background(Color(0xF0151A20))
+                .background(Color(BrandTokens.WIDGET_BG))
                 .padding(12.dp),
         ) {
             Row(
@@ -151,7 +197,7 @@ class MashaWidget : GlanceAppWidget() {
             Text(
                 state.line,
                 maxLines = 3,
-                style = TextStyle(color = ColorProvider(Color(0xDDFFFFFF)), fontSize = 11.5.sp),
+                style = TextStyle(color = ColorProvider(Color.White.copy(alpha = 0.87f)), fontSize = 11.5.sp),
                 modifier = GlanceModifier.clickable(actionStartActivity(MainActivity.openMashaIntent(context))),
             )
             if (state.picks.isNotEmpty()) {
@@ -159,7 +205,7 @@ class MashaWidget : GlanceAppWidget() {
                 Row(GlanceModifier.fillMaxWidth()) {
                     state.picks.forEachIndexed { i, pick ->
                         if (i > 0) Spacer(GlanceModifier.width(8.dp))
-                        Pick(context, pick, GlanceModifier.defaultWeight())
+                        Pick(context, pick, GlanceModifier.defaultWeight(), accentText)
                     }
                 }
             }
@@ -167,12 +213,12 @@ class MashaWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun Pick(context: Context, pick: WidgetPick, modifier: GlanceModifier) {
+    private fun Pick(context: Context, pick: WidgetPick, modifier: GlanceModifier, accentText: Color) {
         val launch: Intent = MainActivity.launchGameIntent(context, pick.key)
         Row(
             modifier
                 .cornerRadius(14.dp)
-                .background(Color(0x22FFFFFF))
+                .background(Color.White.copy(alpha = 0.13f))
                 .padding(6.dp)
                 .clickable(actionStartActivity(launch)),
             verticalAlignment = Alignment.CenterVertically,
@@ -185,7 +231,7 @@ class MashaWidget : GlanceAppWidget() {
                     contentScale = ContentScale.Crop,
                 )
             } else {
-                Box(GlanceModifier.size(38.dp, 50.dp).cornerRadius(8.dp).background(Color(0x44FFFFFF))) {}
+                Box(GlanceModifier.size(38.dp, 50.dp).cornerRadius(8.dp).background(Color.White.copy(alpha = 0.27f))) {}
             }
             Spacer(GlanceModifier.width(8.dp))
             Column {
@@ -197,7 +243,7 @@ class MashaWidget : GlanceAppWidget() {
                 Text(
                     "▶ " + AppLocale.wrap(context).getString(R.string.widget_play) + " · " + pick.platform,
                     maxLines = 1,
-                    style = TextStyle(color = ColorProvider(Color(0xFFC9B6FF)), fontSize = 9.5.sp),
+                    style = TextStyle(color = ColorProvider(accentText), fontSize = 9.5.sp),
                 )
             }
         }
@@ -207,6 +253,8 @@ class MashaWidget : GlanceAppWidget() {
         const val MAX_PICKS = 2
         const val COVER_PX = 160
         const val ICON_PX = 96
+        const val FALLBACK_W = 76
+        const val FALLBACK_H = 100
     }
 }
 

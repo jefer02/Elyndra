@@ -109,6 +109,14 @@ object Systems {
             "ps3 playstation3 sonyplaystation3", ss = 59, igdb = listOf(9), ra = 82, pair = 2,
             emus = listOf("aps3e", "armsx3", "emucorec"), disc = true, dirGames = true,
         ),
+        // PS4: juegos extraídos por Bachata S4. No se buscan por extensión: se
+        // reconocen por su contenido (sce_sys/param.sfo + eboot.bin, ver Ps4.kt).
+        // Los .pkg no son juegos jugables: el análisis de PS4 solo lee su cabecera.
+        sys(
+            "ps4", "PlayStation 4", "PS4", "PS4", "",
+            "ps4 playstation4 sonyplaystation4 play4 ps4games playstation4games juegosps4 sonyps4 orbis", ss = 60, igdb = listOf(48), ra = null, pair = 3,
+            emus = listOf("bachata_s4"), disc = true, dirGames = true,
+        ),
         sys(
             "xbox360", "Xbox 360", "XBOX 360", "360", "iso xex zar",
             "xbox360 x360 360 microsoftxbox360", ss = 33, igdb = listOf(12), ra = null, pair = 3,

@@ -162,6 +162,23 @@ internal class MashaAnimator(
         if (eyeR >= 0) { skeleton.modelQuat(model, eyeR, q1); conj(q1, q2); quatRotate(q2, fwd, eyeFwdR) }
     }
 
+    /**
+     * Punto entre los ojos (o, sin huesos de ojos, delante de la cabeza) en el
+     * espacio del modelo, en la pose de este fotograma. False antes del primero.
+     */
+    fun faceCenter(out: FloatArray): Boolean {
+        if (frames == 0) return false
+        if (eyeL >= 0 && eyeR >= 0) {
+            for (i in 0..2) out[i] = 0.5f * (model[16 * eyeL + 12 + i] + model[16 * eyeR + 12 + i])
+            return true
+        }
+        if (head >= 0) {
+            for (i in 0..2) out[i] = model[16 * head + 12 + i] + 0.09f * up[i]
+            return true
+        }
+        return false
+    }
+
     /** Texto para el registro: ejes medidos y el eje delantero del ojo en su marco local. */
     fun describeFrame(): String =
         "fwd=${fmt(fwd)} left=${fmt(left)} up=${fmt(up)} eyeFwdLocal=${fmt(eyeFwdL)} headFwdLocal=${fmt(headFwd)}"

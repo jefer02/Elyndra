@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui
 
+import com.elyndra.launcher.ui.screens.IdentifySheet
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.scaleIn
@@ -22,11 +23,7 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.snap
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -47,7 +44,6 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.components.GameActionOverlayContainer
-import com.elyndra.launcher.ui.components.BootSplash
 import com.elyndra.launcher.ui.components.ElyDialogView
 import com.elyndra.launcher.ui.components.LocalScreenSize
 import com.elyndra.launcher.ui.components.ToastView
@@ -62,6 +58,11 @@ import com.elyndra.launcher.ui.screens.MashaScreen
 import com.elyndra.launcher.ui.screens.SettingsScreen
 import com.elyndra.launcher.ui.screens.VoiceSyncScreen
 import com.elyndra.launcher.ui.theme.ElyndraTheme
+import com.elyndra.launcher.ui.theme.LocalSkin
+import com.elyndra.launcher.ui.masha.Holo
+import com.elyndra.launcher.ui.intro.BootIntro
+import androidx.compose.runtime.key
+import com.elyndra.launcher.data.argb
 
 /**
  * Raíz de la app.
@@ -85,7 +86,11 @@ fun ElyndraApp(vm: ElyndraViewModel) {
         request?.let { mediaPicker.launch(it.mimeTypes.toTypedArray()) }
     }
 
+    // Menús, diálogos y pantallas que cambian suenan desde aquí (ver UiSoundEffects).
+    UiSoundEffects(vm)
+
     ElyndraTheme(skin = vm.settings.skin, landscape = landscape) {
+    CompositionLocalProvider(LocalUiSounds provides vm.sound) {
         // Atrás cierra, por orden: diálogo, hoja, ficha, pantalla y buscador.
         // Atrás predictivo (Android 13+): mientras el gesto dura, la pantalla
         // que se abandona se encoge y se apaga siguiendo al dedo; si el gesto
@@ -121,11 +126,30 @@ fun ElyndraApp(vm: ElyndraViewModel) {
             }
         }
 
-        Box(Modifier.fillMaxSize().background(P.paper)) {
+        // Masha y la calibración de voz son oscuras de borde a borde: el fondo de
+        // la raíz también, o la franja de la muesca (fuera del padding de
+        // insets) quedaría clara junto a ellas.
+        val holoScreen = vm.screen == Screen.Masha || vm.screen == Screen.VoiceSync
+        Box(Modifier.fillMaxSize().background(if (holoScreen) Holo.bg else P.paper)) {
+            // Las barras van ocultas (pantalla completa), así que sus insets son 0;
+            // se mantiene el del recorte de pantalla para que en un móvil con muesca
+            // el contenido no quede debajo.
+            // La pantalla entera va dentro del contenedor del menú de
+            // acciones: es él quien la desenfoca y la oscurece cuando el menú
+            // está abierto, y quien monta el overlay por encima.
+            GameActionOverlayContainer(
+                isOverlayVisible = vm.sheet != null,
+                onOverlayDismissed = vm::dismissSheet,
+                spec = vm.sheet,
+                input = vm.input,
+                origin = vm.sheetOrigin,
+                dimForOtherLayer = vm.dialog != null,
+            ) {
             // Fondo de la app (solo de Elyndra, no del sistema), debajo de todo:
-            // el vídeo en bucle o la imagen fija que el usuario haya elegido.
+            // el vídeo en bucle o la imagen fija que el usuario haya elegido. Va
+            // dentro del contenedor para desenfocarse con el resto al abrir el menú.
             val s = vm.settings
-            if (s.backgroundEnabled) {
+            if (s.backgroundEnabled && !holoScreen) {
                 s.backgroundUri?.let { uri ->
                     val opacity = s.backgroundOpacity / 100f
                     if (s.backgroundIsVideo) {
@@ -140,25 +164,6 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                     }
                 }
             }
-
-            // Las barras van ocultas (pantalla completa), así que sus insets son 0;
-            // se mantiene el del recorte de pantalla para que en un móvil con muesca
-            // el contenido no quede debajo.
-            // La pantalla entera va dentro del contenedor del menú de
-            // acciones: es él quien la oscurece y la desenfoca cuando el menú
-            // está abierto, y quien monta el overlay por encima.
-            GameActionOverlayContainer(
-                isOverlayVisible = vm.sheet != null,
-                onOverlayDismissed = vm::dismissSheet,
-                onActionClicked = { action ->
-                    vm.dismissSheet()
-                    action.action()
-                },
-                spec = vm.sheet,
-                origin = vm.sheetOrigin,
-                focus = vm.input.sheetFocus,
-                dimForOtherLayer = vm.dialog != null,
-            ) {
             BoxWithConstraints(
                 Modifier
                     .fillMaxSize()
@@ -218,6 +223,7 @@ fun ElyndraApp(vm: ElyndraViewModel) {
 
             vm.detailsKey?.let { DetailsSheet(vm, it) }
             vm.artPicker?.let { ArtPickerSheet(vm, it) }
+            if (vm.identify.state != null) IdentifySheet(vm, vm.identify)
             vm.dialog?.let { ElyDialogView(it, onDismiss = vm::dismissDialog, focus = vm.input.dialogFocus) }
             vm.toast?.let {
                 ToastView(
@@ -229,12 +235,14 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                 )
             }
 
-            // Arranque de consola, encima de todo y solo una vez por arranque
-            // (sobrevive a la recreación por cambio de idioma). La biblioteca
-            // ya se compone debajo, así que al irse no hay espera.
-            var booted by rememberSaveable { mutableStateOf(false) }
-            if (!booted) BootSplash(onFinished = { booted = true })
+            // Intro de arranque, encima de todo: una vez por proceso (la decide
+            // MainActivity) o al pedir la vista previa en Ajustes. La biblioteca
+            // ya se compone debajo, así que al fundirse no hay espera.
+            if (vm.intro.visible) {
+                key(vm.intro.run) { BootIntro(vm.intro, vm.settings.introColor.base(LocalSkin.current.a1.argb())) }
+            }
         }
+    }
     }
 }
 

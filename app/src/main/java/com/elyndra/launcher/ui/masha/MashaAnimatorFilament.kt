@@ -192,6 +192,15 @@ internal class MashaAnimatorFilament(
         }
     }
 
+    private val face = FloatArray(3)
+
+    /** [MashaAnimator.faceCenter] en coordenadas del mundo (tras [frame]). No crea objetos. */
+    fun faceWorld(out: FloatArray): Boolean {
+        if (!core.faceCenter(face)) return false
+        point4(rootWorld, face, out)
+        return true
+    }
+
     private companion object {
         const val TAG = "MashaAnimator"
     }
