@@ -52,6 +52,9 @@ class InputController(private val vm: ElyndraViewModel) {
     /** El mando ha entrado en juego: la interfaz enseña lo que está señalado. */
     var active by mutableStateOf(false); private set
 
+    /** Hay un mando conectado: la interfaz enseña las pistas de sus botones. */
+    var gamepadPresent by mutableStateOf(false); private set
+
     /** Botón de la barra superior señalado; null = el mando está en el carrusel. */
     var barFocus by mutableStateOf<BarItem?>(null); private set
 
@@ -103,10 +106,12 @@ class InputController(private val vm: ElyndraViewModel) {
     /* ── conexión de mandos ───────────────────────────────────── */
 
     fun onGamepadConnected(name: String, announce: Boolean) {
+        gamepadPresent = true
         if (announce) vm.showToast(UiText.res(R.string.gamepad_connected, name))
     }
 
     fun onGamepadDisconnected(anyLeft: Boolean) {
+        gamepadPresent = anyLeft
         if (!anyLeft) {
             // Sin mando no hay a quién enseñarle la marca del foco.
             active = false
@@ -172,6 +177,15 @@ class InputController(private val vm: ElyndraViewModel) {
      */
     private fun form(pad: Pad): Boolean = when (pad) {
         Pad.Back -> { vm.back(); true }
+        // L1/R1: en Ajustes, categoría (o mover la fuente cogida); en Añadir, pestaña.
+        Pad.PagePrev, Pad.PageNext -> {
+            val delta = if (pad == Pad.PagePrev) -1 else 1
+            when (vm.screen) {
+                Screen.Settings -> { vm.settings.onBumper(delta); true }
+                Screen.Add -> { vm.add.updateTab(if (delta < 0) AddTab.Android else AddTab.Roms); true }
+                else -> false
+            }
+        }
         // Start abre y cierra Ajustes, como el botón de pausa de una consola.
         Pad.Menu -> {
             vm.go(if (vm.screen == Screen.Settings) Screen.Library else Screen.Settings)
