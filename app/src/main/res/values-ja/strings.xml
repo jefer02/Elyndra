@@ -451,6 +451,7 @@
     <string name="masha_profile_never">未プレイ。今日がその日かも。</string>
     <string name="masha_profile_matched">%2$s で%1$sにより識別</string>
     <string name="masha_match_hash">ファイルハッシュ</string>
+    <string name="masha_match_package">パッケージ名</string>
     <string name="masha_match_name">名前</string>
     <string name="masha_match_fuzzy">類似名</string>
     <string name="masha_match_manual">あなた</string>
@@ -664,9 +665,10 @@
     <string name="keyless_status_ok">アカウント不要</string>
     <string name="keyless_title">アカウント不要のソース</string>
     <string name="keyless_desc">設定なしでカバー・スクリーンショット・説明文を取得します。アカウントが必要なサービスを設定すると、そちらが優先されます。</string>
+    <string name="keyless_gplay_desc">Android ゲームの公式タイトル・説明文・アイコン・スクリーンショットをパッケージ名で取得。スクリーンショットを背景に使います。</string>
     <string name="keyless_libretro_desc">ゲーム機のカバー、スクリーンショット、タイトル画面。</string>
     <string name="keyless_steam_desc">PC ゲームと、Steam でも配信されている Android ゲームの説明文（あなたの言語）と画像。</string>
-    <string name="keyless_privacy">接続先：thumbnails.libretro.com と store.steampowered.com。送信するのはゲーム名と機種のみで、パス・アカウント・端末情報は送信しません。</string>
+    <string name="keyless_privacy">接続先：play.google.com、thumbnails.libretro.com、store.steampowered.com。送信するのはゲーム名・機種・パッケージ名のみで、パス・アカウント・端末情報は送信しません。</string>
 
     <!-- Identificar juego / sin nombre -->
     <string name="identify_action">名前を編集 / ゲームを特定</string>

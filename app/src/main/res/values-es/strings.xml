@@ -482,6 +482,7 @@
     <string name="masha_profile_never">Nunca abierto. Podría ser hoy.</string>
     <string name="masha_profile_matched">Identificado por %1$s en %2$s</string>
     <string name="masha_match_hash">hash del archivo</string>
+    <string name="masha_match_package">nombre de paquete</string>
     <string name="masha_match_name">nombre</string>
     <string name="masha_match_fuzzy">nombre parecido</string>
     <string name="masha_match_manual">ti</string>
@@ -696,9 +697,10 @@
     <string name="keyless_status_ok">No necesita cuenta</string>
     <string name="keyless_title">Fuentes sin cuenta</string>
     <string name="keyless_desc">Carátulas, capturas y descripciones sin configurar nada. Los servicios con cuenta mandan cuando los configuras.</string>
+    <string name="keyless_gplay_desc">Título oficial, descripción, icono y capturas de los juegos Android, buscados por su nombre de paquete. Una captura se usa de fondo.</string>
     <string name="keyless_libretro_desc">Carátulas, capturas y pantallas de título de consolas.</string>
     <string name="keyless_steam_desc">Descripciones en tu idioma e imágenes de juegos de PC, y de juegos Android que también están en Steam.</string>
-    <string name="keyless_privacy">Se consulta: thumbnails.libretro.com y store.steampowered.com. Solo se envía el nombre del juego y su sistema; nunca rutas, cuentas ni datos del dispositivo.</string>
+    <string name="keyless_privacy">Se consulta: play.google.com, thumbnails.libretro.com y store.steampowered.com. Solo se envía el nombre del juego, su sistema o su nombre de paquete; nunca rutas, cuentas ni datos del dispositivo.</string>
 
     <!-- Identificar juego / sin nombre -->
     <string name="identify_action">Editar nombre / Identificar juego</string>

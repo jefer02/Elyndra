@@ -474,6 +474,7 @@
     <string name="masha_profile_never">Never opened. Could be today.</string>
     <string name="masha_profile_matched">Identified by %1$s via %2$s</string>
     <string name="masha_match_hash">file hash</string>
+    <string name="masha_match_package">package name</string>
     <string name="masha_match_name">name</string>
     <string name="masha_match_fuzzy">similar name</string>
     <string name="masha_match_manual">you</string>
@@ -688,9 +689,10 @@
     <string name="keyless_status_ok">No account needed</string>
     <string name="keyless_title">Sources without an account</string>
     <string name="keyless_desc">Covers, screenshots and descriptions with no setup. Services with an account keep priority when you configure them.</string>
+    <string name="keyless_gplay_desc">Official title, description, icon and screenshots of Android games, looked up by their package name. A screenshot becomes the background.</string>
     <string name="keyless_libretro_desc">Console covers, screenshots and title screens.</string>
     <string name="keyless_steam_desc">Descriptions in your language and art for PC games, and for Android games that are also on Steam.</string>
-    <string name="keyless_privacy">Contacted: thumbnails.libretro.com and store.steampowered.com. Only the game name and its system are sent; never paths, accounts or device data.</string>
+    <string name="keyless_privacy">Contacted: play.google.com, thumbnails.libretro.com and store.steampowered.com. Only the game name, its system or its package name are sent; never paths, accounts or device data.</string>
 
     <!-- Identificar juego / sin nombre -->
     <string name="identify_action">Edit name / Identify game</string>
