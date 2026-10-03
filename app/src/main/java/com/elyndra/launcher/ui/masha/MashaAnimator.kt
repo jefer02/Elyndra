@@ -240,11 +240,22 @@ internal class MashaAnimator(
         // 3. Mirada.
         if (config.look.enabled && head >= 0) gaze(t, dt, input.thinking, camera)
 
-        // 3b. Cabeceo del habla (acentos, preguntas): capa aditiva sobre la mirada
-        // (después, para que la mirada no la compense). 40 % cuello, 60 % cabeza.
-        if (input.headNod != 0f && head >= 0) {
-            rotate(neck, left, 0.4f * input.headNod, model)
-            rotate(head, left, 0.6f * input.headNod, model)
+        // 3b. Gestos de cabeza (cabeceos del habla y de la escucha, inclinación, giro lento):
+        // capa aditiva sobre la mirada (después, para que la mirada no la compense).
+        // 40 % cuello, 60 % cabeza.
+        if (head >= 0) {
+            if (input.headNod != 0f) {
+                rotate(neck, left, 0.4f * input.headNod, model)
+                rotate(head, left, 0.6f * input.headNod, model)
+            }
+            if (input.headRoll != 0f) {
+                rotate(neck, fwd, 0.4f * input.headRoll, model)
+                rotate(head, fwd, 0.6f * input.headRoll, model)
+            }
+            if (input.headYaw != 0f) {
+                rotate(neck, up, 0.4f * input.headYaw, model)
+                rotate(head, up, 0.6f * input.headYaw, model)
+            }
         }
 
         // 4. Pies.
