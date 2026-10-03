@@ -47,6 +47,8 @@ class ArtSources(
         // libretro solo tiene ROMs de los sistemas que cataloga; Steam, juegos (no carpetas).
         Service.Libretro -> repo.romByKey(key)?.let { LibretroNames.folderFor(it.systemId) } != null
         Service.Steam -> repo.folderByKey(key) == null
+        // Google Play, por paquete: solo apps Android.
+        Service.GooglePlay -> repo.appByKey(key) != null
         else -> true
     }
 
@@ -99,6 +101,7 @@ class ArtSources(
             Service.RetroAchievements -> retroAchievements(meta, name, system, kind)
             Service.Libretro -> libretro(rom?.fileName, name, system, kind)
             Service.Steam -> steam(meta, name, kind)
+            Service.GooglePlay -> googlePlay(app?.packageName, kind)
         }.distinctBy { it.url }.take(MAX_CANDIDATES)
     }
 
@@ -269,6 +272,21 @@ class ArtSources(
                 // Los iconos de Steam son diminutos: no sirven de icono de juego.
                 ArtKind.Icon -> emptyList()
             }.map { (url, thumb) -> ArtCandidate(url, thumb, g.name) }
+        }
+    }
+
+    /** Google Play: el icono grande y las capturas de la ficha del paquete. */
+    private suspend fun googlePlay(packageName: String?, kind: ArtKind): List<ArtCandidate> {
+        val pkg = packageName ?: return emptyList()
+        val listing = engine.googlePlay.listing(pkg, DescriptionLangs.FALLBACK) ?: return emptyList()
+        return when (kind) {
+            ArtKind.Icon -> listOfNotNull(listing.icon).map { ArtCandidate(PlayParser.icon(it, 512), PlayParser.icon(it, 192), listing.title) }
+            // Cualquier captura puede ser fondo; la elige el usuario.
+            ArtKind.Background -> listing.screenshots.map {
+                ArtCandidate(PlayParser.sized(it, 1920, 1080), PlayParser.sized(it, 480, 480), listing.title)
+            }
+            // Play no tiene carátula vertical ni logo con transparencia.
+            ArtKind.Cover, ArtKind.Logo -> emptyList()
         }
     }
 

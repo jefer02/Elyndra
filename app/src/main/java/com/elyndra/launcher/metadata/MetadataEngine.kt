@@ -15,6 +15,7 @@ import com.elyndra.launcher.data.RomEntry
 import com.elyndra.launcher.data.RomFolder
 import com.elyndra.launcher.data.SettingsStore
 import com.elyndra.launcher.data.Systems
+import com.elyndra.launcher.library.AppCatalog
 import com.elyndra.launcher.library.DiscSheets
 import com.elyndra.launcher.library.Names
 import com.elyndra.launcher.library.SafFiles
@@ -48,7 +49,12 @@ enum class FailureKind { Credentials, Quota, Blocked, Unavailable, Network }
  *         de servicios en el orden de prioridad del usuario, cada uno solo si
  *         puede mejorar algún campo → RetroAchievements (por hash rcheevos o,
  *         si no, por título) siempre, porque además trae los logros.
- *   Apps: IGDB (plataforma Android) → SteamGridDB, en el mismo orden de prioridad.
+ *   Apps: PackageManager (nombre y paquete de la app instalada; su icono es la
+ *         base que la interfaz enseña mientras no haya otro) → Google Play por
+ *         paquete (título oficial, descripción, icono grande y capturas; una
+ *         captura apaisada hace de fondo) → IGDB (plataforma Android) →
+ *         SteamGridDB → tienda de Steam (de reserva: carátula, logo y lo que
+ *         Play no tenga), en el mismo orden de prioridad.
  *
  * Lo que da cada servicio se reúne aparte ([SourceData]) y se mezcla al final
  * campo a campo ([MetadataMerge]): la prioridad decide qué se queda. Cada
@@ -74,6 +80,9 @@ class MetadataEngine(
     /** Sin clave: arte de consolas (libretro) y ficha de la tienda de Steam. */
     val libretro = LibretroClient(context.cacheDir)
     val steam = SteamStoreClient(context.cacheDir)
+    /** Sin clave: ficha de Google Play de los juegos Android, por paquete. */
+    val googlePlay = GooglePlayClient(context.cacheDir)
+    private val apps = AppCatalog(context)
 
     data class Progress(
         val running: Boolean = false,
@@ -227,8 +236,8 @@ class MetadataEngine(
                 val system = repo.romByKey(key)?.let { Systems.byId(it.systemId) }
                 (credentials.isConfigured(Service.ScreenScraper) && system?.ssId != null) || igdbEnglish || steam
             }
-            // IGDB solo sabe inglés: para otro idioma no hay a quién preguntar.
-            key.startsWith("a:") -> igdbEnglish || steam
+            // Google Play da la ficha en el idioma que se le pide; IGDB solo sabe inglés.
+            key.startsWith("a:") -> credentials.isConfigured(Service.GooglePlay) || igdbEnglish || steam
             else -> false
         }
     }
@@ -342,6 +351,8 @@ class MetadataEngine(
                 Service.Libretro -> if (!descriptionsOnly && usable(Service.Libretro, failures) && MetadataMerge.wanted(Service.Libretro, results, priority).isNotEmpty()) {
                     libretroInto(results, rom, system, bestName(results, searchName, locked), lang)
                 }
+                // Google Play solo cataloga apps Android.
+                Service.GooglePlay -> Unit
                 // La tienda de Steam cubre los juegos de PC.
                 Service.Steam -> if (system.id == PC_SYSTEM && usable(Service.Steam, failures) && wantsSteam(results, priority, lang)) {
                     steamInto(results, bestName(results, searchName, locked), lang, rom.meta.steamAppId)
@@ -363,21 +374,40 @@ class MetadataEngine(
         descriptionsOnly: Boolean = false,
     ): Map<Service, SourceData> {
         val results = LinkedHashMap<Service, SourceData>()
+        val lang = AppLocale.current(context)
         val locked = app.meta.lockedName
-        val name = locked ?: app.label
+        // 1. PackageManager, la base: el nombre de la app instalada (el de ahora,
+        //    por si una actualización lo cambió) y su paquete. Su icono no se
+        //    descarga: la interfaz lo pinta siempre que no haya otro, así que
+        //    aunque fallen todas las fuentes el juego nunca se queda sin imagen.
+        val name = locked ?: apps.label(app.packageName)?.takeIf { it.isNotBlank() } ?: app.label
+        // 2. Google Play por paquete: identifica sin adivinar y da el título
+        //    oficial con el que se busca en los demás. Va primero sea cual sea
+        //    la prioridad (como ScreenScraper con las ROMs); la prioridad decide
+        //    qué campos se quedan.
+        if (usable(Service.GooglePlay, failures)) playInto(results, app.packageName, lang)
         for (service in priority.queryOrder()) {
             when (service) {
                 Service.Igdb -> if (usable(Service.Igdb, failures)) {
-                    igdbInto(results, name, listOf(ANDROID_IGDB), failures)
-                    if (results[Service.Igdb]?.igdbId == null) igdbInto(results, name, null, failures, minSimilarity = 0.9)
+                    val search = bestName(results, name, locked)
+                    igdbInto(results, search, listOf(ANDROID_IGDB), failures)
+                    if (results[Service.Igdb]?.igdbId == null) igdbInto(results, search, null, failures, minSimilarity = 0.9)
                 }
                 Service.SteamGridDb -> if (!descriptionsOnly && usable(Service.SteamGridDb, failures) && MetadataMerge.wanted(Service.SteamGridDb, results, priority).isNotEmpty()) {
                     sgdbInto(results, bestName(results, name, locked), SteamGridDbClient.SQUARE + SteamGridDbClient.PORTRAIT, failures)
                 }
-                // Muchos juegos Android también están en Steam (solo con coincidencia alta).
-                Service.Steam -> if (usable(Service.Steam, failures) && wantsSteam(results, priority, AppLocale.current(context))) {
-                    steamInto(results, bestName(results, name, locked), AppLocale.current(context), app.meta.steamAppId)
+                // 3. Steam, de reserva: muchos juegos Android también están en Steam
+                //    (solo con coincidencia alta). Da carátula y logo, que Play no
+                //    tiene, y cubre lo que Play no haya dado. Se prueba con el título
+                //    de Play y, si no casa, con el nombre de la app instalada.
+                Service.Steam -> if (usable(Service.Steam, failures) && wantsSteam(results, priority, lang)) {
+                    for (search in listOf(bestName(results, name, locked), name).distinct()) {
+                        steamInto(results, search, lang, app.meta.steamAppId)
+                        if (Service.Steam in results || app.meta.steamAppId != null) break
+                    }
                 }
+                // Ya preguntado arriba.
+                Service.GooglePlay -> Unit
                 // ScreenScraper, RetroAchievements y libretro no catalogan juegos Android.
                 Service.ScreenScraper, Service.RetroAchievements, Service.Libretro -> Unit
             }
@@ -598,6 +628,35 @@ class MetadataEngine(
         }
     }
 
+    /**
+     * Google Play: la ficha del paquete. Título, descripción (con su idioma
+     * real), desarrollador, género y nota; icono grande; y de fondo la primera
+     * captura apaisada. La primera captura, sea como sea, queda de captura: la
+     * interfaz la usa de fondo si ninguna fuente da uno.
+     */
+    private suspend fun playInto(results: MutableMap<Service, SourceData>, packageName: String, lang: String) {
+        try {
+            val game = googlePlay.find(packageName, lang) ?: return
+            val listing = game.listing
+            val data = SourceData(Service.GooglePlay)
+            // El paquete es el juego: tan seguro como un hash.
+            data.matched(MatchMethod.PACKAGE, 1.0)
+            data.setText(MetaField.Name, listing.title)
+            game.descriptions.forEach { (l, t) -> data.addDescription(l, t) }
+            data.setText(MetaField.Developer, listing.developer)
+            data.setText(MetaField.Genre, listing.genre)
+            data.rating = listing.rating
+            listing.icon?.let { data.setArt(MetaField.Icon, PlayParser.icon(it, 512)) }
+            game.landscape?.let { data.setArt(MetaField.Hero, PlayParser.sized(it, 1920, 1080)) }
+            listing.screenshots.firstOrNull()?.let { data.setArt(MetaField.Screenshot, PlayParser.sized(it, 1920, 1920)) }
+            results[Service.GooglePlay] = data
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Sin clave no hay credenciales que invalidar: un fallo es "no hay", y sigue Steam.
+        }
+    }
+
     private fun raInfo(p: RaGameProgress, matchedBy: String) = RaInfo(
         gameId = p.id,
         title = p.title,
@@ -630,14 +689,25 @@ class MetadataEngine(
             // Se vuelve a mirar justo antes de bajar: el usuario puede haber elegido una mientras tanto.
             val kindNow = field.artKind
             if (kindNow != null && kindNow in (repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta)?.pinned.orEmpty()) return null
-            val (service, url) = merged.art[field] ?: return null
             val kind = field.artKind ?: return null
-            return media.download(url, key, kind)?.also { origins[kind] = ArtOrigin(service.id, url) }
+            // La de más prioridad y, si su descarga falla, la siguiente.
+            val chain = merged.artChain[field] ?: listOfNotNull(merged.art[field])
+            for ((service, url) in chain) {
+                media.download(url, key, kind)?.let { path ->
+                    origins[kind] = ArtOrigin(service.id, url)
+                    return path
+                }
+            }
+            return null
         }
 
-        // Un juego Android no usa carátula (se representa con su icono): no se baja.
-        val cover = fetch(MetaField.Cover, !isApp && "cover" !in pinned)
-        // El icono es la imagen de un juego Android: se baja solo para ellos.
+        // En el carrusel un juego Android se representa con su icono, pero si
+        // alguna fuente (Steam) tiene su carátula se baja igual: la usan la ficha
+        // y los menús.
+        val cover = fetch(MetaField.Cover, "cover" !in pinned)
+        // El icono es la imagen de un juego Android: se baja solo para ellos. Si
+        // no llega ninguno (o falla la descarga) se queda el que había o, si no
+        // había, el del PackageManager, que la interfaz pinta en su lugar.
         val icon = fetch(MetaField.Icon, isApp && "icon" !in pinned)
         val hero = fetch(MetaField.Hero, "hero" !in pinned)
         val logo = fetch(MetaField.Logo, "logo" !in pinned)
