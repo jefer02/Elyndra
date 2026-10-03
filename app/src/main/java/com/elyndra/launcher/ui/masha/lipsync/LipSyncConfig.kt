@@ -50,6 +50,13 @@ data class LipSyncConfig(
     val smileRoundingCut: Float = 0.65f,
     /** Separación mínima entre acentos de ceja (s). */
     val accentGap: Float = 1.4f,
+    /**
+     * Subida pequeña de cejas (sin cabeceo) en el resto de tónicas de palabras con contenido que
+     * no son acento fuerte (0 = ninguna). Las cejas "puntúan" el habla sin parecer un tic.
+     */
+    val minorBrowAccent: Float = 0.16f,
+    /** Separación mínima entre esas subidas pequeñas y cualquier otro acento (s). */
+    val minorAccentGap: Float = 0.45f,
 ) {
     /** Caída de la dominancia antes de O/U: a [anticipationMs] vale 1/3. */
     val roundThetaPre: Float get() = (ln(3.0) / (anticipationMs.coerceAtLeast(40f) / 1000.0)).toFloat()

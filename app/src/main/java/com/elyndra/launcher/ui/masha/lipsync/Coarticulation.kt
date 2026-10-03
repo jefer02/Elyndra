@@ -87,6 +87,8 @@ object Coarticulator {
     private const val WINDOW = 0.6f
     /** Duración máxima de un cierre de P/B/M (s); el resto de un segmento más largo es reposo. */
     private const val MAX_CLOSURE = 0.11f
+    /** Energía mínima (z respecto a la frase) de una tónica para llevar un acento pequeño de cejas. */
+    private const val MINOR_Z = 0.1f
 
     /**
      * Rellena [out] ([frames] × [Ch.COUNT]) a partir de [segs] (ya alineados),
@@ -307,8 +309,10 @@ object Coarticulator {
         val ex = cfg.expressionIntensity
         if (segs.isEmpty()) return
         // Acentos: vocal tónica de palabra con contenido y energía por encima de la media.
+        // Las tónicas que no llegan a acento fuerte quedan como candidatas a uno pequeño.
         data class Accent(val t: Float, val s: Float)
         val cands = ArrayList<Accent>()
+        val minorCands = ArrayList<Accent>()
         for (i in segs.indices) {
             val s = segs[i]
             if (s.ph?.vowel != true || !s.stress || s.word < 0) continue
@@ -317,15 +321,31 @@ object Coarticulator {
             val z = strength[i + 1]
             val bang = w.token.pause == Pause.EXCLAIM
             if (!content && !bang) continue
-            if (z < 0.6f && !bang) continue
+            if (z < 0.6f && !bang) {
+                if (z >= MINOR_Z) minorCands += Accent(s.mid, (0.5f + 0.4f * z).coerceIn(0.4f, 1f))
+                continue
+            }
             cands += Accent(s.mid, if (bang) max(0.7f, (0.4f + 0.4f * z).coerceIn(0.4f, 1f)) else (0.4f + 0.4f * z).coerceIn(0.4f, 1f))
         }
         val accepted = ArrayList<Accent>()
-        for (c in cands.sortedByDescending { it.s }) if (accepted.none { abs(it.t - c.t) < cfg.accentGap }) accepted += c
+        for (c in cands.sortedByDescending { it.s }) {
+            if (accepted.none { abs(it.t - c.t) < cfg.accentGap }) accepted += c else minorCands += c.copy(s = 0.7f)
+        }
         val nod = cfg.nodDeg * (PI.toFloat() / 180f) * ex
         for (a in accepted) {
             paint(out, frames, a.t - 0.12f, a.t + 0.45f) { t -> Ch.BROW to cfg.browAccent * ex * a.s * bump(t, a.t - 0.12f, a.t + 0.05f, a.t + 0.45f) }
             paint(out, frames, a.t - 0.05f, a.t + 0.42f) { t -> Ch.NOD to nod * a.s * bump(t, a.t - 0.05f, a.t + 0.12f, a.t + 0.42f) }
+        }
+        // Acentos pequeños (solo cejas): el resto de tónicas con algo de énfasis, separadas entre sí y de los fuertes.
+        if (cfg.minorBrowAccent > 0f) {
+            val minors = ArrayList<Accent>()
+            for (c in minorCands.sortedByDescending { it.s }) {
+                if (accepted.any { abs(it.t - c.t) < cfg.minorAccentGap } || minors.any { abs(it.t - c.t) < cfg.minorAccentGap }) continue
+                minors += c
+            }
+            for (a in minors) {
+                paint(out, frames, a.t - 0.1f, a.t + 0.32f) { t -> Ch.BROW to cfg.minorBrowAccent * ex * a.s * bump(t, a.t - 0.1f, a.t + 0.04f, a.t + 0.32f) }
+            }
         }
         val lastWord = segs.lastOrNull { it.word >= 0 }?.word ?: return
         val lastSegs = segs.filter { it.word == lastWord }

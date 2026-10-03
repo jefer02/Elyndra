@@ -175,8 +175,12 @@ internal class MotionInput {
     var mood = MashaMood.Neutral
     /** Nivel real de la voz (0..1, envolvente del audio que suena). */
     var voice = 0f
-    /** Cabeceo del habla (rad, + = barbilla abajo; − = cabeza arriba al preguntar). */
+    /** Cabeceo del habla y de la escucha (rad, + = barbilla abajo; − = cabeza arriba al preguntar). */
     var headNod = 0f
+    /** Inclinación de la cabeza (rad, + = hacia su izquierda): escuchar, ánimo, acentos ([HeadGestures]). */
+    var headRoll = 0f
+    /** Giro lento de la cabeza al hablar (rad). */
+    var headYaw = 0f
 }
 
 /**
