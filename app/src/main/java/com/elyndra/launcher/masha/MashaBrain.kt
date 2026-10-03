@@ -130,6 +130,7 @@ class MashaBrain @Inject constructor(
         Service.RetroAchievements -> "RetroAchievements"
         Service.Libretro -> "libretro"
         Service.Steam -> "Steam"
+        Service.GooglePlay -> "Google Play"
     }
 
     private companion object {

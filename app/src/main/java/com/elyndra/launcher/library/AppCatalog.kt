@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.graphics.drawable.Drawable
 import android.os.Build
+import android.util.DisplayMetrics
 import com.elyndra.launcher.data.Emulators
 
 /** Apps instaladas que se pueden abrir desde un launcher. */
@@ -80,5 +81,22 @@ class AppCatalog(private val context: Context) {
     }.getOrNull()
 
     fun icon(pkg: String): Drawable? = runCatching { pm.getApplicationIcon(pkg) }.getOrNull()
+
+    /**
+     * El icono de la app a la mayor densidad que traiga (xxxhdpi): el que se
+     * pinta en una card grande sin verse borroso. Si la app no lo tiene a esa
+     * densidad, Android da el más cercano; si algo falla, el de siempre.
+     */
+    fun highResIcon(pkg: String): Drawable? = runCatching {
+        val ai = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.getApplicationInfo(pkg, PackageManager.ApplicationInfoFlags.of(0))
+        } else {
+            @Suppress("DEPRECATION")
+            pm.getApplicationInfo(pkg, 0)
+        }
+        ai.icon.takeIf { it != 0 }?.let { res ->
+            pm.getResourcesForApplication(ai).getDrawableForDensity(res, DisplayMetrics.DENSITY_XXXHIGH, null)
+        }
+    }.getOrNull() ?: icon(pkg)
 
 }

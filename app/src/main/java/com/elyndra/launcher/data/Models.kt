@@ -212,6 +212,8 @@ data class ArtOrigin(val source: String, val url: String? = null)
 object MatchMethod {
     /** Hash del archivo (CRC/MD5/SHA-1 o rcheevos): es ese volcado y no otro. */
     const val HASH = "hash"
+    /** Nombre de paquete de Android (ficha de Google Play): es esa app y no otra. */
+    const val PACKAGE = "package"
     /** Nombre casi idéntico al del servicio. */
     const val NAME = "name"
     /** Nombre parecido, por encima del umbral pero lejos de ser exacto. */
