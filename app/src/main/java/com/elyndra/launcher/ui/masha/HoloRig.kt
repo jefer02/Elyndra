@@ -21,9 +21,12 @@ import kotlin.random.Random
  *   Orden por fotograma: clips → fundidos → capas aditivas (con el cabeceo
  *   del habla) → mirada → pies → cara (expresión y labios, [LipSync]) → giros
  *   y muelles ([SpringBonesFilament]) → `updateBoneMatrices`.
- * - **Cara:** morph targets mezclados en vivo — visemas de la voz, parpadeo
- *   con doble parpadeo ocasional, sonrisa y cejas según el ánimo y pequeñas
- *   microexpresiones al azar.
+ * - **Cara:** morph targets mezclados en vivo — visemas de la voz y, encima,
+ *   la expresión ([FaceExpression]): cada ánimo como combinación de morphs
+ *   ARKit ([MoodFace]), atención al escuchar, microexpresiones, cejas en los
+ *   acentos del habla, párpados que siguen a la mirada; parpadeo con ritmo y
+ *   estilo según lo que hace ([Blink]); pupila que se dilata con el ánimo y la
+ *   atención; inclinaciones y cabeceos al escuchar y al hablar ([HeadGestures]).
  * - **Holograma:** el color de la piel y del brillo siguen al ánimo (azul frío
  *   al analizar, lavanda al bromear o emocionarse), el código de la piel fluye
  *   (matriz UV de la emisión), el brillo late con la voz y el micrófono, y de
@@ -45,6 +48,8 @@ internal class HoloRig(
     private val shader: HoloShader? = null,
     /** Entidad de la cámara: Masha la mira (0 = una posición por defecto delante de ella). */
     private val cameraEntity: Int = 0,
+    /** Calidad del escenario: la ligera deja menos morphs de expresión activos a la vez. */
+    quality: MashaQuality = MashaQuality.High,
 ) {
 
     private val animator = node.animator
@@ -147,17 +152,26 @@ internal class HoloRig(
     private var pulse = 0f
 
     private val rnd = Random(7)
-    private val blink = Blink { rnd.nextFloat() }
+    private val blink = Blink(Random(11))
+    private val expression = FaceExpression()
+    private val exIn = ExpressionInput()
+    private val gestures = HeadGestures()
     private var nextGlitch = 5f
     private var glitchUntil = -1f
-    private var nextMicro = 3f
-    private var microUntil = -1f
-    private var microKind = 0
+
+    /** Centros de los ojos en el mundo (L 0..2, R 3..5) para el shader. */
+    private val eyes = FloatArray(6)
+
+    /** Lo que se ve en este fotograma: el estado de [presence] o, en debug, la vista previa ([MashaDebugPose.mood]). */
+    private var shownMood = MashaMood.Neutral
+    private var shownListening = false
+    private var shownThinking = false
 
     private val uv = FloatArray(9)
 
     init {
         morphs.smileCut = presence.lipSync.config.smileRoundingCut
+        morphs.exprBudget = if (quality == MashaQuality.High) EXPR_BUDGET_HIGH else EXPR_BUDGET_LITE
         linear(presence.visibleMood.skin, skin)
         linear(presence.visibleMood.glow, glow)
         // Orden de dibujo (0 primero): el cuerpo y la cara escriben profundidad,
@@ -212,6 +226,7 @@ internal class HoloRig(
         }
         val t = (frameTimeNanos - start) / 1e9f
         val dt = ((frameTimeNanos - last) / 1e9f).coerceIn(0f, 0.1f)
+        if (com.elyndra.launcher.BuildConfig.DEBUG) perf.begin(frameTimeNanos, last)
         last = frameTimeNanos
 
         // La voz de este fotograma (reloj de audio): la usan el cuerpo (gestos al
@@ -219,13 +234,75 @@ internal class HoloRig(
         dbgT0 = System.nanoTime()
         presence.lipSync.sample(frameTimeNanos, dt, speech)
         dbgT1 = System.nanoTime()
-        // Orden: clips → fundidos → capas aditivas (+ cabeceo del habla) →
+        resolveState()
+        gestures.update(t, dt, shownMood, presence.speaking, shownListening, presence.micLevel, speech.brow)
+        // Orden: clips → fundidos → capas aditivas (+ gestos de cabeza) →
         // expresión y labios → muelles → matrices de huesos.
         body(t, dt)
         faceFrame(t, dt)
         if (!(com.elyndra.launcher.BuildConfig.DEBUG && MashaDebugPose.noSprings)) springs?.frame(frameTimeNanos)
         animator.updateBoneMatrices()
         hologram(t, dt)
+        if (com.elyndra.launcher.BuildConfig.DEBUG) perf.end(frameTimeNanos, activeMorphs())
+    }
+
+    /** Solo debug: cuántos morphs de la cara tienen peso ≠ 0 en este fotograma (coste de GPU). */
+    private fun activeMorphs(): Int {
+        var n = 0
+        for (w in weights) if (w != 0f) n++
+        return n
+    }
+
+    private val perf = PerfLog()
+
+    /**
+     * Solo debug: cada 2 s, en logcat (etiqueta MashaPerf), el ritmo de los callbacks de
+     * fotograma (no los fotogramas que Filament llega a presentar: esos, con SurfaceFlinger),
+     * el tiempo de CPU de [frame] y los morphs activos. Sin objetos por fotograma.
+     */
+    private class PerfLog {
+        private var windowStart = -1L
+        private var frames = 0
+        private var cpuSum = 0L
+        private var cpuMax = 0L
+        private var gapMax = 0L
+        private var morphSum = 0
+        private var morphMax = 0
+        private var t0 = 0L
+
+        fun begin(now: Long, prev: Long) {
+            t0 = System.nanoTime()
+            if (windowStart < 0) windowStart = now
+            val gap = now - prev
+            if (gap > gapMax) gapMax = gap
+        }
+
+        fun end(now: Long, morphs: Int) {
+            val cpu = System.nanoTime() - t0
+            frames++
+            cpuSum += cpu
+            if (cpu > cpuMax) cpuMax = cpu
+            morphSum += morphs
+            if (morphs > morphMax) morphMax = morphs
+            if (now - windowStart < 2_000_000_000L) return
+            val secs = (now - windowStart) / 1e9
+            android.util.Log.i(
+                "MashaPerf",
+                "callbacks/s=%.1f cpu_avg_us=%d cpu_max_us=%d gap_max_ms=%.1f morphs_avg=%.1f morphs_max=%d".format(
+                    frames / secs, cpuSum / 1000 / frames, cpuMax / 1000, gapMax / 1e6, morphSum.toFloat() / frames, morphMax,
+                ),
+            )
+            windowStart = now
+            frames = 0; cpuSum = 0; cpuMax = 0; gapMax = 0; morphSum = 0; morphMax = 0
+        }
+    }
+
+    /** El estado que se ve; en debug, la vista previa de un ánimo manda (`DEBUG_MOOD` o el chip de la pantalla). */
+    private fun resolveState() {
+        val preview = if (com.elyndra.launcher.BuildConfig.DEBUG) MashaDebugPose.mood else null
+        shownMood = preview ?: presence.visibleMood
+        shownListening = presence.listening || (com.elyndra.launcher.BuildConfig.DEBUG && MashaDebugPose.listen)
+        shownThinking = presence.thinking || preview == MashaMood.Thinking
     }
 
     /* ── cuerpo ───────────────────────────────────────────────── */
@@ -238,12 +315,16 @@ internal class HoloRig(
         }
         if (m != null) {
             input.speaking = presence.speaking
-            input.listening = presence.listening
-            input.thinking = presence.thinking
-            input.mood = presence.mood
+            input.listening = shownListening
+            input.thinking = shownThinking
+            // El de la última respuesta (pensar no cuenta: si no, volver a Playful tras pensar repetiría la reacción).
+            input.mood = if (shownMood == presence.visibleMood) presence.mood else shownMood
             // Nivel real de la voz (no una suposición por letras): golpes de gesto al compás.
             input.voice = speech.env
-            input.headNod = speech.nod
+            // Cabeceos del habla (acentos, preguntas) y de la escucha; inclinación y giro de cabeza.
+            input.headNod = speech.nod + gestures.nod
+            input.headRoll = gestures.roll
+            input.headYaw = gestures.yaw
             // Clips → capas → mirada → pies (y escribe las locales).
             m.frame(t, dt, input, cameraEntity)
         } else {
@@ -270,71 +351,75 @@ internal class HoloRig(
     private fun faceFrame(t: Float, dt: Float) {
         if (face == null || !morphs.usable) return
         val c = channels
-        val mood = presence.visibleMood
         val body = motion?.core
 
         // Labios y mandíbula: ya coarticulados y suavizados (con dt) en LipSync.
         speech.lips.copyInto(c.lips)
         c.jaw = speech.jaw
-        c.speechBrow = speech.brow
         if (com.elyndra.launcher.BuildConfig.DEBUG) MashaDebugPose.jaw?.let { j ->
             MashaDebugPose.lips.copyInto(c.lips)
             c.jaw = j
             if (MashaDebugPose.wobble) {
-                val k = 0.5f + 0.5f * kotlin.math.sin(t * 10f)
+                val k = 0.5f + 0.5f * sin(t * 10f)
                 for (v in c.lips.indices) c.lips[v] *= k
                 c.jaw *= k
             }
         }
 
-        // Microexpresiones: una ceja que sube, un amago de sonrisa, entrecerrar.
-        if (t > nextMicro) {
-            microKind = rnd.nextInt(3)
-            microUntil = t + 0.45f + rnd.nextFloat() * 0.4f
-            nextMicro = t + 3f + rnd.nextFloat() * 5f
-        }
-        val micro = if (t < microUntil) sin(((microUntil - t) / 0.8f).coerceIn(0f, 1f) * PI.toFloat()) else 0f
-
-        val slow = 1f - exp(-dt * 4f)
-        // Clips alegres (Var_GlanceSmile, React_Happy) suman su sonrisa.
-        val clipSmile = body?.smile ?: 0f
-        c.smile += (mood.smile + (if (microKind == 1) 0.18f * micro else 0f) + clipSmile - c.smile) * slow
-        c.browUp += ((if (microKind == 0) 0.35f * micro else 0f) - c.browUp) * slow
-        c.squint += ((if (microKind == 2) 0.5f * micro else 0f) - c.squint) * slow
-        c.listen += ((if (presence.listening) 1f else 0f) - c.listen) * slow
-        c.think += ((if (presence.thinking) 1f else 0f) - c.think) * slow
-        c.frown += ((when (mood) {
-            MashaMood.Concerned -> 0.45f
-            MashaMood.Analytical -> 0.15f
-            else -> 0f
-        }) - c.frown) * slow
-
-        // Parpadeo del contrato (más espaciado pensando; el derecho, un pelo detrás),
-        // y uno más en los cambios grandes de mirada y al final de cada frase.
+        // Parpadeo: ritmo y estilo según lo que hace (el derecho, un pelo detrás), y uno
+        // más en los cambios grandes de mirada, al final de cada frase y en sus comas y puntos.
         if (body != null && body.blinkRequest) {
             body.blinkRequest = false
             blink.trigger(t)
         }
-        // Y en las comas y puntos de lo que dice.
         if (speech.blink) blink.trigger(t)
-        blink.update(t, slow = presence.thinking)
-        // Párpados acoplados a la mirada: mirar abajo los baja, mirar arriba los abre.
-        val pitch = body?.eyePitch ?: 0f
-        val lid = GazeConfig.lidDown(pitch)
-        val bl = blink.left(t)
-        val br = blink.right(t)
-        c.blinkL = bl + (1f - bl) * lid
-        c.blinkR = br + (1f - br) * lid
-        c.wideL = GazeConfig.lidUp(pitch)
-        c.wideR = c.wideL
+        blink.update(t, blinkMode())
+
+        // Expresión: ánimo + atención + microexpresiones + cejas del habla + párpados y mirada.
+        val ex = exIn
+        ex.mood = shownMood
+        ex.listening = shownListening
+        ex.speaking = presence.speaking
+        ex.speechBrow = speech.brow
+        // Clips alegres (Var_GlanceSmile, React_Happy) suman su sonrisa.
+        ex.clipSmile = body?.smile ?: 0f
+        ex.eyePitch = body?.eyePitch ?: 0f
+        ex.blinkL = blink.left(t)
+        ex.blinkR = blink.right(t)
+        expression.update(t, dt, ex, c)
 
         morphs.write(c, weights)
-        if (com.elyndra.launcher.BuildConfig.DEBUG) MashaDebugPose.raw?.let { (n, v) ->
+        if (com.elyndra.launcher.BuildConfig.DEBUG) debugMorphs()
+        face.setMorphWeights(weights, 0)
+        if (com.elyndra.launcher.BuildConfig.DEBUG && (presence.speaking || MashaDebugPose.traceAll)) traceFace(t)
+    }
+
+    private fun blinkMode(): Blink.Mode = when {
+        shownThinking -> Blink.Mode.Thinking
+        shownListening -> Blink.Mode.Listening
+        presence.speaking -> Blink.Mode.Speaking
+        shownMood == MashaMood.Warm -> Blink.Mode.Warm
+        else -> Blink.Mode.Rest
+    }
+
+    /**
+     * Solo debug: un morph crudo por adb (`DEBUG_POSE --es morph X --ef w 1`) y la carga de
+     * prueba (`DEBUG_POSE --ei load N`: N morphs apagados más, a 0,02, invisibles) para medir lo
+     * que cuesta en GPU cada morph activo.
+     */
+    private fun debugMorphs() {
+        MashaDebugPose.raw?.let { (n, v) ->
             val k = morphs.names.indexOf(n)
             if (k >= 0) weights[k] = v
         }
-        face.setMorphWeights(weights, 0)
-        if (com.elyndra.launcher.BuildConfig.DEBUG && (presence.speaking || MashaDebugPose.traceAll)) traceFace(t)
+        var load = MashaDebugPose.load
+        for (k in weights.indices) {
+            if (load <= 0) break
+            if (weights[k] == 0f) {
+                weights[k] = 0.02f
+                load--
+            }
+        }
     }
 
     private var dbgT0 = 0L
@@ -357,7 +442,7 @@ internal class HoloRig(
     /* ── holograma ────────────────────────────────────────────── */
 
     private fun hologram(t: Float, dt: Float) {
-        val mood = presence.visibleMood
+        val mood = shownMood
         // El color se desliza hacia el del ánimo en ~1 s.
         val k = 1f - exp(-dt * 2.5f)
         linearTo(mood.skin, skin, k)
@@ -434,11 +519,21 @@ internal class HoloRig(
                 mi.setParameter("emissiveUvMatrix", MaterialInstance.FloatElement.MAT3, uv, 0, 1)
             }
         }
-        shader?.frame(t, presence.energy, pulse, if (glitch) 1f else 0f, skin, glow)
+        // Los ojos: pupila y atención de la expresión; dónde están, para calmar el glitch a su alrededor.
+        val eyesKnown = motion?.eyesWorld(eyes) == true
+        shader?.frame(t, presence.energy, pulse, if (glitch) 1f else 0f, skin, glow, expression.pupil, expression.attention, if (eyesKnown) eyes else null)
     }
 
     companion object {
         private const val HEAD = "Masha_Head"
+
+        /**
+         * Morphs de expresión activos a la vez como mucho (sin parpadeo ni boca), por calidad. Los
+         * ánimos usan 2–8; con la atención o las cejas del habla encima, hasta 12. Cada morph activo
+         * cuesta GPU en todos los vértices de la cabeza (ver `FaceMorphs.EXPR_MIN_WEIGHT`).
+         */
+        const val EXPR_BUDGET_HIGH = 10
+        const val EXPR_BUDGET_LITE = 7
 
         /** ¿Es el modelo v2 (el que usa los materiales de [HoloShader])? */
         fun isV2(node: ModelNode): Boolean =

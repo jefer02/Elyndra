@@ -27,7 +27,10 @@ private const val TAG = "HoloShader"
  *   barrido y glitch. La cara usa el mismo material con menos emisión.
  * - `masha_holo_eye`: ojos (y dientes/lengua). Opaco, iris con un brillo suave
  *   que no llega al umbral del bloom, esclerótica atenuada, córnea con capa
- *   transparente para el reflejo.
+ *   transparente para el reflejo. Encima, todo emisión: la pupila se dilata
+ *   ([frame]), anillo holográfico y limbo oscuro en el borde del iris, un brillo
+ *   fijo respecto a la cámara (los ojos "vivos") y un lóbulo húmedo en la córnea.
+ *   El glitch apenas desgarra los ojos (y lo mismo la cara a su alrededor).
  * - `masha_holo_card`: pelo, cejas y pestañas (tarjetas con alfa).
  *
  * Uso: [create] → [decodeTextures] (fuera del hilo principal si se quiere) →
@@ -97,6 +100,11 @@ internal class HoloShader private constructor(
         val selfIllum: Float = 0.04f,
         /** Celdas por unidad UV del patrón de repuesto (sin máscara del traje). */
         val proceduralScale: Float = 24f,
+        /** Segundo lóbulo de Fresnel, ancho: dibuja los contornos de los rasgos desde dentro (solo la cara). */
+        val contourPower: Float = 2f,
+        val contourIntensity: Float = 0f,
+        /** Cuánto se apagan scanlines, barrido y parpadeo del glitch alrededor de los ojos (solo la cara). */
+        val eyeScanCalm: Float = 0f,
     ) {
         companion object {
             val BODY = HoloShaderParams()
@@ -104,14 +112,16 @@ internal class HoloShader private constructor(
             /**
              * Cara: opaca (si no, a través de los párpados y los labios se ven
              * los ojos y los dientes, que son opacos y se dibujan antes), más
-             * clara y casi sin circuitos: manda la luz.
+             * clara y casi sin circuitos: manda la luz. El borde de Fresnel algo
+             * más fuerte y un segundo lóbulo ancho marcan nariz, labios, pómulos y
+             * mandíbula; alrededor de los ojos, sin scanlines.
              */
             val FACE = HoloShaderParams(
                 albedo = 0.50f,
                 desaturate = 0.55f,
                 roughness = 0.48f,
                 specular = 0.40f,
-                rimIntensity = 0.6f,
+                rimIntensity = 0.7f,
                 rimPower = 3.5f,
                 rimAlpha = 0.3f,
                 circuitIntensity = 1.2f,
@@ -121,6 +131,9 @@ internal class HoloShader private constructor(
                 alpha = 1f,
                 emissiveDamp = 0.3f,
                 selfIllum = 0.06f,
+                contourPower = 2f,
+                contourIntensity = 0.22f,
+                eyeScanCalm = 0.85f,
             )
 
             /** Interior de la boca: oscuro, opaco, sin efectos salvo el glitch (se desgarra con la cara). */
@@ -139,7 +152,11 @@ internal class HoloShader private constructor(
         }
     }
 
-    /** Ajustes de `masha_holo_eye` (ver la cabecera de `masha_holo_eye.mat`). */
+    /**
+     * Ajustes de `masha_holo_eye` (ver la cabecera de `masha_holo_eye.mat`). La geometría del
+     * iris es la de `masha_eye_basecolor.png`/`masha_eye_irismask.png` (dos islas UV, una por ojo):
+     * centros de la pupila, radio de la pupila y del iris, en UV.
+     */
     data class HoloEyeParams(
         val irisEmission: Float = 0.35f,
         val irisTint: Float = 0.25f,
@@ -150,11 +167,42 @@ internal class HoloShader private constructor(
         val corneaGloss: Float = 1f,
         val corneaRoughness: Float = 0.06f,
         val brightness: Float = 1f,
+        /** Centros de la pupila de las dos islas, en UV (A: u > v, B: u < v). */
+        val pupilAU: Float = 0.7067f,
+        val pupilAV: Float = 0.2962f,
+        val pupilBU: Float = 0.2937f,
+        val pupilBV: Float = 0.7020f,
+        /** Radio de la pupila y del iris en la textura (UV); un radio de iris 0 apaga dilatación, limbo y anillo. */
+        val pupilRadius: Float = 0.031f,
+        val irisRadius: Float = 0.104f,
+        val limbusDark: Float = 0.3f,
+        val ringGlow: Float = 0.35f,
+        /**
+         * Brillo fijo respecto a la cámara: hacia dónde está (espacio de la vista: arriba a la
+         * izquierda de quien mira, no tan alto que lo tape el párpado superior).
+         */
+        val catchX: Float = -0.32f,
+        val catchY: Float = 0.24f,
+        val catchZ: Float = 1f,
+        /** Coseno de su radio angular en la córnea (0,99919 ≈ 2,3°) e intensidad (algo más de 1: un destello mínimo de bloom). */
+        val catchSize: Float = 0.99919f,
+        val catchIntensity: Float = 1.2f,
+        val wetIntensity: Float = 0.18f,
     ) {
         companion object {
-            val EYES = HoloEyeParams()
-            val TEETH = HoloEyeParams(irisEmission = 0f, scleraDim = 0.6f, scleraTint = 0.5f, roughness = 0.4f, corneaGloss = 0.3f, corneaRoughness = 0.2f, brightness = 0.45f)
-            val TONGUE = HoloEyeParams(irisEmission = 0f, scleraDim = 0.55f, scleraTint = 0.45f, roughness = 0.5f, corneaGloss = 0.2f, corneaRoughness = 0.3f, brightness = 0.4f)
+            /** El iris se lee mejor (más claro y con más tono del ánimo); la pupila se mueve con [frame]. */
+            val EYES = HoloEyeParams(irisEmission = 0.42f, irisTint = 0.3f, irisBrightness = 1.15f)
+
+            // Dientes y lengua: sus PNG son opacos (alfa 1), así que van por la rama del "iris":
+            // todo lo que es solo del ojo, apagado.
+            val TEETH = HoloEyeParams(
+                irisEmission = 0f, scleraDim = 0.6f, scleraTint = 0.5f, roughness = 0.4f, corneaGloss = 0.3f, corneaRoughness = 0.2f, brightness = 0.45f,
+                irisRadius = 0f, limbusDark = 0f, ringGlow = 0f, catchIntensity = 0f, wetIntensity = 0f,
+            )
+            val TONGUE = HoloEyeParams(
+                irisEmission = 0f, scleraDim = 0.55f, scleraTint = 0.45f, roughness = 0.5f, corneaGloss = 0.2f, corneaRoughness = 0.3f, brightness = 0.4f,
+                irisRadius = 0f, limbusDark = 0f, ringGlow = 0f, catchIntensity = 0f, wetIntensity = 0f,
+            )
         }
     }
 
@@ -176,9 +224,10 @@ internal class HoloShader private constructor(
         companion object {
             val HAIR = HoloCardParams()
             // Cejas y pestañas: su textura es negra y en el holograma desaparecían
-            // (la cara parecía sin cejas). Brillo propio para que se lean.
+            // (la cara parecía sin cejas). Brillo propio para que se lean. Las pestañas
+            // casi no parpadean con el glitch: enmarcan los ojos, que tienen que leerse.
             val BROWS = HoloCardParams(albedo = 0.6f, detail = 0.3f, rimIntensity = 0.3f, sheenIntensity = 0f, glowIntensity = 0.55f, alpha = 1f, cutoff = 0.05f)
-            val LASHES = HoloCardParams(albedo = 0.3f, detail = 0.2f, rimIntensity = 0f, sheenIntensity = 0f, glowIntensity = 0.25f, alpha = 1f, cutoff = 0.1f)
+            val LASHES = HoloCardParams(albedo = 0.3f, detail = 0.2f, rimIntensity = 0f, sheenIntensity = 0f, glowIntensity = 0.25f, alpha = 1f, cutoff = 0.1f, glitchAmount = 0.3f)
         }
     }
 
@@ -391,8 +440,22 @@ internal class HoloShader private constructor(
      * @param glitch 0..1: la ráfaga de glitch (0 fuera de ella).
      * @param moodSkin color de piel del ánimo, RGB lineal (3 floats).
      * @param moodGlow color de brillo del ánimo, RGB lineal (3 floats).
+     * @param pupil dilatación de la pupila (radio relativo, `FaceExpression.pupil`).
+     * @param attention 0..1 (escuchar, curiosidad): aviva el anillo del iris y el brillo del ojo.
+     * @param eyes centros de los ojos en el mundo (L 0..2, R 3..5), o null si no se saben:
+     *   alrededor de ellos el glitch y las scanlines se calman.
      */
-    fun frame(timeSec: Float, energy: Float, pulse: Float, glitch: Float, moodSkin: FloatArray, moodGlow: FloatArray) {
+    fun frame(
+        timeSec: Float,
+        energy: Float,
+        pulse: Float,
+        glitch: Float,
+        moodSkin: FloatArray,
+        moodGlow: FloatArray,
+        pupil: Float = 0f,
+        attention: Float = 0f,
+        eyes: FloatArray? = null,
+    ) {
         val time = timeSec % TIME_WRAP
         // Cada ráfaga nueva, otro patrón de bandas.
         if (glitch > 0f && lastGlitch <= 0f) glitchSeed = (glitchSeed + 0.618034f) % 1f
@@ -407,6 +470,8 @@ internal class HoloShader private constructor(
                     mi.setParameter("pulse", pulse)
                     mi.setParameter("glitch", glitch * s.holo.glitchAmount)
                     mi.setParameter("glitchSeed", glitchSeed)
+                    // Solo la cara llega a la zona de calma de los ojos (cuerpo y boca quedan fuera).
+                    if (s.kind == Kind.Face) writeEyes(mi, eyes)
                 }
                 Family.Eye -> {
                     // El mismo desgarro que la cara: ojos, dientes y lengua van con su banda.
@@ -414,6 +479,13 @@ internal class HoloShader private constructor(
                     mi.setParameter("time", time)
                     mi.setParameter("glitch", glitch)
                     mi.setParameter("glitchSeed", glitchSeed)
+                    // Dientes y lengua quedan fuera de la zona de calma: solo los ojos.
+                    if (s.kind == Kind.Eyes) {
+                        writeEyes(mi, eyes)
+                        mi.setParameter("pupilDilation", pupil)
+                        mi.setParameter("attention", attention)
+                        if (com.elyndra.launcher.BuildConfig.DEBUG) debugCatch(s)
+                    }
                 }
                 Family.Card -> {
                     mi.setParameter("time", time)
@@ -423,6 +495,27 @@ internal class HoloShader private constructor(
                 }
             }
             writeColors(s, moodSkin, moodGlow)
+        }
+    }
+
+    /** Solo debug: el brillo del ojo que se pide por adb (`MashaDebugPose.catchX/Y/I`), o el de fábrica. */
+    private fun debugCatch(s: Slot) {
+        val p = s.eye
+        val x = MashaDebugPose.catchX
+        val y = MashaDebugPose.catchY
+        val i = MashaDebugPose.catchI
+        s.mi.setParameter("catchDir", if (x.isNaN()) p.catchX else x, if (y.isNaN()) p.catchY else y, p.catchZ)
+        s.mi.setParameter("catchIntensity", if (i.isNaN()) p.catchIntensity else i)
+    }
+
+    /** Centros de los ojos (zona de calma del glitch y las scanlines); lejos si no se saben. */
+    private fun writeEyes(mi: MaterialInstance, eyes: FloatArray?) {
+        if (eyes == null) {
+            mi.setParameter("eyeCenterL", FAR, FAR, FAR)
+            mi.setParameter("eyeCenterR", FAR, FAR, FAR)
+        } else {
+            mi.setParameter("eyeCenterL", eyes[0], eyes[1], eyes[2])
+            mi.setParameter("eyeCenterR", eyes[3], eyes[4], eyes[5])
         }
     }
 
@@ -476,6 +569,12 @@ internal class HoloShader private constructor(
                 mi.setParameter("emissiveDamp", emissiveDamp)
                 mi.setParameter("selfIllum", selfIllum)
                 mi.setParameter("proceduralScale", proceduralScale)
+                mi.setParameter("contourPower", contourPower)
+                mi.setParameter("contourIntensity", contourIntensity)
+                mi.setParameter("eyeScanCalm", eyeScanCalm)
+                mi.setParameter("eyeCalmRadii", EYE_CALM_INNER, EYE_CALM_OUTER)
+                mi.setParameter("eyeGlitch", EYE_GLITCH)
+                writeEyes(mi, null)
                 mi.setParameter("time", 0f)
                 mi.setParameter("glitch", 0f)
                 mi.setParameter("glitchSeed", 0f)
@@ -492,6 +591,19 @@ internal class HoloShader private constructor(
                 mi.setParameter("corneaGloss", corneaGloss)
                 mi.setParameter("corneaRoughness", corneaRoughness)
                 mi.setParameter("brightness", brightness)
+                mi.setParameter("irisCenters", pupilAU, pupilAV, pupilBU, pupilBV)
+                mi.setParameter("irisRadii", pupilRadius, irisRadius)
+                mi.setParameter("limbusDark", limbusDark)
+                mi.setParameter("ringGlow", ringGlow)
+                mi.setParameter("catchDir", catchX, catchY, catchZ)
+                mi.setParameter("catchSize", catchSize)
+                mi.setParameter("catchIntensity", catchIntensity)
+                mi.setParameter("wetIntensity", wetIntensity)
+                mi.setParameter("eyeCalmRadii", EYE_CALM_INNER, EYE_CALM_OUTER)
+                mi.setParameter("eyeGlitch", EYE_GLITCH)
+                writeEyes(mi, null)
+                mi.setParameter("pupilDilation", 0f)
+                mi.setParameter("attention", 0f)
                 mi.setParameter("pulse", 0f)
                 mi.setParameter("time", 0f)
                 mi.setParameter("glitch", 0f)
@@ -585,6 +697,18 @@ internal class HoloShader private constructor(
 
         /** El reloj del shader se envuelve cada hora (precisión de float). */
         private const val TIME_WRAP = 3600f
+
+        /**
+         * Zona de calma alrededor de cada ojo (m): entera dentro de [EYE_CALM_INNER] (párpados,
+         * pestañas), nada más allá de [EYE_CALM_OUTER] (cejas, pómulo). Ahí el glitch desgarra
+         * solo [EYE_GLITCH] y la cara apaga sus scanlines. Los dos materiales usan los mismos valores.
+         */
+        const val EYE_CALM_INNER = 0.022f
+        const val EYE_CALM_OUTER = 0.045f
+        const val EYE_GLITCH = 0.3f
+
+        /** Ojos desconocidos: centros lejísimos (sin zona de calma). */
+        private const val FAR = 1e4f
 
         private val NEUTRAL_SKIN = floatArrayOf(0.07f, 0.29f, 1f)
         private val NEUTRAL_GLOW = floatArrayOf(0.24f, 0.67f, 1f)
