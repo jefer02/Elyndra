@@ -286,7 +286,9 @@ class KeylessPriorityTest {
     @Test
     fun savedPriorityFromOlderVersionsGetsTheNewSourcesAtTheEnd() {
         val parsed = MetadataPriority.parse("ss,igdb,sgdb,ra", MetadataPriority.DEFAULT.art)
-        assertEquals(listOf(Service.ScreenScraper, Service.Igdb, Service.SteamGridDb, Service.RetroAchievements), parsed.take(4))
+        // Google Play, primera de serie, entra delante; el orden guardado se respeta.
+        assertEquals(Service.GooglePlay, parsed.first())
+        assertEquals(listOf(Service.ScreenScraper, Service.Igdb, Service.SteamGridDb, Service.RetroAchievements), parsed.drop(1).take(4))
         assertTrue(parsed.containsAll(listOf(Service.Libretro, Service.Steam)))
     }
 
