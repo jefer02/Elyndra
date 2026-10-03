@@ -9,30 +9,65 @@
 // to its albedo, stays under the bloom threshold at default values); the
 // sclera is dimmed and tinted towards the hologram color so it doesn't pop
 // as a white ball; a clear-coat cornea keeps a tiny sharp specular highlight
-// (catch light) from the key light / IBL.
+// from the key light / IBL.
+//
+// On top of that, so the eyes look alive through the hologram (all of it is
+// emission, not photoreal shading):
+//   - the pupil dilates/constricts: the iris texture is warped radially around
+//     the pupil center of this eye's UV island (the atlas holds both eyes), so
+//     the fibers compress like a real iris;
+//   - a darker limbal ring and a thin holographic glow ring at the iris edge
+//     (x glowColor, i.e. the mood tint) make the iris read at a distance;
+//   - a catchlight fixed relative to the CAMERA (a small virtual softbox up-left
+//     of the viewer, given in view space): it stays put on screen while the eye
+//     rotates, like a real reflection. Anti-aliased with fwidth and dimmed when
+//     it is smaller than a pixel (no twinkling at full-body distance). It is
+//     computed on the eyeball sphere around the eye bone (eyeCenterL/R), not on
+//     the mesh: the iris is dished, and its normals would mirror it;
+//   - a soft "wet" lobe around it plus a faint grazing sheen on the cornea.
+// The signal glitch tears the eyes much less than the rest of the body (see
+// eyeGlitch): the same attenuation is applied to the face around the eyes in
+// masha_holo.mat, so eyelids and eyes still tear together.
 //
 // -----------------------------------------------------------------------------
 // Samplers (1)
 //   eyeMap     RGBA8, sRGB color + LINEAR alpha (SRGB8_A8). RGB = eye base
 //              color (masha_eye_basecolor.png), A = iris mask
 //              (masha_eye_irismask.png). HoloShader.kt packs both PNGs into one
-//              texture at load time. For teeth/tongue: their base color with
-//              A = 0 (no iris emission, whole surface treated as "sclera").
+//              texture at load time. Teeth/tongue use their own base color
+//              (their PNGs are opaque, so A = 1: they take the "iris" color
+//              path; their instances switch every eye-only effect off).
 //
 // Parameters (default / range — effect)
 //   time / glitch / glitchSeed — same as masha_holo.mat (vertex tearing only; no color change).
 //   holoColor           mood skin, linear RGB — tint for the sclera / surface.
-//   glowColor           mood glow, linear RGB — tint mixed into the iris glow.
+//   glowColor           mood glow, linear RGB — tint mixed into the iris glow, ring and highlights.
 //   irisEmission        0.35 / [0, 1]    — iris self-illumination (x iris albedo).
 //   irisTint            0.25 / [0, 1]    — pushes the iris hue towards glowColor.
 //   irisBrightness      1.0 / [0.5, 2]   — iris albedo scale.
 //   scleraDim           0.55 / [0, 1]    — sclera albedo scale (1 = texture white).
 //   scleraTint          0.40 / [0, 1]    — sclera hue towards holoColor.
 //   roughness           0.35 / [0.05, 1] — base layer roughness (wet but soft).
-//   corneaGloss         1.0 / [0, 1]     — clear-coat strength (catch light).
+//   corneaGloss         1.0 / [0, 1]     — clear-coat strength.
 //   corneaRoughness     0.06 / [0.02, 0.5] — clear-coat roughness (smaller = tighter highlight).
-//   pulse               0 / [0, 1.5]     — voice pulse, adds up to +40% iris glow.
+//   pulse               0 / [0, 1.5]     — voice pulse, adds up to +40% iris glow (+50% ring).
 //   brightness          1.0 / [0, 2]     — overall albedo scale (teeth: ~0.6).
+//   irisCenters         (uA, vA, uB, vB) — pupil centers of the two UV islands
+//                                          (A: u > v, B: u < v).
+//   irisRadii           (pupil, iris)    — radii in UV of the texture's pupil and iris.
+//                                          (0, 0) switches dilation, limbus and ring off.
+//   pupilDilation       0 / [-0.4, 0.8]  — relative change of the pupil radius (0.25 = 25% wider).
+//   limbusDark          0.3 / [0, 1]     — darkens the iris border (limbal ring).
+//   ringGlow            0.35 / [0, 2]    — emissive ring at the iris edge (+ faint one at the pupil).
+//   attention           0 / [0, 1]       — listening / curious: ring and catchlight +30%.
+//   catchDir            view space       — direction to the virtual catchlight (normalized on GPU).
+//   catchSize           0.99919 / cos    — cos of the catchlight's angular radius on the cornea (~2.3 deg).
+//   catchIntensity      1.2 / [0, 4]     — catchlight emission (a little over 1: tiny bloom glint).
+//   wetIntensity        0.18 / [0, 1]    — soft lobe around the catchlight + grazing sheen.
+//   eyeCenterL/R        user world (m)   — eye bone positions: glitch attenuation and the cornea
+//                                          sphere for the catchlight (x >= 1000 = unknown).
+//   eyeCalmRadii        (inner, outer) m — attenuation is full inside, gone outside.
+//   eyeGlitch           0.3 / [0, 1]     — fraction of the glitch tearing kept at the eyes.
 // =============================================================================
 
 material {
@@ -58,13 +93,28 @@ material {
         { type : float, name : brightness },
         { type : float, name : time, precision : high },
         { type : float, name : glitch },
-        { type : float, name : glitchSeed }
+        { type : float, name : glitchSeed },
+        { type : float4, name : irisCenters, precision : high },
+        { type : float2, name : irisRadii, precision : high },
+        { type : float, name : pupilDilation },
+        { type : float, name : limbusDark },
+        { type : float, name : ringGlow },
+        { type : float, name : attention },
+        { type : float3, name : catchDir },
+        { type : float, name : catchSize, precision : high },
+        { type : float, name : catchIntensity },
+        { type : float, name : wetIntensity },
+        { type : float3, name : eyeCenterL, precision : high },
+        { type : float3, name : eyeCenterR, precision : high },
+        { type : float2, name : eyeCalmRadii },
+        { type : float, name : eyeGlitch }
     ],
     variantFilter : [ shadowReceiver, vsm, ssr, stereo ]
 }
 
 // Same signal glitch as masha_holo.mat (identical bands and shift for the same world Y, time and
-// seed), so eyes, teeth and tongue tear together with the face instead of floating in place.
+// seed), so eyes, teeth and tongue tear together with the face instead of floating in place. Near
+// the eyes both materials keep only eyeGlitch of the shift (same formula, same parameters).
 vertex {
     highp float holoHash(highp float n) {
         return fract(sin(n) * 43758.5453);
@@ -80,6 +130,9 @@ vertex {
             highp float r = holoHash(band * 7.13 + step20 * 3.7);
             float on = step(1.0 - 0.45 * g, r);
             highp float shift = (holoHash(band * 1.91 + step20 * 0.77) - 0.5) * 0.07 * g * on;
+            highp float d = min(distance(userPos.xyz, materialParams.eyeCenterL), distance(userPos.xyz, materialParams.eyeCenterR));
+            float calm = 1.0 - smoothstep(materialParams.eyeCalmRadii.x, materialParams.eyeCalmRadii.y, d);
+            shift *= 1.0 - (1.0 - materialParams.eyeGlitch) * calm;
             highp vec3 camRight = getWorldFromViewMatrix()[0].xyz;
             material.worldPosition.xyz += camRight * shift;
         }
@@ -90,7 +143,28 @@ fragment {
     void material(inout MaterialInputs material) {
         prepareMaterial(material);
 
-        vec4 tex = texture(materialParams_eyeMap, getUV0());
+        // ---- pupil dilation: radial warp of the iris around this island's pupil center
+        highp vec2 uv = getUV0();
+        highp vec4 cs = materialParams.irisCenters;
+        highp vec2 c = uv.x < uv.y ? cs.zw : cs.xy;
+        highp vec2 d = uv - c;
+        highp float r = length(d);
+        highp float p0 = materialParams.irisRadii.x;
+        highp float R = materialParams.irisRadii.y;
+        highp vec2 suv = uv;
+        // Radius inside the iris, 0..1 (> 1 outside); 9 = no iris (teeth, tongue).
+        float rn = 9.0;
+        float pupilN = 0.0;
+        if (R > 0.0) {
+            rn = r / R;
+            highp float p1 = clamp(p0 * (1.0 + materialParams.pupilDilation), 0.4 * p0, 0.7 * R);
+            pupilN = p1 / R;
+            if (r < R) {
+                highp float rs = r < p1 ? r * (p0 / p1) : p0 + (r - p1) * (R - p0) / (R - p1);
+                suv = c + d * (rs / max(r, 1e-6));
+            }
+        }
+        vec4 tex = texture(materialParams_eyeMap, suv);
         vec3 albedo = tex.rgb;
         float iris = tex.a;
 
@@ -100,10 +174,12 @@ fragment {
         float holoLuma = max(dot(holo, vec3(0.2126, 0.7152, 0.0722)), 1e-3);
         vec3 scleraCol = mix(albedo, luma * holo / holoLuma, materialParams.scleraTint) * materialParams.scleraDim;
 
-        // Iris: keeps its texture, hue nudged towards the glow color.
+        // Iris: keeps its texture, hue nudged towards the glow color, darker border (limbal ring).
         vec3 glow = materialParams.glowColor;
         float glowLuma = max(dot(glow, vec3(0.2126, 0.7152, 0.0722)), 1e-3);
         vec3 irisCol = mix(albedo, luma * glow / glowLuma, materialParams.irisTint) * materialParams.irisBrightness;
+        float limbus = smoothstep(0.70, 0.95, rn) * (1.0 - smoothstep(1.0, 1.12, rn));
+        irisCol *= 1.0 - materialParams.limbusDark * limbus;
 
         vec3 base = mix(scleraCol, irisCol, iris) * materialParams.brightness;
         material.baseColor = vec4(saturate(base), 1.0);
@@ -113,9 +189,47 @@ fragment {
         material.clearCoat = materialParams.corneaGloss;
         material.clearCoatRoughness = materialParams.corneaRoughness;
 
-        // Soft iris glow: proportional to the iris albedo (pupil stays dark),
-        // exposure-independent (w = 0). ~0.1-0.3 absolute: no bloom halo.
-        float e = materialParams.irisEmission * (1.0 + 0.4 * materialParams.pulse) * iris;
-        material.emissive = vec4(irisCol * e, 0.0);
+        // ---- emission (exposure-independent, w = 0)
+        float pulse = materialParams.pulse;
+        float att = materialParams.attention;
+        // Soft iris glow: proportional to the iris albedo (pupil stays dark). ~0.1-0.3: no bloom halo.
+        vec3 emit = irisCol * (materialParams.irisEmission * (1.0 + 0.4 * pulse) * iris);
+
+        // Holographic ring: thin band just inside the limbus, a fainter one at the pupil edge.
+        float ringOut = (rn - 0.92) / 0.06;
+        float ringIn = (rn - pupilN - 0.05) / 0.05;
+        float ring = exp(-ringOut * ringOut) + 0.3 * exp(-ringIn * ringIn);
+        emit += glow * (ring * materialParams.ringGlow * (1.0 + 0.5 * pulse + 0.3 * att));
+
+        // Catchlight fixed to the camera + wet lobe + grazing sheen. They live on the cornea, and this
+        // model has none: its iris is dished (concave, MPFB eyes), so the mesh normal would mirror the
+        // reflection through the pupil. Use the eyeball sphere around the eye bone instead (convex,
+        // where the cornea would be); the mesh normal only when the eye centers are unknown.
+        if (materialParams.catchIntensity > 0.0) {
+            vec3 n = getWorldNormalVector();
+            highp vec3 cL = materialParams.eyeCenterL;
+            if (cL.x < 1000.0) {
+                highp vec3 pw = (getUserWorldFromWorldMatrix() * vec4(getWorldPosition(), 1.0)).xyz;
+                highp vec3 cR = materialParams.eyeCenterR;
+                n = normalize(pw - (distance(pw, cL) < distance(pw, cR) ? cL : cR));
+            }
+            vec3 v = getWorldViewVector();
+            vec3 l = normalize((getWorldFromViewMatrix() * vec4(materialParams.catchDir, 0.0)).xyz);
+            vec3 h = normalize(l + v);
+            highp float nh = saturate(dot(n, h));
+            highp float cs0 = materialParams.catchSize;
+            highp float aa = max(fwidth(nh), 1e-5);
+            // Smaller than a pixel: same energy spread over the pixel instead of a twinkling dot.
+            float sub = saturate((1.0 - cs0) / aa);
+            float spot = smoothstep(cs0 - aa, cs0 + aa, nh) * sub;
+            float wet = pow(nh, 140.0);
+            float NoV = saturate(dot(n, v));
+            float sheen = pow(1.0 - NoV, 5.0);
+            vec3 white = mix(vec3(1.0), glow / max(max(glow.r, max(glow.g, glow.b)), 1e-3), 0.25);
+            float onCornea = mix(0.5, 1.0, iris);
+            emit += white * (spot * materialParams.catchIntensity * (1.0 + 0.3 * att) * onCornea);
+            emit += mix(white, glow, 0.5) * (materialParams.wetIntensity * (0.6 * wet * onCornea + 0.5 * sheen));
+        }
+        material.emissive = vec4(emit, 0.0);
     }
 }

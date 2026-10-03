@@ -317,9 +317,14 @@ energía dentro del habla; suavizado de fase cero. **No es abrir y cerrar con el
 ### Expresión al hablar
 
 En las mismas curvas: **cejas y cabeceo** (2,2°) en la tónica de palabras con contenido cuya energía
-destaca (o que acaban en "!"), como mucho uno cada 1,4 s; **cabeza arriba (3°) y cejas** al final de
+destaca (o que acaban en "!"), como mucho uno cada 1,4 s; **subidas pequeñas de cejas** (sin cabeceo)
+en el resto de tónicas de palabras con contenido con algo de énfasis (z ≥ 0,1, a ≥ 0,45 s de cualquier
+otro acento; unas 2,5 veces más pequeñas que un acento fuerte); **cabeza arriba (3°) y cejas** al final de
 una pregunta; cabeceo pequeño al final de una afirmación; **parpadeo** en comas y puntos (p = 0,5,
-determinista por frase); **sonrisa del ánimo** que cede un 65 % en O/U/P/F. El cabeceo es una capa
+determinista por frase); **sonrisa del ánimo** que cede un 65 % en O/U/P/F. El ánimo decide cómo se
+reparte el acento entre browInnerUp y browOuterUp (preocupada, casi todo dentro; juguetona o curiosa,
+más fuera) y una ceja manda un poco, alternando despacio (ver "Expresión de la cara" en
+[MASHA.md](MASHA.md)). El cabeceo es una capa
 aditiva de huesos (cuello 40 %, cabeza 60 %) aplicada en `MashaAnimator` después de la mirada (para que
 la mirada no lo compense) y antes de muelles y matrices. Los gestos del cuerpo (`Talk_*`) siguen ahora
 el **nivel real del audio** (`LipSync.Frame.env`: dBFS −45…−10 → 0…1) en vez de la suposición por letras.
@@ -364,6 +369,8 @@ Morphs por nombre; lo que falta se ignora o se sustituye.
 | `punctuationBlink` | 0,5 | probabilidad de parpadeo en coma o punto |
 | `smileRoundingCut` | 0,65 | cuánto cede la sonrisa en O/U/P/F |
 | `accentGap` | 1,4 s | separación mínima entre acentos |
+| `minorBrowAccent` | 0,16 | subida pequeña de cejas en las otras tónicas (0 = ninguna) |
+| `minorAccentGap` | 0,45 s | separación mínima de esas subidas pequeñas |
 
 Para cambiarlos: `MashaPresence.lipSync = LipSync(LipSyncConfig(...))`. Las tablas por visema (topes,
 apertura, dominancias) están en `Vis` (`lipsync/Phonemes.kt`).
@@ -398,7 +405,7 @@ Perfilado con Perfetto y A/B en un Motorola edge 50 fusion (pantalla de 120 Hz),
 
 #### Pendiente (tarea aparte)
 
-- **Partículas de la biblioteca** (`NeonParticles`, `MashaParticles`, `SettingsParticles`…): probablemente
+- **Partículas de la biblioteca** (`ui/selection/` (marco y polvo estelar), `MashaParticles`, `SettingsParticles`…): probablemente
   redibujan en cada vsync como hacía la atmósfera; medir y aplicar el mismo patrón (reloj a menos Hz).
 - **Ambiente sonoro** (`AmbientSoundscape`, ExoPlayer): ~11 % de un núcleo de CPU decodificando sin parar
   (`doSomeWork` cada ~10 ms). No limita los fps de Masha, pero gasta batería.
@@ -407,9 +414,10 @@ Perfilado con Perfetto y A/B en un Motorola edge 50 fusion (pantalla de 120 Hz),
 
 `app/src/test/.../ui/masha/lipsync/`: `G2pTest` (español, inglés con CMUdict y por reglas, pt/fr/de,
 tokens), `LipSyncPipelineTest` (alineado con y sin rangos sobre voz sintética, cierre en P, topes,
-anticipación de U, cierre final, solo audio, preguntas, streaming), y
+anticipación de U, cierre final, solo audio, preguntas, acentos pequeños de cejas, streaming), y
 `ui/masha/LipSyncRenderTest` (independencia de fps 30 vs 120, parpadeos, adelanto visual, mezcla a
-morphs con los dos GLB y las reglas del contrato).
+morphs con los dos GLB y las reglas del contrato). La expresión de la cara (ánimo → morphs, parpadeo,
+mirada, cabeza, sin objetos por fotograma): `ui/masha/MashaExpressionTest`.
 
     ./gradlew :app:testDebugUnitTest --tests "com.elyndra.launcher.ui.masha.*"
 
@@ -446,9 +454,17 @@ Receptores de `adb` que no existen en release (`BuildConfig.DEBUG`):
     adb shell am broadcast -a com.elyndra.launcher.DEBUG_POSE --ez trace true                         # traza también sin hablar
     adb shell am broadcast -a com.elyndra.launcher.DEBUG_POSE --ez glitch true                        # glitch del holograma permanente
     adb shell am broadcast -a com.elyndra.launcher.DEBUG_PERF --ez atmo false --ez ssao false --ez bloom false --ef scale 0.75 --ei atmoHz 60 --ez springs false
+    adb shell am broadcast -a com.elyndra.launcher.DEBUG_POSE --ei load 8                             # 8 morphs más activos a 0,02 (invisibles): coste de GPU
+    adb shell am broadcast -a com.elyndra.launcher.DEBUG_POSE --ef catchX -0.3 --ef catchY 0.2 --ef catchI 1.2   # brillo del ojo en vivo (catchI -1 = de fábrica)
+    adb shell am broadcast -a com.elyndra.launcher.DEBUG_MOOD --es mood Curious                       # vista previa de un ánimo (o Listening; auto = el de la conversación)
+    adb shell "run-as com.elyndra.launcher sh -c 'echo lite > cache/masha_quality'"                  # fuerza la calidad (lite/high; borrar = automática)
 
 Con Masha hablando (o `trace`), logcat `MashaFace` da por fotograma los pesos de boca y el tiempo de CPU
-(`us_lip`, `us_body_face`); `MashaVoice` da el tiempo hasta el primer sonido y el modo de cada frase.
+(`us_lip`, `us_body_face`); `MashaVoice` da el tiempo hasta el primer sonido y el modo de cada frase;
+`MashaPerf`, cada 2 s, el ritmo de los callbacks de fotograma, el tiempo de CPU de `HoloRig.frame` y
+los morphs activos (los fotogramas que de verdad se presentan, con `dumpsys SurfaceFlinger --latency`
+sobre la capa del SurfaceView). En la pantalla de Masha (debug) hay además un chip "FX" a la derecha
+que recorre los ánimos.
 Con el fichero `cache/noholo` (`adb shell run-as com.elyndra.launcher touch cache/noholo`) el escenario
 arranca sin HoloShader (materiales de gltfio), para aislar problemas del shader.
 
