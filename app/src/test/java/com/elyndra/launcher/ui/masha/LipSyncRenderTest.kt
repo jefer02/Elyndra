@@ -200,9 +200,10 @@ class LipSyncRenderTest {
 
     @Test
     fun `la sonrisa cede en la u y en la p`() {
-        val plain = mix(newNames) { smile = 0.6f }
-        val u = mix(newNames) { smile = 0.6f; lips[Vis.U.ordinal] = 0.6f }
-        val p = mix(newNames) { smile = 0.6f; lips[Vis.PP.ordinal] = 0.85f }
+        fun FaceChannels.smile() { expr[Ex.SMILE_L] = 0.36f; expr[Ex.SMILE_R] = 0.36f }
+        val plain = mix(newNames) { smile() }
+        val u = mix(newNames) { smile(); lips[Vis.U.ordinal] = 0.6f }
+        val p = mix(newNames) { smile(); lips[Vis.PP.ordinal] = 0.85f }
         assertTrue(u.getValue("mouthSmileLeft") < 0.5f * plain.getValue("mouthSmileLeft"))
         assertTrue(p.getValue("mouthSmileLeft") < 0.5f * plain.getValue("mouthSmileLeft"))
     }

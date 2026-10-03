@@ -172,6 +172,35 @@ class LipSyncPipelineTest {
     }
 
     @Test
+    fun `las cejas suben un poco en las otras tonicas, no solo en el acento fuerte`() {
+        // "camino palabra momento": tónicas (mi, la, men) más fuertes que las átonas.
+        val loud = 0.42f
+        val audio = Synth.render(
+            Synth.Sil(100),
+            Synth.Gap(50), Synth.Vowel(120, 850f, 1450f, 0.2f), Synth.Nasal(60), Synth.Vowel(160, 330f, 2650f, loud), Synth.Nasal(60), Synth.Vowel(120, 540f, 1050f, 0.2f),
+            Synth.Gap(60), Synth.Vowel(120, 850f, 1450f, 0.2f), Synth.Nasal(50), Synth.Vowel(170, 850f, 1450f, loud), Synth.Gap(60), Synth.Nasal(40), Synth.Vowel(120, 850f, 1450f, 0.2f),
+            Synth.Nasal(60), Synth.Vowel(120, 540f, 1050f, 0.2f), Synth.Nasal(60), Synth.Vowel(170, 520f, 2150f, loud), Synth.Nasal(50), Synth.Gap(50), Synth.Vowel(120, 540f, 1050f, 0.2f),
+            Synth.Sil(200),
+        )
+        val ranges = listOf(100, 670, 1290)
+        fun peaks(c: LipSyncConfig): List<Float> {
+            val tr = utterance("camino palabra momento", audio, ranges).build(c, VowelProfile(), 0.075f)
+            val out = ArrayList<Float>()
+            for (k in 1 until tr.frames - 1) {
+                val b = tr.at(k, Ch.BROW)
+                if (b > 0.02f && b >= tr.at(k - 1, Ch.BROW) && b > tr.at(k + 1, Ch.BROW)) out += b
+            }
+            return out
+        }
+        val majorOnly = peaks(cfg.copy(minorBrowAccent = 0f))
+        val all = peaks(cfg)
+        assertTrue("solo fuertes: $majorOnly", majorOnly.isNotEmpty())
+        assertTrue("con pequeños: $all frente a $majorOnly", all.size > majorOnly.size)
+        // Los pequeños, más pequeños que el fuerte.
+        assertTrue(all.minOrNull()!! < majorOnly.maxOrNull()!!)
+    }
+
+    @Test
     fun `alineado en streaming no inventa lo que aun no ha llegado`() {
         val u = Utterance("mapa mapa", es, seed = 1)
         u.begin(Synth.SR, AudioFormat.ENCODING_PCM_16BIT, 1)
