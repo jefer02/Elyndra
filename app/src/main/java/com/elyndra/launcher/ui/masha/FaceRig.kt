@@ -1,7 +1,9 @@
 package com.elyndra.launcher.ui.masha
 
 import com.elyndra.launcher.ui.masha.lipsync.Vis
+import kotlin.math.ln
 import kotlin.math.min
+import kotlin.random.Random
 
 /*
  * La cara de Masha sin Filament (se prueba en la JVM): canales semánticos
@@ -15,42 +17,26 @@ import kotlin.math.min
  */
 
 /**
- * Lo que la cara expresa en este fotograma, en unidades semánticas 0..1. El
- * rig lo rellena (con su suavizado) y [FaceMorphs.write] lo traduce a morphs.
+ * Lo que la cara expresa en este fotograma. El habla (labios, mandíbula) la
+ * pone [LipSync]; la expresión (ánimo, atención, microexpresiones, cejas del
+ * habla, párpados), [FaceExpression]. [FaceMorphs.write] lo traduce a morphs.
  */
 internal class FaceChannels {
     /** Visemas de labios ya coarticulados y suavizados, por ordinal de [Vis] (sin mandíbula). */
     val lips = FloatArray(Vis.COUNT)
     /** Mandíbula del habla, en peso de `jawOpen`. */
     var jaw = 0f
-    /** Receta "smile" (sonrisa por ánimo + microsonrisas). */
-    var smile = 0f
-    /** Sonrisa extra por lado (media sonrisa asimétrica, sesgo en reposo). */
-    var smileL = 0f
-    var smileR = 0f
-    /** Receta antigua "BrowUp" (microexpresión). */
-    var browUp = 0f
-    /** Acento de cejas del habla (palabras enfáticas, preguntas). */
-    var speechBrow = 0f
-    /** Receta antigua "BrowFrown" (preocupada / analítica). */
-    var frown = 0f
-    /** Receta "listening" y "thoughtful" (0..1 de cada una). */
-    var listen = 0f
-    var think = 0f
-    /** Entrecerrar suave (microexpresión "soft_squint"). */
-    var squint = 0f
-    /** Párpados, ya con el acoplamiento a la mirada. */
+    /** Expresión, en pesos de morph por canal de [Ex] (antes de ceder ante el habla). */
+    val expr = FloatArray(Ex.COUNT)
+    /** Párpado superior: parpadeo + [Ex.LID] + acoplamiento a la mirada (0 abierto, 1 cerrado). */
     var blinkL = 0f
     var blinkR = 0f
-    var wideL = 0f
-    var wideR = 0f
 
     fun clear() {
         lips.fill(0f)
         jaw = 0f
-        smile = 0f; smileL = 0f; smileR = 0f
-        browUp = 0f; speechBrow = 0f; frown = 0f; listen = 0f; think = 0f; squint = 0f
-        blinkL = 0f; blinkR = 0f; wideL = 0f; wideR = 0f
+        expr.fill(0f)
+        blinkL = 0f; blinkR = 0f
     }
 }
 
@@ -67,6 +53,13 @@ internal abstract class FaceMorphs(val names: List<String>) {
 
     /** Cuánto baja la sonrisa del ánimo en O/U/P/F (`LipSyncConfig.smileRoundingCut`). */
     var smileCut = 0.65f
+
+    /**
+     * Morphs de expresión activos a la vez como mucho (sin contar parpadeo ni boca: esos
+     * tienen su propio tope). Por encima, se resta el siguiente en fuerza y se reescala, como
+     * con los visemas: continuo, sin saltos. Sin límite por defecto; el rig lo pone según la calidad.
+     */
+    var exprBudget = Int.MAX_VALUE
 
     /** Escribe en [out] (tamaño = nº de morphs) los pesos para [c]. */
     abstract fun write(c: FaceChannels, out: FloatArray)
@@ -106,6 +99,12 @@ internal abstract class FaceMorphs(val names: List<String>) {
         const val VISEME_FLOOR = 0.03f
         /** Peso mínimo que se escribe en cualquier morph (menos no se ve y cuesta GPU). */
         const val MIN_WEIGHT = 0.015f
+        /**
+         * Peso mínimo de un morph de expresión. Cada morph activo cuesta lo mismo pese poco o mucho
+         * (medido: ~0,25 ms de GPU por morph y fotograma en un Snapdragon 8 Gen 3 con la GPU al
+         * límite; el doble en uno de gama media), y por debajo de esto casi no se ve.
+         */
+        const val EXPR_MIN_WEIGHT = 0.03f
 
         /** Nombre del morph de cada visema, por ordinal de [Vis]. */
         val VISEME_NAMES: List<String> = Vis.entries.map {
@@ -150,27 +149,15 @@ internal abstract class FaceMorphs(val names: List<String>) {
     class V2(names: List<String>) : FaceMorphs(names) {
         private val blinkL = i("eyeBlinkLeft")
         private val blinkR = i("eyeBlinkRight")
-        private val squintL = i("eyeSquintLeft")
-        private val squintR = i("eyeSquintRight")
-        private val wideL = i("eyeWideLeft")
-        private val wideR = i("eyeWideRight")
-        private val browInnerUp = i("browInnerUp")
-        private val browDownL = i("browDownLeft")
-        private val browDownR = i("browDownRight")
-        private val browOuterL = i("browOuterUpLeft")
-        private val browOuterR = i("browOuterUpRight")
-        private val cheekL = i("cheekSquintLeft")
-        private val cheekR = i("cheekSquintRight")
-        private val smileL = i("mouthSmileLeft")
-        private val smileR = i("mouthSmileRight")
-        private val frownL = i("mouthFrownLeft")
-        private val frownR = i("mouthFrownRight")
         private val jaw = i("jawOpen")
         private val pucker = i("mouthPucker")
-        private val press = i("mouthPress")
-        private val mouthLeft = i("mouthLeft")
         private val close = i("mouthClose")
         private val vis = IntArray(Vis.COUNT) { i(VISEME_NAMES[it]) }
+        /** Morph de cada canal de [Ex] (−1 si el GLB no lo trae, o [Ex.LID], que no es un morph). */
+        private val ex = IntArray(Ex.COUNT) { k -> Ex.MORPH[k]?.let { i(it) } ?: -1 }
+        /** Expresión final de este fotograma (ya cedida ante el habla y con el presupuesto). */
+        private val ew = FloatArray(Ex.COUNT)
+        private val exSorted = FloatArray(Ex.COUNT)
 
         /** ¿Visemas solo de labios (contrato de lip-sync)? */
         val lipOnly = vis[Vis.KK.ordinal] >= 0 || vis[Vis.NN.ordinal] >= 0 || vis[Vis.RR.ordinal] >= 0 || vis[Vis.TH.ordinal] >= 0
@@ -250,10 +237,11 @@ internal abstract class FaceMorphs(val names: List<String>) {
                 val th = (w[Vis.TH.ordinal] / 0.3f).coerceIn(0f, 1f)
                 j = maxOf(j, TH_MIN_JAW * th)
             }
-            // Al hablar, la boca de "pensar" (labios apretados, de lado) se va.
+            // Al hablar, la boca de la expresión (labios apretados, de lado, hoyuelos) cede.
             val talk = min(1f, (sum + j) * 2f)
-            var pr = 0.35f * c.think * (1f - talk)
-            val left = 0.3f * c.think * (1f - talk)
+            val quiet = 1f - talk
+            val e = c.expr
+            var pr = e[Ex.PRESS] * quiet
             val pp = w[Vis.PP.ordinal]
             val ff = w[Vis.FF.ordinal]
             if (lipOnly) {
@@ -276,37 +264,45 @@ internal abstract class FaceMorphs(val names: List<String>) {
             set(out, pucker, 0f)
             for (v in 0 until Vis.COUNT) set(out, vis[v], w[v])
             set(out, jaw, j)
-            set(out, press, pr)
-            set(out, mouthLeft, left)
             val o = w[Vis.O.ordinal]
             val u = w[Vis.U.ordinal]
 
-            // Recetas: smile, BrowUp, BrowFrown, listening, thoughtful, soft_squint.
-            // La sonrisa cede en O/U/P/F: si no, se come el redondeo y el cierre.
+            // Expresión (ver FaceExpression). La sonrisa y los hoyuelos ceden en O/U/P/F: si no,
+            // se comen el redondeo y el cierre. Al cerrar el párpado, entrecerrar y abrir de más ceden.
             val round = ((o + u) / 0.6f + pp / 0.7f + ff / 0.8f).coerceIn(0f, 1f)
             val keep = 1f - smileCut * round
-            val s = c.smile * keep
-            set(out, smileL, 0.6f * s + 0.18f * c.listen + c.smileL * keep)
-            set(out, smileR, 0.6f * s + 0.18f * c.listen + c.smileR * keep)
-            set(out, cheekL, 0.35f * s + 0.1f * c.squint)
-            set(out, cheekR, 0.35f * s + 0.1f * c.squint)
-            val sqL = 0.2f * s + 0.25f * c.think + 0.15f * c.squint
-            val sqR = 0.2f * s + 0.15f * c.think + 0.15f * c.squint
-            // Al cerrar el párpado, el entrecerrar y el abrir de más ceden.
-            set(out, squintL, sqL * (1f - c.blinkL))
-            set(out, squintR, sqR * (1f - c.blinkR))
-            set(out, wideL, (c.wideL + 0.1f * c.listen) * (1f - c.blinkL))
-            set(out, wideR, (c.wideR + 0.1f * c.listen) * (1f - c.blinkR))
+            e.copyInto(ew)
+            ew[Ex.SMILE_L] *= keep
+            ew[Ex.SMILE_R] *= keep
+            ew[Ex.DIMPLE] *= keep * (1f - 0.5f * talk)
+            ew[Ex.SQUINT_L] *= 1f - c.blinkL
+            ew[Ex.SQUINT_R] *= 1f - c.blinkR
+            ew[Ex.WIDE_L] *= 1f - c.blinkL
+            ew[Ex.WIDE_R] *= 1f - c.blinkR
+            ew[Ex.FROWN_L] *= 1f - 0.4f * talk
+            ew[Ex.FROWN_R] *= 1f - 0.4f * talk
+            ew[Ex.PRESS] = pr
+            ew[Ex.MOUTH_LEFT] *= quiet
+            ew[Ex.MOUTH_RIGHT] *= quiet
+            budget()
+            for (k in 0 until Ex.COUNT) set(out, ex[k], if (ew[k] < EXPR_MIN_WEIGHT) 0f else ew[k])
             set(out, blinkL, c.blinkL)
             set(out, blinkR, c.blinkR)
-            val brow = c.browUp + c.speechBrow
-            set(out, browInnerUp, 0.7f * brow + 0.3f * c.listen + 0.25f * c.think)
-            set(out, browOuterL, 0.5f * brow + 0.12f * c.listen)
-            set(out, browOuterR, 0.5f * brow + 0.12f * c.listen)
-            set(out, browDownL, 0.8f * c.frown + 0.3f * c.think)
-            set(out, browDownR, 0.8f * c.frown)
-            set(out, frownL, 0.2f * c.frown)
-            set(out, frownR, 0.2f * c.frown)
+        }
+
+        /**
+         * Deja como mucho [exprBudget] morphs de expresión por encima de [EXPR_MIN_WEIGHT]: resta el
+         * siguiente en fuerza y reescala (como [keepStrongest]); continuo cuando dos se cruzan.
+         */
+        private fun budget() {
+            if (exprBudget >= Ex.COUNT) return
+            var n = 0
+            for (k in 0 until Ex.COUNT) if (ex[k] >= 0 && ew[k] >= EXPR_MIN_WEIGHT) exSorted[n++] = ew[k]
+            if (n <= exprBudget) return
+            exSorted.sortDescending(0, n)
+            val thr = exSorted[exprBudget]
+            if (thr >= 0.99f) return
+            for (k in 0 until Ex.COUNT) ew[k] = ((ew[k] - thr) / (1f - thr)).coerceAtLeast(0f)
         }
     }
 
@@ -338,10 +334,11 @@ internal abstract class FaceMorphs(val names: List<String>) {
             set(out, ee, maxOf(m[Vis.E.ordinal], m[Vis.I.ordinal]))
             set(out, fv, m[Vis.FF.ordinal])
             set(out, mbp, m[Vis.PP.ordinal])
-            set(out, smile, c.smile + 0.5f * (c.smileL + c.smileR) + 0.18f * c.listen)
-            // Como antes: escuchar sube las cejas 0.5 y pensar 0.3.
-            set(out, browUp, c.browUp + c.speechBrow + 0.5f * c.listen + 0.3f * c.think)
-            set(out, frown, c.frown)
+            // Los canales ARKit de la expresión, a las tres recetas del modelo antiguo.
+            val e = c.expr
+            set(out, smile, (e[Ex.SMILE_L] + e[Ex.SMILE_R]) / 1.2f)
+            set(out, browUp, e[Ex.BROW_INNER] / 0.7f + 0.5f * (e[Ex.BROW_OUTER_L] + e[Ex.BROW_OUTER_R]))
+            set(out, frown, (e[Ex.BROW_DOWN_L] + e[Ex.BROW_DOWN_R]) / 1.6f + 0.5f * (e[Ex.FROWN_L] + e[Ex.FROWN_R]))
             set(out, blinkL, c.blinkL)
             set(out, blinkR, c.blinkR)
         }
@@ -349,64 +346,130 @@ internal abstract class FaceMorphs(val names: List<String>) {
 }
 
 /**
- * Parpadeo del contrato: cierra en 70 ms (ease-in), se queda 20–30 ms,
- * abre en 110–150 ms (ease-out); cada 2,5–6 s (5–9 s pensando); 15 % dobles
- * (el segundo empieza 120 ms después de cerrar el primero); el ojo derecho va
- * 0–15 ms detrás. [random] da valores 0..1 (inyectable para las pruebas).
+ * Parpadeo. Uno normal (contrato): cierra en 70 ms (ease-in), se queda
+ * 20–30 ms, abre en 110–150 ms (ease-out); el ojo derecho va 0–15 ms detrás.
+ * El ritmo y el estilo dependen de lo que hace ([Mode]): intervalos de
+ * distribución sesgada (muchos cortos, alguno largo: no un metrónomo), dobles
+ * ocasionales (el segundo empieza 120 ms después de cerrar el primero),
+ * parpadeos incompletos y, pensando, medios parpadeos; cálida, alguno lento.
+ * [rnd] es inyectable para las pruebas (un `Random` y no una lambda: devuelve
+ * primitivos, sin objetos).
  */
-internal class Blink(private val random: () -> Float) {
+internal class Blink(private val rnd: Random) {
+
+    /**
+     * Ritmo (s entre parpadeos: mínimo, media, máximo) y estilo de cada estado.
+     * [partialP] = parte de parpadeos incompletos, de profundidad [partialMin]–[partialMax].
+     */
+    enum class Mode(
+        val minGap: Float,
+        val meanGap: Float,
+        val maxGap: Float,
+        val partialP: Float,
+        val partialMin: Float,
+        val partialMax: Float,
+        val doubleP: Float,
+        val slowP: Float,
+    ) {
+        /** En reposo: ~16 por minuto. */
+        Rest(1.2f, 3.8f, 9f, 0.10f, 0.65f, 0.85f, 0.15f, 0f),
+        /** Hablando se parpadea más (~22/min), sobre todo en las pausas (ver [trigger]). */
+        Speaking(0.8f, 2.7f, 6.5f, 0.12f, 0.65f, 0.85f, 0.18f, 0f),
+        /** Escuchando, con atención: menos. */
+        Listening(1.5f, 4.6f, 10f, 0.08f, 0.65f, 0.85f, 0.10f, 0f),
+        /** Pensando: la mitad son medios parpadeos (el párpado baja y vuelve, "procesando"). */
+        Thinking(1.0f, 3.0f, 7.5f, 0.55f, 0.40f, 0.62f, 0.08f, 0f),
+        /** Cálida: de vez en cuando uno lento, de complicidad. */
+        Warm(1.3f, 4.2f, 9f, 0.10f, 0.65f, 0.85f, 0.12f, 0.3f),
+    }
+
     private var start = -10f
+    private var close = CLOSE
     private var hold = 0.025f
     private var open = 0.13f
+    private var depth = 1f
     private var double = false
     private var offsetR = 0f
     private var next = 1.2f
+    private var mode = Mode.Rest
 
-    /** Parpadea ya (cambio grande de mirada, final de una frase) si no está parpadeando. */
+    private fun random() = rnd.nextFloat()
+
+    /** Profundidad del parpadeo en curso (1 = completo), para pruebas. */
+    val currentDepth: Float get() = depth
+
+    /** Parpadea ya (cambio grande de mirada, final de una frase, coma) si no está parpadeando: completo. */
     fun trigger(t: Float) {
         if (t - start < total() + 0.25f) return
-        begin(t)
+        begin(t, Mode.Rest, full = true)
     }
 
-    private fun total() = CLOSE + hold + open
+    private fun total() = close + hold + open + if (double) DOUBLE_GAP + close + hold + open else 0f
 
-    private fun begin(t: Float) {
+    private fun begin(t: Float, m: Mode, full: Boolean) {
         start = t
+        close = CLOSE
         hold = 0.02f + 0.01f * random()
         open = 0.11f + 0.04f * random()
-        double = random() < DOUBLE_P
+        depth = 1f
+        val r = random()
+        when {
+            full -> Unit
+            r < m.slowP -> {
+                // Lento: cierra despacio, se queda y abre aún más despacio.
+                close = 0.12f
+                hold = 0.12f + 0.08f * random()
+                open = 0.26f + 0.08f * random()
+            }
+            r < m.slowP + m.partialP -> {
+                depth = m.partialMin + (m.partialMax - m.partialMin) * random()
+                hold = 0.01f + 0.02f * random()
+                open = 0.09f + 0.03f * random()
+            }
+        }
+        double = depth >= 1f && close == CLOSE && random() < m.doubleP
         offsetR = 0.015f * random()
     }
 
-    /** Avanza el reloj; [slow] = pensando (intervalo más largo). */
-    fun update(t: Float, slow: Boolean) {
-        if (t >= next) {
-            begin(t)
-            next = t + if (slow) 5f + 4f * random() else 2.5f + 3.5f * random()
+    /** Avanza el reloj con el ritmo y el estilo de [m]. */
+    fun update(t: Float, m: Mode) {
+        if (m != mode) {
+            // Al cambiar a un estado más parpadeador no espera el intervalo largo del anterior.
+            mode = m
+            next = minOf(next, t + m.meanGap * 0.5f)
         }
+        if (t >= next) {
+            begin(t, m, full = false)
+            next = t + gap(m)
+        }
+    }
+
+    /** Intervalo: mínimo + exponencial (media [Mode.meanGap]), acotado a [Mode.maxGap]. */
+    private fun gap(m: Mode): Float {
+        val u = random().coerceIn(0f, 0.999f)
+        return (m.minGap - (m.meanGap - m.minGap) * ln(1f - u)).coerceAtMost(m.maxGap)
     }
 
     fun left(t: Float): Float = eye(t - start)
     fun right(t: Float): Float = eye(t - start - offsetR)
 
     private fun eye(x: Float): Float {
-        var w = curve(x, hold, open)
-        if (double) w = maxOf(w, curve(x - (CLOSE + hold + DOUBLE_GAP), hold, open))
-        return w
+        var w = curve(x, close, hold, open)
+        if (double) w = maxOf(w, curve(x - (close + hold + DOUBLE_GAP), close, hold, open))
+        return w * depth
     }
 
     companion object {
         const val CLOSE = 0.07f
-        const val DOUBLE_P = 0.15f
         const val DOUBLE_GAP = 0.12f
 
         /** Curva de un parpadeo en el instante [x] (s desde que empieza). */
-        fun curve(x: Float, hold: Float, open: Float): Float = when {
+        fun curve(x: Float, close: Float, hold: Float, open: Float): Float = when {
             x < 0f -> 0f
-            x < CLOSE -> (x / CLOSE).let { it * it }
-            x < CLOSE + hold -> 1f
-            x < CLOSE + hold + open -> {
-                val k = (x - CLOSE - hold) / open
+            x < close -> (x / close).let { it * it }
+            x < close + hold -> 1f
+            x < close + hold + open -> {
+                val k = (x - close - hold) / open
                 (1f - k) * (1f - k)
             }
             else -> 0f
@@ -454,13 +517,24 @@ internal object GazeConfig {
     const val AWAY_INTERVAL_MAX = 8f
     const val AWAY_HOLD_MIN = 0.8f
     const val AWAY_HOLD_MAX = 2f
-    /** Acoplamiento de párpados: mirar abajo cierra, arriba abre. */
-    const val LID_DOWN = 0.45f
-    const val LID_UP = 0.35f
+    /**
+     * Acoplamiento de párpados (el GLB no trae eyeLookUp/Down: la mirada es de huesos, así que
+     * su pitch mueve los párpados): mirar abajo baja el superior (sigue al iris casi 1:1, como en
+     * las personas: a 20° el iris baja ~4 mm, la mitad del recorrido del parpadeo), mirar arriba
+     * lo abre y, pasados unos grados, alza un poco las cejas.
+     */
+    const val LID_DOWN = 0.5f
+    const val LID_UP = 0.4f
+    const val BROW_LIFT = 0.12f
+    /** Grados hacia arriba desde los que las cejas acompañan. */
+    const val BROW_LIFT_FROM = 6f
 
     /** eyeBlink extra al mirar abajo ([pitch] en grados, + = arriba). */
     fun lidDown(pitch: Float) = LID_DOWN * (-pitch / EYE_PITCH_DOWN).coerceIn(0f, 1f)
 
     /** eyeWide extra al mirar arriba. */
     fun lidUp(pitch: Float) = LID_UP * (pitch / EYE_PITCH_UP).coerceIn(0f, 1f)
+
+    /** browInnerUp extra al mirar muy arriba (la frente ayuda). */
+    fun browLift(pitch: Float) = BROW_LIFT * ((pitch - BROW_LIFT_FROM) / (EYE_PITCH_UP - BROW_LIFT_FROM)).coerceIn(0f, 1f)
 }

@@ -668,7 +668,7 @@ class SettingsController(private val vm: ElyndraViewModel) {
                         UiText.res(R.string.ra_status_detail, p.user, p.points)
                     }
                     // Sin cuenta: no hay nada que comprobar.
-                    Service.Libretro, Service.Steam -> UiText.res(R.string.keyless_status_ok)
+                    Service.Libretro, Service.Steam, Service.GooglePlay -> UiText.res(R.string.keyless_status_ok)
                 }
                 store.setVerified(service.id, true)
                 states[service] = ServiceState(ServiceState.Status.Connected, detail)
@@ -849,6 +849,7 @@ class SettingsController(private val vm: ElyndraViewModel) {
             Service.SteamGridDb -> "https://www.steamgriddb.com/profile/preferences/api"
             Service.Libretro -> "https://thumbnails.libretro.com/"
             Service.Steam -> "https://store.steampowered.com/"
+            Service.GooglePlay -> "https://play.google.com/store/games"
             Service.RetroAchievements -> "https://retroachievements.org/settings"
         }
     }

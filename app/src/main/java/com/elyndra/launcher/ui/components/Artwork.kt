@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.graphics.drawable.toBitmap
+import com.elyndra.launcher.library.AppCatalog
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -146,7 +147,7 @@ internal suspend fun appIconPixels(context: Context, packageName: String, side: 
     }
 }
 
-private const val ICON_PX = 384
+private const val ICON_PX = 512
 
 /**
  * Icono de una app listo para llenar una card.
@@ -157,7 +158,8 @@ private const val ICON_PX = 384
  * recortarlo el dibujo queda pequeño en medio de la card.
  */
 private fun loadAppIcon(context: Context, packageName: String): ImageBitmap {
-    val d = context.packageManager.getApplicationIcon(packageName)
+    // A la densidad más alta que traiga la app: se pinta en cards grandes.
+    val d = AppCatalog(context).highResIcon(packageName) ?: context.packageManager.getApplicationIcon(packageName)
     val w = d.intrinsicWidth.takeIf { it > 0 } ?: ICON_PX
     val h = d.intrinsicHeight.takeIf { it > 0 } ?: ICON_PX
     val k = ICON_PX.toFloat() / maxOf(w, h)

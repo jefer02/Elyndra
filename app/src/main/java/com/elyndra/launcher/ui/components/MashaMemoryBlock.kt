@@ -109,6 +109,7 @@ private fun memoryLines(vm: ElyndraViewModel, p: GameProfile, meta: GameMeta): L
         val how = stringResource(
             when (method) {
                 MatchMethod.HASH -> R.string.masha_match_hash
+                MatchMethod.PACKAGE -> R.string.masha_match_package
                 MatchMethod.MANUAL -> R.string.masha_match_manual
                 MatchMethod.FUZZY -> R.string.masha_match_fuzzy
                 else -> R.string.masha_match_name
