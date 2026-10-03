@@ -19,6 +19,8 @@ enum class Service(val id: String, val keyless: Boolean = false) {
     Libretro("libretro", keyless = true),
     /** Tienda de Steam: descripción traducida e imágenes de juegos de PC (y de Android que estén en Steam). */
     Steam("steam", keyless = true),
+    /** Ficha de Google Play por nombre de paquete: título, descripción, icono y capturas de juegos Android. */
+    GooglePlay("gplay", keyless = true),
 }
 
 /**
@@ -60,7 +62,7 @@ class ServiceCredentials(
         Service.Igdb -> igdb().isComplete
         Service.SteamGridDb -> sgdbKey().isNotEmpty()
         Service.RetroAchievements -> ra().isComplete
-        Service.Libretro, Service.Steam -> settings.keylessEnabled(service.id)
+        Service.Libretro, Service.Steam, Service.GooglePlay -> settings.keylessEnabled(service.id)
     }
 
     fun anyConfigured(): Boolean = Service.entries.any { isConfigured(it) }

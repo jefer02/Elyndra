@@ -154,7 +154,7 @@ class IdentifyController(private val vm: ElyndraViewModel) {
                     g.id,
                 )
             }
-            Service.SteamGridDb, Service.RetroAchievements -> emptyList()
+            Service.SteamGridDb, Service.RetroAchievements, Service.GooglePlay -> emptyList()
         }
     }
 
@@ -225,7 +225,8 @@ object IdentifyRules {
             Service.ScreenScraper -> base.copy(ssGameId = match.id)
             Service.Libretro -> base.copy(libretroName = match.id)
             Service.SteamGridDb -> base.copy(sgdbId = match.id.toLongOrNull())
-            Service.RetroAchievements -> base
+            // Play identifica por paquete: no hay nada que elegir a mano.
+            Service.RetroAchievements, Service.GooglePlay -> base
         }
     }
 
