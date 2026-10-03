@@ -67,6 +67,7 @@ fun serviceName(s: Service): String = when (s) {
     Service.RetroAchievements -> "RetroAchievements"
     Service.Libretro -> "libretro"
     Service.Steam -> "Steam"
+    Service.GooglePlay -> "Google Play"
 }
 
 @Composable
@@ -251,7 +252,7 @@ private fun CredentialField(label: String, value: String, secret: Boolean, onCha
 }
 
 /**
- * Fuentes sin cuenta (libretro, Steam): encendidas de serie, cada una con su
+ * Fuentes sin cuenta (Google Play, libretro, Steam): encendidas de serie, cada una con su
  * interruptor, y la línea que dice a quién se pregunta y qué se envía.
  */
 @Composable
@@ -259,7 +260,11 @@ fun KeylessPanel(vm: ElyndraViewModel) {
     val s = vm.settings
     SettingsGroup {
         SettingRow(stringResource(R.string.keyless_title), description = stringResource(R.string.keyless_desc))
-        listOf(Service.Libretro to R.string.keyless_libretro_desc, Service.Steam to R.string.keyless_steam_desc).forEach { (service, desc) ->
+        listOf(
+            Service.GooglePlay to R.string.keyless_gplay_desc,
+            Service.Libretro to R.string.keyless_libretro_desc,
+            Service.Steam to R.string.keyless_steam_desc,
+        ).forEach { (service, desc) ->
             SwitchRow(serviceName(service), stringResource(desc), s.keyless[service] ?: true, { s.toggleKeyless(service) })
         }
         ElyText(stringResource(R.string.keyless_privacy), size = 9.5f, color = P.ink2, lineHeightRatio = 1.45f)

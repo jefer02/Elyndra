@@ -3,6 +3,7 @@ package com.elyndra.launcher.ui.screens
 import android.Manifest
 import android.content.pm.PackageManager
 import com.elyndra.launcher.BuildConfig
+import com.elyndra.launcher.ui.masha.MashaDebugMoodChip
 import com.elyndra.launcher.ui.masha.MashaDebugSay
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -295,6 +296,10 @@ fun MashaScreen(vm: ElyndraViewModel) {
             modifier = Modifier.align(Alignment.TopEnd).padding(top = 64.dp, end = m.pad),
         ) {
             SoundPanel(vm, glow)
+        }
+        // Solo en debug: vista previa de cada ánimo en la cara (también `adb … DEBUG_MOOD`).
+        if (BuildConfig.DEBUG && stage == StageStatus.Ready) {
+            MashaDebugMoodChip(Modifier.align(Alignment.CenterEnd).padding(end = m.pad))
         }
     }
 }
