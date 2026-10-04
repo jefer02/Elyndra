@@ -310,6 +310,8 @@
     <string name="details_file">File</string>
     <string name="details_size">Size</string>
     <string name="details_package">Package</string>
+    <string name="details_about">About this game</string>
+    <string name="details_info">Info</string>
     <string name="achievements_title">Achievements</string>
     <string name="achievements_summary">%1$d/%2$d unlocked · %3$d/%4$d points</string>
     <string name="achievements_loading">Loading achievements…</string>
@@ -748,6 +750,7 @@
     <string name="hint_options">Options</string>
     <string name="hint_section">Section</string>
     <string name="hint_category">Category</string>
+    <string name="hint_keyboard">Keyboard</string>
     <string name="hint_move">Move</string>
     <string name="empty_filter_title">Nothing here yet</string>
     <string name="empty_library_message">Add your Android games or a folder of ROMs and they will show up here.</string>

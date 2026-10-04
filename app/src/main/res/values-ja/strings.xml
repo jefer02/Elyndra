@@ -290,6 +290,8 @@
     <string name="details_file">ファイル</string>
     <string name="details_size">サイズ</string>
     <string name="details_package">パッケージ</string>
+    <string name="details_about">このゲームについて</string>
+    <string name="details_info">情報</string>
     <string name="achievements_title">実績</string>
     <string name="achievements_summary">%1$d/%2$d 解除 · %3$d/%4$d ポイント</string>
     <string name="achievements_loading">実績を読み込み中…</string>
@@ -723,6 +725,7 @@
     <string name="hint_options">オプション</string>
     <string name="hint_section">セクション</string>
     <string name="hint_category">カテゴリ</string>
+    <string name="hint_keyboard">キーボード</string>
     <string name="hint_move">移動</string>
     <string name="empty_filter_title">まだ何もありません</string>
     <string name="empty_library_message">Android ゲームや ROM フォルダーを追加すると、ここに表示されます。</string>

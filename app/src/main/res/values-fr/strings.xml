@@ -318,6 +318,8 @@
     <string name="details_file">Fichier</string>
     <string name="details_size">Taille</string>
     <string name="details_package">Paquet</string>
+    <string name="details_about">À propos du jeu</string>
+    <string name="details_info">Informations</string>
     <string name="achievements_title">Succès</string>
     <string name="achievements_summary">%1$d/%2$d débloqués · %3$d/%4$d points</string>
     <string name="achievements_loading">Chargement des succès…</string>
@@ -756,6 +758,7 @@
     <string name="hint_options">Options</string>
     <string name="hint_section">Section</string>
     <string name="hint_category">Catégorie</string>
+    <string name="hint_keyboard">Clavier</string>
     <string name="hint_move">Déplacer</string>
     <string name="empty_filter_title">Rien ici pour l\'instant</string>
     <string name="empty_library_message">Ajoutez vos jeux Android ou un dossier de ROMs et ils apparaîtront ici.</string>
