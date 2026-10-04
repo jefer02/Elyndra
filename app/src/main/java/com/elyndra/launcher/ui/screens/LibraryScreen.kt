@@ -50,6 +50,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -596,6 +599,9 @@ private fun SearchField(vm: ElyndraViewModel, m: Metrics) {
                 singleLine = true,
                 textStyle = inputStyle(12f, Color.White),
                 cursorBrush = SolidColor(Color.White),
+                // Se filtra al escribir: "Buscar" en el teclado solo lo cierra para ver los resultados.
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
                 modifier = Modifier.fillMaxWidth().focusRequester(focus),
                 decorationBox = { inner ->
                     if (vm.query.isEmpty()) {
