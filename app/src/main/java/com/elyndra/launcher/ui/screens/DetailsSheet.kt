@@ -308,7 +308,8 @@ private fun AchievementRow(a: RaAchievement) {
 
 /**
  * Debajo de una sinopsis que no está en el idioma de la app: su idioma, en
- * pequeño, y "Traducir"; o, ya traducida, de qué idioma viene y "Ver original".
+ * pequeño, y "Traducir" (que ofrece bajar el paquete si falta); o, ya
+ * traducida, de qué idioma viene y "Ver original".
  */
 @Composable
 private fun DescriptionLanguageRow(vm: ElyndraViewModel, key: String, meta: com.elyndra.launcher.data.GameMeta, d: com.elyndra.launcher.metadata.DescriptionView) {
@@ -321,7 +322,11 @@ private fun DescriptionLanguageRow(vm: ElyndraViewModel, key: String, meta: com.
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         val name = com.elyndra.launcher.ui.DescriptionsController.languageName(original, lang)
         ElyText(
-            if (d.translated) stringResource(R.string.description_translated_from, name) else name,
+            if (d.translated) {
+                stringResource(R.string.description_translated_from, com.elyndra.launcher.ui.DescriptionsController.languageNameInline(original, lang))
+            } else {
+                name
+            },
             size = 9f,
             weight = FontWeight.SemiBold,
             color = P.ink2,
@@ -330,6 +335,9 @@ private fun DescriptionLanguageRow(vm: ElyndraViewModel, key: String, meta: com.
         )
         when {
             c.busy == key -> ElyText(stringResource(R.string.description_translating), size = 9.5f, color = P.ink2)
+            // El paquete se está bajando: al terminar, la traducción aparece sola.
+            !d.translated && c.packStates[lang] != null && c.packStates[lang] != com.elyndra.launcher.metadata.PackState.Error ->
+                ElyText(stringResource(R.string.translate_state_downloading), size = 9.5f, color = P.ink2)
             d.translated -> GhostButton(stringResource(R.string.description_show_original), { c.showOriginal(key, true) })
             else -> GhostButton(stringResource(R.string.description_translate), { c.translate(key, meta) })
         }

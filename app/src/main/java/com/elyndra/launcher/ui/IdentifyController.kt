@@ -197,8 +197,17 @@ class IdentifyController(private val vm: ElyndraViewModel) {
 /** Las reglas de un nombre puesto a mano (Kotlin puro: se prueba en la JVM). */
 object IdentifyRules {
 
-    /** Lo que se identificó antes ya no vale: el juego puede ser otro. */
+    /**
+     * Lo que se identificó antes ya no vale: el juego puede ser otro. Su
+     * descripción tampoco (sería la de aquel): la buena llega con la pasada
+     * que sigue.
+     */
     private fun clearIds(m: GameMeta) = m.copy(
+        description = null,
+        descriptionLang = null,
+        descriptions = emptyMap(),
+        descriptionCheckedLang = null,
+        descriptionSources = null,
         ssGameId = null,
         igdbId = null,
         sgdbId = null,

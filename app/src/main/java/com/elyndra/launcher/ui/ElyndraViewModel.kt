@@ -6,6 +6,7 @@ import com.elyndra.launcher.metadata.MediaResult
 import com.elyndra.launcher.library.NameCheck
 import com.elyndra.launcher.library.Names
 import com.elyndra.launcher.metadata.TranslationCache
+import com.elyndra.launcher.metadata.TranslationPacks
 import android.app.Application
 import android.content.Intent
 import android.net.Uri
@@ -85,6 +86,8 @@ class ElyndraViewModel @Inject constructor(
     val music: BackgroundMusic,
     /** Traducciones de descripciones en el dispositivo (ver [TranslationCache]). */
     val translations: TranslationCache,
+    /** Paquetes de idioma para traducir y su descarga (ver [TranslationPacks]). */
+    val packs: TranslationPacks,
 ) : AndroidViewModel(application) {
 
     val app = application as ElyndraApplication
@@ -817,6 +820,8 @@ class ElyndraViewModel @Inject constructor(
             // Si cambió el idioma de la app (o hay descripciones sin idioma de antes),
             // se piden las del idioma de ahora en segundo plano; no hay nada que esperar.
             engine.refreshDescriptions()
+            // Si el idioma cambió y falta un paquete de traducción, se ofrece (sin bajar nada aún).
+            descriptions.onAppLanguage(settings.lang)
             val session = sessions.finish()
             if (session != null) afterSession(session)
             // Lo que Masha tenga que decir sale ya, con la sesión recién cerrada:
