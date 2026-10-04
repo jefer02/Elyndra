@@ -6,6 +6,7 @@ import com.elyndra.launcher.metadata.MediaResult
 import com.elyndra.launcher.library.NameCheck
 import com.elyndra.launcher.library.Names
 import com.elyndra.launcher.metadata.TranslationCache
+import com.elyndra.launcher.metadata.TranslationPacks
 import android.app.Application
 import android.content.Intent
 import android.net.Uri
@@ -85,6 +86,8 @@ class ElyndraViewModel @Inject constructor(
     val music: BackgroundMusic,
     /** Traducciones de descripciones en el dispositivo (ver [TranslationCache]). */
     val translations: TranslationCache,
+    /** Paquetes de idioma para traducir y su descarga (ver [TranslationPacks]). */
+    val packs: TranslationPacks,
 ) : AndroidViewModel(application) {
 
     val app = application as ElyndraApplication
@@ -109,6 +112,9 @@ class ElyndraViewModel @Inject constructor(
 
     /* ── capas superpuestas ───────────────────────────────────── */
     var dialog by mutableStateOf<DialogSpec?>(null); private set
+
+    /** Lo escrito en el campo del diálogo (si lo lleva): aceptar con el dedo, con A o con Intro lee esto. */
+    var dialogText by mutableStateOf(""); private set
     var sheet by mutableStateOf<ActionSheetSpec?>(null); private set
 
     /**
@@ -126,6 +132,12 @@ class ElyndraViewModel @Inject constructor(
     /** Rectángulo de la card que se acaba de mantener pulsada (lo consume el siguiente menú). */
     private var pendingOrigin: Rect? = null
     var detailsKey by mutableStateOf<String?>(null); private set
+
+    /**
+     * La card de la que sale la ficha (como [sheetOrigin]): la seleccionada,
+     * si la ficha es de ella. Null = aparece en su sitio (desde Masha o un atajo).
+     */
+    var detailsOrigin by mutableStateOf<Rect?>(null); private set
     var achievements by mutableStateOf<AchievementsState>(AchievementsState.Idle); private set
     var toast by mutableStateOf<UiText?>(null); private set
     var artPicker by mutableStateOf<ArtPickerState?>(null); private set
@@ -393,24 +405,44 @@ class ElyndraViewModel @Inject constructor(
 
     fun go(target: Screen) {
         if (target == Screen.Add) add.onOpen()
-        if (target == Screen.Settings) settings.onOpen()
+        if (target == Screen.Settings) settings.onOpen(fromPage = screen.isSettingsPage)
         screen = target
     }
 
     val canGoBack: Boolean
         get() = intro.visible || dialog != null || sheet != null || artPicker != null || identify.state != null || detailsKey != null || screen != Screen.Library || searchOpen
 
+    /** Lo que hay abierto, para [BackPriority] ([keyboard]: el teclado en pantalla, que lo cierra el mando). */
+    fun backState(keyboard: Boolean = false) = BackPriority.State(
+        keyboard = keyboard,
+        intro = intro.visible,
+        dialog = dialog != null,
+        sheet = sheet != null,
+        artPicker = artPicker != null,
+        identify = identify.state != null,
+        details = detailsKey != null,
+        screen = screen,
+        priorityGrab = settings.priorityGrab != null,
+        settingsPageOpen = settings.compact && settings.detailOpen,
+        searchOpen = searchOpen,
+    )
+
     fun back() {
-        when {
-            intro.visible -> intro.skip()
-            dialog != null -> dialog = null
-            sheet != null -> sheet = null
-            artPicker != null -> closeArtPicker()
-            identify.state != null -> identify.close()
-            detailsKey != null -> closeDetails()
-            screen.isSettingsPage -> go(Screen.Settings)
-            screen != Screen.Library -> go(Screen.Library)
-            searchOpen -> toggleSearch()
+        when (BackPriority.next(backState())) {
+            BackPriority.Target.Intro -> intro.skip()
+            BackPriority.Target.Dialog -> dialog = null
+            BackPriority.Target.Sheet -> sheet = null
+            BackPriority.Target.ArtPicker -> closeArtPicker()
+            BackPriority.Target.Identify -> identify.close()
+            BackPriority.Target.Details -> closeDetails()
+            // En Ajustes, atrás suelta la fuente cogida y, en ventana estrecha, vuelve a la lista.
+            BackPriority.Target.PriorityGrab -> settings.releaseGrab()
+            BackPriority.Target.SettingsCategory -> settings.closeCategory()
+            BackPriority.Target.SettingsPage -> go(Screen.Settings)
+            BackPriority.Target.Screen -> go(Screen.Library)
+            BackPriority.Target.Search -> toggleSearch()
+            // El teclado lo cierra el mando (InputController) o el propio sistema.
+            BackPriority.Target.Keyboard, BackPriority.Target.None -> Unit
         }
     }
 
@@ -814,6 +846,8 @@ class ElyndraViewModel @Inject constructor(
             // Si cambió el idioma de la app (o hay descripciones sin idioma de antes),
             // se piden las del idioma de ahora en segundo plano; no hay nada que esperar.
             engine.refreshDescriptions()
+            // Si el idioma cambió y falta un paquete de traducción, se ofrece (sin bajar nada aún).
+            descriptions.onAppLanguage(settings.lang)
             val session = sessions.finish()
             if (session != null) afterSession(session)
             // Lo que Masha tenga que decir sale ya, con la sesión recién cerrada:
@@ -1422,6 +1456,12 @@ class ElyndraViewModel @Inject constructor(
 
     /* ── cabecera de juego del menú ───────────────────────────── */
 
+    /** La cabecera de la ficha: el mismo arte, logo y fondo que el menú de acciones. */
+    fun detailsHero(key: String): SheetHero? {
+        repo.romByKey(key)?.let { return heroOf(it) }
+        return repo.appByKey(key)?.let { heroOf(LibraryItem.App(it, installed = true)) }
+    }
+
     private fun heroOf(item: LibraryItem): SheetHero = when (item) {
         is LibraryItem.Folder -> SheetHero(
             backgroundPath = item.heroPath,
@@ -1870,6 +1910,14 @@ class ElyndraViewModel @Inject constructor(
     }
 
     fun showDetails(key: String) {
+        // De la card seleccionada (con X o desde su menú de acciones, que
+        // vuelve a ella mientras la ficha sale), como el menú.
+        val fromCard = when (screen) {
+            Screen.Library -> selected()?.key == key
+            Screen.Folder -> selectedRom()?.key == key
+            else -> false
+        }
+        detailsOrigin = if (fromCard) selectedCardBounds else null
         detailsKey = key
         achievements = AchievementsState.Idle
         val rom = repo.romByKey(key)
@@ -1893,11 +1941,14 @@ class ElyndraViewModel @Inject constructor(
 
     fun showDialog(spec: DialogSpec) {
         sheet = null
+        dialogText = spec.input?.initial.orEmpty()
         dialog = spec
         input.onDialogShown()
     }
 
     fun dismissDialog() { dialog = null }
+
+    fun updateDialogText(text: String) { dialogText = text }
 
     /** [origin]: la card de la que sale el menú (ver [sheetOrigin]); null = de ninguna. */
     fun showSheet(spec: ActionSheetSpec, origin: Rect? = null) {

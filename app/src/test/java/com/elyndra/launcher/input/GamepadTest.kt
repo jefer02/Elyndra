@@ -42,6 +42,10 @@ class GamepadTest {
         // Y lo que no mueve el foco (Start, Select, L1…) tampoco se reenvía.
         assertNull(Gamepad.systemKey(KeyEvent.KEYCODE_BUTTON_START))
         assertNull(Gamepad.systemKey(KeyEvent.KEYCODE_VOLUME_UP))
+        // Intro de un teclado físico sigue siendo Intro: en un campo es "Hecho".
+        assertNull(Gamepad.systemKey(KeyEvent.KEYCODE_ENTER))
+        assertNull(Gamepad.systemKey(KeyEvent.KEYCODE_NUMPAD_ENTER))
+        assertEquals(Pad.Confirm, Gamepad.actionFor(KeyEvent.KEYCODE_ENTER))
     }
 
     @Test

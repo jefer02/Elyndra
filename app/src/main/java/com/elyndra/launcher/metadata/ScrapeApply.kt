@@ -28,8 +28,9 @@ object ScrapeApply {
         val origins: Map<String, ArtOrigin> = emptyMap(),
     )
 
-    fun apply(old: GameMeta, merged: MergedMetadata, lang: String, art: Art, now: Long): GameMeta {
-        val described = GameDescriptionUpdate.apply(old, merged.descriptions, lang)
+    /** [consulted]: las fuentes de descripción que respondieron (ver [GameDescriptionUpdate]). */
+    fun apply(old: GameMeta, merged: MergedMetadata, lang: String, art: Art, now: Long, consulted: Set<String> = emptySet()): GameMeta {
+        val described = GameDescriptionUpdate.apply(old, merged.descriptions, lang, consulted)
         val text = merged.text
         val manual = old.matchedBy == MatchMethod.MANUAL
         val matched = merged.matched
@@ -46,6 +47,7 @@ object ScrapeApply {
             descriptionLang = described.descriptionLang,
             descriptions = described.descriptions,
             descriptionCheckedLang = described.descriptionCheckedLang,
+            descriptionSources = described.descriptionSources,
             releaseDate = text[MetaField.ReleaseDate] ?: old.releaseDate,
             developer = text[MetaField.Developer] ?: old.developer,
             publisher = text[MetaField.Publisher] ?: old.publisher,

@@ -193,11 +193,28 @@ internal class MashaAnimatorFilament(
     }
 
     private val face = FloatArray(3)
+    private val eyeL = core.skeleton.index("masha:eye.L")
+    private val eyeR = core.skeleton.index("masha:eye.R")
+    private val eyeM = FloatArray(16)
 
     /** [MashaAnimator.faceCenter] en coordenadas del mundo (tras [frame]). No crea objetos. */
     fun faceWorld(out: FloatArray): Boolean {
         if (!core.faceCenter(face)) return false
         point4(rootWorld, face, out)
+        return true
+    }
+
+    /**
+     * Centros de los ojos en el mundo tal como se dibujan (transformación final de los huesos
+     * `masha:eye.L/R`, con los gestos de cabeza ya puestos; tras [frame]): L en [out] 0..2, R en
+     * 3..5. False sin huesos de ojos. No crea objetos.
+     */
+    fun eyesWorld(out: FloatArray): Boolean {
+        if (eyeL < 0 || eyeR < 0) return false
+        tm.getWorldTransform(inst[eyeL], eyeM)
+        out[0] = eyeM[12]; out[1] = eyeM[13]; out[2] = eyeM[14]
+        tm.getWorldTransform(inst[eyeR], eyeM)
+        out[3] = eyeM[12]; out[4] = eyeM[13]; out[5] = eyeM[14]
         return true
     }
 

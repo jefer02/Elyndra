@@ -4,18 +4,21 @@ import com.elyndra.launcher.masha.MashaTools
 
 /**
  * El ánimo de Masha, tal como se ve: el tono de su piel holográfica, el color
- * de su brillo y cuánta energía (partículas, pulso) desprende.
+ * de su brillo y cuánta energía (partículas, pulso) desprende. La cara de cada
+ * ánimo (qué morphs mueve) está en `MoodFace`.
  *
  * Frío y azul cuando analiza; lavanda cuando juega o se emociona. Los colores
  * son ARGB y están pensados para mezclarse entre sí sin pasar por grises.
  */
-enum class MashaMood(val skin: Long, val glow: Long, val energy: Float, val smile: Float) {
-    Neutral(0xFF4A92FF, 0xFF86D6FF, 0.50f, 0.10f),
-    Analytical(0xFF3AA2FF, 0xFF62EAFF, 0.55f, 0.02f),
-    Playful(0xFF8F72FF, 0xFFD0B2FF, 0.85f, 0.60f),
-    Warm(0xFFA57BFF, 0xFFE8B6FF, 0.65f, 0.35f),
-    Thinking(0xFF4A86FF, 0xFF8DF5FF, 0.95f, 0.05f),
-    Concerned(0xFF5068D8, 0xFF9DB0FF, 0.35f, 0.0f),
+enum class MashaMood(val skin: Long, val glow: Long, val energy: Float) {
+    Neutral(0xFF4A92FF, 0xFF86D6FF, 0.50f),
+    Analytical(0xFF3AA2FF, 0xFF62EAFF, 0.55f),
+    Playful(0xFF8F72FF, 0xFFD0B2FF, 0.85f),
+    Warm(0xFFA57BFF, 0xFFE8B6FF, 0.65f),
+    Thinking(0xFF4A86FF, 0xFF8DF5FF, 0.95f),
+    Concerned(0xFF5068D8, 0xFF9DB0FF, 0.35f),
+    /** Pregunta algo y espera la respuesta: interesada. Azul claro, entre Neutral y Thinking. */
+    Curious(0xFF4C9BFF, 0xFF9FE6FF, 0.70f),
     ;
 
     companion object {
@@ -44,8 +47,8 @@ enum class MashaMood(val skin: Long, val glow: Long, val energy: Float, val smil
 
         /**
          * Lee el ánimo de una respuesta: primero lo que hizo (herramientas), luego
-         * el tono del texto. Sin señales claras, neutral. Es barato y local: no
-         * cambia nada de cómo se habla con la IA.
+         * el tono del texto. Si no hay otra señal y termina preguntando, curiosa;
+         * si no, neutral. Es barato y local: no cambia nada de cómo se habla con la IA.
          */
         fun read(text: String, tools: Collection<String>, failed: Boolean): MashaMood {
             if (failed) return Concerned
@@ -58,8 +61,15 @@ enum class MashaMood(val skin: Long, val glow: Long, val energy: Float, val smil
                 warm > 0 && warm >= playful -> Warm
                 playful > 0 && playful >= analytic -> Playful
                 analytic > 0 -> Analytical
+                asks(t) -> Curious
                 else -> Neutral
             }
+        }
+
+        /** ¿Acaba preguntando? (la última frase lleva "?", "？" o "؟"; ignora emojis y espacios finales). */
+        private fun asks(t: String): Boolean {
+            val end = t.trimEnd { !it.isLetterOrDigit() && it != '?' && it != '？' && it != '؟' }
+            return end.endsWith('?') || end.endsWith('？') || end.endsWith('؟')
         }
     }
 }

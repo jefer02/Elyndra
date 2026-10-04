@@ -1,8 +1,11 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.components.PadHints
+import com.elyndra.launcher.ui.components.PadHint
 import android.Manifest
 import android.content.pm.PackageManager
 import com.elyndra.launcher.BuildConfig
+import com.elyndra.launcher.ui.masha.MashaDebugMoodChip
 import com.elyndra.launcher.ui.masha.MashaDebugSay
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -70,6 +73,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import com.elyndra.launcher.ui.components.padTextField
+import com.elyndra.launcher.ui.components.rememberPadField
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -296,6 +302,10 @@ fun MashaScreen(vm: ElyndraViewModel) {
         ) {
             SoundPanel(vm, glow)
         }
+        // Solo en debug: vista previa de cada ánimo en la cara (también `adb … DEBUG_MOOD`).
+        if (BuildConfig.DEBUG && stage == StageStatus.Ready) {
+            MashaDebugMoodChip(Modifier.align(Alignment.CenterEnd).padding(end = m.pad))
+        }
     }
 }
 
@@ -400,6 +410,7 @@ private fun ColumnScope.Conversation(
     }
     Spacer(Modifier.height(8.dp))
     Dock(vm, presence, glow, onMic)
+    PadHints(hints = MASHA_HINTS, visible = vm.input.gamepadPresent, modifier = Modifier.padding(top = 6.dp), onDark = true)
     Spacer(Modifier.height(if (landscape) 10.dp else 16.dp))
 }
 
@@ -480,15 +491,18 @@ private fun Dock(vm: ElyndraViewModel, presence: MashaPresence, glow: Color, onM
                 .padding(horizontal = 14.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
+            // Lo del teclado y el mando, como todos los campos (ver padTextField).
+            val field = rememberPadField()
             BasicTextField(
                 value = masha.draft,
                 onValueChange = masha::updateDraft,
                 singleLine = true,
+                readOnly = field.readOnly(vm.input.active),
                 textStyle = inputStyle(12.5f, Holo.text),
                 cursorBrush = SolidColor(glow),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { masha.send(lang) }),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padTextField(field),
                 decorationBox = { inner ->
                     if (masha.draft.isEmpty()) {
                         ElyText(
@@ -720,3 +734,5 @@ private class FaceAreaProbe {
         return Rect(r.left - s.left, r.top - s.top, r.right - s.left, r.bottom - s.top)
     }
 }
+
+private val MASHA_HINTS = listOf(PadHint("A", R.string.hint_select), PadHint("B", R.string.hint_back))

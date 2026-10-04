@@ -13,8 +13,15 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
+import com.elyndra.launcher.data.P
+import com.elyndra.launcher.ui.selection.SelectionFx
+import com.elyndra.launcher.ui.selection.SelectionInk
+import com.elyndra.launcher.ui.selection.SelectionInks
+import com.elyndra.launcher.ui.selection.drawStar
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.min
@@ -36,6 +43,9 @@ import kotlin.random.Random
       con la estela apagada no hay ni un fotograma de trabajo.
     - Se dibuja en la fase de dibujo leyendo un contador: avanzar
       la simulación no recompone la pantalla.
+    - Cada chispa es un sprite del atlas del polvo estelar de la
+      selección (núcleo fino y halo, sin desenfoque), con la misma
+      mezcla según el tema.
    ───────────────────────────────────────────────────────────── */
 
 @Stable
@@ -46,7 +56,10 @@ class ParticleField {
     private val vy = FloatArray(MAX)
     private val life = FloatArray(MAX)
     private val maxLife = FloatArray(MAX)
-    private val radius = FloatArray(MAX)
+    /** Diámetro del núcleo, en px. */
+    private val core = FloatArray(MAX)
+    private val variant = IntArray(MAX)
+    private val glint = BooleanArray(MAX)
     private var next = 0
     private var alive = 0
 
@@ -80,7 +93,9 @@ class ParticleField {
             vy[i] = back.y * speed * (0.25f + Random.nextFloat() * 0.35f) + (Random.nextFloat() - 0.5f) * jitter
             maxLife[i] = 0.55f + Random.nextFloat() * 0.6f
             life[i] = maxLife[i]
-            radius[i] = (1.4f + Random.nextFloat() * 2.2f) * density
+            core[i] = (SelectionFx.MIN_SIZE_DP + Random.nextFloat() * (SelectionFx.MAX_SIZE_DP - SelectionFx.MIN_SIZE_DP)) * density
+            variant[i] = Random.nextInt(SelectionFx.VARIANTS)
+            glint[i] = Random.nextFloat() < SelectionFx.GLINT_CHANCE
         }
         alive = MAX
         running = true
@@ -104,17 +119,13 @@ class ParticleField {
         return any
     }
 
-    internal fun draw(scope: androidx.compose.ui.graphics.drawscope.DrawScope, color: Color) {
+    internal fun draw(scope: DrawScope, ink: SelectionInk) {
         for (i in 0 until alive) {
             val l = life[i]
             if (l <= 0f) continue
             val f = l / maxLife[i]
-            // Se apaga y se encoge a la vez; el halo, más deprisa que el núcleo.
-            val r = radius[i] * (0.4f + 0.6f * f)
-            val c = Offset(x[i], y[i])
-            scope.drawCircle(color, radius = r * 3.2f, center = c, alpha = 0.16f * f * f)
-            scope.drawCircle(color, radius = r * 1.6f, center = c, alpha = 0.35f * f)
-            scope.drawCircle(Color.White, radius = r * 0.55f, center = c, alpha = 0.85f * f, blendMode = BlendMode.SrcOver)
+            // Se apaga y se encoge a la vez.
+            scope.drawStar(ink.atlas, variant[i], glint[i], x[i], y[i], core[i] * (0.4f + 0.6f * f), f, ink.blend)
         }
     }
 
@@ -135,6 +146,10 @@ fun rememberParticleField(): ParticleField = remember { ParticleField() }
 @Composable
 fun ParticleLayer(field: ParticleField, color: Color, modifier: Modifier = Modifier) {
     val running = field.running
+    val argb = color.toArgb()
+    val dark = P.isDark
+    val density = LocalDensity.current.density
+    val ink = remember(argb, dark, density) { SelectionInks.of(argb, dark, density) }
     LaunchedEffect(running) {
         if (!running) return@LaunchedEffect
         var last = withFrameNanos { it }
@@ -151,7 +166,7 @@ fun ParticleLayer(field: ParticleField, color: Color, modifier: Modifier = Modif
     Spacer(
         modifier.drawBehind {
             // Leer `tick` aquí es lo que repinta la capa en cada paso.
-            if (field.tick >= 0) field.draw(this, color)
+            if (field.tick >= 0) field.draw(this, ink)
         },
     )
 }

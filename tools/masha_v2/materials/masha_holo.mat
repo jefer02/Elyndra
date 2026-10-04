@@ -65,6 +65,15 @@
 //                                        scanline alpha interlace. Face instance: 0.3.
 //   useSuitMask       0 / {0, 1}       — 1 = sample suitMask, 0 = procedural pattern.
 //   proceduralScale   24 / [4, 64]     — cells per UV unit of the procedural pattern.
+//   contourPower      2.0 / [0.5, 6]   — exponent of a second, broad Fresnel lobe that outlines
+//                                        the features (nose, lips, cheekbones, jaw) from inside.
+//   contourIntensity  0 / [0, 2]       — its emission (x rimColor). Face instance only.
+//   eyeCenterL/R      user world (m)   — eye bone positions (the "calm" zone around the eyes).
+//   eyeCalmRadii      (inner, outer) m — full calm inside inner, none beyond outer.
+//   eyeGlitch         0.3 / [0, 1]     — fraction of the glitch tearing kept at the eyes (same
+//                                        value as masha_holo_eye, so eyelids and eyes tear together).
+//   eyeScanCalm       0 / [0, 1]       — how much scanlines, sweep and glitch flicker fade around
+//                                        the eyes (face instance: the eyes stay readable).
 // =============================================================================
 
 material {
@@ -118,7 +127,14 @@ material {
         { type : float, name : emissiveDamp },
         { type : float, name : selfIllum },
         { type : float, name : useSuitMask },
-        { type : float, name : proceduralScale }
+        { type : float, name : proceduralScale },
+        { type : float, name : contourPower },
+        { type : float, name : contourIntensity },
+        { type : float3, name : eyeCenterL, precision : high },
+        { type : float3, name : eyeCenterR, precision : high },
+        { type : float2, name : eyeCalmRadii },
+        { type : float, name : eyeGlitch },
+        { type : float, name : eyeScanCalm }
     ],
     // No shadows are cast on Masha, no SSR, no stereo: fewer variants, smaller
     // package. Skinning/morphing and fog variants stay (both are used).
@@ -132,23 +148,28 @@ vertex {
 
     void materialVertex(inout MaterialVertexInputs material) {
         // holoFx.x = glitch band strength for this vertex, .y = user-world Y
-        // (interpolated: scanlines and sweep use it, stable under camera motion).
+        // (interpolated: scanlines and sweep use it, stable under camera motion),
+        // .z = closeness to the eyes 0..1 (1 = inside eyeCalmRadii.x).
         highp vec4 userPos = getUserWorldFromWorldMatrix() * vec4(material.worldPosition.xyz, 1.0);
-        material.holoFx = vec4(0.0, userPos.y, 0.0, 0.0);
+        highp float eyeD = min(distance(userPos.xyz, materialParams.eyeCenterL), distance(userPos.xyz, materialParams.eyeCenterR));
+        float calm = 1.0 - smoothstep(materialParams.eyeCalmRadii.x, materialParams.eyeCalmRadii.y, eyeD);
+        material.holoFx = vec4(0.0, userPos.y, calm, 0.0);
 
         float g = materialParams.glitch;
         if (g > 0.001) {
             // Horizontal tearing: the body is cut into bands along Y; a random
             // subset jumps sideways (camera right), re-rolled 20 times a second.
+            // Around the eyes only eyeGlitch of it (same as masha_holo_eye).
             highp float step20 = floor(materialParams.time * 20.0) + materialParams.glitchSeed * 17.0;
             highp float bands = 9.0 + 14.0 * holoHash(step20 * 1.31);
             highp float band = floor(userPos.y * bands + holoHash(step20) * 3.0);
             highp float r = holoHash(band * 7.13 + step20 * 3.7);
             float on = step(1.0 - 0.45 * g, r);
-            highp float shift = (holoHash(band * 1.91 + step20 * 0.77) - 0.5) * 0.07 * g * on;
+            float keep = 1.0 - (1.0 - materialParams.eyeGlitch) * calm;
+            highp float shift = (holoHash(band * 1.91 + step20 * 0.77) - 0.5) * 0.07 * g * on * keep;
             highp vec3 camRight = getWorldFromViewMatrix()[0].xyz;
             material.worldPosition.xyz += camRight * shift;
-            material.holoFx.x = on * g;
+            material.holoFx.x = on * g * keep;
         }
     }
 }
@@ -208,6 +229,8 @@ fragment {
         float damp = materialParams.emissiveDamp;
         float glitchBand = variable_holoFx.x;
         highp float worldY = variable_holoFx.y;
+        // Around the eyes the scan effects step back so the eyes stay readable.
+        float calm = variable_holoFx.z * materialParams.eyeScanCalm;
 
         // ---- surface (lit): dark, desaturated, suit a bit darker and glossier
         vec3 tint = materialParams.baseColor;
@@ -221,17 +244,19 @@ fragment {
         float scanFade = saturate(1.5 - fwidth(sy) * 2.5);
         float scan = 1.0 - abs(fract(sy) - 0.5) * 2.0;          // triangle 0..1
         scan = scan * scan * scan * scanFade;
+        scanFade *= 1.0 - calm;
+        scan *= 1.0 - calm;
 
         // ---- slow scan sweep band moving upwards
         highp float sw = fract(worldY * 0.25 - t * materialParams.sweepSpeed) - 0.5;
-        float sweep = exp(-sw * sw * 900.0);
+        float sweep = exp(-sw * sw * 900.0) * (1.0 - 0.7 * calm);
 
         // ---- alpha: global, rim more opaque, scanline interlace, glitch flicker
         float a = materialParams.alpha;
         a = mix(a, 1.0, saturate(fresnel * materialParams.rimAlpha));
         a *= 1.0 - materialParams.scanlineIntensity * 0.6 * (1.0 - scan) * scanFade * damp;
         highp float gt = floor(t * 30.0);
-        float flicker = 1.0 - materialParams.glitch * 0.55 * holoHash12(vec2(gt, floor(worldY * 40.0)));
+        float flicker = 1.0 - materialParams.glitch * 0.55 * (1.0 - 0.75 * calm) * holoHash12(vec2(gt, floor(worldY * 40.0)));
         a *= flicker;
         a = saturate(a);
 
@@ -257,7 +282,13 @@ fragment {
         float sweepEmit = sweep * materialParams.sweepIntensity * (0.3 + 0.7 * suit + 0.5 * energy);
 
         vec3 emit = glow * ((circuit + seams + scanEmit + sweepEmit) * damp + materialParams.selfIllum);
-        emit += materialParams.rimColor * (fresnel * materialParams.rimIntensity * (0.85 + 0.5 * pulse));
+        float rim = fresnel * materialParams.rimIntensity;
+        // Contours (face): a broad second lobe; the surface turns away from the camera along the
+        // nose, the lip edges, the cheekbones and the jaw, so those lines light up from inside.
+        if (materialParams.contourIntensity > 0.0) {
+            rim += pow(1.0 - NoV, materialParams.contourPower) * materialParams.contourIntensity;
+        }
+        emit += materialParams.rimColor * (rim * (0.85 + 0.5 * pulse));
 
         // Glitch: displaced bands flash with a chromatic split.
         emit += vec3(glow.r * 0.6 + 0.3, glow.g * 0.2, glow.b + 0.2) * glitchBand * 0.9;

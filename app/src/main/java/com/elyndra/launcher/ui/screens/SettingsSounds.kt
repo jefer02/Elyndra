@@ -10,15 +10,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -29,21 +31,31 @@ import com.elyndra.launcher.sound.CustomSoundRules
 import com.elyndra.launcher.sound.SoundPack
 import com.elyndra.launcher.sound.UiSound
 import com.elyndra.launcher.ui.ElyndraViewModel
+import com.elyndra.launcher.ui.SoundSummary
+import com.elyndra.launcher.ui.components.AccordionHeader
+import com.elyndra.launcher.ui.components.ConsoleGlyph
+import com.elyndra.launcher.ui.components.CssGrid
 import com.elyndra.launcher.ui.components.ElyText
+import com.elyndra.launcher.ui.components.Expandable
 import com.elyndra.launcher.ui.components.GhostButton
-import com.elyndra.launcher.ui.components.GlowingSwitch
-import com.elyndra.launcher.ui.components.Pill
-import com.elyndra.launcher.ui.components.SettingsDivider
+import com.elyndra.launcher.ui.components.IconAction
+import com.elyndra.launcher.ui.components.SegmentedControl
+import com.elyndra.launcher.ui.components.SettingRow
 import com.elyndra.launcher.ui.components.SettingsGroup
+import com.elyndra.launcher.ui.components.SwitchRow
+import com.elyndra.launcher.ui.theme.LocalSkin
+import com.elyndra.launcher.ui.theme.MinTouch
+import com.elyndra.launcher.ui.theme.Space
+import com.elyndra.launcher.ui.theme.TypeScale
 
 /**
- * Ajustes → Sonidos: interruptor general, volumen, sonido al navegar, el
- * paquete (Console, Soft, Retro o ninguno) y, por evento, un sonido propio
- * elegido con el selector del sistema, con su vista previa y "restablecer".
+ * Ajustes → Sonido: interruptor general, volumen, sonido al navegar, el
+ * paquete (Console, Soft, Retro o ninguno) y, plegados, los sonidos propios
+ * de cada evento: una fila compacta por evento con probar, elegir y
+ * restablecer; en dos columnas si la ventana es ancha.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun SoundsSection(vm: ElyndraViewModel) {
+internal fun SoundsSection(vm: ElyndraViewModel, wide: Boolean) {
     val s = vm.sounds
     // El selector del sistema no dice para qué evento se abrió: se recuerda aquí.
     var picking by remember { mutableStateOf<UiSound?>(null) }
@@ -51,57 +63,77 @@ internal fun SoundsSection(vm: ElyndraViewModel) {
         picking?.let { s.onPicked(it, uri) }
         picking = null
     }
+    var customOpen by rememberSaveable { mutableStateOf(false) }
 
     SectionLabel(stringResource(R.string.section_sounds))
     SettingsGroup {
         SwitchRow(stringResource(R.string.sound_enabled), stringResource(R.string.sound_enabled_desc), s.enabled, s::toggleEnabled)
         if (s.enabled) {
-            SliderRow(stringResource(R.string.sound_volume), "${s.volume} %", s.volume, 0..100, s::updateVolume, topPadding = 14.dp)
-            Spacer(Modifier.height(14.dp))
+            SliderRow(stringResource(R.string.sound_volume), "${s.volume} %", s.volume, 0..100, s::updateVolume, topPadding = 4.dp)
+            Spacer(Modifier.height(Space.s))
             SwitchRow(stringResource(R.string.sound_navigation), stringResource(R.string.sound_navigation_desc), s.navigation, s::toggleNavigation)
-
-            Spacer(Modifier.height(14.dp))
-            ElyText(stringResource(R.string.sound_pack), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
-            Spacer(Modifier.height(8.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                SoundPack.entries.forEach { pack ->
-                    Pill(stringResource(pack.nameRes), active = s.pack == pack, onClick = { s.choosePack(pack) })
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-            SettingsDivider()
-            Spacer(Modifier.height(12.dp))
-            ElyText(stringResource(R.string.sound_custom_title), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
-            Spacer(Modifier.height(4.dp))
-            ElyText(
-                stringResource(
-                    R.string.sound_custom_desc,
-                    (CustomSoundRules.MAX_BYTES / 1024).toInt(),
-                    "%.1f".format(CustomSoundRules.MAX_MS / 1000f),
-                    "%.0f".format(CustomSoundRules.MAX_LAUNCH_MS / 1000f),
-                ),
-                size = 10f,
-                color = P.ink2,
-                lineHeightRatio = 1.45f,
+            SettingRow(stringResource(R.string.sound_pack))
+            SegmentedControl(
+                options = SoundPack.entries.map { stringResource(it.nameRes) },
+                selected = SoundPack.entries.indexOf(s.pack),
+                onSelect = { s.choosePack(SoundPack.entries[it]) },
             )
-            UiSound.entries.forEach { sound ->
-                EventRow(
-                    name = stringResource(sound.nameRes),
-                    source = when {
-                        s.importing == sound -> stringResource(R.string.sound_checking)
-                        s.custom[sound] != null -> stringResource(R.string.sound_source_custom)
-                        s.pack == SoundPack.Off -> stringResource(R.string.sound_pack_off)
-                        else -> stringResource(s.pack.nameRes)
-                    },
-                    custom = s.custom[sound] != null,
-                    onPreview = { s.preview(sound) },
-                    onChoose = {
-                        picking = sound
-                        picker.launch(arrayOf("audio/*"))
-                    },
-                    onReset = { s.reset(sound) },
+            Spacer(Modifier.height(Space.s))
+        }
+    }
+
+    if (s.enabled) {
+        val events = UiSound.entries.size
+        val custom = s.custom.size
+        val eventsText = pluralStringResource(R.plurals.sound_events_count, events, events)
+        val customText = pluralStringResource(R.plurals.sound_custom_count, custom, custom)
+        SettingsGroup(padding = 0.dp) {
+            AccordionHeader(
+                title = stringResource(R.string.sound_custom_title),
+                expanded = customOpen,
+                onToggle = { customOpen = !customOpen },
+                summary = SoundSummary.text(events, custom, { eventsText }, { customText }),
+            )
+            Expandable(customOpen) {
+                ElyText(
+                    stringResource(
+                        R.string.sound_custom_desc,
+                        (CustomSoundRules.MAX_BYTES / 1024).toInt(),
+                        "%.1f".format(CustomSoundRules.MAX_MS / 1000f),
+                        "%.0f".format(CustomSoundRules.MAX_LAUNCH_MS / 1000f),
+                    ),
+                    size = TypeScale.Caption,
+                    color = P.ink2,
+                    lineHeightRatio = 1.45f,
                 )
+                Spacer(Modifier.height(Space.s))
+                CssGrid(
+                    columns = if (wide) 2 else 1,
+                    horizontalGap = Space.m,
+                    verticalGap = 0.dp,
+                    items = UiSound.entries.map { sound ->
+                        {
+                            val file = s.custom[sound]
+                            SoundEventRow(
+                                name = stringResource(sound.nameRes),
+                                source = when {
+                                    s.importing == sound -> stringResource(R.string.sound_checking)
+                                    file != null -> file
+                                    s.pack == SoundPack.Off -> stringResource(R.string.sound_pack_off)
+                                    else -> stringResource(s.pack.nameRes)
+                                },
+                                custom = file != null,
+                                onPreview = { s.preview(sound) },
+                                onChoose = {
+                                    picking = sound
+                                    picker.launch(arrayOf("audio/*"))
+                                },
+                                onReset = { s.reset(sound) },
+                            )
+                        }
+                    },
+                )
+                Spacer(Modifier.height(Space.s))
             }
         }
     }
@@ -118,43 +150,24 @@ internal fun MusicSection(vm: ElyndraViewModel) {
     SettingsGroup {
         SwitchRow(stringResource(R.string.music_enabled), stringResource(R.string.music_enabled_desc), s.musicEnabled, s::toggleMusic)
         if (s.musicEnabled) {
-            SliderRow(stringResource(R.string.music_volume), "${s.musicVolume} %", s.musicVolume, 0..100, s::updateMusicVolume, topPadding = 14.dp)
-            Spacer(Modifier.height(14.dp))
-            ElyText(stringResource(R.string.music_source), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
-            Spacer(Modifier.height(4.dp))
-            ElyText(
-                s.musicName ?: stringResource(R.string.music_source_builtin),
-                size = 10.5f,
-                color = if (s.musicUri != null) P.ink else P.ink2,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(8.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            SliderRow(stringResource(R.string.music_volume), "${s.musicVolume} %", s.musicVolume, 0..100, s::updateMusicVolume, topPadding = 4.dp)
+            Spacer(Modifier.height(Space.s))
+            SettingRow(stringResource(R.string.music_source), description = s.musicName ?: stringResource(R.string.music_source_builtin))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalArrangement = Arrangement.spacedBy(Space.s)) {
                 GhostButton(stringResource(R.string.music_choose), { picker.launch(arrayOf("audio/*")) })
                 if (s.musicUri != null) GhostButton(stringResource(R.string.music_use_builtin), s::useBuiltInMusic)
             }
+            Spacer(Modifier.height(Space.s))
         }
     }
 }
 
+/**
+ * Un evento: su nombre y el sonido que suena ahora (el del paquete o el
+ * archivo propio), y a la derecha probar, elegir y, si es propio, restablecer.
+ */
 @Composable
-private fun SwitchRow(title: String, desc: String, checked: Boolean, onToggle: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            ElyText(title, size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
-            Spacer(Modifier.height(4.dp))
-            ElyText(desc, size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
-        }
-        Spacer(Modifier.width(12.dp))
-        GlowingSwitch(checked, onToggle)
-    }
-}
-
-/** Un evento: su nombre y de dónde sale el sonido, y debajo probar, elegir y restablecer. */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun EventRow(
+private fun SoundEventRow(
     name: String,
     source: String,
     custom: Boolean,
@@ -162,16 +175,22 @@ private fun EventRow(
     onChoose: () -> Unit,
     onReset: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ElyText(name, modifier = Modifier.weight(1f), size = 11.5f, weight = FontWeight.Medium, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            ElyText(source, size = 10f, color = if (custom) P.ink else P.ink2, maxLines = 1)
+    val skin = LocalSkin.current
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 52.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            ElyText(name, size = 11.5f, weight = FontWeight.Medium, color = P.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            ElyText(source, size = 9.5f, color = if (custom) skin.a2 else P.ink2, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Spacer(Modifier.height(6.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            GhostButton(stringResource(R.string.sound_preview), onPreview)
-            GhostButton(stringResource(R.string.sound_choose), onChoose)
-            if (custom) GhostButton(stringResource(R.string.sound_reset), onReset)
+        IconAction(ConsoleGlyph.Play, "${stringResource(R.string.sound_preview)}: $name", onPreview, filled = true)
+        IconAction(ConsoleGlyph.Folder, "${stringResource(R.string.sound_choose)} $name", onChoose)
+        if (custom) {
+            IconAction(ConsoleGlyph.Reset, "${stringResource(R.string.sound_reset)}: $name", onReset)
+        } else {
+            // El hueco del botón de restablecer se queda: así las filas no bailan.
+            Spacer(Modifier.width(MinTouch))
         }
     }
 }

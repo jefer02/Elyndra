@@ -61,17 +61,29 @@ data class MetadataPriority(val text: List<Service>, val art: List<Service>) {
         val DEFAULT = MetadataPriority(
             // Las fuentes sin clave, detrás: rellenan huecos y mandan cuando no
             // hay ninguna con cuenta. (La descripción va además por idioma: ver
-            // DescriptionMerge.)
-            text = listOf(Service.ScreenScraper, Service.Igdb, Service.Steam, Service.RetroAchievements, Service.SteamGridDb, Service.Libretro),
-            art = listOf(Service.ScreenScraper, Service.Igdb, Service.SteamGridDb, Service.Steam, Service.Libretro, Service.RetroAchievements),
+            // DescriptionMerge.) Google Play va delante de todo: solo se le
+            // pregunta por juegos Android, y por paquete, que no se equivoca;
+            // Steam queda de reserva cuando Play no tiene la ficha.
+            text = listOf(Service.GooglePlay, Service.ScreenScraper, Service.Igdb, Service.Steam, Service.RetroAchievements, Service.SteamGridDb, Service.Libretro),
+            art = listOf(Service.GooglePlay, Service.ScreenScraper, Service.Igdb, Service.SteamGridDb, Service.Steam, Service.Libretro, Service.RetroAchievements),
         )
 
-        /** Lista guardada ("ss,igdb,…") a orden completo: lo que falte se añade al final, lo repetido se ignora. */
+        /**
+         * Lista guardada ("ss,igdb,…") a orden completo; lo repetido se ignora.
+         * Lo que falte se añade al final, salvo lo que en [fallback] va antes
+         * que todo lo guardado (una fuente nueva que va primera de serie, como
+         * Google Play): eso entra delante, para que quien ya tenía un orden
+         * guardado la reciba en su sitio y no detrás de Steam.
+         */
         fun parse(stored: String?, fallback: List<Service>): List<Service> {
             val parsed = stored.orEmpty().split(',')
                 .mapNotNull { id -> Service.entries.firstOrNull { it.id == id.trim() } }
                 .distinct()
-            return parsed + fallback.filterNot { it in parsed }
+            if (parsed.isEmpty()) return fallback
+            val missing = fallback.filterNot { it in parsed }
+            val firstStored = fallback.indexOfFirst { it in parsed }
+            val (front, back) = missing.partition { fallback.indexOf(it) < firstStored }
+            return front + parsed + back
         }
 
         fun format(order: List<Service>): String = order.joinToString(",") { it.id }
@@ -160,6 +172,12 @@ data class MergedMetadata(
     val ra: RaInfo?,
     val matchedBy: String?,
     val confidence: Float?,
+    /**
+     * Por cada clase de imagen, todas las que hay en orden de prioridad (la
+     * primera es la de [art]). Si la descarga de una falla, se prueba la
+     * siguiente: un 404 en una fuente no deja el juego sin imagen.
+     */
+    val artChain: Map<MetaField, List<Pair<Service, String>>> = emptyMap(),
 ) {
     val matched: Boolean get() = sources.isNotEmpty()
 }
@@ -179,6 +197,11 @@ object MetadataMerge {
         )
         // Carátula, captura y pantalla de título (como fondo, si no hay otro mejor).
         Service.Libretro -> setOf(MetaField.Cover, MetaField.Screenshot, MetaField.Hero)
+        // Por paquete: la ficha oficial del juego Android. Sin carátula vertical ni logo.
+        Service.GooglePlay -> setOf(
+            MetaField.Name, MetaField.Description, MetaField.Developer, MetaField.Genre, MetaField.Rating,
+            MetaField.Icon, MetaField.Hero, MetaField.Screenshot,
+        )
         // El icono de un juego Android instalado es el suyo: Steam no lo da.
         Service.Steam -> setOf(
             MetaField.Name, MetaField.Description, MetaField.Developer, MetaField.Publisher, MetaField.Genre,
@@ -210,6 +233,9 @@ object MetadataMerge {
             .mapNotNull { f -> pick(f) { it.text[f] }?.let { f to it.second } }
             .toMap()
         val art = MetaField.ART.mapNotNull { f -> pick(f) { it.art[f] }?.let { f to it } }.toMap()
+        val artChain = MetaField.ART.associateWith { f ->
+            results.values.sortedBy { priority.rank(it.service, f) }.mapNotNull { d -> d.art[f]?.let { d.service to it } }
+        }.filterValues { it.isNotEmpty() }
         val matched = results.values.filter { it.matchedBy != null }
         val best = matched.maxByOrNull { it.confidence }
         val descriptions = DescriptionMerge.combine(
@@ -228,6 +254,7 @@ object MetadataMerge {
             ra = results[Service.RetroAchievements]?.ra,
             matchedBy = best?.matchedBy,
             confidence = best?.confidence,
+            artChain = artChain,
         )
     }
 

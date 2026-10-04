@@ -1,5 +1,8 @@
 package com.elyndra.launcher.ui
 
+import com.elyndra.launcher.ui.components.rememberBackdropStack
+import com.elyndra.launcher.ui.components.LocalBackdropStack
+import com.elyndra.launcher.ui.components.OverlayHost
 import com.elyndra.launcher.ui.screens.IdentifySheet
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
@@ -46,11 +49,15 @@ import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.components.GameActionOverlayContainer
 import com.elyndra.launcher.ui.components.ElyDialogView
 import com.elyndra.launcher.ui.components.LocalScreenSize
+import com.elyndra.launcher.ui.components.LocalPadHints
+import com.elyndra.launcher.ui.components.LocalPadInput
+import com.elyndra.launcher.ui.components.ImeBridge
+import com.elyndra.launcher.ui.components.PadFocusGroup
 import com.elyndra.launcher.ui.components.ToastView
 import com.elyndra.launcher.ui.components.VideoBackdrop
 import com.elyndra.launcher.ui.screens.AddScreen
 import com.elyndra.launcher.ui.screens.ArtPickerSheet
-import com.elyndra.launcher.ui.screens.DetailsSheet
+import com.elyndra.launcher.ui.screens.DetailsHost
 import com.elyndra.launcher.ui.screens.FolderScreen
 import com.elyndra.launcher.ui.screens.LibraryScreen
 import com.elyndra.launcher.ui.screens.LicensesScreen
@@ -90,11 +97,15 @@ fun ElyndraApp(vm: ElyndraViewModel) {
     UiSoundEffects(vm)
 
     ElyndraTheme(skin = vm.settings.skin, landscape = landscape) {
-    CompositionLocalProvider(LocalUiSounds provides vm.sound) {
+    // Las capas modales abiertas: un solo desenfoque y velos que se apilan (ver BackdropStack).
+    val backdrop = rememberBackdropStack()
+    CompositionLocalProvider(LocalUiSounds provides vm.sound, LocalPadInput provides vm.input, LocalBackdropStack provides backdrop) {
         // Atrás cierra, por orden: diálogo, hoja, ficha, pantalla y buscador.
         // Atrás predictivo (Android 13+): mientras el gesto dura, la pantalla
         // que se abandona se encoge y se apaga siguiendo al dedo; si el gesto
         // se cancela, vuelve a su sitio con un muelle.
+        // El teclado en pantalla, para el mando: B lo cierra antes que la capa.
+        ImeBridge()
         val backProgress = remember { Animatable(0f) }
         val backScope = rememberCoroutineScope()
         val reduced = LocalReducedMotion.current
@@ -109,6 +120,8 @@ fun ElyndraApp(vm: ElyndraViewModel) {
             }
         }
         val screenBack = vm.screen != Screen.Library && vm.dialog == null && vm.detailsKey == null && vm.sheet == null
+        // Capas con foco propio encima de la pantalla.
+        val overlayOpen = vm.dialog != null || vm.sheet != null || vm.detailsKey != null || vm.artPicker != null || vm.identify.state != null
 
         // Lanzar un juego saca la pantalla igual que abrir una carpeta: se
         // desliza una décima del ancho, se funde y crece hasta 1.02.
@@ -143,7 +156,6 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                 spec = vm.sheet,
                 input = vm.input,
                 origin = vm.sheetOrigin,
-                dimForOtherLayer = vm.dialog != null,
             ) {
             // Fondo de la app (solo de Elyndra, no del sistema), debajo de todo:
             // el vídeo en bucle o la imagen fija que el usuario haya elegido. Va
@@ -170,7 +182,10 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                     .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)),
             ) {
                 // Las métricas reparten este alto entre hero y cards (móvil y tableta).
-                CompositionLocalProvider(LocalScreenSize provides DpSize(maxWidth, maxHeight)) {
+                CompositionLocalProvider(
+                    LocalScreenSize provides DpSize(maxWidth, maxHeight),
+                    LocalPadHints provides vm.input.gamepadPresent,
+                ) {
                     // Cambiar de pantalla se ve: la que entra llega deslizando
                     // desde el lado al que se va, y la que sale se aparta por
                     // el contrario. Volver a la biblioteca invierte el sentido,
@@ -207,24 +222,45 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                         },
                         label = "screen",
                     ) { screen ->
-                        when (screen) {
-                            Screen.Library -> LibraryScreen(vm)
-                            Screen.Folder -> FolderScreen(vm)
-                            Screen.Add -> AddScreen(vm)
-                            Screen.Settings -> SettingsScreen(vm)
-                            Screen.Masha -> MashaScreen(vm)
-                            Screen.Licenses -> LicensesScreen(vm)
-                            Screen.VoiceSync -> VoiceSyncScreen(vm)
+                        // Cada pantalla es un grupo de foco (ver PadFocusGroup): con mando
+                        // nace con algo señalado, recupera lo que tenía al cerrarse una
+                        // capa y, mientras hay una capa encima, el foco no se cuela aquí.
+                        PadFocusGroup(
+                            Modifier.fillMaxSize(),
+                            blocked = overlayOpen,
+                            // Biblioteca y Carpeta van con la selección del InputController.
+                            padFocus = screen != Screen.Library && screen != Screen.Folder,
+                        ) {
+                            when (screen) {
+                                Screen.Library -> LibraryScreen(vm)
+                                Screen.Folder -> FolderScreen(vm)
+                                Screen.Add -> AddScreen(vm)
+                                Screen.Settings -> SettingsScreen(vm)
+                                Screen.Masha -> MashaScreen(vm)
+                                Screen.Licenses -> LicensesScreen(vm)
+                                Screen.VoiceSync -> VoiceSyncScreen(vm)
+                            }
                         }
                     }
                 }
             }
             }
 
-            vm.detailsKey?.let { DetailsSheet(vm, it) }
-            vm.artPicker?.let { ArtPickerSheet(vm, it) }
-            if (vm.identify.state != null) IdentifySheet(vm, vm.identify)
-            vm.dialog?.let { ElyDialogView(it, onDismiss = vm::dismissDialog, focus = vm.input.dialogFocus) }
+            DetailsHost(vm)
+            // Cada capa se monta con su host: entra y sale con la animación del menú.
+            OverlayHost(vm.artPicker, "artPicker") { state, open, progress -> ArtPickerSheet(vm, state, open, progress) }
+            OverlayHost(vm.identify.state, "identify") { state, open, progress -> IdentifySheet(vm, vm.identify, state, open, progress) }
+            OverlayHost(vm.dialog, "dialog") { spec, open, progress ->
+                ElyDialogView(spec, open, progress, onDismiss = vm::dismissDialog, focus = vm.input.dialogFocus, text = vm.dialogText, onText = vm::updateDialogText)
+            }
+            // Un paquete de idioma bajándose: arriba, pequeño, sin tapar nada.
+            TranslationPackBanner(
+                vm,
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .windowInsetsPadding(WindowInsets.systemBars)
+                    .padding(top = 8.dp),
+            )
             vm.toast?.let {
                 ToastView(
                     it,

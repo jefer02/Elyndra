@@ -310,6 +310,8 @@
     <string name="details_file">File</string>
     <string name="details_size">Size</string>
     <string name="details_package">Package</string>
+    <string name="details_about">About this game</string>
+    <string name="details_info">Info</string>
     <string name="achievements_title">Achievements</string>
     <string name="achievements_summary">%1$d/%2$d unlocked · %3$d/%4$d points</string>
     <string name="achievements_loading">Loading achievements…</string>
@@ -474,6 +476,7 @@
     <string name="masha_profile_never">Never opened. Could be today.</string>
     <string name="masha_profile_matched">Identified by %1$s via %2$s</string>
     <string name="masha_match_hash">file hash</string>
+    <string name="masha_match_package">package name</string>
     <string name="masha_match_name">name</string>
     <string name="masha_match_fuzzy">similar name</string>
     <string name="masha_match_manual">you</string>
@@ -545,8 +548,12 @@
     <string name="masha_particles_desc">The glowing trail Masha leaves behind when you drag her.</string>
     <string name="masha_particles_hue">Hue</string>
     <string name="masha_particles_preview">Preview</string>
+    <string name="section_selection">Selection</string>
+    <string name="selection_fx_desc">How the selected icon or cover lights up. The glow and the particles share this color.</string>
+    <string name="selection_glow_title">Selection glow</string>
+    <string name="selection_glow_desc">A polished light frame with a soft glow and a slow sheen around the selected icon or cover.</string>
     <string name="selection_particles_title">Selection particles</string>
-    <string name="selection_particles_desc">Glowing neon sparks that drift slowly down around the selected icon or cover.</string>
+    <string name="selection_particles_desc">Fine stardust that drifts up from the edge of the selected icon or cover.</string>
     <string name="masha_status_online">Online</string>
     <string name="masha_status_offline">Offline mode</string>
     <string name="masha_status_listening">Listening…</string>
@@ -664,19 +671,25 @@
     <string name="description_show_original">Show original</string>
     <string name="description_translated_from">Translated from %1$s</string>
     <string name="description_translating">Translating…</string>
-    <string name="translate_model_title">Download the translator?</string>
-    <string name="translate_model_msg">Translating needs the language models for %1$s (about %2$d MB in total). They are downloaded once and translation then happens on this device; the text never leaves it. %3$s</string>
-    <string name="translate_model_wifi">It will only download over Wi-Fi.</string>
+    <string name="translate_model_title">Download the language pack?</string>
+    <string name="translate_model_msg">To show descriptions in your language, Elyndra needs the %1$s language pack (about %2$d MB in total). It\'s downloaded once and translation then happens on this device. %3$s</string>
+    <string name="translate_model_wifi">It downloads over Wi-Fi only (you can allow mobile data in Settings → Metadata).</string>
     <string name="translate_model_any">It may use mobile data.</string>
-    <string name="translate_download">Download</string>
+    <string name="translate_download">Download now</string>
+    <string name="translate_later">Later</string>
+    <string name="translate_allow_mobile">Allow mobile data</string>
+    <string name="translate_allow_mobile_desc">Download language packs without Wi-Fi. Off: they wait for Wi-Fi.</string>
+    <string name="translate_state_installed">Installed</string>
+    <string name="translate_state_downloading">Downloading…</string>
+    <string name="translate_state_waiting_wifi">Waiting for Wi-Fi</string>
+    <string name="translate_state_error">Download failed</string>
+    <string name="translate_banner_downloading">Downloading the %1$s language pack…</string>
+    <string name="translate_banner_waiting">%1$s language pack: waiting for Wi-Fi</string>
+    <string name="translate_banner_error">Couldn\'t download the %1$s language pack</string>
     <string name="translate_failed">Couldn\'t translate. Try again later.</string>
     <string name="translate_unsupported">This language can\'t be translated on the device.</string>
-    <string name="translate_needs_wifi">Connect to Wi-Fi to download the translator (or turn off "Wi-Fi only" in Settings).</string>
     <string name="section_translation">Description translation</string>
-    <string name="auto_translate">Translate descriptions automatically</string>
-    <string name="auto_translate_desc">Only with language models already downloaded. Nothing is ever downloaded without asking.</string>
-    <string name="translate_wifi_only">Download models over Wi-Fi only</string>
-    <string name="translate_models">Downloaded models</string>
+    <string name="translate_models">Language packs</string>
     <string name="translate_models_none">None</string>
     <string name="translate_model_delete">Delete</string>
 
@@ -684,9 +697,10 @@
     <string name="keyless_status_ok">No account needed</string>
     <string name="keyless_title">Sources without an account</string>
     <string name="keyless_desc">Covers, screenshots and descriptions with no setup. Services with an account keep priority when you configure them.</string>
+    <string name="keyless_gplay_desc">Official title, description, icon and screenshots of Android games, looked up by their package name. A screenshot becomes the background.</string>
     <string name="keyless_libretro_desc">Console covers, screenshots and title screens.</string>
     <string name="keyless_steam_desc">Descriptions in your language and art for PC games, and for Android games that are also on Steam.</string>
-    <string name="keyless_privacy">Contacted: thumbnails.libretro.com and store.steampowered.com. Only the game name and its system are sent; never paths, accounts or device data.</string>
+    <string name="keyless_privacy">Contacted: play.google.com, thumbnails.libretro.com and store.steampowered.com. Only the game name, its system or its package name are sent; never paths, accounts or device data.</string>
 
     <!-- Identificar juego / sin nombre -->
     <string name="identify_action">Edit name / Identify game</string>
@@ -729,4 +743,63 @@
         <item quantity="one">Add %d game to the library</item>
         <item quantity="other">Add %d games to the library</item>
     </plurals>
+    <string name="a11y_expand">Expand</string>
+    <string name="a11y_collapse">Collapse</string>
+    <string name="hint_select">Select</string>
+    <string name="hint_back">Back</string>
+    <string name="hint_options">Options</string>
+    <string name="hint_section">Section</string>
+    <string name="hint_category">Category</string>
+    <string name="hint_keyboard">Keyboard</string>
+    <string name="hint_move">Move</string>
+    <string name="empty_filter_title">Nothing here yet</string>
+    <string name="empty_library_message">Add your Android games or a folder of ROMs and they will show up here.</string>
+    <string name="art_state_add">Add</string>
+    <string name="settings_cat_display">Display &amp; theme</string>
+    <string name="settings_cat_sound">Sound</string>
+    <string name="settings_cat_music">Music &amp; background</string>
+    <string name="settings_cat_appearance">Appearance</string>
+    <string name="settings_cat_library">Library</string>
+    <string name="settings_cat_metadata">Metadata</string>
+    <string name="settings_cat_masha">Masha</string>
+    <string name="settings_cat_about">About</string>
+    <string name="settings_cat_display_desc">Theme, intro, frame rate and language</string>
+    <string name="settings_cat_sound_desc">Interface sounds and custom sounds</string>
+    <string name="settings_cat_music_desc">Menu music and custom background</string>
+    <string name="settings_cat_appearance_desc">Accent color, liquid glass and particles</string>
+    <string name="settings_cat_library_desc">Sorting, rescans and downloaded images</string>
+    <string name="settings_cat_metadata_desc">Sources, accounts, priority and translation</string>
+    <string name="settings_cat_masha_desc">AI, voice, presence and privacy</string>
+    <string name="settings_cat_about_desc">Version and licenses</string>
+    <plurals name="sound_events_count">
+        <item quantity="one">%d event</item>
+        <item quantity="other">%d events</item>
+    </plurals>
+    <plurals name="sound_custom_count">
+        <item quantity="one">%d custom</item>
+        <item quantity="other">%d custom</item>
+    </plurals>
+    <string name="priority_summary">Text: %1$s · Images: %2$s</string>
+    <string name="priority_tab_text">Text</string>
+    <string name="priority_tab_art">Images</string>
+    <string name="priority_drag">Drag to reorder</string>
+    <string name="priority_hint">Drag a source by its handle, or tap it and move it with the arrows (LB/RB on a gamepad).</string>
+    <string name="particle_custom_hue">Custom color</string>
+    <string name="add_search_apps">Search apps</string>
+    <string name="add_select_all">Select all</string>
+    <string name="add_deselect_all">Deselect all</string>
+    <plurals name="add_selected_count">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <string name="add_pick_reason">Select at least one game</string>
+    <string name="add_no_app_match">No app matches</string>
+    <string name="add_search_systems">Search systems</string>
+    <string name="add_no_system_match">No system matches</string>
+    <string name="maker_nintendo">Nintendo</string>
+    <string name="maker_sony">Sony</string>
+    <string name="maker_microsoft">Microsoft</string>
+    <string name="maker_sega">Sega</string>
+    <string name="maker_others">Atari and others</string>
+    <string name="maker_pc">PC</string>
 </resources>

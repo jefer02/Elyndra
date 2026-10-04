@@ -23,6 +23,7 @@ import com.elyndra.launcher.metadata.ApiException
 import com.elyndra.launcher.metadata.FailureKind
 import com.elyndra.launcher.metadata.Service
 import com.elyndra.launcher.ui.intro.IntroColor
+import com.elyndra.launcher.sound.UiSound
 import com.elyndra.launcher.ui.masha.lipsync.AudioRoute
 import com.elyndra.launcher.ui.masha.lipsync.AudioRouteOffsets
 import com.elyndra.launcher.ui.masha.voice.NeuralRuntime
@@ -93,7 +94,11 @@ class SettingsController(private val vm: ElyndraViewModel) {
     /* ── intro de arranque ────────────────────────────────────── */
 
     var introEnabled by mutableStateOf(store.introEnabled); private set
-    var introColor by mutableStateOf(IntroColor.byId(store.introColor)); private set
+    /** Color elegido a mano (id); null = el de partida, que depende del tema (ver [IntroColor.defaultFor]). */
+    private var introColorId by mutableStateOf(store.introColor)
+
+    /** El color con el que sale la intro: lo elegido o, si no, el de partida del tema activo. */
+    val introColor: IntroColor get() = IntroColor.resolve(introColorId, darkMode)
 
     fun toggleIntro() {
         introEnabled = !introEnabled
@@ -101,7 +106,7 @@ class SettingsController(private val vm: ElyndraViewModel) {
     }
 
     fun updateIntroColor(color: IntroColor) {
-        introColor = color
+        introColorId = color.id
         store.introColor = color.id
     }
 
@@ -186,7 +191,15 @@ class SettingsController(private val vm: ElyndraViewModel) {
         store.mashaParticleColor = argb
     }
 
-    /** Partículas de neón alrededor del icono o la carátula seleccionados. */
+    /** Halo del marco de la card seleccionada. */
+    var selectionGlow by mutableStateOf(store.selectionGlow); private set
+
+    fun toggleSelectionGlow() {
+        selectionGlow = !selectionGlow
+        store.selectionGlow = selectionGlow
+    }
+
+    /** Polvo estelar alrededor del icono o la carátula seleccionados. */
     var selectionParticles by mutableStateOf(store.selectionParticles); private set
 
     fun toggleSelectionParticles() {
@@ -194,7 +207,7 @@ class SettingsController(private val vm: ElyndraViewModel) {
         store.selectionParticles = selectionParticles
     }
 
-    /** Color (ARGB) de las partículas de la selección. */
+    /** Color (ARGB) de la selección: marco, halo y partículas. */
     var selectionParticleColor by mutableIntStateOf(store.selectionParticleColor); private set
 
     fun updateSelectionParticleColor(argb: Int) {
@@ -464,19 +477,74 @@ class SettingsController(private val vm: ElyndraViewModel) {
 
     /** Mueve un servicio una posición en el orden de textos o de imágenes. */
     fun movePriority(art: Boolean, service: Service, delta: Int) {
-        val list = (if (art) priority.art else priority.text).toMutableList()
+        val list = if (art) priority.art else priority.text
         val from = list.indexOf(service)
-        val to = (from + delta).coerceIn(0, list.lastIndex)
-        if (from < 0 || from == to) return
-        list.removeAt(from)
-        list.add(to, service)
-        priority = if (art) priority.copy(art = list) else priority.copy(text = list)
+        if (from < 0) return
+        movePriorityTo(art, service, (from + delta).coerceIn(0, list.lastIndex))
+    }
+
+    /** Lleva un servicio a la posición [to] (al soltarlo tras arrastrarlo). */
+    fun movePriorityTo(art: Boolean, service: Service, to: Int) {
+        val list = if (art) priority.art else priority.text
+        val moved = PriorityOrder.moveTo(list, list.indexOf(service), to)
+        if (moved == list) return
+        priority = if (art) priority.copy(art = moved) else priority.copy(text = moved)
         vm.metadataPriority.set(priority)
     }
 
     fun resetPriority() {
         vm.metadataPriority.reset()
         priority = vm.metadataPriority.get()
+        priorityGrab = null
+    }
+
+    /** Fuente "cogida" para moverla con las flechas o con LB/RB (null = ninguna). */
+    data class PriorityGrab(val art: Boolean, val service: Service)
+
+    var priorityGrab by mutableStateOf<PriorityGrab?>(null); private set
+
+    fun toggleGrab(art: Boolean, service: Service) {
+        val grab = PriorityGrab(art, service)
+        priorityGrab = if (priorityGrab == grab) null else grab
+    }
+
+    fun releaseGrab() {
+        priorityGrab = null
+    }
+
+    /* ── navegación de Ajustes ────────────────────────────────── */
+
+    /** Categoría en pantalla. Es navegación, no un ajuste: no se guarda. */
+    var category by mutableStateOf(SettingsCategory.Display); private set
+
+    /** Ventana estrecha: se está viendo la página de [category] y no la lista. */
+    var detailOpen by mutableStateOf(false); private set
+
+    /** Lo fija la pantalla: true = ventana estrecha (lista de categorías → página). */
+    var compact = false
+
+    fun openCategory(c: SettingsCategory) {
+        if (c != category) vm.sound.play(UiSound.Navigate)
+        category = c
+        detailOpen = true
+        priorityGrab = null
+    }
+
+    fun closeCategory() {
+        detailOpen = false
+        priorityGrab = null
+    }
+
+    /** LB/RB: mueven la fuente cogida en la prioridad o, si no hay ninguna, cambian de categoría. */
+    fun onBumper(delta: Int) {
+        val grab = priorityGrab
+        if (grab != null) {
+            movePriority(grab.art, grab.service, delta)
+            vm.sound.play(UiSound.Navigate)
+            return
+        }
+        openCategory(SettingsNav.step(category, delta))
+        if (!compact) detailOpen = false
     }
 
     /* ── orden de la biblioteca ───────────────────────────────── */
@@ -600,7 +668,7 @@ class SettingsController(private val vm: ElyndraViewModel) {
                         UiText.res(R.string.ra_status_detail, p.user, p.points)
                     }
                     // Sin cuenta: no hay nada que comprobar.
-                    Service.Libretro, Service.Steam -> UiText.res(R.string.keyless_status_ok)
+                    Service.Libretro, Service.Steam, Service.GooglePlay -> UiText.res(R.string.keyless_status_ok)
                 }
                 store.setVerified(service.id, true)
                 states[service] = ServiceState(ServiceState.Status.Connected, detail)
@@ -668,7 +736,12 @@ class SettingsController(private val vm: ElyndraViewModel) {
     var rescanning by mutableStateOf(false); private set
     var mediaBytes by mutableLongStateOf(-1L); private set
 
-    fun onOpen() {
+    /** Al entrar en Ajustes. Desde la biblioteca se empieza por la lista; al volver de una subpantalla, no. */
+    fun onOpen(fromPage: Boolean = false) {
+        if (!fromPage) {
+            detailOpen = false
+            priorityGrab = null
+        }
         refreshUsageAccess()
         Service.entries.forEach { s ->
             if (states[s]?.status != ServiceState.Status.Checking && states[s]?.status != ServiceState.Status.Connected) {
@@ -776,6 +849,7 @@ class SettingsController(private val vm: ElyndraViewModel) {
             Service.SteamGridDb -> "https://www.steamgriddb.com/profile/preferences/api"
             Service.Libretro -> "https://thumbnails.libretro.com/"
             Service.Steam -> "https://store.steampowered.com/"
+            Service.GooglePlay -> "https://play.google.com/store/games"
             Service.RetroAchievements -> "https://retroachievements.org/settings"
         }
     }

@@ -83,6 +83,29 @@ class MigrationTest {
     }
 
     @Test
+    fun migration4to5MatchesTheExportedSchema() {
+        val v4 = schema(4)
+        val v5 = schema(5)
+        val sql = sqlOf(ElyndraDatabase.MIGRATION_4_5)
+        val added = addedColumns(sql, "game_metadata")
+        assertEquals(setOf("description_sources"), added)
+        assertEquals(columns(v5.getValue("game_metadata")), columns(v4.getValue("game_metadata")) + added)
+        // Las traducciones se quedan; ninguna tabla aparece ni desaparece.
+        assertEquals(v4.keys, v5.keys)
+        assertTrue("description_translations" in v5.keys)
+    }
+
+    @Test
+    fun androidDescriptionsNotFromPlayAreForgottenAndRomsAreUntouched() {
+        val update = sqlOf(ElyndraDatabase.MIGRATION_4_5).single { it.startsWith("UPDATE") }
+        assertTrue(update.contains("`game_key` LIKE 'a:%'"))
+        assertTrue(update.contains("NOT LIKE '%gplay%'"))
+        // Solo se vacían las columnas de descripción: la fila (y lo demás) se queda.
+        assertTrue(update.contains("`descriptions` = NULL"))
+        assertTrue("DELETE" !in update.uppercase())
+    }
+
+    @Test
     fun migrationsNeverDropOrDelete() {
         for (m in ElyndraDatabase.MIGRATIONS) for (s in sqlOf(m)) {
             val upper = s.uppercase()
@@ -102,5 +125,16 @@ class MigrationTest {
         assertEquals(map, LibraryMapper.decodeDescriptions(LibraryMapper.encodeDescriptions(map)))
         assertEquals(emptyMap<String, String>(), LibraryMapper.decodeDescriptions("{roto"))
         assertEquals(null, LibraryMapper.encodeDescriptions(emptyMap()))
+    }
+
+    @Test
+    fun descriptionSourcesRoundTripThroughTheMapper() {
+        fun roundTrip(m: com.elyndra.launcher.data.GameMeta) =
+            LibraryMapper.gameMeta(LibraryMapper.metadata("r:1", m), emptyList()).descriptionSources
+        val base = com.elyndra.launcher.data.GameMeta(scrapedAt = 1, name = "X")
+        assertEquals(setOf("gplay", "steam"), roundTrip(base.copy(descriptionSources = setOf("steam", "gplay"))))
+        // "Ya preguntado y nadie respondió" no es lo mismo que "sin saber".
+        assertEquals(emptySet<String>(), roundTrip(base.copy(descriptionSources = emptySet())))
+        assertEquals(null, roundTrip(base.copy(descriptionSources = null)))
     }
 }

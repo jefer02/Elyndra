@@ -149,18 +149,38 @@ object GameDescriptionUpdate {
     /**
      * Las descripciones nuevas se suman a las que había (otros idiomas no se
      * pierden); la principal pasa a ser la del idioma de la app, y queda
-     * anotado para qué idioma se preguntó.
+     * anotado para qué idioma se preguntó y qué fuentes respondieron
+     * ([consulted]; en el mismo idioma se suman a las de antes).
      */
-    fun apply(old: GameMeta, fresh: Map<String, String>, lang: String): GameMeta {
+    fun apply(old: GameMeta, fresh: Map<String, String>, lang: String, consulted: Set<String> = emptySet()): GameMeta {
         // Datos de antes de etiquetar idiomas: esa descripción no se sabe de qué
         // idioma es, así que en cuanto llega alguna etiquetada deja de contar.
         val all = DescriptionMerge.update(old.descriptions, fresh)
         val chosen = DescriptionMerge.chooseLang(all, lang)
+        val sources = if (old.descriptionCheckedLang == lang) old.descriptionSources.orEmpty() + consulted else consulted
         return old.copy(
             description = chosen?.let { all[it] } ?: old.description,
             descriptionLang = chosen ?: old.descriptionLang,
             descriptions = all,
             descriptionCheckedLang = lang,
+            descriptionSources = sources,
         )
+    }
+}
+
+/**
+ * ¿Hay que volver a pedir la descripción de un juego? Solo si falta la del
+ * idioma de la app y alguna fuente capaz de darla ([capable], ids de
+ * `Service`) no ha respondido todavía en ese idioma: un idioma nuevo, una
+ * fuente activada después o datos de antes de anotarlo. Lo ya preguntado no
+ * se repite, y sin fuente capaz no se pregunta nada.
+ */
+object DescriptionRecheck {
+
+    fun needed(meta: GameMeta, lang: String, capable: Set<String>): Boolean {
+        if (meta.scrapedAt == 0L || capable.isEmpty() || lang in meta.descriptions) return false
+        if (meta.descriptionCheckedLang != lang) return true
+        val asked = meta.descriptionSources ?: return true
+        return !asked.containsAll(capable)
     }
 }

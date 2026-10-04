@@ -1,5 +1,7 @@
 package com.elyndra.launcher.ui.components
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.elyndra.launcher.ui.theme.Springs
 import com.elyndra.launcher.ui.theme.motion
 import androidx.compose.animation.core.animateFloatAsState
@@ -7,6 +9,14 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.indication
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import com.elyndra.launcher.ui.theme.focusRing
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -58,6 +68,8 @@ import com.elyndra.launcher.ui.theme.consoleFocus
 import com.elyndra.launcher.ui.theme.darkGlass
 import com.elyndra.launcher.ui.theme.drawArcSpinner
 import com.elyndra.launcher.ui.theme.glass
+import com.elyndra.launcher.ui.theme.pressFeedback
+import androidx.compose.foundation.layout.heightIn
 import com.elyndra.launcher.ui.theme.shapeClickable
 import com.elyndra.launcher.ui.theme.spinAngle
 import kotlin.math.roundToInt
@@ -96,7 +108,7 @@ fun Pill(
             .border(1.dp, P.ink.copy(alpha = 0.14f), shape)
     }
     Box(
-        m.shapeClickable(shape, enabled = enabled, onClick = onClick)
+        m.shapeClickable(shape, enabled = enabled, color = if (active) Color.White else null, onClick = onClick)
             .padding(horizontal = horizontalPadding, vertical = if (height != null) 0.dp else verticalPadding),
         contentAlignment = Alignment.Center,
     ) {
@@ -170,8 +182,10 @@ fun CtaButton(
 ) {
     val skin = LocalSkin.current
     val shape = RoundedCornerShape(17.dp)
+    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier
+            .pressFeedback(interaction)
             .fillMaxWidth()
             .height(50.dp)
             .alpha(if (enabled) 1f else 0.42f)
@@ -182,7 +196,7 @@ fun CtaButton(
             )
             .clip(shape)
             .drawBehind { drawRect(accentGradient(skin, 145f, size)) }
-            .shapeClickable(shape, enabled = enabled, onClick = onClick),
+            .shapeClickable(shape, enabled = enabled, interactionSource = interaction, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         ElyText(label, size = 13.5f, weight = FontWeight.SemiBold, color = Color.White, maxLines = 1)
@@ -197,34 +211,44 @@ fun AccentButton(
     modifier: Modifier = Modifier,
     fontSize: Float = 12.5f,
     cornerRadius: Dp = 15.dp,
+    enabled: Boolean = true,
 ) {
     val skin = LocalSkin.current
     val shape = RoundedCornerShape(cornerRadius)
+    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier
+            .pressFeedback(interaction)
             .height(42.dp)
-            .shadow(12.dp, shape, clip = false, ambientColor = P.shade.copy(alpha = 0.24f), spotColor = P.shade.copy(alpha = 0.24f))
+            .then(
+                if (enabled) {
+                    Modifier.shadow(12.dp, shape, clip = false, ambientColor = P.shade.copy(alpha = 0.24f), spotColor = P.shade.copy(alpha = 0.24f))
+                } else Modifier,
+            )
             .clip(shape)
             .drawBehind { drawRect(accentGradient(skin, 145f, size)) }
-            .shapeClickable(shape, onClick = onClick)
-            .padding(horizontal = 12.dp),
+            // Sobre el relleno de acento, el aro del foco va en blanco (en acento no se vería).
+            .shapeClickable(shape, enabled = enabled, interactionSource = interaction, color = Color.White, onClick = onClick)
+            .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
     ) {
         ElyText(label, size = fontSize, weight = FontWeight.SemiBold, color = Color.White, maxLines = 1)
     }
 }
 
-/** `iconBtn` — botón cuadrado de cristal (38dp) usado en las cabeceras de las hojas. */
+/** `iconBtn` — botón cuadrado de cristal usado en las cabeceras; [contentDescription] para los lectores de pantalla. */
 @Composable
 fun GlassIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     size: Dp = 38.dp,
     cornerRadius: Dp = 13.dp,
+    contentDescription: String? = null,
     content: @Composable () -> Unit,
 ) {
     Box(
         modifier
+            .then(if (contentDescription != null) Modifier.semantics { this.contentDescription = contentDescription } else Modifier)
             .size(size)
             .glass(RoundedCornerShape(cornerRadius))
             .shapeClickable(RoundedCornerShape(cornerRadius), onClick = onClick),
@@ -237,13 +261,17 @@ fun GlassIconButton(
 @Composable
 fun GhostButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(11.dp)
+    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier
+            .pressFeedback(interaction)
+            .heightIn(min = 36.dp)
             .clip(shape)
             .background(P.chip)
             .border(1.dp, P.ink.copy(alpha = 0.14f), shape)
-            .shapeClickable(shape, onClick = onClick)
+            .shapeClickable(shape, interactionSource = interaction, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
     ) {
         ElyText(label, size = 11f, weight = FontWeight.Medium, color = P.ink, maxLines = 1)
     }
@@ -364,6 +392,9 @@ fun AccentSlider(
             latest(range.first + (f * span).roundToInt())
         }
 
+        // Con el mando: el foco lo realza y la cruceta lo mueve a pasos de un 5 %.
+        val step = (span / 20).coerceAtLeast(1)
+        val focusShape = RoundedCornerShape(8.dp)
         Box(
             Modifier
                 .fillMaxSize()
@@ -373,7 +404,17 @@ fun AccentSlider(
                         onHorizontalDrag = { change, _ -> report(change.position.x) },
                     )
                 }
-                .clickable(interactionSource = interaction, indication = null) {},
+                .onKeyEvent { e ->
+                    if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                    when (e.key) {
+                        Key.DirectionLeft -> { latest((value - step).coerceIn(range.first, range.last)); true }
+                        Key.DirectionRight -> { latest((value + step).coerceIn(range.first, range.last)); true }
+                        else -> false
+                    }
+                }
+                .clip(focusShape)
+                .indication(interaction, focusRing(focusShape))
+                .focusable(interactionSource = interaction),
         )
 
         // Pista

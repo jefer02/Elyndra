@@ -1,6 +1,17 @@
 package com.elyndra.launcher.ui.screens
 
 import com.elyndra.launcher.ui.components.NeedsNameBadge
+import androidx.compose.animation.AnimatedContent
+import com.elyndra.launcher.ui.LibraryItem
+import com.elyndra.launcher.ui.components.ConsoleGlyph
+import com.elyndra.launcher.ui.components.EmptyState
+import com.elyndra.launcher.ui.components.Metrics
+import com.elyndra.launcher.ui.components.PAD_HINTS_HEIGHT
+import com.elyndra.launcher.ui.components.PadHint
+import com.elyndra.launcher.ui.components.PadHints
+import com.elyndra.launcher.ui.theme.LocalReducedMotion
+import com.elyndra.launcher.ui.theme.heroInfoTransition
+import com.elyndra.launcher.ui.theme.shelfSurface
 import com.elyndra.launcher.library.NameCheck
 import com.elyndra.launcher.ui.heroDescription
 import com.elyndra.launcher.ui.rememberDescription
@@ -20,7 +31,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -46,7 +56,6 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -84,11 +93,9 @@ import com.elyndra.launcher.ui.components.Hero
 import com.elyndra.launcher.ui.components.LogoImage
 import com.elyndra.launcher.ui.components.MaterializingContainer
 import com.elyndra.launcher.ui.components.OpenButton
-import com.elyndra.launcher.ui.components.neonParticles
 import com.elyndra.launcher.ui.components.metrics
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.theme.HeroTitleShadow
-import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.animFadeIn
 import com.elyndra.launcher.ui.theme.animFadeUp
 import com.elyndra.launcher.ui.theme.animPopIn
@@ -98,12 +105,15 @@ import com.elyndra.launcher.ui.theme.darkGlass
 import com.elyndra.launcher.ui.theme.pulseHintAlpha
 import com.elyndra.launcher.ui.theme.selectionLift
 import com.elyndra.launcher.ui.theme.selectionScale
-import com.elyndra.launcher.ui.theme.sheenBrush
-import com.elyndra.launcher.ui.theme.sheenProgress
+import com.elyndra.launcher.ui.selection.SelectionLook
+import com.elyndra.launcher.ui.selection.rememberSelectionLook
+import com.elyndra.launcher.ui.selection.selectionFrame
+import androidx.compose.ui.zIndex
 
 @Composable
 fun FolderScreen(vm: ElyndraViewModel) {
     val m = metrics()
+    val reduced = LocalReducedMotion.current
     val item = vm.currentFolder()
     if (item == null) {
         LaunchedEffect(Unit) { vm.go(Screen.Library) }
@@ -121,8 +131,8 @@ fun FolderScreen(vm: ElyndraViewModel) {
 
     // Un solo reloj para la flotación de todos los logos de juego de la pantalla.
     val floatClock = rememberFloatClock()
-    // Chispas de neón de la carátula seleccionada (Ajustes → Masha); null = apagadas.
-    val sparkColor = if (vm.settings.selectionParticles) Color(vm.settings.selectionParticleColor) else null
+    // El marco de la selección (Ajustes → Apariencia): halo, partículas y su color.
+    val look = rememberSelectionLook(vm.settings.selectionParticleColor, vm.settings.selectionGlow, vm.settings.selectionParticles)
 
     Column(Modifier.fillMaxSize().animFadeIn(key = Screen.Folder)) {
 
@@ -214,110 +224,21 @@ fun FolderScreen(vm: ElyndraViewModel) {
                 }
             },
             info = {
-                Column(
-                    Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .padding(start = m.pad, end = m.pad, bottom = if (m.landscape) 8.dp else 18.dp),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(bottom = if (m.landscape) 3.dp else 6.dp),
-                    ) {
-                        HeroChip(stringResource(R.string.rom_chip, item.system.short))
-                        rom?.meta?.ra?.takeIf { it.achievements > 0 }?.let { ra ->
-                            Spacer(Modifier.width(6.dp))
-                            Box(
-                                Modifier
-                                    .darkGlass(RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 8.dp, vertical = 3.dp),
-                            ) {
-                                ElyText("🏆 ${ra.earned}/${ra.achievements}", size = 8.5f, weight = FontWeight.Bold, color = Color.White)
-                            }
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        ElyText(
-                            (rom?.let { playedLabel(it) } ?: "") + (rom?.let { " · " + it.extension } ?: ""),
-                            size = 9.5f,
-                            weight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.85f),
-                            letterSpacing = tracking(0.1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    val logo = rom?.meta?.logo
-                    if (logo != null) {
-                        MaterializingContainer(
-                            isMaterializing = vm.isMaterializingArt(rom.key, ArtKind.Logo),
-                            onAnimationEnd = { vm.finishMaterializeArt() },
-                        ) {
-                            DisintegratingContainer(
-                                isDisintegrating = vm.isVanishingArt(rom.key, ArtKind.Logo),
-                                onAnimationEnd = { vm.finishVanish() },
-                            ) {
-                                LogoImage(
-                                    logo,
-                                    Modifier
-                                        .animTitleIn(key = rom.key)
-                                        .floating(floatClock, floatPhaseOf(rom.key), amplitude = 3.dp, periodSeconds = 4.2f)
-                                        .fillMaxWidth(0.72f)
-                                        .height(m.logoH),
-                                )
-                            }
-                        }
-                    } else {
-                        ElyText(
-                            rom?.displayTitle ?: item.system.name,
-                            modifier = Modifier.animTitleIn(key = rom?.key ?: item.key),
-                            size = m.titleSize,
-                            weight = FontWeight.ExtraBold,
-                            color = Color.White,
-                            letterSpacing = tracking(-0.03f),
-                            lineHeightRatio = 0.92f,
-                            shadow = HeroTitleShadow,
-                            uppercase = true,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    val description = rememberDescription(vm, rom?.key, rom?.meta)
-                    if (description != null) {
-                        ElyText(
-                            heroDescription(description, vm.settings.lang),
-                            modifier = Modifier
-                                .padding(top = if (m.landscape) 4.dp else 6.dp)
-                                .fillMaxWidth(0.86f)
-                                .animFadeUp(key = rom?.key ?: "none"),
-                            size = 10f,
-                            weight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.72f),
-                            letterSpacing = tracking(0.02f),
-                            lineHeightRatio = 1.28f,
-                            maxLines = if (m.landscape) 2 else 3,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    } else {
-                        ElyText(
-                            stringResource(R.string.hint_gestures),
-                            modifier = Modifier
-                                .padding(top = if (m.landscape) 4.dp else 7.dp)
-                                .alpha(pulseHintAlpha()),
-                            size = 9f,
-                            weight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.8f),
-                            letterSpacing = tracking(0.14f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            uppercase = true,
-                        )
-                    }
+                AnimatedContent(
+                    targetState = rom,
+                    contentKey = { it?.key ?: item.key },
+                    modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth(),
+                    contentAlignment = Alignment.BottomStart,
+                    transitionSpec = { heroInfoTransition(reduced) },
+                    label = "folderInfo",
+                ) { shown ->
+                    FolderHeroInfo(vm, item, shown, m, floatClock)
                 }
             },
         )
 
         // ── ROMS ──
-        Column(Modifier.weight(1f).padding(top = 10.dp)) {
+        Column(Modifier.weight(1f).shelfSurface().padding(top = 10.dp)) {
             Row(
                 Modifier.fillMaxWidth().padding(start = m.pad, end = m.pad, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -359,67 +280,185 @@ fun FolderScreen(vm: ElyndraViewModel) {
                 )
             }
 
-            if (roms.isEmpty()) {
-                Column(
-                    Modifier.fillMaxWidth().weight(1f).padding(horizontal = m.pad),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    ElyText(stringResource(R.string.folder_empty), size = 11f, color = P.ink2, align = TextAlign.Center, lineHeightRatio = 1.5f)
-                    Spacer(Modifier.height(10.dp))
-                    GhostButton(stringResource(R.string.rescan_folder), { vm.rescanFolder(item.folder) })
-                }
-            } else {
-                LazyRow(
-                    Modifier.fillMaxWidth().weight(1f),
-                    state = carousel,
-                    contentPadding = PaddingValues(
-                        start = m.pad,
-                        end = m.pad,
-                        // Hueco para la card seleccionada, que sube y se amplía: sin él
-                        // se metía sobre el rótulo de ROMS.
-                        top = m.carouselTop,
-                        bottom = m.carouselBottom,
-                    ),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    itemsIndexed(roms, key = { _, r -> r.id }) { i, r ->
-                        // Quitar el juego deshace la card entera; quitar solo
-                        // su carátula deshace únicamente la imagen, dentro.
-                        DisintegratingContainer(
-                            isDisintegrating = vm.vanishing == r.key,
-                            onAnimationEnd = { vm.finishVanish() },
-                        ) {
-                            RomTile(
-                                rom = r,
-                                floatClock = floatClock,
-                                time = playedLabel(r),
-                                index = i,
-                                selected = r.key == rom?.key,
-                                sparkColor = sparkColor,
-                                fallback = vm.romFallback(r),
-                                width = m.romW,
-                                height = m.romTileH,
-                                coverVanishing = vm.isVanishingArt(r.key, ArtKind.Cover),
-                                onCoverVanished = { vm.finishVanish() },
-                                coverMaterializing = vm.isMaterializingArt(r.key, ArtKind.Cover),
-                                onCoverMaterialized = { vm.finishMaterializeArt() },
-                                onTap = { vm.selectRom(r.key) },
-                                onOpen = { vm.openRom(r) },
-                                onBounds = vm::noteSelectedCard,
-                                onLongPress = { bounds ->
-                                    vm.selectRom(r.key)
-                                    vm.markSheetOrigin(bounds)
-                                    vm.romOptions(r)
-                                },
-                            )
+            Box(Modifier.fillMaxWidth().weight(1f)) {
+                if (roms.isEmpty()) {
+                    EmptyState(
+                        title = null,
+                        message = stringResource(R.string.folder_empty),
+                        actionLabel = stringResource(R.string.rescan_folder),
+                        onAction = { vm.rescanFolder(item.folder) },
+                        modifier = Modifier.fillMaxSize().padding(bottom = if (vm.input.gamepadPresent) PAD_HINTS_HEIGHT else 0.dp),
+                        glyph = ConsoleGlyph.Folder,
+                    )
+                } else {
+                    LazyRow(
+                        Modifier.fillMaxSize(),
+                        state = carousel,
+                        contentPadding = PaddingValues(
+                            start = m.pad,
+                            end = m.pad,
+                            // Hueco para la card seleccionada, que sube y se amplía: sin él
+                            // se metía sobre el rótulo de ROMS.
+                            top = m.carouselTop,
+                            bottom = m.carouselBottom,
+                        ),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        itemsIndexed(roms, key = { _, r -> r.id }) { i, r ->
+                            // Quitar el juego deshace la card entera; quitar solo
+                            // su carátula deshace únicamente la imagen, dentro.
+                            val selected = r.key == rom?.key
+                            DisintegratingContainer(
+                                isDisintegrating = vm.vanishing == r.key,
+                                onAnimationEnd = { vm.finishVanish() },
+                                // La seleccionada, por encima de sus vecinas: su halo no queda debajo.
+                                modifier = Modifier.zIndex(if (selected) 1f else 0f),
+                            ) {
+                                RomTile(
+                                    rom = r,
+                                    floatClock = floatClock,
+                                    time = playedLabel(r),
+                                    index = i,
+                                    selected = selected,
+                                    look = look,
+                                    fallback = vm.romFallback(r),
+                                    width = m.romW,
+                                    height = m.romTileH,
+                                    coverVanishing = vm.isVanishingArt(r.key, ArtKind.Cover),
+                                    onCoverVanished = { vm.finishVanish() },
+                                    coverMaterializing = vm.isMaterializingArt(r.key, ArtKind.Cover),
+                                    onCoverMaterialized = { vm.finishMaterializeArt() },
+                                    onTap = { vm.selectRom(r.key) },
+                                    onOpen = { vm.openRom(r) },
+                                    onBounds = vm::noteSelectedCard,
+                                    onLongPress = { bounds ->
+                                        vm.selectRom(r.key)
+                                        vm.markSheetOrigin(bounds)
+                                        vm.romOptions(r)
+                                    },
+                                )
+                            }
                         }
                     }
                 }
+                PadHints(
+                    hints = FOLDER_HINTS,
+                    visible = vm.input.gamepadPresent,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(start = m.pad - 10.dp, bottom = 2.dp),
+                )
             }
         }
 
+    }
+}
+
+/** Las pistas del mando al pie de la carpeta. */
+private val FOLDER_HINTS = listOf(
+    PadHint("A", R.string.sheet_play),
+    PadHint("X", R.string.details),
+    PadHint("Y", R.string.hint_options),
+    PadHint("B", R.string.hint_back),
+)
+
+/** El bloque de título del hero de la carpeta: el de la ROM elegida o, sin ella, el del sistema. */
+@Composable
+private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: RomEntry?, m: Metrics, floatClock: FloatClock) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = m.pad, end = m.pad, bottom = if (m.landscape) 8.dp else 18.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(bottom = if (m.landscape) 3.dp else 6.dp),
+        ) {
+            HeroChip(stringResource(R.string.rom_chip, item.system.short))
+            rom?.meta?.ra?.takeIf { it.achievements > 0 }?.let { ra ->
+                Spacer(Modifier.width(6.dp))
+                Box(
+                    Modifier
+                        .darkGlass(RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                ) {
+                    ElyText("🏆 ${ra.earned}/${ra.achievements}", size = 8.5f, weight = FontWeight.Bold, color = Color.White)
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            ElyText(
+                (rom?.let { playedLabel(it) } ?: "") + (rom?.let { " · " + it.extension } ?: ""),
+                size = 9.5f,
+                weight = FontWeight.Medium,
+                color = Color.White.copy(alpha = 0.85f),
+                letterSpacing = tracking(0.1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        val logo = rom?.meta?.logo
+        if (logo != null) {
+            MaterializingContainer(
+                isMaterializing = vm.isMaterializingArt(rom.key, ArtKind.Logo),
+                onAnimationEnd = { vm.finishMaterializeArt() },
+            ) {
+                DisintegratingContainer(
+                    isDisintegrating = vm.isVanishingArt(rom.key, ArtKind.Logo),
+                    onAnimationEnd = { vm.finishVanish() },
+                ) {
+                    LogoImage(
+                        logo,
+                        Modifier
+                            .floating(floatClock, floatPhaseOf(rom.key), amplitude = 3.dp, periodSeconds = 4.2f)
+                            .fillMaxWidth(0.72f)
+                            .height(m.logoH),
+                    )
+                }
+            }
+        } else {
+            ElyText(
+                rom?.displayTitle ?: item.system.name,
+                size = m.titleSize,
+                weight = FontWeight.ExtraBold,
+                color = Color.White,
+                letterSpacing = tracking(-0.03f),
+                lineHeightRatio = 0.92f,
+                shadow = HeroTitleShadow,
+                uppercase = true,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        val description = rememberDescription(vm, rom?.key, rom?.meta)
+        if (description != null) {
+            ElyText(
+                heroDescription(description, vm.settings.lang),
+                modifier = Modifier
+                    .padding(top = if (m.landscape) 4.dp else 6.dp)
+                    .fillMaxWidth(0.86f),
+                size = 10f,
+                weight = FontWeight.Medium,
+                color = Color.White.copy(alpha = 0.72f),
+                letterSpacing = tracking(0.02f),
+                lineHeightRatio = 1.28f,
+                maxLines = if (m.landscape) 2 else 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        } else if (!vm.input.gamepadPresent) {
+            // Con mando, las pistas de sus botones ya van al pie del estante.
+            ElyText(
+                stringResource(R.string.hint_gestures),
+                modifier = Modifier
+                    .padding(top = if (m.landscape) 4.dp else 7.dp)
+                    .alpha(pulseHintAlpha()),
+                size = 9f,
+                weight = FontWeight.Medium,
+                color = Color.White.copy(alpha = 0.8f),
+                letterSpacing = tracking(0.14f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                uppercase = true,
+            )
+        }
     }
 }
 
@@ -437,8 +476,7 @@ private fun RomTile(
     time: String,
     index: Int,
     selected: Boolean,
-    /** Color de las chispas de neón de la selección; null = sin chispas. */
-    sparkColor: Color?,
+    look: SelectionLook,
     fallback: ArtFallback,
     width: Dp,
     height: Dp,
@@ -453,7 +491,6 @@ private fun RomTile(
     /** Rectángulo de la card mientras está seleccionada (el menú sale de ahí con el mando). */
     onBounds: (Rect) -> Unit = {},
 ) {
-    val skin = LocalSkin.current
     val shape = RoundedCornerShape(12.dp)
     val bounds = remember { arrayOf(Rect.Zero) }
     val lift = selectionLift(selected)
@@ -461,13 +498,9 @@ private fun RomTile(
     val press = rememberPress()
     val pressed = pressScale(press)
     val curtain = curtainAlpha(minOf(index, 12) * 40, key = rom.id)
-    val sheen = sheenProgress()
     val cover = rom.meta.cover
-    // Con las chispas encendidas, el marco (y su resplandor) toman su color.
-    val sparkFrame = sparkColor?.takeIf { selected }
-    val sparks = sparkFrame != null
-    val frameColor = sparkFrame ?: skin.a1
-    val glowColor = if (sparks) frameColor.copy(alpha = 0.6f) else P.shade.copy(alpha = if (selected) 0.32f else 0.2f)
+    // La luz de la selección la pone el marco; la sombra es siempre neutra.
+    val shadowColor = P.shade.copy(alpha = 0.2f)
     // El detector de gestos sobrevive a las recomposiciones (llave = id): tiene
     // que llamar a las lambdas actuales, que llevan la ROM con sus datos al día.
     val tap by rememberUpdatedState(onTap)
@@ -501,22 +534,18 @@ private fun RomTile(
                     scaleX = scale * pressed.value
                     scaleY = scale * pressed.value
                 }
-                // Tras la escala (la acompañan) y antes del recorte: las chispas
-                // caen por el marco, encima de la card, y su halo asoma fuera.
-                .neonParticles(sparks, frameColor)
                 .shadow(
-                    if (press.pressed) 4.dp else if (selected) 16.dp else 8.dp,
+                    if (press.pressed) 4.dp else if (selected) 12.dp else 8.dp,
                     shape,
                     clip = false,
-                    ambientColor = glowColor,
-                    spotColor = glowColor,
+                    ambientColor = shadowColor,
+                    spotColor = shadowColor,
                 )
+                // Tras la escala (la acompaña) y antes del recorte: halo, luz en
+                // el estante y partículas asoman por fuera de la carátula.
+                .selectionFrame(selected, look, shape)
                 .clip(shape)
-                .border(
-                    if (selected) 6.dp else 1.dp,
-                    if (selected) frameColor else P.hairline,
-                    shape,
-                ),
+                .border(1.dp, P.hairline, shape),
         ) {
             MaterializingContainer(
                 isMaterializing = coverMaterializing,
@@ -555,16 +584,6 @@ private fun RomTile(
             // Sin un nombre que sirva para buscarlo: se marca, sin más avisos.
             val unnamed = remember(rom.displayTitle) { !NameCheck.isNameUsable(rom.displayTitle) }
             if (unnamed) NeedsNameBadge(Modifier.align(Alignment.TopStart).padding(5.dp), onDark = true)
-
-            if (selected) {
-                Box(
-                    Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(0.36f)
-                        .graphicsLayer { translationX = size.width / 0.36f * sheen }
-                        .drawBehind { drawRect(sheenBrush(size)) },
-                )
-            }
 
             if (curtain > 0f) {
                 Box(Modifier.fillMaxSize().alpha(curtain).background(P.paper))

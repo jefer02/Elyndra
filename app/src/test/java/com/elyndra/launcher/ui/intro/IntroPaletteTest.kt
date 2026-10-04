@@ -68,12 +68,19 @@ class IntroPaletteTest {
     }
 
     @Test
-    fun matchAccentUsesTheAccentAndUnknownIdsFallBackToGold() {
+    fun defaultIsGoldInDarkAndTheAccentInLight() {
         val accent = 0xFF4E56D8.toInt()
         assertEquals(accent, IntroColor.Accent.base(accent))
-        assertEquals(IntroColor.Gold, IntroColor.byId(null))
-        assertEquals(IntroColor.Gold, IntroColor.byId("nope"))
-        assertEquals(IntroColor.Emerald, IntroColor.byId("emerald"))
+        // Sin elegir: oro en oscuro y el acento en claro.
+        assertEquals(IntroColor.Gold, IntroColor.resolve(null, dark = true))
+        assertEquals(IntroColor.Accent, IntroColor.resolve(null, dark = false))
+        // Un id que ya no existe cuenta como "sin elegir".
+        assertEquals(IntroColor.Gold, IntroColor.resolve("nope", dark = true))
+        assertEquals(IntroColor.Accent, IntroColor.resolve("nope", dark = false))
+        // Lo elegido a mano manda en los dos temas.
+        assertEquals(IntroColor.Emerald, IntroColor.resolve("emerald", dark = false))
+        assertEquals(IntroColor.Gold, IntroColor.resolve("gold", dark = false))
+        assertEquals(IntroColor.Accent, IntroColor.resolve("accent", dark = true))
     }
 
     private fun hueDistance(a: Float, b: Float): Float {

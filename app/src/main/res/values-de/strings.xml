@@ -304,6 +304,8 @@
     <string name="details_file">Datei</string>
     <string name="details_size">Größe</string>
     <string name="details_package">Paket</string>
+    <string name="details_about">Über das Spiel</string>
+    <string name="details_info">Infos</string>
     <string name="achievements_title">Erfolge</string>
     <string name="achievements_summary">%1$d/%2$d freigeschaltet · %3$d/%4$d Punkte</string>
     <string name="achievements_loading">Erfolge werden geladen…</string>
@@ -468,6 +470,7 @@
     <string name="masha_profile_never">Nie geöffnet. Vielleicht heute.</string>
     <string name="masha_profile_matched">Erkannt per %1$s über %2$s</string>
     <string name="masha_match_hash">Datei-Hash</string>
+    <string name="masha_match_package">Paketname</string>
     <string name="masha_match_name">Name</string>
     <string name="masha_match_fuzzy">ähnlichen Namen</string>
     <string name="masha_match_manual">dich</string>
@@ -539,8 +542,12 @@
     <string name="masha_particles_desc">Die leuchtende Spur, die Masha beim Ziehen hinterlässt.</string>
     <string name="masha_particles_hue">Farbton</string>
     <string name="masha_particles_preview">Vorschau</string>
+    <string name="section_selection">Auswahl</string>
+    <string name="selection_fx_desc">Wie das ausgewählte Symbol oder Cover aufleuchtet. Leuchten und Partikel teilen sich diese Farbe.</string>
+    <string name="selection_glow_title">Auswahlleuchten</string>
+    <string name="selection_glow_desc">Ein polierter Lichtrahmen mit sanftem Leuchten und langsamem Glanz um das ausgewählte Symbol oder Cover.</string>
     <string name="selection_particles_title">Auswahlpartikel</string>
-    <string name="selection_particles_desc">Leuchtende Neonfunken, die langsam um das ausgewählte Symbol oder Cover herabfallen.</string>
+    <string name="selection_particles_desc">Feiner Sternenstaub, der vom Rand des ausgewählten Symbols oder Covers aufsteigt.</string>
     <string name="masha_status_online">Online</string>
     <string name="masha_status_offline">Offline-Modus</string>
     <string name="masha_status_listening">Hört zu…</string>
@@ -658,19 +665,25 @@
     <string name="description_show_original">Original anzeigen</string>
     <string name="description_translated_from">Übersetzt aus dem %1$s</string>
     <string name="description_translating">Wird übersetzt…</string>
-    <string name="translate_model_title">Übersetzer herunterladen?</string>
-    <string name="translate_model_msg">Zum Übersetzen werden die Sprachmodelle für %1$s benötigt (insgesamt etwa %2$d MB). Sie werden einmal geladen, danach wird auf diesem Gerät übersetzt: Der Text verlässt es nicht. %3$s</string>
-    <string name="translate_model_wifi">Nur über WLAN.</string>
+    <string name="translate_model_title">Sprachpaket herunterladen?</string>
+    <string name="translate_model_msg">Damit Beschreibungen in deiner Sprache erscheinen, braucht Elyndra das Sprachpaket %1$s (insgesamt etwa %2$d MB). Es wird einmal geladen, danach wird auf diesem Gerät übersetzt. %3$s</string>
+    <string name="translate_model_wifi">Nur über WLAN (mobile Daten kannst du unter Einstellungen → Metadaten erlauben).</string>
     <string name="translate_model_any">Mobile Daten können verwendet werden.</string>
-    <string name="translate_download">Herunterladen</string>
+    <string name="translate_download">Jetzt herunterladen</string>
+    <string name="translate_later">Später</string>
+    <string name="translate_allow_mobile">Mobile Daten erlauben</string>
+    <string name="translate_allow_mobile_desc">Sprachpakete auch ohne WLAN laden. Aus: Sie warten auf WLAN.</string>
+    <string name="translate_state_installed">Installiert</string>
+    <string name="translate_state_downloading">Wird geladen…</string>
+    <string name="translate_state_waiting_wifi">Wartet auf WLAN</string>
+    <string name="translate_state_error">Download fehlgeschlagen</string>
+    <string name="translate_banner_downloading">Sprachpaket %1$s wird geladen…</string>
+    <string name="translate_banner_waiting">Sprachpaket %1$s: wartet auf WLAN</string>
+    <string name="translate_banner_error">Sprachpaket %1$s konnte nicht geladen werden</string>
     <string name="translate_failed">Übersetzung fehlgeschlagen. Versuche es später erneut.</string>
     <string name="translate_unsupported">Diese Sprache kann auf dem Gerät nicht übersetzt werden.</string>
-    <string name="translate_needs_wifi">Verbinde dich mit einem WLAN, um den Übersetzer zu laden (oder schalte „Nur WLAN“ in den Einstellungen aus).</string>
     <string name="section_translation">Übersetzung der Beschreibungen</string>
-    <string name="auto_translate">Beschreibungen automatisch übersetzen</string>
-    <string name="auto_translate_desc">Nur mit bereits geladenen Sprachmodellen. Nichts wird ohne Nachfrage geladen.</string>
-    <string name="translate_wifi_only">Modelle nur über WLAN laden</string>
-    <string name="translate_models">Geladene Modelle</string>
+    <string name="translate_models">Sprachpakete</string>
     <string name="translate_models_none">Keine</string>
     <string name="translate_model_delete">Löschen</string>
 
@@ -678,9 +691,10 @@
     <string name="keyless_status_ok">Kein Konto nötig</string>
     <string name="keyless_title">Quellen ohne Konto</string>
     <string name="keyless_desc">Cover, Screenshots und Beschreibungen ohne Einrichtung. Dienste mit Konto haben Vorrang, sobald sie eingerichtet sind.</string>
+    <string name="keyless_gplay_desc">Offizieller Titel, Beschreibung, Symbol und Screenshots von Android-Spielen, gesucht über den Paketnamen. Ein Screenshot wird zum Hintergrund.</string>
     <string name="keyless_libretro_desc">Cover, Screenshots und Titelbildschirme von Konsolen.</string>
     <string name="keyless_steam_desc">Beschreibungen in deiner Sprache und Bilder für PC-Spiele sowie für Android-Spiele, die es auch auf Steam gibt.</string>
-    <string name="keyless_privacy">Kontaktiert: thumbnails.libretro.com und store.steampowered.com. Gesendet werden nur Spielname und System, nie Pfade, Konten oder Gerätedaten.</string>
+    <string name="keyless_privacy">Kontaktiert: play.google.com, thumbnails.libretro.com und store.steampowered.com. Gesendet werden nur Spielname, System oder Paketname, nie Pfade, Konten oder Gerätedaten.</string>
 
     <!-- Identificar juego / sin nombre -->
     <string name="identify_action">Namen bearbeiten / Spiel erkennen</string>
@@ -723,4 +737,63 @@
         <item quantity="one">%d Spiel zur Bibliothek hinzufügen</item>
         <item quantity="other">%d Spiele zur Bibliothek hinzufügen</item>
     </plurals>
+    <string name="a11y_expand">Aufklappen</string>
+    <string name="a11y_collapse">Zuklappen</string>
+    <string name="hint_select">Auswählen</string>
+    <string name="hint_back">Zurück</string>
+    <string name="hint_options">Optionen</string>
+    <string name="hint_section">Bereich</string>
+    <string name="hint_category">Kategorie</string>
+    <string name="hint_keyboard">Tastatur</string>
+    <string name="hint_move">Verschieben</string>
+    <string name="empty_filter_title">Hier ist noch nichts</string>
+    <string name="empty_library_message">Füge deine Android-Spiele oder einen ROM-Ordner hinzu, dann erscheinen sie hier.</string>
+    <string name="art_state_add">Hinzufügen</string>
+    <string name="settings_cat_display">Anzeige &amp; Design</string>
+    <string name="settings_cat_sound">Ton</string>
+    <string name="settings_cat_music">Musik &amp; Hintergrund</string>
+    <string name="settings_cat_appearance">Erscheinungsbild</string>
+    <string name="settings_cat_library">Bibliothek</string>
+    <string name="settings_cat_metadata">Metadaten</string>
+    <string name="settings_cat_masha">Masha</string>
+    <string name="settings_cat_about">Info</string>
+    <string name="settings_cat_display_desc">Design, Intro, Bildrate und Sprache</string>
+    <string name="settings_cat_sound_desc">Oberflächentöne und eigene Töne</string>
+    <string name="settings_cat_music_desc">Menümusik und eigener Hintergrund</string>
+    <string name="settings_cat_appearance_desc">Akzentfarbe, Liquid Glass und Partikel</string>
+    <string name="settings_cat_library_desc">Sortierung, Neuscans und geladene Bilder</string>
+    <string name="settings_cat_metadata_desc">Quellen, Konten, Priorität und Übersetzung</string>
+    <string name="settings_cat_masha_desc">KI, Stimme, Präsenz und Datenschutz</string>
+    <string name="settings_cat_about_desc">Version und Lizenzen</string>
+    <plurals name="sound_events_count">
+        <item quantity="one">%d Ereignis</item>
+        <item quantity="other">%d Ereignisse</item>
+    </plurals>
+    <plurals name="sound_custom_count">
+        <item quantity="one">%d eigener</item>
+        <item quantity="other">%d eigene</item>
+    </plurals>
+    <string name="priority_summary">Texte: %1$s · Bilder: %2$s</string>
+    <string name="priority_tab_text">Texte</string>
+    <string name="priority_tab_art">Bilder</string>
+    <string name="priority_drag">Zum Umsortieren ziehen</string>
+    <string name="priority_hint">Ziehe eine Quelle am Griff oder tippe sie an und verschiebe sie mit den Pfeilen (LB/RB am Controller).</string>
+    <string name="particle_custom_hue">Eigene Farbe</string>
+    <string name="add_search_apps">Apps suchen</string>
+    <string name="add_select_all">Alle auswählen</string>
+    <string name="add_deselect_all">Auswahl aufheben</string>
+    <plurals name="add_selected_count">
+        <item quantity="one">%d ausgewählt</item>
+        <item quantity="other">%d ausgewählt</item>
+    </plurals>
+    <string name="add_pick_reason">Wähle mindestens ein Spiel</string>
+    <string name="add_no_app_match">Keine App passt</string>
+    <string name="add_search_systems">System suchen</string>
+    <string name="add_no_system_match">Kein System passt</string>
+    <string name="maker_nintendo">Nintendo</string>
+    <string name="maker_sony">Sony</string>
+    <string name="maker_microsoft">Microsoft</string>
+    <string name="maker_sega">Sega</string>
+    <string name="maker_others">Atari und andere</string>
+    <string name="maker_pc">PC</string>
 </resources>

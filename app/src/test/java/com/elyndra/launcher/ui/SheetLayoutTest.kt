@@ -68,10 +68,15 @@ class SheetLayoutTest {
         assertEquals(3, l.move(0, Move.Right))
         // Izquierda desde la primera imagen: de vuelta a la columna de Jugar.
         assertEquals(0, l.move(3, Move.Left))
-        // Abajo en la columna izquierda no baja a la derecha.
+        // Abajo en la columna izquierda no baja a la derecha…
         assertEquals(1, l.move(0, Move.Down))
-        assertEquals(1, l.move(1, Move.Down))
+        // …pero sí al pie de borrado, que ocupa el ancho de las dos.
+        assertEquals(6, l.move(1, Move.Down))
         assertEquals(6, l.move(3, Move.Down))
+        // Del pie no se salta de columna, y arriba vuelve a la última fila de encima.
+        assertEquals(6, l.move(6, Move.Left))
+        assertEquals(6, l.move(6, Move.Right))
+        assertEquals(3, l.move(6, Move.Up))
     }
 
     @Test
@@ -87,7 +92,9 @@ class SheetLayoutTest {
     @Test
     fun tileColumnsStayBalanced() {
         assertEquals(1, SheetLayout.columnsFor(1))
-        assertEquals(4, SheetLayout.columnsFor(4))
+        assertEquals(3, SheetLayout.columnsFor(3))
+        // Cuatro, en dos filas de dos: en una sola los rótulos no caben a dos líneas.
+        assertEquals(2, SheetLayout.columnsFor(4))
         assertEquals(3, SheetLayout.columnsFor(5))
         assertEquals(3, SheetLayout.columnsFor(6))
     }

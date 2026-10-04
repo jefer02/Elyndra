@@ -62,6 +62,14 @@ enum class MashaQuality(val model: String) {
 
     companion object {
         fun detect(context: Context): MashaQuality {
+            // Solo debug (medir fps en las dos calidades en el mismo móvil):
+            //   adb shell "run-as com.elyndra.launcher sh -c 'echo lite > cache/masha_quality'"   (o high; borrar = automático)
+            if (BuildConfig.DEBUG) {
+                when (runCatching { java.io.File(context.cacheDir, "masha_quality").readText().trim() }.getOrNull()) {
+                    "lite" -> return Lite
+                    "high" -> return High
+                }
+            }
             val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
             if (am.isLowRamDevice) return Lite
             val info = ActivityManager.MemoryInfo().also(am::getMemoryInfo)
@@ -190,7 +198,7 @@ fun MashaStage(
         }
         childNodes += node
         // Masha mira a la cámara: el rig lee su posición en cada fotograma.
-        rig = HoloRig(node, presence, gpu.engine, shader, cameraEntity = cameraNode.entity)
+        rig = HoloRig(node, presence, gpu.engine, shader, cameraEntity = cameraNode.entity, quality = quality)
         status(StageStatus.Ready)
     }
 

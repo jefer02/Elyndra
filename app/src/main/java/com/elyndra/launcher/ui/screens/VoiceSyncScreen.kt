@@ -1,5 +1,7 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.components.PadHints
+import com.elyndra.launcher.ui.components.PadHint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -108,7 +110,7 @@ fun VoiceSyncScreen(vm: ElyndraViewModel) {
             Modifier.align(Alignment.TopStart).padding(m.pad),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            GlassIconButton(onClick = { vm.go(Screen.Settings) }) { BackChevron() }
+            GlassIconButton(onClick = { vm.go(Screen.Settings) }, size = com.elyndra.launcher.ui.theme.MinTouch, cornerRadius = 15.dp, contentDescription = stringResource(R.string.hint_back)) { BackChevron() }
             Spacer(Modifier.width(11.dp))
             ElyText(stringResource(R.string.dev_voice_sync), size = 16f, weight = FontWeight.SemiBold, color = Holo.text)
         }
@@ -158,9 +160,12 @@ fun VoiceSyncScreen(vm: ElyndraViewModel) {
                 },
                 Modifier.fillMaxWidth(),
             )
+            PadHints(hints = VOICE_SYNC_HINTS, visible = vm.input.gamepadPresent, modifier = Modifier.padding(top = 8.dp), onDark = true)
         }
     }
 }
+
+private val VOICE_SYNC_HINTS = listOf(PadHint("A", R.string.hint_select), PadHint("B", R.string.hint_back))
 
 @Composable
 private fun routeLabel(route: AudioRoute): String = when (route.kind) {

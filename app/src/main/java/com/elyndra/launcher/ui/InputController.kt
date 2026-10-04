@@ -11,6 +11,8 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewModelScope
 import com.elyndra.launcher.R
 import com.elyndra.launcher.input.Pad
+import com.elyndra.launcher.ui.components.PadFocusScope
+import androidx.compose.ui.focus.FocusRequester
 import kotlinx.coroutines.launch
 
 /**
@@ -52,6 +54,9 @@ class InputController(private val vm: ElyndraViewModel) {
     /** El mando ha entrado en juego: la interfaz enseña lo que está señalado. */
     var active by mutableStateOf(false); private set
 
+    /** Hay un mando conectado: la interfaz enseña las pistas de sus botones. */
+    var gamepadPresent by mutableStateOf(false); private set
+
     /** Botón de la barra superior señalado; null = el mando está en el carrusel. */
     var barFocus by mutableStateOf<BarItem?>(null); private set
 
@@ -63,6 +68,39 @@ class InputController(private val vm: ElyndraViewModel) {
      * juego, así que no puede ser la selección: se señala aparte.
      */
     private var addFocus by mutableStateOf(false)
+
+    /* ── foco de Compose ──────────────────────────────────────── */
+
+    /** Grupos de foco compuestos (pantalla y capas), el de arriba al final. */
+    private val focusScopes = ArrayList<PadFocusScope>(4)
+
+    fun pushFocusScope(scope: PadFocusScope) {
+        focusScopes.remove(scope)
+        focusScopes.add(scope)
+    }
+
+    fun popFocusScope(scope: PadFocusScope) {
+        focusScopes.remove(scope)
+    }
+
+    fun isTopFocusScope(scope: PadFocusScope): Boolean = focusScopes.lastOrNull() === scope
+
+    /**
+     * Pulsación que va al foco de Compose sin nada señalado en la capa de
+     * arriba (se acaba de abrir, se cerró una capa o se tocó la pantalla):
+     * coloca el foco allí —en lo que lo tuvo la última vez o en lo inicial—
+     * y se gasta en eso. Sin esto, la cruceta podía caer en la pantalla de
+     * detrás o no encontrar nada.
+     */
+    fun wakeFocus(): Boolean {
+        val top = focusScopes.lastOrNull() ?: return false
+        if (top.hasFocus) return false
+        runCatching { top.entry.requestFocus() }
+        return top.hasFocus
+    }
+
+    /** El botón principal de la pantalla en curso (ver `padPrimaryAction`): Y lleva el foco a él. */
+    var primaryAction: FocusRequester? = null
 
     /** Panel desplazable de la capa de arriba, mientras esté en pantalla. */
     private var scroll: ScrollState? = null
@@ -103,10 +141,12 @@ class InputController(private val vm: ElyndraViewModel) {
     /* ── conexión de mandos ───────────────────────────────────── */
 
     fun onGamepadConnected(name: String, announce: Boolean) {
+        gamepadPresent = true
         if (announce) vm.showToast(UiText.res(R.string.gamepad_connected, name))
     }
 
     fun onGamepadDisconnected(anyLeft: Boolean) {
+        gamepadPresent = anyLeft
         if (!anyLeft) {
             // Sin mando no hay a quién enseñarle la marca del foco.
             active = false
@@ -116,8 +156,26 @@ class InputController(private val vm: ElyndraViewModel) {
         vm.showToast(UiText.res(R.string.gamepad_disconnected))
     }
 
+    /* ── teclado en pantalla ───────────────────────────────────── */
+
+    /** El teclado en pantalla está a la vista (lo lleva `ImeBridge`). */
+    var imeVisible: Boolean = false
+
+    /** Cierra el teclado en pantalla (lo pone `ImeBridge`). */
+    var hideKeyboard: (() -> Unit)? = null
+
+    /** Abre el teclado en el campo del diálogo abierto (lo pone el propio campo). */
+    var dialogKeyboard: (() -> Unit)? = null
+
     fun handle(pad: Pad): Boolean {
         active = true
+        // B con el teclado abierto lo cierra a él primero; la capa, a la siguiente.
+        if (pad == Pad.Back && hideKeyboard != null &&
+            BackPriority.next(vm.backState(keyboard = imeVisible)) == BackPriority.Target.Keyboard
+        ) {
+            hideKeyboard?.invoke()
+            return true
+        }
         if (vm.screen != barScreen) {
             barScreen = vm.screen
             barFocus = null
@@ -140,15 +198,13 @@ class InputController(private val vm: ElyndraViewModel) {
     }
 
     /**
-     * La ficha del juego: se lee de arriba abajo y se cierra.
-     *
-     * Es un panel de lectura, así que la cruceta lo desplaza en vez de saltar
-     * de botón en botón — que es lo que haría el foco, dejando media ficha sin
-     * ver. El desplazamiento lo cede el propio panel con [PadScrollBinding].
+     * La ficha del juego: la recorre el foco de Compose —"Jugar", las piezas
+     * y los bloques de lectura, en orden— y lo que no cabe lo desplaza la
+     * misma cruceta (ver `PadFocus`). Aquí solo cerrar y pasar página.
      */
     private fun details(pad: Pad): Boolean = when (pad) {
-        Pad.Up -> scrollBy(-SCROLL_STEP)
-        Pad.Down -> scrollBy(SCROLL_STEP)
+        Pad.PagePrev -> scrollBy(-SCROLL_STEP * 2)
+        Pad.PageNext -> scrollBy(SCROLL_STEP * 2)
         Pad.Back, Pad.Details -> { vm.closeDetails(); true }
         else -> false
     }
@@ -172,6 +228,17 @@ class InputController(private val vm: ElyndraViewModel) {
      */
     private fun form(pad: Pad): Boolean = when (pad) {
         Pad.Back -> { vm.back(); true }
+        // L1/R1: en Ajustes, categoría (o mover la fuente cogida); en Añadir, pestaña.
+        Pad.PagePrev, Pad.PageNext -> {
+            val delta = if (pad == Pad.PagePrev) -1 else 1
+            when (vm.screen) {
+                Screen.Settings -> { vm.settings.onBumper(delta); true }
+                Screen.Add -> { vm.add.updateTab(if (delta < 0) AddTab.Android else AddTab.Roms); true }
+                else -> false
+            }
+        }
+        // Y: al botón principal de la pantalla (en Añadir, "Añadir N juegos").
+        Pad.Options -> primaryAction?.let { runCatching { it.requestFocus() }; true } ?: false
         // Start abre y cierra Ajustes, como el botón de pausa de una consola.
         Pad.Menu -> {
             vm.go(if (vm.screen == Screen.Settings) Screen.Library else Screen.Settings)
@@ -398,14 +465,20 @@ class InputController(private val vm: ElyndraViewModel) {
         val spec = vm.dialog ?: return false
         val buttons = dialogButtons(spec)
         return when (pad) {
-            Pad.Left, Pad.Up -> { dialogFocus = step(dialogFocus, -1, buttons.size); true }
+            // Con campo de texto, arriba abre el teclado sobre él.
+            Pad.Up -> {
+                if (spec.input != null) dialogKeyboard?.invoke() else dialogFocus = step(dialogFocus, -1, buttons.size)
+                true
+            }
+            Pad.Left -> { dialogFocus = step(dialogFocus, -1, buttons.size); true }
             Pad.Right, Pad.Down -> { dialogFocus = step(dialogFocus, 1, buttons.size); true }
             Pad.Confirm -> {
                 // Sin nada señalado manda el botón principal, que es el que ya
                 // está resaltado en pantalla.
                 val button = buttons.getOrNull(dialogFocus) ?: buttons.first()
                 vm.dismissDialog()
-                if (spec.input != null && button === spec.confirm) spec.input.onConfirm(spec.input.initial) else button.action()
+                // Lo escrito, no el valor con el que se abrió el diálogo.
+                if (spec.input != null && button === spec.confirm) spec.input.onConfirm(vm.dialogText) else button.action()
                 true
             }
             Pad.Back -> { vm.dismissDialog(); spec.dismiss?.action?.invoke(); true }

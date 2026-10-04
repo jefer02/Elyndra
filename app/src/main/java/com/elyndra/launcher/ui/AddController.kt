@@ -64,6 +64,32 @@ class AddController(private val vm: ElyndraViewModel) {
 
     fun visibleApps(): List<InstalledApp> = if (showAllApps) apps else apps.filter { it.isGame }
 
+    /** Lo escrito en el buscador de apps. */
+    var appQuery by mutableStateOf(""); private set
+
+    fun updateAppQuery(q: String) {
+        appQuery = q
+    }
+
+    /** Las apps de la lista que encajan con el buscador. */
+    fun shownApps(): List<InstalledApp> = visibleApps().filter { AppSearch.matches(it.label, it.packageName, appQuery) }
+
+    /** ¿Están marcadas todas las que se ven y se pueden añadir? */
+    fun allShownPicked(): Boolean {
+        val selectable = shownApps().filterNot { isInLibrary(it.packageName) }
+        return selectable.isNotEmpty() && selectable.all { it.packageName in picked }
+    }
+
+    /** "Seleccionar todo" / "Quitar selección" sobre lo que se ve (lo que ya está en la biblioteca no cuenta). */
+    fun toggleSelectAllShown() {
+        val selectable = shownApps().filterNot { isInLibrary(it.packageName) }.map { it.packageName }
+        if (allShownPicked()) {
+            picked.removeAll(selectable.toSet())
+        } else {
+            selectable.filterNot { it in picked }.forEach { picked.add(it) }
+        }
+    }
+
     fun isInLibrary(pkg: String): Boolean = vm.library.apps.any { it.packageName == pkg }
 
     fun togglePicked(pkg: String) {
@@ -95,6 +121,13 @@ class AddController(private val vm: ElyndraViewModel) {
     var emulatorId by mutableStateOf<String?>(null); private set
     var scan by mutableStateOf<ScanState>(ScanState.Idle); private set
     var bulkProgress by mutableStateOf<UiText?>(null); private set
+
+    /** Lo escrito en el buscador de sistemas. */
+    var systemQuery by mutableStateOf(""); private set
+
+    fun updateSystemQuery(q: String) {
+        systemQuery = q
+    }
 
     private var scanJob: Job? = null
 
@@ -264,5 +297,6 @@ class AddController(private val vm: ElyndraViewModel) {
         systemId = null
         emulatorId = null
         scan = ScanState.Idle
+        systemQuery = ""
     }
 }

@@ -35,7 +35,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AiCacheEntity::class,
         DescriptionTranslationEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class ElyndraDatabase : RoomDatabase() {
@@ -92,6 +92,23 @@ abstract class ElyndraDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        /**
+         * 4 → 5: qué fuentes respondieron ya con la descripción (para volver a
+         * preguntar cuando aparece una nueva). Y las apps Android solo toman
+         * la descripción de Google Play: la que les vino de IGDB o de Steam
+         * (a veces de otro juego con el mismo nombre) se olvida y se pide a
+         * Play. No se borra ninguna fila; las ROMs no se tocan.
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `game_metadata` ADD COLUMN `description_sources` TEXT")
+                db.execSQL(
+                    "UPDATE `game_metadata` SET `description` = NULL, `description_lang` = NULL, `descriptions` = NULL, " +
+                        "`description_checked_lang` = NULL WHERE `game_key` LIKE 'a:%' AND (`sources` IS NULL OR `sources` NOT LIKE '%gplay%')",
+                )
+            }
+        }
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
     }
 }

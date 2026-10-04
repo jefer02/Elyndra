@@ -3,6 +3,10 @@ package com.elyndra.launcher.di
 import com.elyndra.launcher.metadata.TranslationCache
 import com.elyndra.launcher.metadata.RoomTranslationStore
 import com.elyndra.launcher.metadata.MlKitTranslator
+import com.elyndra.launcher.metadata.DescriptionTranslator
+import com.elyndra.launcher.metadata.TranslationPacks
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import com.elyndra.launcher.data.db.TranslationDao
 import android.content.Context
 import com.elyndra.launcher.data.LibraryRepository
@@ -73,7 +77,23 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun translations(dao: TranslationDao) = TranslationCache(RoomTranslationStore(dao), MlKitTranslator())
+    fun translator(): DescriptionTranslator = MlKitTranslator()
+
+    @Provides
+    @Singleton
+    fun translations(dao: TranslationDao, translator: DescriptionTranslator) = TranslationCache(RoomTranslationStore(dao), translator)
+
+    /** Los paquetes de idioma: "Wi-Fi" es cualquier red que no se cobre por uso. */
+    @Provides
+    @Singleton
+    fun translationPacks(
+        @ApplicationContext context: Context,
+        translator: DescriptionTranslator,
+        @ApplicationScope scope: CoroutineScope,
+    ) = TranslationPacks(translator, scope, unmetered = {
+        val cm = context.getSystemService(ConnectivityManager::class.java)
+        cm?.getNetworkCapabilities(cm.activeNetwork)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) == true
+    })
 
     @Provides
     @Singleton

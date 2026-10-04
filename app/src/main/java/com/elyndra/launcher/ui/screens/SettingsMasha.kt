@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.components.SwitchRow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -125,9 +126,6 @@ internal fun MashaColumn(vm: ElyndraViewModel) {
 
         // La estela de partículas del botón de Masha: su color.
         ParticleColorGroup(vm)
-
-        // Las chispas de neón de la selección: encendidas o no, y su color.
-        SelectionParticlesGroup(vm)
 
         // Tiempo de juego exacto (acceso de uso, opcional).
         SettingsGroup(padding = 0.dp) {
@@ -258,17 +256,7 @@ private fun VoiceGroup(vm: ElyndraViewModel) {
 
 @Composable
 private fun ToggleRow(title: String, desc: String?, checked: Boolean, onToggle: () -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            ElyText(title, size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
-            if (desc != null) {
-                Spacer(Modifier.height(4.dp))
-                ElyText(desc, size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
-            }
-        }
-        Spacer(Modifier.width(12.dp))
-        GlowingSwitch(checked, onToggle)
-    }
+    SwitchRow(title, desc, checked, onToggle)
 }
 
 /** Clave propia de DeepSeek (opcional): oculta, con opción de mostrarla, como las de los servicios. */
@@ -306,67 +294,4 @@ private fun KeyField(vm: ElyndraViewModel) {
             null
         },
     )
-}
-
-/* ── Prioridad de fuentes de metadatos ───────────────────────── */
-
-/**
- * Dos listas ordenables —textos e imágenes— con flechas para subir y bajar
- * cada servicio. Flechas y no arrastrar: así se maneja igual con el dedo que
- * con la cruceta de un mando.
- */
-@Composable
-internal fun MetadataPriorityPanel(vm: ElyndraViewModel) {
-    val s = vm.settings
-    SettingsGroup(padding = 0.dp) {
-        Column(Modifier.padding(vertical = 12.dp)) {
-            ElyText(stringResource(R.string.settings_priority), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
-            Spacer(Modifier.height(4.dp))
-            ElyText(stringResource(R.string.settings_priority_desc), size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
-            Spacer(Modifier.height(10.dp))
-            PriorityList(stringResource(R.string.settings_priority_text), s.priority.text) { service, delta -> s.movePriority(false, service, delta) }
-            Spacer(Modifier.height(10.dp))
-            PriorityList(stringResource(R.string.settings_priority_art), s.priority.art) { service, delta -> s.movePriority(true, service, delta) }
-            Spacer(Modifier.height(10.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                GhostButton(stringResource(R.string.settings_priority_reset), s::resetPriority)
-            }
-        }
-    }
-}
-
-@Composable
-private fun PriorityList(title: String, order: List<Service>, onMove: (Service, Int) -> Unit) {
-    val skin = LocalSkin.current
-    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-        ElyText(title, size = 9.5f, weight = FontWeight.SemiBold, color = P.ink2, uppercase = true)
-        order.forEachIndexed { i, service ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .padding(vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                ElyText("${i + 1}", size = 10.5f, weight = FontWeight.Bold, color = skin.a2, modifier = Modifier.width(18.dp))
-                ElyText(serviceName(service), size = 11.5f, weight = FontWeight.Medium, color = P.ink, modifier = Modifier.weight(1f))
-                ArrowButton(up = true, enabled = i > 0, label = stringResource(R.string.move_up)) { onMove(service, -1) }
-                Spacer(Modifier.width(6.dp))
-                ArrowButton(up = false, enabled = i < order.lastIndex, label = stringResource(R.string.move_down)) { onMove(service, +1) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ArrowButton(up: Boolean, enabled: Boolean, label: String, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .size(30.dp)
-            .alpha(if (enabled) 1f else 0.3f)
-            .shapeClickable(RoundedCornerShape(9.dp), enabled = enabled, onClickLabel = label, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        ElyText(if (up) "▲" else "▼", size = 10f, color = P.ink)
-    }
 }

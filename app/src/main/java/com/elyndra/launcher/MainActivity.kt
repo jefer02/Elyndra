@@ -15,6 +15,7 @@ import android.os.SystemClock
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.SystemBarStyle
@@ -54,6 +55,18 @@ class MainActivity : ComponentActivity() {
      * manteniendo, repetición controlada (350 ms de espera, luego cada 150 ms).
      */
     private val repeater = DirectionalRepeater(fire = ::deliverDirection)
+
+    /**
+     * De dónde vino la última dirección (fuente y dispositivo): las teclas de
+     * cruceta que se reenvían al foco de Compose la llevan, así un campo de
+     * texto distingue la cruceta de un mando (sale del campo) de las flechas
+     * de un teclado físico (mueven el cursor).
+     */
+    private var directionSource = PAD_SOURCE
+    private var directionDevice = -1
+
+    /** A del mando que solo colocó el foco: su "soltar" no se reenvía. */
+    private var swallowConfirmUp = false
 
     /** Zona muerta (~0.5) e histéresis de cada fuente analógica. */
     private val stickGate = AxisGate()
@@ -278,7 +291,11 @@ class MainActivity : ComponentActivity() {
         val pad = Gamepad.actionFor(event.keyCode) ?: return super.dispatchKeyEvent(event)
         if (pad.isDirection) {
             when (event.action) {
-                KeyEvent.ACTION_DOWN -> if (event.repeatCount == 0) repeater.press(DirectionalRepeater.Channel.Keys, pad)
+                KeyEvent.ACTION_DOWN -> if (event.repeatCount == 0) {
+                    directionSource = event.source
+                    directionDevice = event.deviceId
+                    repeater.press(DirectionalRepeater.Channel.Keys, pad)
+                }
                 KeyEvent.ACTION_UP -> repeater.release(DirectionalRepeater.Channel.Keys, pad)
             }
             return true
@@ -286,14 +303,35 @@ class MainActivity : ComponentActivity() {
         if (event.action == KeyEvent.ACTION_DOWN) {
             // Mantener A no "pulsa" veinte veces por segundo.
             if (event.repeatCount > 0) return true
+            // Un botón de mando deja el modo táctil, como lo haría la cruceta.
+            if (Gamepad.isGamepadSource(event.source)) enterKeyboardMode()
             if (vm.input.handle(pad)) {
                 padSound(pad)
                 return true
             }
+            // Va al foco de Compose: con el foco perdido (capa recién abierta o
+            // cerrada, se tocó la pantalla), esta pulsación solo lo coloca.
+            if (pad == Pad.Confirm) {
+                enterKeyboardMode()
+                if (vm.input.wakeFocus()) {
+                    swallowConfirmUp = true
+                    vm.sound.play(UiSound.Navigate)
+                    return true
+                }
+            }
+        } else if (event.action == KeyEvent.ACTION_UP && pad == Pad.Confirm && swallowConfirmUp) {
+            swallowConfirmUp = false
+            return true
         }
         val system = Gamepad.systemKey(event.keyCode)
         val handled = if (system != null) {
-            super.dispatchKeyEvent(KeyEvent(event.downTime, event.eventTime, event.action, system, event.repeatCount))
+            // Con su fuente y su dispositivo: el foco sabe que viene de un mando.
+            super.dispatchKeyEvent(
+                KeyEvent(
+                    event.downTime, event.eventTime, event.action, system, event.repeatCount,
+                    event.metaState, event.deviceId, event.scanCode, event.flags, event.source,
+                ),
+            )
         } else {
             super.dispatchKeyEvent(event)
         }
@@ -326,6 +364,8 @@ class MainActivity : ComponentActivity() {
         if (!Gamepad.isGamepadSource(event.source) || event.actionMasked != MotionEvent.ACTION_MOVE) {
             return super.dispatchGenericMotionEvent(event)
         }
+        directionSource = PAD_SOURCE
+        directionDevice = event.deviceId
         val (hx, hy) = Gamepad.hat(event)
         updateAxis(DirectionalRepeater.Channel.Hat, hatGate.update(hx, hy))
         val (sx, sy) = Gamepad.leftStick(event)
@@ -343,16 +383,39 @@ class MainActivity : ComponentActivity() {
      */
     @SuppressLint("RestrictedApi")
     private fun deliverDirection(pad: Pad) {
+        enterKeyboardMode()
         // El paso suena si alguien lo ha movido (el carrusel o el foco de Compose).
         if (vm.input.handle(pad)) {
             vm.sound.play(UiSound.Navigate)
             return
         }
         val key = Gamepad.systemKeyFor(pad) ?: return
+        // Sin nada señalado, la primera pulsación coloca el foco en la capa de arriba.
+        if (vm.input.wakeFocus()) {
+            vm.sound.play(UiSound.Navigate)
+            return
+        }
         val now = SystemClock.uptimeMillis()
-        val moved = super.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, key, 0))
-        super.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, key, 0))
+        val source = directionSource
+        val device = directionDevice
+        val moved = super.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, key, 0, 0, device, 0, 0, source))
+        super.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, key, 0, 0, device, 0, 0, source))
         if (moved) vm.sound.play(UiSound.Navigate)
+    }
+
+    /**
+     * Sale del modo táctil, como lo haría una cruceta de verdad.
+     *
+     * Tras tocar la pantalla Android está en modo táctil y ahí los botones de
+     * Compose no aceptan el foco. Una cruceta física lo deja al pasar por la
+     * ventana, pero el stick (eventos de movimiento) y las teclas que se
+     * reenvían desde aquí no: sin esto, después de tocar la pantalla el stick
+     * no movía nada en Ajustes ni en Añadir.
+     */
+    private fun enterKeyboardMode() {
+        if (!window.decorView.isInTouchMode) return
+        val target = currentFocus ?: findViewById<ViewGroup>(android.R.id.content)?.getChildAt(0)
+        target?.requestFocusFromTouch()
     }
 
     private fun releaseDirections() {
@@ -380,6 +443,9 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_GAME_KEY = "gameKey"
 
         private val SHORTCUT_ACTIONS = setOf(ACTION_LAUNCH_GAME, ACTION_SHOW_GAME, ACTION_OPEN_MASHA)
+
+        /** Fuente de las direcciones que no traen tecla (stick, hat): un mando con cruceta. */
+        private const val PAD_SOURCE = InputDevice.SOURCE_DPAD or InputDevice.SOURCE_GAMEPAD
 
         /** Velo de las barras donde el sistema no sabe pintar iconos oscuros (navegación en Android 8.0). */
         private const val LIGHT_BARS_FALLBACK_SCRIM = 0x801B1B1B.toInt()

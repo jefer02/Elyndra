@@ -33,10 +33,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -49,6 +52,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.data.P
@@ -212,7 +217,7 @@ fun GlowingSwitch(
                 }
             }
             .border(1.dp, Color.White.copy(alpha = 0.35f), shape)
-            .shapeClickable(shape, enabled = enabled) {
+            .shapeClickable(shape, enabled = enabled, color = if (checked) Color.White else null) {
                 // Todos los interruptores de la app pasan por aquí: un solo enganche.
                 sounds?.play(if (checked) UiSound.ToggleOff else UiSound.ToggleOn)
                 onToggle()
@@ -238,6 +243,10 @@ fun GlowingSwitch(
  * con color y halo: el filo pasa a acento y la caja proyecta un resplandor
  * corto. Así se ve cuál de los seis campos de credenciales está activo sin
  * que la lista dé un salto.
+ *
+ * Lleva de serie lo del teclado y el mando ([padTextField]): se trae a la
+ * vista con el teclado abierto y, con mando, A abre el teclado y la cruceta
+ * sale del campo.
  */
 @Composable
 fun GlassTextField(
@@ -251,11 +260,18 @@ fun GlassTextField(
     textSize: Float = 11f,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val skin = LocalSkin.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    val field = rememberPadField()
+    val pad = LocalPadInput.current
+    // El cursor empieza al final del texto (para seguir escribiendo o borrar
+    // hacia atrás), no al principio. Si el texto cambia desde fuera, también.
+    var edited by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
+    val shown = if (edited.text == value) edited else TextFieldValue(value, TextRange(value.length))
     val shape = RoundedCornerShape(12.dp)
 
     val border by animateColorAsState(
@@ -297,16 +313,21 @@ fun GlassTextField(
         ) {
             Box(Modifier.weight(1f)) {
                 BasicTextField(
-                    value = value,
-                    onValueChange = onValueChange,
+                    value = shown,
+                    onValueChange = {
+                        edited = it
+                        if (it.text != value) onValueChange(it.text)
+                    },
                     enabled = enabled,
+                    readOnly = field.readOnly(pad?.active == true),
                     singleLine = singleLine,
                     textStyle = inputStyle(textSize),
                     cursorBrush = SolidColor(skin.a2),
                     visualTransformation = visualTransformation,
                     keyboardOptions = keyboardOptions,
+                    keyboardActions = keyboardActions,
                     interactionSource = interaction,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padTextField(field),
                 )
                 // El marcador va debajo del campo y solo cuando está vacío:
                 // `BasicTextField` no trae ninguno.
@@ -378,7 +399,7 @@ fun GlassTabBar(
                     Modifier
                         .width(slot)
                         .fillMaxSize()
-                        .shapeClickable(shape) { onSelect(index) },
+                        .shapeClickable(shape, color = if (active) Color.White else null) { onSelect(index) },
                     contentAlignment = Alignment.Center,
                 ) {
                     ElyText(
@@ -476,7 +497,8 @@ fun DangerButton(
             .clip(shape)
             .background(Brush.verticalGradient(listOf(P.red.copy(alpha = 0.94f), P.red)))
             .border(1.dp, Color.White.copy(alpha = 0.3f), shape)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            // Con el realce de foco de todos (antes sin indicación: con la cruceta no se veía).
+            .shapeClickable(shape, interactionSource = interaction, color = Color.White, onClick = onClick)
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
