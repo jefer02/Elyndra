@@ -108,7 +108,7 @@ fun Pill(
             .border(1.dp, P.ink.copy(alpha = 0.14f), shape)
     }
     Box(
-        m.shapeClickable(shape, enabled = enabled, onClick = onClick)
+        m.shapeClickable(shape, enabled = enabled, color = if (active) Color.White else null, onClick = onClick)
             .padding(horizontal = horizontalPadding, vertical = if (height != null) 0.dp else verticalPadding),
         contentAlignment = Alignment.Center,
     ) {
@@ -227,7 +227,8 @@ fun AccentButton(
             )
             .clip(shape)
             .drawBehind { drawRect(accentGradient(skin, 145f, size)) }
-            .shapeClickable(shape, enabled = enabled, interactionSource = interaction, onClick = onClick)
+            // Sobre el relleno de acento, el aro del foco va en blanco (en acento no se vería).
+            .shapeClickable(shape, enabled = enabled, interactionSource = interaction, color = Color.White, onClick = onClick)
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
     ) {
