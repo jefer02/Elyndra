@@ -1,6 +1,8 @@
 package com.elyndra.launcher.ui.components
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -39,17 +42,21 @@ import com.elyndra.launcher.ui.daysAgoText
 import com.elyndra.launcher.ui.resolve
 import com.elyndra.launcher.ui.screens.serviceName
 import com.elyndra.launcher.ui.theme.LocalSkin
-import com.elyndra.launcher.ui.theme.glass
 
 /**
  * "Masha recuerda": el perfil vivo del juego en la ficha — la última sesión y
  * con qué emulador, cuánto suelen durar, si el emulador va bien o se sale al
  * minuto, y cómo se identificó el juego. Es lo mismo que Masha usa para
  * hablar de él, contado en tres o cuatro líneas.
+ *
+ * En el cristal de la ficha: pieza con el radio de las demás, filo del color
+ * del juego ([accent]) a la izquierda y el avatar de Masha en su aro.
+ * [modifier] va por fuera (la ficha lo usa para el foco de lectura); sin
+ * recuerdos no se pinta nada, ni el hueco.
  */
 @Composable
-fun MashaMemoryBlock(vm: ElyndraViewModel, key: String, meta: GameMeta) {
-    val skin = LocalSkin.current
+fun MashaMemoryBlock(vm: ElyndraViewModel, key: String, meta: GameMeta, modifier: Modifier = Modifier, accent: Color? = null) {
+    val tint = accent ?: LocalSkin.current.a2
     var profile by remember(key) { mutableStateOf<GameProfile?>(null) }
     LaunchedEffect(key, vm.library) {
         profile = runCatching { vm.brain.knowledge.snapshot().profiles[key] }.getOrNull()
@@ -58,26 +65,38 @@ fun MashaMemoryBlock(vm: ElyndraViewModel, key: String, meta: GameMeta) {
     val lines = memoryLines(vm, p, meta)
     if (lines.isEmpty()) return
 
-    Column(
-        Modifier
+    val shape = RoundedCornerShape(TILE_RADIUS)
+    Row(
+        modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp)
-            .glass(RoundedCornerShape(14.dp))
-            .drawBehind { drawRect(skin.a1, size = Size(2.dp.toPx(), size.height)) }
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
+            .clip(shape)
+            .background(tileFill())
+            .border(1.dp, P.hairline.copy(alpha = 0.8f), shape)
+            .drawBehind { drawRect(tint, size = Size(3.dp.toPx(), size.height)) }
+            .padding(start = 15.dp, end = 12.dp, top = 11.dp, bottom = 11.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Image(
-                painterResource(R.drawable.masha),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(18.dp).clip(CircleShape),
+        Image(
+            painterResource(R.drawable.masha),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(30.dp)
+                .border(1.5.dp, tint.copy(alpha = 0.7f), CircleShape)
+                .padding(2.dp)
+                .clip(CircleShape),
+        )
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            ElyText(
+                stringResource(R.string.masha_profile_title),
+                size = 9f,
+                weight = FontWeight.Bold,
+                color = tint,
+                letterSpacing = tracking(0.18f),
+                uppercase = true,
             )
-            Spacer(Modifier.width(7.dp))
-            ElyText(stringResource(R.string.masha_profile_title), size = 9f, weight = FontWeight.SemiBold, color = skin.a2, uppercase = true)
+            lines.forEach { ElyText(it, size = 10.5f, color = P.ink, lineHeightRatio = 1.45f) }
         }
-        lines.forEach { ElyText(it, size = 10.5f, color = P.ink, lineHeightRatio = 1.45f) }
     }
 }
 
