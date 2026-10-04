@@ -158,6 +158,12 @@ data class GameMeta(
      * app cambia de idioma, se vuelven a pedir en segundo plano (una vez).
      */
     val descriptionCheckedLang: String? = null,
+    /**
+     * Fuentes capaces de dar descripción que ya respondieron en ese idioma
+     * (ids de `Service`). Si aparece otra capaz, se vuelve a preguntar; null =
+     * datos de antes de guardarlo: se pregunta una vez.
+     */
+    val descriptionSources: Set<String>? = null,
     /** "AAAA-MM-DD" o "AAAA". */
     val releaseDate: String? = null,
     val developer: String? = null,

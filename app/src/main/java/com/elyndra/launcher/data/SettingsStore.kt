@@ -143,15 +143,23 @@ class SettingsStore(context: Context) {
 
     fun setKeylessEnabled(id: String, enabled: Boolean) = prefs.edit { putBoolean("keyless.$id", enabled) }
 
-    /** Traducir sola la descripción cuando no está en el idioma de la app (solo con modelos ya bajados). */
-    var autoTranslate: Boolean
-        get() = prefs.getBoolean("translate.auto", false)
-        set(v) = prefs.edit { putBoolean("translate.auto", v) }
+    /**
+     * Bajar los paquetes de traducción también con datos móviles (apagado de
+     * serie: solo por Wi-Fi). Hereda el antiguo "solo Wi-Fi", al revés.
+     */
+    var translateAllowMobile: Boolean
+        get() = prefs.getBoolean("translate.allowMobile", !prefs.getBoolean("translate.wifiOnly", true))
+        set(v) = prefs.edit { putBoolean("translate.allowMobile", v).remove("translate.wifiOnly") }
 
-    /** Bajar los modelos de traducción solo por Wi-Fi. */
-    var translateWifiOnly: Boolean
-        get() = prefs.getBoolean("translate.wifiOnly", true)
-        set(v) = prefs.edit { putBoolean("translate.wifiOnly", v) }
+    /** Último idioma de la app visto: al cambiar, se avisa si falta un paquete de traducción. Null = aún ninguno. */
+    var translateLastLang: String?
+        get() = prefs.getString("translate.lastLang", null)
+        set(v) = prefs.edit { putString("translate.lastLang", v) }
+
+    /** Ajustes de traducción que ya no existen ("traducir automáticamente": ahora se traduce siempre que haya paquete). */
+    fun dropRetiredTranslationPrefs() {
+        if (prefs.contains("translate.auto")) prefs.edit { remove("translate.auto") }
+    }
 
     /** Píldora de hora y batería en Biblioteca y Carpeta. */
     var statusVisible: Boolean
