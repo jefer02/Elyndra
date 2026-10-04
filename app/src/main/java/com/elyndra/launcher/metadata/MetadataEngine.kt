@@ -212,35 +212,45 @@ class MetadataEngine(
         repo.romByKey(key)?.displayTitle ?: repo.appByKey(key)?.displayTitle ?: ""
 
     /**
-     * ¿Hay que volver a pedir la descripción de este juego? Sí cuando la app
-     * está en un idioma para el que no se preguntó todavía, no hay ya una en
-     * ese idioma y alguna fuente configurada puede darla en él. Con datos de
-     * antes de etiquetar idiomas (descripción sin idioma) también, una vez.
+     * ¿Hay que volver a pedir la descripción de este juego? Sí cuando falta la
+     * del idioma de la app y alguna fuente que puede darla no ha respondido
+     * todavía en ese idioma (ver [DescriptionRecheck]): un idioma nuevo, una
+     * fuente activada después, o datos de antes de anotarlo.
      */
     fun needsDescription(key: String): Boolean {
         val lang = AppLocale.current(context)
         val meta = repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta ?: return false
-        if (meta.scrapedAt == 0L) return false
-        if (meta.descriptionCheckedLang == lang || lang in meta.descriptions) return false
-        return canDescribe(key, lang, meta)
+        return DescriptionRecheck.needed(meta, lang, describingSources(key, lang, meta).mapTo(HashSet()) { it.id })
     }
 
-    /** ¿Alguna fuente configurada puede dar la descripción de [key] en [lang]? */
-    private fun canDescribe(key: String, lang: String, meta: GameMeta): Boolean {
-        val igdbEnglish = lang == DescriptionLangs.FALLBACK && DescriptionLangs.FALLBACK !in meta.descriptions &&
-            credentials.isConfigured(Service.Igdb)
-        // Steam solo si ya se sabe que el juego está en la tienda: no se busca a ciegas cada vez.
-        val steam = credentials.isConfigured(Service.Steam) && meta.steamAppId != null
-        return when {
+    /**
+     * Las fuentes que pueden dar la descripción de [key] en [lang]. No se
+     * pregunta a ciegas: los juegos Android, solo a Google Play y si el
+     * paquete no es un fallo conocido; ScreenScraper, solo si ya identificó
+     * el juego; Steam, solo con su appid; IGDB solo sabe inglés.
+     */
+    fun describingSources(key: String, lang: String, meta: GameMeta): Set<Service> = buildSet {
+        when {
+            key.startsWith("a:") -> {
+                if (credentials.isConfigured(Service.GooglePlay) && !googlePlay.isKnownMiss(key.removePrefix("a:"))) add(Service.GooglePlay)
+            }
             key.startsWith("r:") -> {
                 val system = repo.romByKey(key)?.let { Systems.byId(it.systemId) }
-                (credentials.isConfigured(Service.ScreenScraper) && system?.ssId != null) || igdbEnglish || steam
+                if (credentials.isConfigured(Service.ScreenScraper) && system?.ssId != null && meta.ssGameId != null) add(Service.ScreenScraper)
+                if (lang == DescriptionLangs.FALLBACK && DescriptionLangs.FALLBACK !in meta.descriptions && credentials.isConfigured(Service.Igdb)) add(Service.Igdb)
+                if (credentials.isConfigured(Service.Steam) && meta.steamAppId != null) add(Service.Steam)
             }
-            // Google Play da la ficha en el idioma que se le pide; IGDB solo sabe inglés.
-            key.startsWith("a:") -> credentials.isConfigured(Service.GooglePlay) || igdbEnglish || steam
-            else -> false
         }
     }
+
+    /**
+     * Qué fuentes de descripción respondieron en esta pasada (ids): las que
+     * trajeron datos. Un fallo de red no cuenta (se volverá a preguntar), y un
+     * "no está en Play" tampoco: mientras dure, Play no cuenta como fuente
+     * capaz ([describingSources]); cuando caduque, se pregunta una vez más.
+     */
+    private fun consulted(results: Map<Service, SourceData>): Set<String> =
+        results.keys.filter { it in DESCRIBERS }.mapTo(HashSet()) { it.id }
 
     /**
      * Tras cambiar el idioma de la app (o al actualizar desde una versión sin
@@ -354,7 +364,10 @@ class MetadataEngine(
                 // Google Play solo cataloga apps Android.
                 Service.GooglePlay -> Unit
                 // La tienda de Steam cubre los juegos de PC.
-                Service.Steam -> if (system.id == PC_SYSTEM && usable(Service.Steam, failures) && wantsSteam(results, priority, lang)) {
+                // Solo descripción: Steam solo con el appid ya conocido, nunca buscando a ciegas.
+                Service.Steam -> if (system.id == PC_SYSTEM && usable(Service.Steam, failures) && wantsSteam(results, priority, lang) &&
+                    (!descriptionsOnly || rom.meta.steamAppId != null)
+                ) {
                     steamInto(results, bestName(results, searchName, locked), lang, rom.meta.steamAppId)
                 }
             }
@@ -386,12 +399,14 @@ class MetadataEngine(
         //    la prioridad (como ScreenScraper con las ROMs); la prioridad decide
         //    qué campos se quedan.
         if (usable(Service.GooglePlay, failures)) playInto(results, app.packageName, lang)
+        // La descripción de un juego Android es solo la de Play: lo demás es arte.
+        if (descriptionsOnly) return results
         for (service in priority.queryOrder()) {
             when (service) {
                 Service.Igdb -> if (usable(Service.Igdb, failures)) {
                     val search = bestName(results, name, locked)
-                    igdbInto(results, search, listOf(ANDROID_IGDB), failures)
-                    if (results[Service.Igdb]?.igdbId == null) igdbInto(results, search, null, failures, minSimilarity = 0.9)
+                    igdbInto(results, search, listOf(ANDROID_IGDB), failures, withDescription = false)
+                    if (results[Service.Igdb]?.igdbId == null) igdbInto(results, search, null, failures, minSimilarity = 0.9, withDescription = false)
                 }
                 Service.SteamGridDb -> if (!descriptionsOnly && usable(Service.SteamGridDb, failures) && MetadataMerge.wanted(Service.SteamGridDb, results, priority).isNotEmpty()) {
                     sgdbInto(results, bestName(results, name, locked), SteamGridDbClient.SQUARE + SteamGridDbClient.PORTRAIT, failures)
@@ -402,7 +417,7 @@ class MetadataEngine(
                 //    de Play y, si no casa, con el nombre de la app instalada.
                 Service.Steam -> if (usable(Service.Steam, failures) && wantsSteam(results, priority, lang)) {
                     for (search in listOf(bestName(results, name, locked), name).distinct()) {
-                        steamInto(results, search, lang, app.meta.steamAppId)
+                        steamInto(results, search, lang, app.meta.steamAppId, withDescription = false)
                         if (Service.Steam in results || app.meta.steamAppId != null) break
                     }
                 }
@@ -488,6 +503,8 @@ class MetadataEngine(
         platforms: List<Int>?,
         failures: MutableMap<Service, FailureKind>,
         minSimilarity: Double = 0.75,
+        /** Los juegos Android toman la descripción solo de Google Play. */
+        withDescription: Boolean = true,
     ) {
         try {
             val (best, similarity) = igdb.search(name, platforms)
@@ -499,7 +516,7 @@ class MetadataEngine(
             data.igdbId = best.id
             data.setText(MetaField.Name, best.name)
             // IGDB solo tiene la sinopsis en inglés.
-            data.addDescription(DescriptionLangs.FALLBACK, best.summary)
+            if (withDescription) data.addDescription(DescriptionLangs.FALLBACK, best.summary)
             data.setText(
                 MetaField.ReleaseDate,
                 best.firstRelease?.let { Instant.ofEpochSecond(it).atZone(ZoneOffset.UTC).toLocalDate().toString() },
@@ -606,14 +623,20 @@ class MetadataEngine(
     }
 
     /** Steam: ficha en el idioma de la app (y en inglés) e imágenes de su CDN, solo con coincidencia alta. */
-    private suspend fun steamInto(results: MutableMap<Service, SourceData>, name: String, lang: String, knownId: Long?) {
+    private suspend fun steamInto(
+        results: MutableMap<Service, SourceData>,
+        name: String,
+        lang: String,
+        knownId: Long?,
+        withDescription: Boolean = true,
+    ) {
         try {
             val game = steam.find(name, lang, knownId) ?: return
             val data = SourceData(Service.Steam)
             data.matched(MetadataMerge.nameMethod(game.similarity), game.similarity)
             data.steamAppId = game.details.id
             data.setText(MetaField.Name, game.details.name)
-            game.descriptions.forEach { (l, t) -> data.addDescription(l, t) }
+            if (withDescription) game.descriptions.forEach { (l, t) -> data.addDescription(l, t) }
             data.setText(MetaField.Developer, game.details.developers.firstOrNull())
             data.setText(MetaField.Publisher, game.details.publishers.firstOrNull())
             data.setText(MetaField.Genre, game.details.genres.take(3).joinToString(", "))
@@ -673,7 +696,7 @@ class MetadataEngine(
     /** Solo las descripciones (pasada tras cambiar de idioma): nada de imágenes ni nombres. */
     private suspend fun saveDescriptions(key: String, results: Map<Service, SourceData>, priority: MetadataPriority, lang: String): Boolean {
         val merged = MetadataMerge.merge(results, priority)
-        repo.updateMeta(key) { old -> GameDescriptionUpdate.apply(old, merged.descriptions, lang) }
+        repo.updateMeta(key) { old -> GameDescriptionUpdate.apply(old, merged.descriptions, lang, consulted(results)) }
         return merged.matched
     }
 
@@ -713,7 +736,8 @@ class MetadataEngine(
         val logo = fetch(MetaField.Logo, "logo" !in pinned)
         val shot = fetch(MetaField.Screenshot, true)
         val art = ScrapeApply.Art(cover, hero, logo, shot, icon, origins)
-        repo.updateMeta(key) { old -> ScrapeApply.apply(old, merged, lang, art, System.currentTimeMillis()) }
+        val asked = consulted(results)
+        repo.updateMeta(key) { old -> ScrapeApply.apply(old, merged, lang, art, System.currentTimeMillis(), asked) }
         val matched = merged.matched
         return matched
     }
@@ -823,6 +847,8 @@ class MetadataEngine(
 
     private companion object {
         const val ANDROID_IGDB = 34
+        /** Los servicios que dan descripción (los demás solo arte, nombre o logros). */
+        val DESCRIBERS = setOf(Service.ScreenScraper, Service.Igdb, Service.Steam, Service.GooglePlay)
     }
 }
 

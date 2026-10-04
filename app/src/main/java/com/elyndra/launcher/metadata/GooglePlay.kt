@@ -132,19 +132,28 @@ class GooglePlayClient(
     private val codec: ImageCodec = AndroidImageCodec,
     private val base: String = "https://play.google.com",
     private val limiter: RateLimiter = RateLimiter(1_500),
+    clock: () -> Long = System::currentTimeMillis,
 ) {
 
-    private val misses = MissCache(cacheDir?.let { File(it, "keyless/gplay_misses.txt") }, 7 * MissCache.DAY_MS)
+    // "_ip": los fallos de cuando se pedía la tienda de EE. UU. (gl=US) ya no valen.
+    private val misses = MissCache(cacheDir?.let { File(it, "keyless/gplay_misses_ip.txt") }, MISS_TTL_MS, clock)
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
+
+    /** ¿Play ya dijo que este paquete no está (y aún no caducó)? Solo un 404 lo marca, nunca un fallo de red. */
+    fun isKnownMiss(packageName: String): Boolean = misses.isMiss(packageName)
 
     /**
      * La ficha de [packageName] en [lang]. null = no está en Play (se recuerda)
      * o no se pudo leer (red, página distinta): en ambos casos, "no hay".
+     *
+     * Sin `gl`: Play usa la región de la conexión, la misma de la tienda donde
+     * se instaló el juego. Con una fija, un juego que no se vende allí (Mobile
+     * Legends en EE. UU.) daría 404 y se tomaría por "no está en Play".
      */
     suspend fun listing(packageName: String, lang: String): PlayListing? {
         if (misses.isMiss(packageName)) return null
-        val r = KeylessHttp.get("$base/store/apps/details?id=${enc(packageName)}&hl=${enc(lang)}&gl=US", limiter) ?: return null
+        val r = KeylessHttp.get("$base/store/apps/details?id=${enc(packageName)}&hl=${enc(lang)}", limiter) ?: return null
         if (r.code == 404) {
             misses.markMiss(packageName)
             return null
@@ -154,17 +163,44 @@ class GooglePlayClient(
     }
 
     /**
-     * Lo que Play sabe de [packageName]: ficha en el idioma de la app (y la
-     * inglesa para saber si la descripción está traducida de verdad) y la
-     * primera captura apaisada, para usarla de fondo.
+     * La ficha en [lang] de una tienda de un país de ese idioma ([STORES]: la
+     * primera que tenga el juego). La de la región del usuario no sirve para
+     * la descripción: puede ser una ficha propia de su país, en su idioma,
+     * pida el idioma que pida (Mobile Legends desde Colombia sale en español
+     * aunque se pida en francés). Que falte aquí no dice que el juego no esté
+     * en Play: no se recuerda como fallo.
+     */
+    private suspend fun storeListing(packageName: String, lang: String): PlayListing? {
+        for (gl in STORES[lang].orEmpty()) {
+            val r = KeylessHttp.get("$base/store/apps/details?id=${enc(packageName)}&hl=${enc(lang)}&gl=$gl", limiter)
+                ?: return null
+            if (r.code == 200) return runCatching { PlayParser.parse(r.body, packageName) }.getOrNull()
+            if (r.code != 404) return null
+        }
+        return null
+    }
+
+    private suspend fun storeListingOrNull(packageName: String, lang: String): PlayListing? = try {
+        storeListing(packageName, lang)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
+    }
+
+    /**
+     * Lo que Play sabe de [packageName]: la ficha de la región del usuario
+     * (si está en Play, título, arte y capturas), la descripción en el idioma
+     * de la app y en inglés —de tiendas de esos idiomas, para saber de verdad
+     * en qué idioma está cada una— y la primera captura apaisada, de fondo.
      */
     suspend fun find(packageName: String, lang: String): PlayGame? {
-        val localized = listing(packageName, lang) ?: return null
-        val english = if (lang == DescriptionLangs.FALLBACK) localized
-        else runCatching { listing(packageName, DescriptionLangs.FALLBACK) }.getOrElse { if (it is CancellationException) throw it else null }
+        val listing = listing(packageName, lang) ?: return null
+        val english = storeListingOrNull(packageName, DescriptionLangs.FALLBACK)
+        val native = if (lang == DescriptionLangs.FALLBACK) english else storeListingOrNull(packageName, lang)
         // Play enseña la descripción original cuando no hay traducción: misma regla que Steam.
-        val descriptions = SteamDescriptions.tag(lang, localized.description, english?.description)
-        return PlayGame(localized, descriptions, firstLandscape(localized.screenshots))
+        val descriptions = SteamDescriptions.tag(lang, native?.description, english?.description)
+        return PlayGame(listing, descriptions, firstLandscape(listing.screenshots))
     }
 
     /**
@@ -187,8 +223,19 @@ class GooglePlayClient(
         null
     }
 
-    private companion object {
-        const val PROBE_SIDE = 160
-        const val MAX_PROBES = 6
+    companion object {
+        /** Un paquete que no está en Play no se vuelve a preguntar en una semana. */
+        const val MISS_TTL_MS = 7 * MissCache.DAY_MS
+        /** Tiendas de un país de cada idioma de la app, en orden: de ahí sale la descripción en ese idioma. */
+        private val STORES = mapOf(
+            "en" to listOf("US", "GB"),
+            "es" to listOf("ES", "MX"),
+            "pt" to listOf("BR", "PT"),
+            "fr" to listOf("FR", "CA"),
+            "de" to listOf("DE", "AT"),
+            "ja" to listOf("JP"),
+        )
+        private const val PROBE_SIDE = 160
+        private const val MAX_PROBES = 6
     }
 }

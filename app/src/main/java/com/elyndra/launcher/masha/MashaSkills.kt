@@ -1,5 +1,9 @@
 package com.elyndra.launcher.masha
 
+import android.content.Context
+import com.elyndra.launcher.data.AppLocale
+import com.elyndra.launcher.metadata.DescriptionPick
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.elyndra.launcher.core.device.DeviceStateMonitor
 import com.elyndra.launcher.data.ArcRepository
 import com.elyndra.launcher.data.SmartListRepository
@@ -37,6 +41,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class MashaSkills @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val knowledge: MashaKnowledge,
     private val lists: SmartListRepository,
     private val arcs: ArcRepository,
@@ -137,7 +142,11 @@ class MashaSkills @Inject constructor(
                 meta.genre?.let { put("genre", it) }
                 meta.developer?.let { put("developer", it) }
                 meta.releaseDate?.let { put("released", it) }
-                meta.description?.let { put("description", it.take(400)) }
+                // La del idioma de la app (o la que haya, con su idioma), no la que se eligió en la última pasada.
+                DescriptionPick.view(meta, AppLocale.current(context))?.let { d ->
+                    put("description", d.text.take(400))
+                    d.lang?.let { put("description_language", it) }
+                }
             }
             putJsonObject("artwork") {
                 put("cover", meta.cover != null)
