@@ -73,7 +73,8 @@ class IdentifyController(private val vm: ElyndraViewModel) {
     fun close() {
         job?.cancel()
         state = null
-        results.clear()
+        // Los resultados se quedan hasta la próxima búsqueda (que los vacía al
+        // empezar): la hoja sale con lo que enseñaba, sin parpadear "sin resultados".
         searching = false
     }
 
