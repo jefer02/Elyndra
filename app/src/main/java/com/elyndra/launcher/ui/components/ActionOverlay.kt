@@ -163,36 +163,17 @@ fun GameActionOverlayContainer(
     input: InputController,
     modifier: Modifier = Modifier,
     origin: Rect? = null,
-    /**
-     * Hay otra capa modal encima (un diálogo). El fondo se aparta igual
-     * —desenfoque— pero sin velo ni panel: de eso se encarga la capa que esté
-     * delante, y dos velos encima del mismo fondo lo dejarían negro.
-     */
-    dimForOtherLayer: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val reduced = LocalReducedMotion.current
     // Un solo progreso 0→1 gobierna velo y panel: entran y salen acompasados.
     // Se lee en fase de dibujo (graphicsLayer), así la animación no recompone.
     // Se abre con muelle y se cierra más deprisa: lo que se va no se hace esperar.
-    val open = animateFloatAsState(
-        targetValue = if (isOverlayVisible) 1f else 0f,
-        animationSpec = when {
-            reduced -> tween(REDUCED_FADE_MS)
-            isOverlayVisible -> Springs.enter()
-            else -> Springs.exit()
-        },
-        label = "overlay",
-    )
-    val backdrop = animateFloatAsState(
-        targetValue = if (isOverlayVisible || dimForOtherLayer) 1f else 0f,
-        animationSpec = when {
-            reduced -> tween(REDUCED_FADE_MS)
-            isOverlayVisible || dimForOtherLayer -> Springs.fade()
-            else -> Springs.exit()
-        },
-        label = "backdrop",
-    )
+    val open = rememberOverlayProgress(isOverlayVisible)
+    // El fondo se desenfoca una sola vez para todas las capas abiertas (menú,
+    // ficha, selector, editar nombre, diálogo): lo decide la pila de capas.
+    val stack = LocalBackdropStack.current
+    val othersBlur by remember(stack) { derivedStateOf { stack?.blurs() == true } }
+    val backdrop = rememberBackdropProgress(isOverlayVisible || othersBlur)
     // Lo último que se enseñó: al cerrar, `spec` pasa a null enseguida y el
     // panel tiene que poder volver a su card con la animación de salida.
     val held = remember { HeldSheet() }
@@ -212,14 +193,8 @@ fun GameActionOverlayContainer(
 
         if (visible && shown != null) {
             // Velo a sangre: toda la ventana, también bajo las barras y la muesca.
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { alpha = open.value.coerceIn(0f, 1f) }
-                    .background(P.shade.copy(alpha = SCRIM_ALPHA))
-                    // Tocar fuera cierra. El panel se come sus propios toques.
-                    .consumeClicks { onOverlayDismissed() },
-            )
+            // Tocar fuera cierra. El panel se come sus propios toques.
+            BackdropScrim(open, onOverlayDismissed, open = isOverlayVisible, z = Backdrop.Z_MENU)
             // El panel sí respeta las barras y la muesca.
             BoxWithConstraints(
                 Modifier
@@ -239,24 +214,6 @@ private class HeldSheet {
     var origin: Rect? = null
 }
 
-/**
- * Desenfoque del fondo, en fase de dibujo. `TileMode.Clamp`: el borde del
- * desenfoque repite los píxeles del borde, así que llega entero hasta el
- * filo de la ventana, sin marco transparente ni esquinas redondeadas.
- */
-private fun Modifier.backdropBlur(amount: State<Float>): Modifier =
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) this else graphicsLayer {
-        val r = BACKGROUND_BLUR.dp.toPx() * amount.value.coerceIn(0f, 1f)
-        renderEffect = if (r >= 0.5f) BlurEffect(r, r, TileMode.Clamp) else null
-    }
-
-private fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t
-
-/** Rectángulo del panel en la ventana. No es estado: solo lo lee la transformación al dibujar. */
-private class Bounds {
-    var rect: Rect = Rect.Zero
-}
-
 /** El panel: superficie que se transforma desde la card y contenido encima. */
 @Composable
 private fun ActionPanel(
@@ -269,32 +226,47 @@ private fun ActionPanel(
     val landscape = LocalLandscape.current
     val layout = remember(spec, landscape) { SheetLayout.of(spec, landscape) }
     SheetLayoutBinding(input, layout)
-    val skin = LocalSkin.current
-    val context = LocalContext.current
     val reduced = LocalReducedMotion.current
     val hero = spec.hero
 
     // El color del juego: sale de su arte (fondo, carátula, icono, logo) o del
     // icono de la app. Mientras se calcula, y si el arte es gris, el del tema.
-    var artAccent by remember(hero) { mutableStateOf<Color?>(null) }
-    LaunchedEffect(hero) {
-        if (hero == null) return@LaunchedEffect
-        val paths = listOfNotNull(hero.backgroundPath, hero.coverPath, hero.iconPath, hero.logoPath)
-        val argb = runCatching { ArtPalette.load(context, paths) }.getOrNull()
-            ?: hero.packageName?.let { runCatching { appIconAccent(context, it) }.getOrNull() }
-        artAccent = argb?.let { Color(it) }
-    }
-    // Sin color en el arte, el primario de la marca (el relleno del acento).
-    val base by animateColorAsState(artAccent ?: skin.a1, motion(Springs.fade()), label = "panelAccent")
-    // Como contenido (texto, glifos, aro de foco) tiene que leerse sobre el panel en los dos temas.
-    val accent = Color(Palettes.contentFor(base.argb(), P.isDark))
+    // Como contenido (texto, glifos, aro de foco) se lee sobre el panel en los dos temas.
+    val accent = rememberArtAccent(hero)
     val tone = panelTone(accent)
-    val bounds = remember { Bounds() }
-    val shape = RoundedCornerShape(PANEL_RADIUS)
     val maxWidth = if (layout.isHero && layout.twoColumns) HERO_WIDE_MAX else PANEL_MAX
 
+    OverlayPanelShell(origin, open, accent, tone, maxWidth, maxHeight) {
+        if (hero != null) {
+            HeroContent(spec, hero, layout, input, accent, tone, open, reduced)
+        } else {
+            ListContent(spec, layout, input, accent, tone, open, reduced)
+        }
+    }
+}
+
+/**
+ * El cuerpo de un panel modal (menú de acciones, ficha): la superficie de
+ * cristal con el tono del juego, que se transforma desde [origin] con [open],
+ * y encima el contenido, recortado a la misma forma (la banda del arte sigue
+ * las esquinas del panel). Se come sus propios toques.
+ */
+@Composable
+internal fun OverlayPanelShell(
+    origin: Rect?,
+    open: State<Float>,
+    accent: Color,
+    tone: Color,
+    maxWidth: Dp,
+    maxHeight: Dp,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val reduced = LocalReducedMotion.current
+    val bounds = remember { PanelBounds() }
+    val shape = RoundedCornerShape(PANEL_RADIUS)
     Box(
-        Modifier
+        modifier
             .widthIn(max = maxWidth)
             .fillMaxWidth()
             .heightIn(max = maxHeight)
@@ -314,7 +286,6 @@ private fun ActionPanel(
                     shape,
                 ),
         )
-        // El contenido, recortado a la misma forma: la banda del arte sigue las esquinas del panel.
         Box(
             Modifier
                 .graphicsLayer {
@@ -324,70 +295,10 @@ private fun ActionPanel(
                 }
                 .consumeClicks(),
         ) {
-            if (hero != null) {
-                HeroContent(spec, hero, layout, input, accent, tone, open, reduced)
-            } else {
-                ListContent(spec, layout, input, accent, tone, open, reduced)
-            }
+            content()
         }
     }
 }
-
-/** Color del cristal del panel: el papel con un toque del acento. Es también el de los fundidos. */
-@Composable
-@ReadOnlyComposable
-private fun panelTone(accent: Color): Color {
-    val base = if (P.isDark) P.surface else P.paper
-    return accent.copy(alpha = if (P.isDark) 0.10f else 0.07f).compositeOver(base).copy(alpha = PANEL_ALPHA)
-}
-
-private fun GraphicsLayerScope.emergeSurface(panel: Rect, origin: Rect?, p: Float, reduced: Boolean) {
-    if (reduced) {
-        alpha = p.coerceIn(0f, 1f)
-        return
-    }
-    if (origin == null || panel.width <= 0f || panel.height <= 0f) {
-        val s = lerp(PANEL_MIN_SCALE, 1f, p)
-        scaleX = s
-        scaleY = s
-        alpha = p.coerceIn(0f, 1f)
-        return
-    }
-    // Del rectángulo de la card al del panel: la esquina de arriba a la
-    // izquierda va de una a otra y el tamaño crece en cada eje por separado.
-    transformOrigin = TransformOrigin(0f, 0f)
-    scaleX = lerp(origin.width / panel.width, 1f, p)
-    scaleY = lerp(origin.height / panel.height, 1f, p)
-    translationX = lerp(origin.left - panel.left, 0f, p)
-    translationY = lerp(origin.top - panel.top, 0f, p)
-    alpha = (p * 2.5f).coerceIn(0f, 1f)
-}
-
-/** El contenido no se deforma: escala uniforme y un deslizamiento corto desde la card. */
-private fun GraphicsLayerScope.emergeContent(panel: Rect, origin: Rect?, p: Float, reduced: Boolean) {
-    if (reduced) {
-        alpha = p.coerceIn(0f, 1f)
-        return
-    }
-    val s = lerp(CONTENT_MIN_SCALE, 1f, p)
-    scaleX = s
-    scaleY = s
-    if (origin != null && panel.width > 0f) {
-        translationX = (origin.center.x - panel.center.x) * (1f - p) * CONTENT_TRAVEL
-        translationY = (origin.center.y - panel.center.y) * (1f - p) * CONTENT_TRAVEL
-    }
-}
-
-/**
- * Entrada escalonada de la parte [index] (0 = la de arriba), con el mismo
- * progreso que el panel: al cerrar, se van en orden inverso. En fase de dibujo.
- */
-private fun Modifier.staggered(open: State<Float>, index: Int, reduced: Boolean): Modifier =
-    if (reduced) this else graphicsLayer {
-        val t = ((open.value - STAGGER_START - index * STAGGER_STEP) / STAGGER_SPAN).coerceIn(0f, 1f)
-        alpha = t
-        translationY = (1f - t) * 14.dp.toPx()
-    }
 
 /** Con el mando, lo señalado se trae a la vista si el panel se desplaza. */
 @OptIn(ExperimentalFoundationApi::class)
@@ -461,7 +372,7 @@ private fun HeroContent(
                 val images: @Composable () -> Unit = {
                     if (layout.art.isNotEmpty()) {
                         Column(Modifier.staggered(open, 3, reduced)) {
-                            artHeader?.let { SectionLabel(it.resolve()) }
+                            artHeader?.let { OverlaySectionLabel(it.resolve()) }
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(GAP)) {
                                 layout.art.forEach { a ->
                                     ArtTile(a, hero, focused = focus == layout.indexOf(a), accent = accent, reduced = reduced, modifier = Modifier.weight(1f)) { run(a) }
@@ -520,9 +431,9 @@ private fun HeroContent(
 
 /** Pistas del mando al pie de cualquier menú: A elige y B cierra. */
 @Composable
-private fun MenuPadHints(input: InputController) {
+internal fun MenuPadHints(input: InputController, hints: List<PadHint> = MENU_HINTS) {
     PadHints(
-        hints = MENU_HINTS,
+        hints = hints,
         visible = input.gamepadPresent,
         modifier = Modifier.fillMaxWidth().padding(start = PAD, end = PAD, bottom = 10.dp),
     )
@@ -669,14 +580,21 @@ private fun InfoLine(info: List<UiText>, accent: Color) {
 
 /** "Jugar": el protagonista. Degradado del color del juego, brillo arriba y la pista del botón A. */
 @Composable
-private fun PlayButton(action: SheetAction, focused: Boolean, accent: Color, gamepad: Boolean, onClick: () -> Unit) {
+internal fun PlayButton(
+    action: SheetAction,
+    focused: Boolean,
+    accent: Color,
+    gamepad: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     val shape = RoundedCornerShape(TILE_RADIUS)
     // Relleno con blanco encima: el color del juego oscurecido hasta el 4,5:1.
     val fill = remember(accent) { Color(Palettes.fillFor(accent.argb())) }
     val deep = remember(fill) { Color(ArtPalette.deeper(fill.toArgb())) }
     val lift = animateFloatAsState(if (focused) 1f else 0f, Springs.snappy(), label = "playLift")
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .height(56.dp)
             .revealWhen(focused)
@@ -709,13 +627,13 @@ private fun PlayButton(action: SheetAction, focused: Boolean, accent: Color, gam
             overflow = TextOverflow.Ellipsis,
         )
         // La pista del mando: se ve siempre, más viva mientras se usa el mando.
-        PadHint("A", Color.White, strong = gamepad)
+        PadBadge("A", Color.White, strong = gamepad)
     }
 }
 
 /** El botón del mando que hace esto, en su círculo. */
 @Composable
-private fun PadHint(label: String, color: Color, strong: Boolean = true) {
+internal fun PadBadge(label: String, color: Color, strong: Boolean = true) {
     Box(
         Modifier
             .size(24.dp)
@@ -731,7 +649,7 @@ private fun PadHint(label: String, color: Color, strong: Boolean = true) {
 
 /** Una acción secundaria como pieza compacta: glifo, rótulo y, si lo hay, su dato. */
 @Composable
-private fun ActionTile(action: SheetAction, focused: Boolean, accent: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+internal fun ActionTile(action: SheetAction, focused: Boolean, accent: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val shape = RoundedCornerShape(TILE_RADIUS)
     val interaction = remember { MutableInteractionSource() }
     Column(
@@ -777,7 +695,7 @@ private fun ActionTile(action: SheetAction, focused: Boolean, accent: Color, mod
 
 @Composable
 @ReadOnlyComposable
-private fun tileFill(): Color = if (P.isDark) Color.White.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.6f)
+internal fun tileFill(): Color = if (P.isDark) Color.White.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.6f)
 
 /**
  * Una clase de imagen con la imagen de verdad, a sangre (el logo, entero sobre
@@ -971,18 +889,18 @@ private fun DangerRow(action: SheetAction, index: Int, focused: Boolean, armed: 
                 )
             }
         }
-        if (armed && input.active) PadHint("A", P.red)
+        if (armed && input.active) PadBadge("A", P.red)
     }
 }
 
 @Composable
-private fun SectionLabel(text: String) {
+internal fun OverlaySectionLabel(text: String, color: Color = P.ink2.copy(alpha = 0.75f)) {
     ElyText(
         text,
         modifier = Modifier.padding(start = 4.dp, bottom = 7.dp),
         size = 9f,
         weight = FontWeight.Bold,
-        color = P.ink2.copy(alpha = 0.75f),
+        color = color,
         letterSpacing = tracking(0.18f),
         uppercase = true,
     )
@@ -1038,7 +956,7 @@ private fun ListContent(
             ) {
                 layout.list.forEachIndexed { g, group ->
                     Column(Modifier.fillMaxWidth().staggered(open, 1 + g, reduced)) {
-                        group.header?.let { SectionLabel(it.resolve()) }
+                        group.header?.let { OverlaySectionLabel(it.resolve()) }
                         Column(verticalArrangement = Arrangement.spacedBy(GAP)) {
                             group.actions.forEach { a ->
                                 val i = layout.indexOf(a)
@@ -1131,7 +1049,7 @@ private fun ActionRow(action: SheetAction, focused: Boolean, accent: Color, onCl
  * que sigue y, abajo, un galón que late y que baja al tocarlo. Nada de barras.
  */
 @Composable
-private fun BoxScope.ScrollHints(scroll: ScrollState, tone: Color, accent: Color) {
+internal fun BoxScope.ScrollHints(scroll: ScrollState, tone: Color, accent: Color) {
     val up by remember { derivedStateOf { scroll.canScrollBackward } }
     val down by remember { derivedStateOf { scroll.canScrollForward } }
     if (up) {
@@ -1225,45 +1143,22 @@ const val MAGNETIC_PULL_MS = 120
 
 private const val PULL_SCALE = 0.9f
 
-/** Radio del desenfoque del fondo, en dp (Android 12+). */
-private const val BACKGROUND_BLUR = 18f
-
-private const val SCRIM_ALPHA = 0.5f
-
-/** Con "reducir movimiento": un fundido corto y nada más. */
-private const val REDUCED_FADE_MS = 160
-
-/** Escala de la que sale el panel cuando no viene de una card. */
-private const val PANEL_MIN_SCALE = 0.9f
-
-/** El contenido crece desde un poco más pequeño y recorre parte del camino desde la card. */
-private const val CONTENT_MIN_SCALE = 0.92f
-private const val CONTENT_TRAVEL = 0.35f
-
-/** Escalonado de la entrada: cuándo empieza, cuánto se retrasa cada parte y cuánto dura. */
-private const val STAGGER_START = 0.25f
-private const val STAGGER_STEP = 0.07f
-private const val STAGGER_SPAN = 0.45f
-
-/** Opacidad del cristal del panel: se transparenta un pelo del fondo desenfocado. */
-private const val PANEL_ALPHA = 0.93f
-
 private const val HOLD_MS = 850
 private const val ARM_TIMEOUT_MS = 3_000L
 
-private val PANEL_MARGIN = 14.dp
-private val PANEL_RADIUS = 28.dp
+internal val PANEL_MARGIN = 14.dp
+internal val PANEL_RADIUS = 28.dp
 private val PANEL_MAX = 460.dp
-private val HERO_WIDE_MAX = 780.dp
-private val PAD = 16.dp
+internal val HERO_WIDE_MAX = 780.dp
+internal val PAD = 16.dp
 
 /** Radio de las piezas de dentro: el del panel menos su margen (concéntricas). */
-private val TILE_RADIUS = PANEL_RADIUS - PAD
-private val GAP = 8.dp
-private val SECTION_GAP = 14.dp
-private val TILE_H = 76.dp
+internal val TILE_RADIUS = PANEL_RADIUS - PAD
+internal val GAP = 8.dp
+internal val SECTION_GAP = 14.dp
+internal val TILE_H = 76.dp
 private val ART_TILE_H = 76.dp
 private val BANNER_TALL = 152.dp
 private val BANNER_WIDE = 112.dp
-private val FADE_INTO_GLASS = 22.dp
+internal val FADE_INTO_GLASS = 22.dp
 private val ART_TILE_BACK get() = P.mediaBack

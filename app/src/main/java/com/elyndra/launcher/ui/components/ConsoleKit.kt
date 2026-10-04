@@ -258,7 +258,7 @@ fun SegmentedControl(
                         .fillMaxSize()
                         .alpha(if (enabled) 1f else 0.4f)
                         .semantics { this.selected = active }
-                        .shapeClickable(inner, enabled = enabled) { onSelect(i) },
+                        .shapeClickable(inner, enabled = enabled, color = if (active) Color.White else null) { onSelect(i) },
                     contentAlignment = Alignment.Center,
                 ) {
                     ElyText(
