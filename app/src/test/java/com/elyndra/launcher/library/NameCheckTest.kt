@@ -94,6 +94,29 @@ class NameOverrideTest {
     }
 
     @Test
+    fun reidentifyingForgetsTheOldDescription() {
+        val described = auto.copy(
+            description = "Protect your Core Crystal",
+            descriptionLang = "en",
+            descriptions = mapOf("en" to "Protect your Core Crystal"),
+            descriptionCheckedLang = "es",
+            descriptionSources = setOf("steam"),
+        )
+        for (m in listOf(
+            IdentifyRules.withUserName(described, "Geometry Dash"),
+            IdentifyRules.withMatch(described, NameMatch("Geometry Dash", null, null, null, Service.Steam, "322170")),
+            IdentifyRules.reset(described),
+        )) {
+            assertNull(m.description)
+            assertTrue(m.descriptions.isEmpty())
+            assertNull(m.descriptionCheckedLang)
+            assertNull(m.descriptionSources)
+        }
+        // Mismo nombre: es el mismo juego, la descripción se queda.
+        assertEquals("Protect your Core Crystal", IdentifyRules.withUserName(described, described.name!!).description)
+    }
+
+    @Test
     fun resetRemovesTheOverride() {
         val back = IdentifyRules.reset(IdentifyRules.withMatch(auto, NameMatch("X", null, null, null, Service.Igdb, "42")))
         assertNull(back.lockedName)
