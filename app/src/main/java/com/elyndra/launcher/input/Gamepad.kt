@@ -126,9 +126,14 @@ object Gamepad {
      * de mando. Cuando Elyndra no consume la pulsación se reenvía traducida,
      * y así esas pantallas se manejan con el mando sin tener que reescribirlas.
      *
-     * Null = la tecla ya es una de esas, o no tiene equivalente.
+     * Null = la tecla ya es una de esas, o no tiene equivalente. Intro de un
+     * teclado físico tampoco se traduce: ya la entiende el foco (pulsa) y,
+     * en un campo de texto, es la acción del teclado (Hecho, Buscar, Enviar).
      */
-    fun systemKey(keyCode: Int): Int? = actionFor(keyCode)?.let { systemKeyFor(it) }?.takeIf { it != keyCode }
+    fun systemKey(keyCode: Int): Int? {
+        if (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) return null
+        return actionFor(keyCode)?.let { systemKeyFor(it) }?.takeIf { it != keyCode }
+    }
 
     /** La misma equivalencia para lo que viene de un stick, que no trae tecla. */
     fun systemKeyFor(pad: Pad): Int? = when (pad) {
