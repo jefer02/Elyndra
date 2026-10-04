@@ -1,5 +1,9 @@
 package com.elyndra.launcher.ui.screens
 
+import androidx.compose.runtime.LaunchedEffect
+import com.elyndra.launcher.ui.components.padInitialFocus
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.focusGroup
 import com.elyndra.launcher.core.device.StatusMode
 import android.Manifest
 import android.app.Activity
@@ -235,6 +239,7 @@ private fun WideSettings(vm: ElyndraViewModel) {
                 Column(
                     Modifier
                         .fillMaxSize()
+                        .focusGroup()
                         .verticalScroll(rememberScrollState())
                         .padding(start = 20.dp, end = 20.dp, top = Space.m, bottom = Space.l),
                 ) {
@@ -258,10 +263,19 @@ private fun SettingsRail(vm: ElyndraViewModel, modifier: Modifier) {
     val categories = SettingsCategory.entries
     val requesters = remember { categories.map { FocusRequester() } }
     val position by animateFloatAsState(s.category.ordinal.toFloat(), motion(Springs.snappy()), label = "rail")
+    // Con LB/RB el foco sigue a la categoría si estaba en el raíl.
+    val railFocused = remember { BooleanArray(1) }
+    LaunchedEffect(s.category) {
+        if (railFocused[0]) runCatching { requesters[s.category.ordinal].requestFocus() }
+    }
     Column(
         modifier
-            .verticalScroll(rememberScrollState())
+            // Al entrar en el raíl (y al abrir Ajustes con mando) el foco cae en la categoría elegida.
+            .padInitialFocus()
+            .onFocusChanged { railFocused[0] = it.hasFocus }
             .focusProperties { enter = { requesters[s.category.ordinal] } }
+            .focusGroup()
+            .verticalScroll(rememberScrollState())
             .drawBehind {
                 val h = RAIL_ITEM_H.toPx()
                 val y = position * (h + RAIL_GAP.toPx())
@@ -326,6 +340,7 @@ private fun PaneHeader(category: SettingsCategory) {
 
 /* ── ventana estrecha: lista → página ─────────────────────────── */
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun CompactSettings(vm: ElyndraViewModel) {
     val s = vm.settings
@@ -343,18 +358,30 @@ private fun CompactSettings(vm: ElyndraViewModel) {
                     .padding(horizontal = if (open) Space.m else Space.s, vertical = Space.s),
             ) {
                 if (open) {
-                    CategoryContent(vm, s.category, wide = false)
+                    // Con mando, la página empieza en su primer control (no en volver).
+                    Column(Modifier.padInitialFocus().focusGroup()) {
+                        CategoryContent(vm, s.category, wide = false)
+                    }
                     Spacer(Modifier.height(Space.l))
                 } else {
-                    SettingsCategory.entries.forEachIndexed { i, category ->
-                        NavRow(
-                            title = stringResource(category.title),
-                            description = stringResource(category.description),
-                            glyph = category.glyph,
-                            onClick = { s.openCategory(category) },
-                            modifier = Modifier.staggerIn(i, key = "settingsList"),
-                        )
-                        if (i < SettingsCategory.entries.lastIndex) SettingsDivider()
+                    // Y la lista, en la categoría de la que se vuelve.
+                    val rows = remember { SettingsCategory.entries.map { FocusRequester() } }
+                    Column(
+                        Modifier
+                            .padInitialFocus()
+                            .focusProperties { enter = { rows[s.category.ordinal] } }
+                            .focusGroup(),
+                    ) {
+                        SettingsCategory.entries.forEachIndexed { i, category ->
+                            NavRow(
+                                title = stringResource(category.title),
+                                description = stringResource(category.description),
+                                glyph = category.glyph,
+                                onClick = { s.openCategory(category) },
+                                modifier = Modifier.staggerIn(i, key = "settingsList").focusRequester(rows[i]),
+                            )
+                            if (i < SettingsCategory.entries.lastIndex) SettingsDivider()
+                        }
                     }
                 }
             }

@@ -1,5 +1,7 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.components.PadHints
+import com.elyndra.launcher.ui.components.PadHint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -158,9 +160,12 @@ fun VoiceSyncScreen(vm: ElyndraViewModel) {
                 },
                 Modifier.fillMaxWidth(),
             )
+            PadHints(hints = VOICE_SYNC_HINTS, visible = vm.input.gamepadPresent, modifier = Modifier.padding(top = 8.dp), onDark = true)
         }
     }
 }
+
+private val VOICE_SYNC_HINTS = listOf(PadHint("A", R.string.hint_select), PadHint("B", R.string.hint_back))
 
 @Composable
 private fun routeLabel(route: AudioRoute): String = when (route.kind) {

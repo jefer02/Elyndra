@@ -1,5 +1,13 @@
 package com.elyndra.launcher.ui.screens
 
+import androidx.compose.runtime.remember
+import com.elyndra.launcher.ui.theme.Radii
+import com.elyndra.launcher.ui.theme.LocalSkin
+import com.elyndra.launcher.ui.components.readingStop
+import com.elyndra.launcher.ui.components.padScrollFallback
+import com.elyndra.launcher.ui.components.ScrollViewport
+import com.elyndra.launcher.ui.components.PadHints
+import com.elyndra.launcher.ui.components.PadHint
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -140,12 +148,20 @@ fun LicensesScreen(vm: ElyndraViewModel) {
         }
     }
 
+    // Es texto para leer: con mando, cada bloque es una parada y los largos se
+    // recorren a pasos (ver readingStop); arriba y abajo desplazan si no hay más.
+    val scroll = rememberScrollState()
+    val viewport = remember { ScrollViewport() }
+    val skin = LocalSkin.current
+    val stop = RoundedCornerShape(Radii.m)
     Box(Modifier.fillMaxSize()) {
         AuroraBackdrop()
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .then(viewport.modifier)
+                .padScrollFallback(scroll)
+                .verticalScroll(scroll)
                 .padding(start = m.pad, end = m.pad, top = m.pad, bottom = 34.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -157,7 +173,7 @@ fun LicensesScreen(vm: ElyndraViewModel) {
             ElyText(stringResource(R.string.licenses_desc), size = 10.5f, color = P.ink2, lineHeightRatio = 1.45f)
 
             SectionLabel(stringResource(R.string.licenses_components))
-            SettingsGroup {
+            SettingsGroup(Modifier.readingStop(scroll, viewport, stop, skin.a2)) {
                 COMPONENTS.forEachIndexed { i, c ->
                     if (i > 0) Spacer(Modifier.height(10.dp))
                     ElyText(c.name, size = 11.5f, weight = FontWeight.SemiBold, color = P.ink, lineHeightRatio = 1.35f)
@@ -169,14 +185,14 @@ fun LicensesScreen(vm: ElyndraViewModel) {
             }
 
             SectionLabel(stringResource(R.string.licenses_assets))
-            SettingsGroup {
+            SettingsGroup(Modifier.readingStop(scroll, viewport, stop, skin.a2)) {
                 ElyText(stringResource(R.string.licenses_mpfb_note), size = 11.5f, weight = FontWeight.SemiBold, color = P.ink, lineHeightRatio = 1.35f)
                 Spacer(Modifier.height(2.dp))
                 ElyText("MPFB2 · MakeHuman system assets · CC0 1.0", size = 9.5f, color = P.ink2)
             }
 
             SectionLabel("CMUdict")
-            SettingsGroup {
+            SettingsGroup(Modifier.readingStop(scroll, viewport, stop, skin.a2)) {
                 ElyText(stringResource(R.string.licenses_cmudict_use), size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
                 Spacer(Modifier.height(10.dp))
                 ElyText(cmudict ?: "…", size = 9.5f, color = P.ink, lineHeightRatio = 1.4f)
@@ -184,6 +200,9 @@ fun LicensesScreen(vm: ElyndraViewModel) {
 
             Spacer(Modifier.height(14.dp))
             GhostButton(stringResource(R.string.close), { vm.go(Screen.Settings) })
+            PadHints(hints = LICENSES_HINTS, visible = vm.input.gamepadPresent, modifier = Modifier.padding(top = 8.dp))
         }
     }
 }
+
+private val LICENSES_HINTS = listOf(PadHint("A", R.string.hint_select), PadHint("B", R.string.hint_back))
