@@ -89,6 +89,9 @@ import com.elyndra.launcher.ui.components.GlassTextField
 import com.elyndra.launcher.ui.components.GlowCheck
 import com.elyndra.launcher.ui.components.PadHint
 import com.elyndra.launcher.ui.components.PadHints
+import com.elyndra.launcher.ui.components.padInitialFocus
+import com.elyndra.launcher.ui.components.padPrimaryAction
+import androidx.compose.foundation.focusGroup
 import com.elyndra.launcher.ui.components.Pill
 import com.elyndra.launcher.ui.components.metrics
 import com.elyndra.launcher.ui.components.tracking
@@ -181,8 +184,8 @@ fun AddScreen(vm: ElyndraViewModel) {
                     }
                 }
 
-                // La barra de acción, fija: no se va con la lista.
-                Box(Modifier.padding(top = Space.s)) {
+                // La barra de acción, fija: no se va con la lista. Con mando, Y salta a su botón.
+                Box(Modifier.padding(top = Space.s).padPrimaryAction()) {
                     when (add.tab) {
                         AddTab.Android -> AndroidActionBar(vm)
                         AddTab.Roms -> RomsActionBar(vm)
@@ -202,6 +205,7 @@ fun AddScreen(vm: ElyndraViewModel) {
 private val ADD_HINTS = listOf(
     PadHint("LB / RB", R.string.hint_section),
     PadHint("A", R.string.hint_select),
+    PadHint("Y", R.string.add_title),
     PadHint("B", R.string.hint_back),
 )
 
@@ -239,7 +243,10 @@ private fun AndroidTab(vm: ElyndraViewModel, wide: Boolean) {
                 app = app,
                 checked = add.picked.contains(app.packageName),
                 inLibrary = add.isInLibrary(app.packageName),
-                modifier = Modifier.staggerIn(i, key = app.packageName, enabled = seen.add(app.packageName)),
+                // Con mando, la lista empieza en la primera app (no en el buscador ni en volver).
+                modifier = Modifier
+                    .staggerIn(i, key = app.packageName, enabled = seen.add(app.packageName))
+                    .then(if (i == 0) Modifier.padInitialFocus() else Modifier),
                 onToggle = { add.togglePicked(app.packageName) },
             )
         }
@@ -424,13 +431,16 @@ private fun RomsTab(vm: ElyndraViewModel) {
                 .consoleSurface(RoundedCornerShape(Radii.l))
                 .padding(Space.m),
         ) {
-            Step(
-                label = stringResource(R.string.step_folder),
-                status = status(1),
-                expanded = active == 1 || editing == 1,
-                summary = add.folder?.displayPath,
-                onChange = { editing = 1 },
-            ) { FolderStep(vm) { picker.launch(null) } }
+            // Con mando, la pestaña empieza en el primer paso.
+            Box(Modifier.padInitialFocus().focusGroup()) {
+                Step(
+                    label = stringResource(R.string.step_folder),
+                    status = status(1),
+                    expanded = active == 1 || editing == 1,
+                    summary = add.folder?.displayPath,
+                    onChange = { editing = 1 },
+                ) { FolderStep(vm) { picker.launch(null) } }
+            }
             Step(
                 label = stringResource(R.string.step_system),
                 status = status(2),

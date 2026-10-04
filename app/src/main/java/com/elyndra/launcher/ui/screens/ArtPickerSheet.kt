@@ -1,7 +1,12 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.components.overlayEmerge
+import com.elyndra.launcher.ui.components.Backdrop
+import com.elyndra.launcher.ui.theme.LocalReducedMotion
+import androidx.compose.runtime.State
 import com.elyndra.launcher.ui.components.PadHint
 import com.elyndra.launcher.ui.components.PadHints
+import com.elyndra.launcher.ui.components.PadFocusGroup
 import androidx.compose.runtime.remember
 import com.elyndra.launcher.ui.components.FallbackArt
 import com.elyndra.launcher.ui.components.ArtVariant
@@ -54,14 +59,14 @@ import com.elyndra.launcher.ui.components.ScrimLayer
 import com.elyndra.launcher.ui.components.consumeClicks
 import com.elyndra.launcher.ui.label
 import com.elyndra.launcher.ui.theme.LocalSkin
-import com.elyndra.launcher.ui.theme.animRiseSheet
 import com.elyndra.launcher.ui.theme.drawArcSpinner
 import com.elyndra.launcher.ui.theme.glass
 import com.elyndra.launcher.ui.theme.spinAngle
 
 /** Hoja con las imágenes que ofrece un servicio para la carátula, el fondo o el icono. */
 @Composable
-fun ArtPickerSheet(vm: ElyndraViewModel, state: ArtPickerState) {
+fun ArtPickerSheet(vm: ElyndraViewModel, state: ArtPickerState, open: Boolean, progress: State<Float>) {
+    val reduced = LocalReducedMotion.current
     val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.82f).dp
     val sheetKey = Triple(state.key, state.kind, state.service)
     val (minCell, ratio) = when (state.kind) {
@@ -75,14 +80,16 @@ fun ArtPickerSheet(vm: ElyndraViewModel, state: ArtPickerState) {
     // Mientras llegan las miniaturas, cada celda enseña el color del juego.
     val fallback = remember(state.key) { vm.fallbackForKey(state.key, state.title).colorOnly() }
 
-    ScrimLayer(onDismiss = vm::closeArtPicker, alignment = Alignment.BottomCenter, key = sheetKey) {
+    ScrimLayer(onDismiss = vm::closeArtPicker, alignment = Alignment.BottomCenter, open = open, progress = progress, z = Backdrop.Z_ART_PICKER) {
+        // El foco del mando no sale de la hoja ni cae en la pantalla de detrás.
+        PadFocusGroup(modal = true, padFocus = open) {
         Column(
             Modifier
                 .widthIn(max = 720.dp)
                 .fillMaxWidth()
                 .heightIn(max = maxHeight)
                 .padding(10.dp)
-                .animRiseSheet(key = sheetKey)
+                .overlayEmerge(progress, reduced)
                 .glass(RoundedCornerShape(24.dp), solid = true)
                 .consumeClicks()
                 .padding(top = 16.dp, bottom = 12.dp),
@@ -126,10 +133,11 @@ fun ArtPickerSheet(vm: ElyndraViewModel, state: ArtPickerState) {
                 }
             }
             PadHints(
-                hints = listOf(PadHint("B", R.string.close)),
+                hints = listOf(PadHint("A", R.string.hint_select), PadHint("B", R.string.close)),
                 visible = vm.input.gamepadPresent,
                 modifier = Modifier.padding(start = 18.dp, top = 8.dp),
             )
+        }
         }
     }
 }
