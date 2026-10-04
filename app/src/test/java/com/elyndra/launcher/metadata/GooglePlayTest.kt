@@ -133,6 +133,69 @@ class GooglePlayClientTest {
         dir.deleteRecursively()
         Unit
     }
+
+    @Test
+    fun aRegionalListingIsNeverTakenForAnotherLanguage() = runBlocking {
+        // Como Mobile Legends desde Colombia: la tienda de la región da su ficha en
+        // español pida el idioma que pida; en EE. UU. no se vende; las tiendas de
+        // cada idioma tienen la suya en ese idioma.
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.path.orEmpty()
+                return when {
+                    !path.startsWith("/store") -> MockResponse().setBody(Buffer().writeUtf8("1920x1080"))
+                    path.contains("gl=US") -> MockResponse().setResponseCode(404)
+                    path.contains("gl=GB") -> MockResponse().setBody(playPage(base(), "Join your friends."))
+                    path.contains("gl=ES") -> MockResponse().setBody(playPage(base(), "Únete a tus amigos."))
+                    path.contains("gl=FR") -> MockResponse().setBody(playPage(base(), "Rejoignez vos amis."))
+                    else -> MockResponse().setBody(playPage(base(), "Únete a tus amigos (ficha regional)."))
+                }
+            }
+        }
+        val c = client()
+        assertEquals(mapOf("es" to "Únete a tus amigos.", "en" to "Join your friends."), c.find("com.mobile.legends", "es")!!.descriptions)
+        assertEquals(mapOf("fr" to "Rejoignez vos amis.", "en" to "Join your friends."), c.find("com.mobile.legends", "fr")!!.descriptions)
+        assertEquals(mapOf("en" to "Join your friends."), c.find("com.mobile.legends", "en")!!.descriptions)
+        // Que una tienda de referencia no lo tenga no es "no está en Play".
+        assertTrue(!c.isKnownMiss("com.mobile.legends"))
+    }
+
+    @Test
+    fun aMissExpiresAfterItsTtl() = runBlocking {
+        var now = 1_000_000L
+        val dir = Files.createTempDirectory("gplay").toFile()
+        val c = GooglePlayClient(dir, codec, base(), RateLimiter(0), clock = { now })
+        server.enqueue(MockResponse().setResponseCode(404))
+        assertNull(c.find("com.example.gone", "en"))
+        assertTrue(c.isKnownMiss("com.example.gone"))
+        now += GooglePlayClient.MISS_TTL_MS + 1
+        // Caducado: se vuelve a preguntar.
+        assertTrue(!c.isKnownMiss("com.example.gone"))
+        server.enqueue(MockResponse().setResponseCode(404))
+        c.find("com.example.gone", "en")
+        assertEquals(2, server.requestCount)
+        dir.deleteRecursively()
+        Unit
+    }
+
+    @Test
+    fun serverErrorsAndNetworkFailuresAreNeverCachedAsMisses() = runBlocking {
+        val dir = Files.createTempDirectory("gplay").toFile()
+        server.enqueue(MockResponse().setResponseCode(500))
+        server.enqueue(MockResponse().setResponseCode(429))
+        assertNull(client(dir).find("com.example.flaky", "en"))
+        assertTrue(!client(dir).isKnownMiss("com.example.flaky"))
+        assertNull(client(dir).find("com.example.flaky", "en"))
+        assertTrue(!client(dir).isKnownMiss("com.example.flaky"))
+        // Sin red (el servidor ya no está): tampoco cuenta como "no está en Play".
+        val url = base()
+        server.shutdown()
+        val offline = GooglePlayClient(dir, codec, url, RateLimiter(0))
+        assertNull(offline.find("com.example.flaky", "en"))
+        assertTrue(!offline.isKnownMiss("com.example.flaky"))
+        dir.deleteRecursively()
+        Unit
+    }
 }
 
 class GooglePlayPriorityTest {
