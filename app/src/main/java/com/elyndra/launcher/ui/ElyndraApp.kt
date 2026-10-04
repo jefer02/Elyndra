@@ -229,6 +229,14 @@ fun ElyndraApp(vm: ElyndraViewModel) {
             vm.artPicker?.let { ArtPickerSheet(vm, it) }
             if (vm.identify.state != null) IdentifySheet(vm, vm.identify)
             vm.dialog?.let { ElyDialogView(it, onDismiss = vm::dismissDialog, focus = vm.input.dialogFocus) }
+            // Un paquete de idioma bajándose: arriba, pequeño, sin tapar nada.
+            TranslationPackBanner(
+                vm,
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .windowInsetsPadding(WindowInsets.systemBars)
+                    .padding(top = 8.dp),
+            )
             vm.toast?.let {
                 ToastView(
                     it,
