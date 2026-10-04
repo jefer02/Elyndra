@@ -122,6 +122,8 @@ data class GameMetadataEntity(
     /** Todas las descripciones por idioma, como objeto JSON {"es": "…", "en": "…"}. */
     val descriptions: String? = null,
     @ColumnInfo(name = "description_checked_lang") val descriptionCheckedLang: String? = null,
+    /** Ids de las fuentes que ya respondieron con la descripción, separados por comas; null = sin saber (versión ≤ 4). */
+    @ColumnInfo(name = "description_sources") val descriptionSources: String? = null,
     @ColumnInfo(name = "release_date") val releaseDate: String?,
     val developer: String?,
     val publisher: String?,
