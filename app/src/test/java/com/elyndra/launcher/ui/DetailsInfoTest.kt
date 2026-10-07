@@ -98,4 +98,50 @@ class DetailsInfoTest {
         assertEquals("com.example.game", i.packageName)
         assertTrue(i.facts.none { it.label == R.string.details_package })
     }
+
+    /* ── Reparto en dos columnas ── */
+
+    private val about = DetailsLayout.Block.About
+    private val memory = DetailsLayout.Block.Memory
+    private val facts = DetailsLayout.Block.Facts
+    private val achievements = DetailsLayout.Block.Achievements
+
+    @Test
+    fun `con sinopsis larga va sola a la izquierda y lo demas a la derecha`() {
+        val (l, r) = DetailsLayout.columns(listOf(about to 12f, memory to 3f, facts to 6f, achievements to 0f))
+        assertEquals(listOf(about), l)
+        assertEquals(listOf(memory, facts), r)
+    }
+
+    @Test
+    fun `sin sinopsis ninguna columna se queda vacia`() {
+        val (l, r) = DetailsLayout.columns(listOf(about to 0f, memory to 3f, facts to 6f, achievements to 9f))
+        assertTrue(l.isNotEmpty() && r.isNotEmpty())
+        assertEquals(listOf(memory, achievements), l)
+        assertEquals(listOf(facts), r)
+    }
+
+    @Test
+    fun `un solo bloque va en una sola columna`() {
+        val (l, r) = DetailsLayout.columns(listOf(about to 0f, memory to 3f, facts to 0f, achievements to 0f))
+        assertEquals(listOf(memory), l)
+        assertTrue(r.isEmpty())
+    }
+
+    @Test
+    fun `el orden de lectura se respeta dentro de cada columna`() {
+        val (l, r) = DetailsLayout.columns(listOf(about to 4f, memory to 3f, facts to 3f, achievements to 4f))
+        assertEquals(listOf(about, achievements), l)
+        assertEquals(listOf(memory, facts), r)
+    }
+
+    @Test
+    fun `los pesos crecen con lo que hay que enseñar`() {
+        assertTrue(DetailsLayout.aboutWeight(600) > DetailsLayout.aboutWeight(100))
+        val few = info(GameMeta(developer = "A"))
+        val many = info(GameMeta(developer = "A", publisher = "B", genre = "Acción", rating = 0.8f, sources = listOf("igdb")))
+        assertTrue(DetailsLayout.factsWeight(many, false) > DetailsLayout.factsWeight(few, false))
+        assertEquals(0f, DetailsLayout.factsWeight(info(), false), 0f)
+        assertTrue(DetailsLayout.achievementsWeight(10) > DetailsLayout.achievementsWeight(0))
+    }
 }
