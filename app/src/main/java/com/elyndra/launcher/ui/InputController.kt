@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
  * la barra tampoco usa foco: se señala con [InputController.barFocus] y cada
  * botón se pinta resaltado cuando le toca.
  */
-enum class BarItem { Masha, Open, Search, Settings, Back, Emulator }
+enum class BarItem { Masha, Open, Search, Settings, Back, Emulator, Sections, Sort }
 
 /**
  * El mando, ya traducido a lo que hace Elyndra.
@@ -41,7 +41,8 @@ enum class BarItem { Masha, Open, Search, Settings, Back, Emulator }
  *  - A: aceptar · B: volver · X: ficha · Y: opciones del juego.
  *  - L1 / R1: cambiar de sección (filtros en la biblioteca, página en una carpeta).
  *  - Start: Ajustes · Select: buscar · L3 / R3: menú de la app.
- *  - Arriba desde el carrusel: la barra superior (Abrir, buscar, Ajustes…).
+ *  - Arriba desde el carrusel: el dock de secciones y, encima, la barra
+ *    superior (Abrir, buscar, Ajustes…); ver [LibraryFocus].
  */
 class InputController(private val vm: ElyndraViewModel) {
 
@@ -59,6 +60,18 @@ class InputController(private val vm: ElyndraViewModel) {
 
     /** Botón de la barra superior señalado; null = el mando está en el carrusel. */
     var barFocus by mutableStateOf<BarItem?>(null); private set
+
+    /** Punto del dock de secciones que señala el mando (con [barFocus] en [BarItem.Sections]). */
+    var dockFocus by mutableIntStateOf(0); private set
+
+    /** Fila señalada del menú de orden; −1 ninguna (se abrió con el dedo). */
+    var sortFocus by mutableIntStateOf(-1); private set
+
+    /**
+     * El dock de la biblioteca va en la barra del hero (ventana ancha) o en la
+     * costura hero/estante: lo publica la pantalla, que es quien lo coloca.
+     */
+    var dockInBar: Boolean = true
 
     /** Pantalla en la que se eligió [barFocus]: al cambiar de pantalla se olvida. */
     private var barScreen: Screen? = null
@@ -127,6 +140,11 @@ class InputController(private val vm: ElyndraViewModel) {
         sheetArmed = -1
     }
 
+    /** Menú de orden recién abierto: con mando, señalado el orden en curso ([current]). */
+    fun onSortMenuShown(current: Int) {
+        sortFocus = if (active) current else -1
+    }
+
     fun onDialogShown() {
         dialogFocus = if (active) 0 else -1
     }
@@ -191,6 +209,7 @@ class InputController(private val vm: ElyndraViewModel) {
             // El diálogo de nombre se maneja con el foco de Compose (campo, resultados, botones).
             vm.identify.state != null -> back(pad)
             vm.detailsKey != null -> details(pad)
+            vm.sortMenuOpen -> sortMenu(pad)
             vm.screen == Screen.Library -> library(pad)
             vm.screen == Screen.Folder -> folder(pad)
             else -> form(pad)
@@ -198,7 +217,7 @@ class InputController(private val vm: ElyndraViewModel) {
     }
 
     /**
-     * La ficha del juego: la recorre el foco de Compose —"Jugar", las piezas
+     * La ficha del juego: la recorre el foco de Compose —sus dos acciones
      * y los bloques de lectura, en orden— y lo que no cabe lo desplaza la
      * misma cruceta (ver `PadFocus`). Aquí solo cerrar y pasar página.
      */
@@ -249,9 +268,6 @@ class InputController(private val vm: ElyndraViewModel) {
 
     /* ── barra superior ───────────────────────────────────────── */
 
-    private fun libraryBar(): List<BarItem> =
-        listOfNotNull(BarItem.Masha, BarItem.Open.takeIf { !vm.searchOpen }, BarItem.Search, BarItem.Settings)
-
     private fun folderBar(): List<BarItem> = listOf(BarItem.Back, BarItem.Open, BarItem.Emulator)
 
     /**
@@ -283,12 +299,60 @@ class InputController(private val vm: ElyndraViewModel) {
             BarItem.Settings -> vm.go(Screen.Settings)
             BarItem.Back -> vm.go(Screen.Library)
             BarItem.Emulator -> vm.currentFolder()?.let { vm.pickFolderEmulator(it.folder) }
+            BarItem.Sections -> vm.availableFilters().getOrNull(dockFocus)?.let {
+                addFocus = false
+                vm.updateFilter(it)
+            }
+            BarItem.Sort -> vm.openSortMenu()
         }
+    }
+
+    /**
+     * La parte de arriba de la biblioteca: la barra y el dock (en una o dos
+     * filas, ver [LibraryFocus]). En el dock, izquierda/derecha recorren los
+     * puntos y solo al pasar del último saltan a la pieza de al lado; A elige
+     * la sección señalada.
+     */
+    private fun libraryTop(pad: Pad, fallback: (Pad) -> Boolean): Boolean {
+        var current = barFocus ?: return fallback(pad)
+        val rows = LibraryFocus.rows(dockInBar, vm.searchOpen)
+        dockFocus = dockFocus.coerceIn(0, (vm.availableFilters().size - 1).coerceAtLeast(0))
+        // Lo señalado ya no está (al abrir el buscador se va "Abrir"): el buscador.
+        if (rows.none { current in it }) {
+            current = BarItem.Search
+            barFocus = current
+        }
+        return when (pad) {
+            Pad.Left, Pad.Right -> {
+                val delta = if (pad == Pad.Left) -1 else 1
+                val dot = if (current == BarItem.Sections) LibraryFocus.stepDot(dockFocus, delta, vm.availableFilters().size) else null
+                if (dot != null) dockFocus = dot else focusTop(LibraryFocus.side(rows, current, delta), fromLeft = delta > 0)
+                true
+            }
+            Pad.Up -> { focusTop(LibraryFocus.up(rows, current)); true }
+            Pad.Down -> {
+                val below = LibraryFocus.down(rows, current)
+                if (below != null) focusTop(below) else barFocus = null
+                true
+            }
+            Pad.Back -> { barFocus = null; true }
+            Pad.Confirm -> { activate(current); true }
+            else -> fallback(pad)
+        }
+    }
+
+    /** Señala [item]; al entrar en el dock, el punto del lado por el que se llega o la sección actual. */
+    private fun focusTop(item: BarItem, fromLeft: Boolean? = null) {
+        if (item == BarItem.Sections && barFocus != BarItem.Sections) {
+            val all = vm.availableFilters()
+            dockFocus = LibraryFocus.entryDot(all.indexOf(vm.filter), all.size, fromLeft)
+        }
+        barFocus = item
     }
 
     /* ── biblioteca ───────────────────────────────────────────── */
 
-    private fun library(pad: Pad): Boolean = bar(pad, libraryBar()) { p ->
+    private fun library(pad: Pad): Boolean = libraryTop(pad) { p ->
         val items = vm.items()
         val index = items.indexOfFirst { it.key == vm.selected()?.key }.coerceAtLeast(0)
         // Sin juegos en la sección, "Añadir" es lo único que hay: ya está señalada.
@@ -301,12 +365,12 @@ class InputController(private val vm: ElyndraViewModel) {
                         addFocus = false
                         vm.select(items.last().key)
                     }
-                    return@bar true
+                    return@libraryTop true
                 }
-                Pad.Right, Pad.Down -> return@bar true
-                Pad.Confirm -> { vm.go(Screen.Add); return@bar true }
+                Pad.Right, Pad.Down -> return@libraryTop true
+                Pad.Confirm -> { vm.go(Screen.Add); return@libraryTop true }
                 // No es un juego: ni ficha ni opciones.
-                Pad.Details, Pad.Options -> return@bar true
+                Pad.Details, Pad.Options -> return@libraryTop true
                 else -> Unit
             }
         }
@@ -318,8 +382,8 @@ class InputController(private val vm: ElyndraViewModel) {
             // Todos, Android, Consolas.
             Pad.PagePrev -> cycleFilter(-1)
             Pad.PageNext -> cycleFilter(1)
-            // Arriba sube a la barra del hero, donde está "Abrir".
-            Pad.Up -> { barFocus = if (vm.searchOpen) BarItem.Search else BarItem.Open; true }
+            // Arriba sube al dock de secciones (o al buscador, si está abierto).
+            Pad.Up -> { focusTop(LibraryFocus.fromCarousel(vm.searchOpen)); true }
             Pad.Down -> true
             // Con mando se abre igual que con el dedo.
             Pad.Confirm -> vm.selected()?.let { vm.requestOpen(it); true } ?: false
@@ -344,8 +408,27 @@ class InputController(private val vm: ElyndraViewModel) {
         val all = vm.availableFilters()
         val next = all[(all.indexOf(vm.filter) + delta + all.size) % all.size]
         addFocus = false
+        if (barFocus == BarItem.Sections) dockFocus = all.indexOf(next)
         vm.updateFilter(next)
         return true
+    }
+
+    /* ── menú de orden ────────────────────────────────────────── */
+
+    private fun sortMenu(pad: Pad): Boolean {
+        val modes = SortMode.entries
+        return when (pad) {
+            Pad.Up -> { sortFocus = step(sortFocus, -1, modes.size); true }
+            Pad.Down -> { sortFocus = step(sortFocus, 1, modes.size); true }
+            Pad.Confirm -> {
+                val i = if (sortFocus in modes.indices) sortFocus else modes.indexOf(vm.settings.sortMode)
+                vm.pickSort(modes[i])
+                true
+            }
+            Pad.Back, Pad.Options -> { vm.closeSortMenu(); true }
+            // Lo demás no atraviesa el menú hacia la biblioteca de detrás.
+            else -> true
+        }
     }
 
     /* ── dentro de una carpeta ────────────────────────────────── */
@@ -493,7 +576,7 @@ class InputController(private val vm: ElyndraViewModel) {
     /** El menú de la app: todo lo que no cabe en un botón del mando. */
     fun mainMenuActions(): List<SheetAction> = listOf(
         SheetAction(UiText.res(R.string.search_hint), icon = SheetIcon.Search) { vm.toggleSearch() },
-        SheetAction(UiText.res(R.string.sort_by), icon = SheetIcon.Sort, opensSheet = true) { vm.sortOptions() },
+        SheetAction(UiText.res(R.string.sort_by), icon = SheetIcon.Sort) { vm.openSortMenu() },
         SheetAction(UiText.res(R.string.add_title), icon = SheetIcon.App) { vm.go(Screen.Add) },
         SheetAction(UiText.res(R.string.settings_title), icon = SheetIcon.Service) { vm.go(Screen.Settings) },
         SheetAction(UiText.res(R.string.masha), icon = SheetIcon.Details) { vm.go(Screen.Masha) },

@@ -167,23 +167,7 @@ class SettingsController(private val vm: ElyndraViewModel) {
 
     /* ── botón de Masha ───────────────────────────────────────── */
 
-    /**
-     * Dónde está el botón de Masha, en dp desde la esquina superior izquierda.
-     * `null` en cualquiera de los dos = nunca se ha movido, y entonces manda
-     * su esquina de siempre.
-     */
-    var mashaX by mutableStateOf(store.mashaX); private set
-    var mashaY by mutableStateOf(store.mashaY); private set
-
-    /** Masha se queda donde se la suelte, también al volver a abrir la app. */
-    fun moveMasha(x: Float, y: Float) {
-        mashaX = x
-        mashaY = y
-        store.mashaX = x
-        store.mashaY = y
-    }
-
-    /** Color (ARGB) de la estela de partículas de Masha al arrastrarla. */
+    /** Color (ARGB) de Masha: las partículas que rodean su emblema en la biblioteca. */
     var mashaParticleColor by mutableIntStateOf(store.mashaParticleColor); private set
 
     fun updateMashaParticleColor(argb: Int) {
