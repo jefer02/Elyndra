@@ -2,13 +2,23 @@ package com.elyndra.launcher.ui.screens
 
 import com.elyndra.launcher.ui.components.NeedsNameBadge
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.foundation.layout.heightIn
 import com.elyndra.launcher.ui.components.ConsoleGlyph
 import com.elyndra.launcher.ui.components.EmptyState
 import com.elyndra.launcher.ui.components.PAD_HINTS_HEIGHT
 import com.elyndra.launcher.ui.components.PadHint
 import com.elyndra.launcher.ui.components.PadHints
-import com.elyndra.launcher.ui.components.SlidingTabs
+import com.elyndra.launcher.ui.components.DotTabs
+import com.elyndra.launcher.ui.components.SortButton
+import com.elyndra.launcher.ui.components.SortPopover
+import com.elyndra.launcher.ui.DockPlacement
+import com.elyndra.launcher.ui.DockPalettes
+import com.elyndra.launcher.ui.theme.DARK_GLASS_MIN
+import com.elyndra.launcher.ui.DotTabsLayout
+import com.elyndra.launcher.ui.ShelfLayout
+import com.elyndra.launcher.ui.SortMode
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalDensity
 import com.elyndra.launcher.ui.theme.heroInfoTransition
 import com.elyndra.launcher.ui.theme.shelfSurface
 import com.elyndra.launcher.library.NameCheck
@@ -28,7 +38,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -81,12 +90,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import com.elyndra.launcher.ui.theme.pressFeedback
+import com.elyndra.launcher.ui.selection.mashaAura
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.pluralStringResource
@@ -114,8 +129,6 @@ import com.elyndra.launcher.ui.components.MaterializingContainer
 import com.elyndra.launcher.ui.components.Hero
 import com.elyndra.launcher.ui.components.ConsoleIconButton
 import com.elyndra.launcher.ui.components.HeroBarHeight
-import com.elyndra.launcher.ui.components.ParticleLayer
-import com.elyndra.launcher.ui.components.rememberParticleField
 import com.elyndra.launcher.ui.components.LocalScreenSize
 import com.elyndra.launcher.ui.components.MashaInsightBubble
 import com.elyndra.launcher.ui.components.LogoImage
@@ -159,7 +172,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun LibraryScreen(vm: ElyndraViewModel) {
     val m = metrics()
-    val skin = LocalSkin.current
     val reduced = LocalReducedMotion.current
     val items = vm.items()
     val sel = vm.selected()
@@ -179,7 +191,38 @@ fun LibraryScreen(vm: ElyndraViewModel) {
     val searchEmpty = vm.query.isNotBlank() && items.isEmpty() && vm.loaded
     // Sin nada en la sección (y sin estar buscando): el estado vacío ocupa el estante.
     val showEmpty = vm.loaded && items.isEmpty() && vm.query.isBlank()
-    Box(Modifier.fillMaxSize()) {
+
+    // El dock de secciones va en la barra del hero si la ventana es ancha; si
+    // no, en la costura entre el hero y el estante (ver DockPlacement).
+    val screen = LocalScreenSize.current
+    val dockInBar = DockPlacement.inBar(screen.width.value)
+    SideEffect { vm.input.dockInBar = dockInBar }
+    val seamRise = DockPlacement.seamRise(heroInfoBottomPad(m).value).dp
+    val dockInset = if (dockInBar) 0.dp else DotTabsLayout.HEIGHT.dp - seamRise + 6.dp
+    val sortAnchor = remember { mutableStateOf(Rect.Zero) }
+    val mashaAnchor = remember { mutableStateOf(Rect.Zero) }
+    val mashaHost = remember { mutableStateOf(Offset.Zero) }
+    val labelBlock = labelBlock(LIBRARY_LABEL_SP)
+
+    BoxWithConstraints(Modifier.fillMaxSize().onGloballyPositioned { mashaHost.value = it.positionInWindow() }) {
+        val shelfH = (maxHeight - m.iconHeroH).value
+        val shelf = ShelfLayout.compute(
+            available = shelfH,
+            hintsVisible = vm.input.gamepadPresent,
+            aspect = 1f,
+            base = m.iconTile.value,
+            topInset = dockInset.value,
+            labelBlock = labelBlock,
+            minTile = if (m.landscape) 72f else 96f,
+            maxTile = ICON_TILE_LIMIT,
+        )
+        // Sin cards no hay escena que continuar: el estado vacío va sobre el estante liso.
+        val extension = if (showEmpty) 0.dp else ShelfLayout.artExtension(shelfH, maxHeight.value, shelf.labelTop).dp
+        val tile = shelf.tileHeight.dp
+        // Con la barra de pistas el hero encoge y la fila se recoloca: se anima su
+        // altura en pantalla (no en el estante), así que se desliza con muelle.
+        val rowY by animateFloatAsState(m.iconHeroH.value + shelf.tileTop, motion(Springs.enter()), label = "shelfRow")
+
         // Fondo vivo: el arte de la selección, desenfocado y teñido con su color.
         DynamicBackdrop(
             when (sel) {
@@ -197,6 +240,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                 backgroundVanishing = sel?.let { vm.isVanishingArt(it.key, ArtKind.Background) } == true,
                 onBackgroundVanished = { vm.finishVanish() },
                 height = m.iconHeroH,
+                extension = extension,
                 imagePath = when (sel) {
                     is LibraryItem.App -> sel.app.meta.hero ?: sel.app.meta.screenshot
                     is LibraryItem.Folder -> sel.heroPath
@@ -210,7 +254,14 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                             .padding(start = m.pad, end = m.pad, top = if (m.landscape) 8.dp else 16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        MashaButton(vm) { mashaAnchor.value = it }
                         Spacer(Modifier.weight(1f))
+                        // Ventana ancha: el dock y el orden abren el grupo de la
+                        // derecha, a mano junto a la hora y "Abrir", con el mismo cristal.
+                        if (dockInBar) {
+                            SectionDock(vm) { sortAnchor.value = it }
+                            Spacer(Modifier.width(8.dp))
+                        }
                         // Hora y batería, arriba a la derecha junto a la barra. Con el
                         // buscador abierto se aparta: el campo necesita el ancho.
                         if (vm.settings.statusVisible && !vm.searchOpen) {
@@ -253,133 +304,175 @@ fun LibraryScreen(vm: ElyndraViewModel) {
             )
 
             // ── ESTANTE ──
-            Column(Modifier.weight(1f).shelfSurface().padding(top = 8.dp)) {
-                Row(
-                    Modifier.fillMaxWidth().padding(start = m.pad - 10.dp, end = m.pad, bottom = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    val filters = vm.availableFilters()
-                    SlidingTabs(
-                        labels = filters.map { stringResource(it.label) },
-                        selected = filters.indexOf(vm.filter),
-                        onSelect = { vm.updateFilter(filters[it]) },
-                    )
-                    Spacer(Modifier.weight(1f))
-                    ElyText(
-                        pluralStringResource(R.plurals.items_count, items.size, items.size),
-                        size = 9f,
-                        weight = FontWeight.Medium,
-                        color = P.ink2.copy(alpha = 0.8f),
-                        letterSpacing = tracking(0.18f),
-                        uppercase = true,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    // "Ordenar por": el criterio en curso hace de etiqueta del botón.
-                    Box(
-                        Modifier
-                            .heightIn(min = 40.dp)
-                            .shapeClickable(RoundedCornerShape(9.dp)) { vm.sortOptions() }
-                            .padding(horizontal = 8.dp),
+            // Sin fila de filtros: todo el alto es para el carrusel, que se
+            // centra entre el hero (o el dock de la costura) y las pistas.
+            Box(Modifier.fillMaxWidth().weight(1f).shelfSurface(extension)) {
+                val bottomPad = if (vm.input.gamepadPresent) PAD_HINTS_HEIGHT else 0.dp
+                when {
+                    searchEmpty -> Box(
+                        Modifier.fillMaxSize().padding(start = m.pad, end = m.pad, top = maxOf(dockInset, extension), bottom = bottomPad),
                         contentAlignment = Alignment.Center,
                     ) {
-                        ElyText(
-                            stringResource(vm.settings.sortMode.label),
-                            size = 9f,
-                            weight = FontWeight.SemiBold,
-                            color = skin.a2,
-                            letterSpacing = tracking(0.1f),
-                            maxLines = 1,
-                            uppercase = true,
+                        ElyText(stringResource(R.string.no_results), size = 11f, color = P.ink2, align = TextAlign.Center)
+                    }
+                    showEmpty -> Box(Modifier.fillMaxSize().padding(top = dockInset, bottom = bottomPad), contentAlignment = Alignment.Center) {
+                        EmptyState(
+                            title = null,
+                            message = stringResource(R.string.empty_library_message),
+                            actionLabel = stringResource(R.string.add_long),
+                            onAction = { vm.go(Screen.Add) },
+                            glyph = ConsoleGlyph.Gamepad,
+                            focused = addFocused,
                         )
                     }
-                }
-
-                Box(Modifier.fillMaxWidth().weight(1f)) {
-                    when {
-                        searchEmpty -> Box(Modifier.fillMaxSize().padding(horizontal = m.pad), contentAlignment = Alignment.Center) {
-                            ElyText(stringResource(R.string.no_results), size = 11f, color = P.ink2, align = TextAlign.Center)
-                        }
-                        showEmpty -> Box(Modifier.fillMaxSize().padding(bottom = if (vm.input.gamepadPresent) PAD_HINTS_HEIGHT else 0.dp), contentAlignment = Alignment.Center) {
-                            EmptyState(
-                                title = null,
-                                message = stringResource(R.string.empty_library_message),
-                                actionLabel = stringResource(R.string.add_long),
-                                onAction = { vm.go(Screen.Add) },
-                                glyph = ConsoleGlyph.Gamepad,
-                                focused = addFocused,
-                            )
-                        }
-                        else -> LazyRow(
-                            Modifier.fillMaxSize(),
-                            state = carousel,
-                            contentPadding = PaddingValues(
-                                start = m.pad,
-                                end = m.pad,
-                                // Hueco para la card seleccionada, que sube y se amplía: sin él
-                                // se metía sobre la fila de filtros.
-                                top = m.carouselTop,
-                                bottom = m.carouselBottom,
-                            ),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.Top,
-                        ) {
-                            itemsIndexed(items, key = { _, it -> it.key }) { _, item ->
-                                val materializing = item.key in vm.materializing
-                                // Las dos caras de lo mismo: un juego recién
-                                // añadido se monta desde el polvo al entrar, y al
-                                // quitarlo se deshace en polvo antes de salir de
-                                // la lista (`finishVanish` es quien borra).
-                                val selected = item.key == sel?.key && !addFocused
-                                MaterializingContainer(
-                                    isMaterializing = materializing,
-                                    onAnimationEnd = { vm.finishMaterialize(item.key) },
-                                    // La seleccionada, por encima de sus vecinas: su halo no queda debajo.
-                                    modifier = Modifier.zIndex(if (selected) 1f else 0f),
+                    else -> LazyRow(
+                        Modifier
+                            .fillMaxSize()
+                            .offset { IntOffset(0, (rowY - m.iconHeroH.value - shelf.tileTop).dp.roundToPx()) },
+                        state = carousel,
+                        contentPadding = PaddingValues(
+                            start = m.pad,
+                            end = m.pad,
+                            // Por encima queda el hueco para lo que la seleccionada sube, crece y alumbra.
+                            top = shelf.tileTop.dp,
+                        ),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        itemsIndexed(items, key = { _, it -> it.key }) { _, item ->
+                            val materializing = item.key in vm.materializing
+                            // Las dos caras de lo mismo: un juego recién
+                            // añadido se monta desde el polvo al entrar, y al
+                            // quitarlo se deshace en polvo antes de salir de
+                            // la lista (`finishVanish` es quien borra).
+                            val selected = item.key == sel?.key && !addFocused
+                            MaterializingContainer(
+                                isMaterializing = materializing,
+                                onAnimationEnd = { vm.finishMaterialize(item.key) },
+                                // La seleccionada, por encima de sus vecinas: su halo no queda debajo.
+                                modifier = Modifier.zIndex(if (selected) 1f else 0f),
+                            ) {
+                                DisintegratingContainer(
+                                    isDisintegrating = vm.vanishing == item.key,
+                                    onAnimationEnd = { vm.finishVanish() },
                                 ) {
-                                    DisintegratingContainer(
-                                        isDisintegrating = vm.vanishing == item.key,
-                                        onAnimationEnd = { vm.finishVanish() },
-                                    ) {
-                                        LibraryTile(
-                                            item = item,
-                                            // Con la card de "Añadir" señalada, la selección es ella.
-                                            selected = selected,
-                                            look = look,
-                                            metrics = m,
-                                            fallback = vm.fallbackOf(item),
-                                            onTap = { vm.select(item.key) },
-                                            onOpen = { vm.requestOpen(item) },
-                                            onBounds = vm::noteSelectedCard,
-                                            onLongPress = { bounds ->
-                                                vm.select(item.key)
-                                                // De aquí sale el overlay.
-                                                vm.markSheetOrigin(bounds)
-                                                vm.itemOptions(item)
-                                            },
-                                        )
-                                    }
+                                    LibraryTile(
+                                        item = item,
+                                        // Con la card de "Añadir" señalada, la selección es ella.
+                                        selected = selected,
+                                        look = look,
+                                        tile = tile,
+                                        landscape = m.landscape,
+                                        fallback = vm.fallbackOf(item),
+                                        onTap = { vm.select(item.key) },
+                                        onOpen = { vm.requestOpen(item) },
+                                        onBounds = vm::noteSelectedCard,
+                                        onLongPress = { bounds ->
+                                            vm.select(item.key)
+                                            // De aquí sale el overlay.
+                                            vm.markSheetOrigin(bounds)
+                                            vm.itemOptions(item)
+                                        },
+                                    )
                                 }
                             }
-                            // "Añadir" es una card más y va al final de la fila: en
-                            // cuanto entra un juego se corre detrás de todos sin dejar
-                            // de estar a mano. El `loaded` evita que la card asome
-                            // mientras se lee la biblioteca del disco.
-                            if (vm.loaded) {
-                                item(key = "add") { AddTile(m, addFocused, look) { vm.go(Screen.Add) } }
-                            }
+                        }
+                        // "Añadir" es una card más y va al final de la fila: en
+                        // cuanto entra un juego se corre detrás de todos sin dejar
+                        // de estar a mano. El `loaded` evita que la card asome
+                        // mientras se lee la biblioteca del disco.
+                        if (vm.loaded) {
+                            item(key = "add") { AddTile(tile, addFocused, look) { vm.go(Screen.Add) } }
                         }
                     }
-                    PadHints(
-                        hints = if (showEmpty) EMPTY_HINTS else LIBRARY_HINTS,
-                        visible = vm.input.gamepadPresent,
-                        modifier = Modifier.align(Alignment.BottomStart).padding(start = m.pad - 10.dp, bottom = 2.dp),
-                    )
                 }
+                PadHints(
+                    hints = libraryHints(vm, showEmpty),
+                    visible = vm.input.gamepadPresent,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(start = m.pad - 10.dp, bottom = 2.dp),
+                )
             }
         }
 
-        MashaFab(vm, m, floatClock)
+        // Ventana estrecha: el dock flota en la costura, sin tapar el titular.
+        if (!dockInBar) {
+            SectionDock(
+                vm,
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = m.iconHeroH - seamRise),
+                // Media cápsula cae sobre el estante, que en claro es perla: cristal más denso.
+                glassMinAlpha = DockPalettes.SEAM_GLASS_MIN,
+            ) { sortAnchor.value = it }
+        }
+
+        MashaInsight(vm, mashaAnchor.value, mashaHost.value)
+
+        SortPopover(
+            visible = vm.sortMenuOpen,
+            anchor = { sortAnchor.value },
+            title = stringResource(R.string.sort_by),
+            caption = pluralStringResource(R.plurals.items_count, items.size, items.size),
+            options = SortMode.entries.map { stringResource(it.label) },
+            selected = SortMode.entries.indexOf(vm.settings.sortMode),
+            focusIndex = if (vm.input.active) vm.input.sortFocus else -1,
+            onPick = { vm.pickSort(SortMode.entries[it]) },
+            onDismiss = vm::closeSortMenu,
+        )
     }
+}
+
+/** Tope del lado de la card de icono ya crecida (el tope de `metrics()` más el crecimiento). */
+private const val ICON_TILE_LIMIT = 185f
+
+/** Cuerpo (sp) del nombre bajo la card de la biblioteca. */
+private const val LIBRARY_LABEL_SP = 9.5f
+
+/** Hueco y línea del nombre bajo la card (dp), con la escala de letra del sistema. */
+@Composable
+internal fun labelBlock(sp: Float): Float = ShelfLayout.LABEL_GAP + sp * 1.45f * LocalDensity.current.fontScale
+
+/** Margen bajo el bloque de título del hero (el dock de la costura no puede pasar de ahí). */
+private fun heroInfoBottomPad(m: Metrics): Dp = if (m.landscape) 8.dp else 18.dp
+
+/** El dock de secciones con el botón de orden al lado. */
+@Composable
+private fun SectionDock(
+    vm: ElyndraViewModel,
+    modifier: Modifier = Modifier,
+    glassMinAlpha: Float = DARK_GLASS_MIN,
+    onSortBounds: (Rect) -> Unit,
+) {
+    val filters = vm.availableFilters()
+    val dockFocused = vm.input.isBarFocused(BarItem.Sections)
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        DotTabs(
+            labels = filters.map { stringResource(it.label) },
+            selected = filters.indexOf(vm.filter).coerceAtLeast(0),
+            onSelect = { i -> filters.getOrNull(i)?.let(vm::updateFilter) },
+            focused = dockFocused,
+            focusIndex = if (dockFocused) vm.input.dockFocus else -1,
+            glassMinAlpha = glassMinAlpha,
+        )
+        Spacer(Modifier.width(8.dp))
+        SortButton(
+            description = stringResource(R.string.sort_button_a11y, stringResource(vm.settings.sortMode.label)),
+            open = vm.sortMenuOpen,
+            onClick = { if (vm.sortMenuOpen) vm.closeSortMenu() else vm.openSortMenu() },
+            focused = vm.input.isBarFocused(BarItem.Sort),
+            glassMinAlpha = glassMinAlpha,
+            modifier = Modifier.onGloballyPositioned { onSortBounds(it.boundsInWindow()) },
+        )
+    }
+}
+
+/** Las pistas del pie según lo que señale el mando: el carrusel, el dock, el botón de orden o su menú. */
+private fun libraryHints(vm: ElyndraViewModel, empty: Boolean): List<PadHint> = when {
+    vm.sortMenuOpen -> SORT_MENU_HINTS
+    vm.input.isBarFocused(BarItem.Sections) -> DOCK_HINTS
+    vm.input.isBarFocused(BarItem.Sort) -> SORT_HINTS
+    empty -> EMPTY_HINTS
+    else -> LIBRARY_HINTS
 }
 
 /** Las pistas del mando al pie de la biblioteca. */
@@ -394,6 +487,24 @@ private val LIBRARY_HINTS = listOf(
 private val EMPTY_HINTS = listOf(
     PadHint("A", R.string.hint_select),
     PadHint("LB / RB", R.string.hint_section),
+)
+
+/** En el dock: A elige la sección señalada. */
+private val DOCK_HINTS = listOf(
+    PadHint("A", R.string.hint_select),
+    PadHint("LB / RB", R.string.hint_section),
+    PadHint("B", R.string.hint_back),
+)
+
+private val SORT_HINTS = listOf(
+    PadHint("A", R.string.sort_by),
+    PadHint("LB / RB", R.string.hint_section),
+    PadHint("B", R.string.hint_back),
+)
+
+private val SORT_MENU_HINTS = listOf(
+    PadHint("A", R.string.hint_select),
+    PadHint("B", R.string.close),
 )
 
 /**
@@ -619,158 +730,65 @@ private fun SearchField(vm: ElyndraViewModel, m: Metrics) {
     }
 }
 
-/** Lado del botón de Masha: flota sobre el hero, así que no se ata a nada. */
-private val MASHA_FAB = 58.dp
+/** Lado del emblema de Masha: algo mayor que las píldoras de la barra (34 dp), como un avatar. */
+private val MASHA_BUTTON = 40.dp
 
 /**
- * Botón de Masha, con el aro que late.
+ * El botón de Masha: su emblema, fijo en la barra del hero, arriba a la
+ * izquierda —la primera pieza de la barra, también para el mando—. Va dentro
+ * del layout, así que no tapa nada ni se puede arrastrar encima del carrusel.
  *
- * Nace **arriba a la izquierda**, a la altura de la barra del hero, y flota
- * con un vaivén vertical muy suave. Se arrastra directamente con el dedo a
- * cualquier punto de la pantalla —soltando partículas fosforescentes del
- * color elegido en Ajustes— y ahí se queda, también al volver a abrir la app
- * ([com.elyndra.launcher.ui.SettingsController.moveMasha]).
- *
- * El estado del arrastre ([dragDp]) no se recrea nunca y el detector tiene
- * llave fija y lee los límites actuales con `rememberUpdatedState`: si el
- * estado dependiera de la posición guardada, tras el primer arrastre el
- * detector seguiría escribiendo en el estado viejo (el botón se quedaba
- * quieto y luego saltaba). Posición, escala y flotación se leen en las fases
- * de layout/capa, así que arrastrar no recompone.
- *
- * La posición se guarda en dp desde la esquina superior izquierda y se recorta
- * al pintar, no al guardar: así girar el móvil lo devuelve a la pantalla sin
- * perder el sitio que tenía en la otra orientación.
+ * Mide 40 dp pero en la barra cuenta como una píldora de 34 (no la desalinea)
+ * y se toca en 48 × 48. Alrededor flotan sus partículas, del color de Masha
+ * (Ajustes → Masha; ver [mashaAura]). [onBounds] recibe su rectángulo en la
+ * ventana: de ahí sale el bocadillo.
  */
 @Composable
-private fun MashaFab(vm: ElyndraViewModel, metrics: Metrics, bobClock: FloatClock) {
-    val skin = LocalSkin.current
-    val screen = LocalScreenSize.current
-    val haptics = LocalHapticFeedback.current
-    val ring = ringProgress()
+private fun MashaButton(vm: ElyndraViewModel, onBounds: (Rect) -> Unit) {
     val shape = CircleShape
-
-    val maxX = (screen.width - MASHA_FAB).value.coerceAtLeast(0f)
-    val maxY = (screen.height - MASHA_FAB).value.coerceAtLeast(0f)
-    // Arriba a la izquierda, centrado en la altura de la barra del hero.
-    val barTop = if (metrics.landscape) 8f else 16f
-    val homeX = metrics.pad.value.coerceAtMost(maxX)
-    val homeY = (barTop + HeroBarHeight.value / 2f - MASHA_FAB.value / 2f).coerceIn(4f, maxY.coerceAtLeast(4f))
-
-    // Límites y posición de reposo, siempre al día para el detector de gestos
-    // (que no se reinicia al cambiar: ver el comentario de arriba).
-    val bounds by rememberUpdatedState(Offset(maxX, maxY))
-    val rest by rememberUpdatedState(Offset(vm.settings.mashaX ?: homeX, vm.settings.mashaY ?: homeY))
-    // Posición mientras se arrastra (dp); null = en reposo, manda lo guardado.
-    val dragDp = remember { mutableStateOf<Offset?>(null) }
-    val dragging = dragDp.value != null
-
-    val particles = rememberParticleField()
-    val particleColor = Color(vm.settings.mashaParticleColor)
-
-    // Mientras se arrastra crece un poco y levanta más sombra: es lo que
-    // distingue "lo llevo en el dedo" de "lo he pulsado". La flotación se
-    // apaga en el dedo y vuelve al soltar.
-    val lift = animateFloatAsState(if (dragging) 1.12f else 1f, motion(Springs.snappy()), label = "mashaLift")
-    val bob = animateFloatAsState(if (dragging) 0f else 1f, motion(Springs.fade()), label = "mashaBob")
-    val reduced = LocalReducedMotion.current
-
-    fun current(): Offset {
-        val p = dragDp.value ?: rest
-        return Offset(p.x.coerceIn(0f, bounds.x), p.y.coerceIn(0f, bounds.y))
-    }
-
-    // La estela, debajo del botón.
-    ParticleLayer(particles, particleColor, Modifier.fillMaxSize())
-
+    val interaction = remember { MutableInteractionSource() }
     Box(
         Modifier
-            // Posición leída en la fase de layout: moverlo no recompone.
-            .offset {
-                val p = current()
-                IntOffset(p.x.dp.roundToPx(), p.y.dp.roundToPx())
+            .layout { measurable, _ ->
+                val touch = 48.dp.roundToPx()
+                val placeable = measurable.measure(Constraints.fixed(touch, touch))
+                val w = MASHA_BUTTON.roundToPx()
+                val h = HeroBarHeight.roundToPx()
+                layout(w, h) { placeable.place((w - touch) / 2, (h - touch) / 2) }
             }
-            .size(MASHA_FAB)
-            .graphicsLayer {
-                scaleX = lift.value
-                scaleY = lift.value
-                // Vaivén vertical muy sutil y continuo (±3 dp, ~4 s).
-                if (!reduced) {
-                    translationY = kotlin.math.sin(bobClock.seconds / 4f * 2f * Math.PI.toFloat()) * 3.dp.toPx() * bob.value
-                }
-            }
-            // Una sola sombra y solo por fuera: el botón es de cristal y una
-            // sombra de elevación se veía a través de él.
-            .outerShadow(
-                if (dragging) 22.dp else 14.dp,
-                shape,
-                ambientColor = if (dragging) particleColor else P.shade.copy(alpha = 0.3f),
-                spotColor = if (dragging) particleColor else P.shade.copy(alpha = 0.3f),
-            )
-            .glass(shape, shadow = 0.dp)
-            .consoleFocus(vm.input.isBarFocused(BarItem.Masha), shape)
-            .shapeClickable(shape) { vm.go(Screen.Masha) }
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = {
-                        dragDp.value = current()
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    },
-                    onDragEnd = {
-                        val p = current()
-                        vm.settings.moveMasha(p.x, p.y)
-                        dragDp.value = null
-                    },
-                    onDragCancel = {
-                        val p = current()
-                        vm.settings.moveMasha(p.x, p.y)
-                        dragDp.value = null
-                    },
-                    onDrag = { change, delta ->
-                        change.consume()
-                        val from = dragDp.value ?: current()
-                        val to = Offset(
-                            (from.x + delta.x.toDp().value).coerceIn(0f, bounds.x),
-                            (from.y + delta.y.toDp().value).coerceIn(0f, bounds.y),
-                        )
-                        dragDp.value = to
-                        // Chispas alrededor del centro, más cuanto más se mueve.
-                        val half = MASHA_FAB.toPx() / 2f
-                        particles.emit(
-                            cx = to.x.dp.toPx() + half,
-                            cy = to.y.dp.toPx() + half,
-                            dx = delta.x,
-                            dy = delta.y,
-                            spread = half,
-                            density = density,
-                        )
-                    },
-                )
-            },
+            .semantics(mergeDescendants = true) { role = Role.Button }
+            .clickable(interactionSource = interaction, indication = null) { vm.go(Screen.Masha) },
         contentAlignment = Alignment.Center,
     ) {
         Box(
             Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    val k = 1f + 0.85f * ring
-                    scaleX = k
-                    scaleY = k
-                    alpha = 0.5f * (1f - ring)
-                }
-                .border(1.5.dp, if (dragging) particleColor else skin.a1, shape),
-        )
-        // El logo, llenando el botón: es lo que tiene que verse.
-        Image(
-            painterResource(R.drawable.masha),
-            contentDescription = stringResource(R.string.masha),
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.size(MASHA_FAB * 0.86f).clip(shape),
-        )
+                .size(MASHA_BUTTON)
+                .onGloballyPositioned { onBounds(it.boundsInWindow()) }
+                .pressFeedback(interaction)
+                .mashaAura(vm.settings.mashaParticleColor)
+                .outerShadow(10.dp, shape, ambientColor = P.shade.copy(alpha = 0.45f), spotColor = P.shade.copy(alpha = 0.45f))
+                .consoleFocus(vm.input.isBarFocused(BarItem.Masha), shape)
+                .indication(interaction, focusRing(shape)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                painterResource(R.drawable.masha),
+                contentDescription = stringResource(R.string.masha),
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
+}
 
-    // La línea ambiental de Masha, junto a su botón. Se recoge sola al rato:
-    // está para enterarse de un vistazo, no para quedarse tapando el carrusel.
+/**
+ * La línea ambiental de Masha, bajo su emblema. Se recoge sola al rato: está
+ * para enterarse de un vistazo, no para quedarse tapando el hero.
+ */
+@Composable
+private fun MashaInsight(vm: ElyndraViewModel, anchor: Rect, host: Offset) {
+    val screen = LocalScreenSize.current
+    val density = LocalDensity.current
     val insight = vm.masha.insight
     val revision = vm.masha.insightRevision
     var bubble by remember(insight?.id, revision) { mutableStateOf(insight != null) }
@@ -780,17 +798,18 @@ private fun MashaFab(vm: ElyndraViewModel, metrics: Metrics, bobClock: FloatCloc
             bubble = false
         }
     }
-    if (insight != null && bubble && !dragging) {
-        val anchor = current()
+    if (insight == null || !bubble || anchor == Rect.Zero) return
+    with(density) {
         MashaInsightBubble(
             text = vm.masha.insightText(insight).resolve(),
-            anchorX = anchor.x.dp,
-            anchorY = anchor.y.dp,
-            anchorSize = MASHA_FAB,
+            anchorX = (anchor.left - host.x).toDp(),
+            anchorY = (anchor.top - host.y).toDp(),
+            anchorSize = anchor.width.toDp(),
             screen = screen,
             onTap = { vm.masha.actOnInsight(vm.settings.lang) },
             onDismiss = { vm.masha.dismissInsight() },
             key = insight.id,
+            below = true,
         )
     }
 }
@@ -804,7 +823,7 @@ private const val MASHA_BUBBLE_MS = 14_000L
  * pasando del último juego ([focused]) y se abre con A, como cualquier otra.
  */
 @Composable
-private fun AddTile(metrics: Metrics, focused: Boolean, look: SelectionLook, onClick: () -> Unit) {
+private fun AddTile(tile: Dp, focused: Boolean, look: SelectionLook, onClick: () -> Unit) {
     val skin = LocalSkin.current
     val lift = selectionLift(focused)
     val scale = selectionScale(focused)
@@ -815,7 +834,7 @@ private fun AddTile(metrics: Metrics, focused: Boolean, look: SelectionLook, onC
     Column(
         Modifier
             .zIndex(if (focused) 1f else 0f)
-            .width(metrics.iconTile)
+            .width(tile)
             .offset(y = lift)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -823,7 +842,7 @@ private fun AddTile(metrics: Metrics, focused: Boolean, look: SelectionLook, onC
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(metrics.iconTile)
+                .height(tile)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
@@ -855,7 +874,9 @@ private fun LibraryTile(
     item: LibraryItem,
     selected: Boolean,
     look: SelectionLook,
-    metrics: Metrics,
+    /** Lado de la card cuadrada (lo decide [ShelfLayout]). */
+    tile: Dp,
+    landscape: Boolean,
     fallback: ArtFallback,
     onTap: () -> Unit,
     onOpen: () -> Unit,
@@ -866,7 +887,7 @@ private fun LibraryTile(
 ) {
     // Juegos Android y carpetas de emulador se representan con icono, no con
     // carátula: su contenedor es cuadrado.
-    val width: Dp = metrics.iconTile
+    val width: Dp = tile
     val lift = selectionLift(selected)
     val scale = selectionScale(selected)
     val press = rememberPress()
@@ -923,7 +944,7 @@ private fun LibraryTile(
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(metrics.iconTile)
+                .height(tile)
                 .graphicsLayer {
                     scaleX = scale * pressed.value
                     scaleY = scale * pressed.value
@@ -986,7 +1007,7 @@ private fun LibraryTile(
                         item.system.short,
                         // La card de carpeta ya no es apaisada, sino una carátula 2:3:
                         // el rótulo se mide contra su ancho, no contra su alto.
-                        size = (metrics.iconTile.value * if (metrics.landscape) 0.2f else 0.18f).coerceAtMost(26f),
+                        size = (tile.value * if (landscape) 0.2f else 0.18f).coerceAtMost(26f),
                         weight = FontWeight.Bold,
                         color = Color.White,
                         letterSpacing = tracking(-0.01f),

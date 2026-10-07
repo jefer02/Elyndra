@@ -109,7 +109,7 @@ private const val PICK_VALUE = 1f
 /**
  * Ajustes → Masha → color de las partículas: vista previa animada, colores de
  * partida y un deslizador de tono. Se guarda al momento (SettingsStore) y el
- * botón de Masha lo usa en el siguiente arrastre.
+ * polvo que rodea el emblema de Masha en la biblioteca cambia enseguida.
  */
 @Composable
 internal fun ParticleColorGroup(vm: ElyndraViewModel) {
