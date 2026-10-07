@@ -40,7 +40,6 @@
 
     <!-- フォルダー -->
     <string name="rom_chip">ROM · %1$s</string>
-    <string name="roms_header">ROM</string>
     <string name="folder_empty">このフォルダーに ROM がありません。再スキャンするか、システムの設定を確認してください。</string>
     <plurals name="roms_summary">
         <item quantity="other">%1$d ROM · %2$s</item>
@@ -61,6 +60,7 @@
     <string name="art_cleared">画像を削除しました</string>
 
     <string name="sort_by">並べ替え</string>
+    <string name="sort_button_a11y">並べ替え: %1$s</string>
     <string name="sort_name">名前 (A–Z)</string>
     <string name="sort_playtime">プレイ時間</string>
     <string name="sort_platform">プラットフォーム</string>
@@ -522,7 +522,7 @@
     <string name="masha_high_refresh">マーシャ：高リフレッシュ（120Hz）</string>
     <string name="masha_high_refresh_desc">オフの場合、マーシャは 60fps で動作します。ホログラムとしては十分滑らかで、GPU の負荷が半分になり、長い会話でもバッテリー消費と発熱を抑えます。</string>
     <string name="masha_particles_title">パーティクルの色</string>
-    <string name="masha_particles_desc">Masha をドラッグしたときに残る光の軌跡です。</string>
+    <string name="masha_particles_desc">ライブラリで Masha のエンブレムの周りに漂う粒子です。</string>
     <string name="masha_particles_hue">色相</string>
     <string name="masha_particles_preview">プレビュー</string>
     <string name="section_selection">選択</string>
