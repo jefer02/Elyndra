@@ -49,6 +49,8 @@ fun MashaInsightBubble(
     onTap: () -> Unit,
     onDismiss: () -> Unit,
     key: Any,
+    /** Debajo del botón, alineado a su izquierda (el botón está fijo en la barra), en vez de al lado. */
+    below: Boolean = false,
 ) {
     val skin = LocalSkin.current
     val shape = RoundedCornerShape(16.dp)
@@ -64,11 +66,19 @@ fun MashaInsightBubble(
                 val size = anchorSize.roundToPx()
                 val onRightHalf = left + size / 2 > screenW / 2
                 // Hacia el lado con sitio: el ancho disponible es lo que queda entre el botón y el borde.
-                val room = if (onRightHalf) left - gap - margin else screenW - (left + size + gap) - margin
+                val room = when {
+                    below -> screenW - left - margin
+                    onRightHalf -> left - gap - margin
+                    else -> screenW - (left + size + gap) - margin
+                }
                 val maxW = min(MAX_WIDTH.roundToPx(), room.coerceAtLeast(MIN_WIDTH.roundToPx()))
                 val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = maxW, minHeight = 0))
-                val x = if (onRightHalf) left - gap - placeable.width else left + size + gap
-                val y = top + size / 2 - placeable.height / 2
+                val x = when {
+                    below -> left
+                    onRightHalf -> left - gap - placeable.width
+                    else -> left + size + gap
+                }
+                val y = if (below) top + size + gap else top + size / 2 - placeable.height / 2
                 layout(placeable.width, placeable.height) {
                     placeable.place(
                         x.coerceIn(margin, (screenW - placeable.width - margin).coerceAtLeast(margin)),
