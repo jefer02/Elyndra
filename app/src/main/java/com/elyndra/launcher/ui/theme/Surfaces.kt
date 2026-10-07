@@ -224,13 +224,18 @@ fun Modifier.glass(
         .border(1.dp, rim, shape)
 }
 
-/** `darkGlass()` — la variante oscura del hero y la barra superior. */
+/**
+ * `darkGlass()` — la variante oscura del hero y la barra superior.
+ * [minAlpha] sube el suelo de la tinta para piezas que pueden caer sobre algo
+ * claro (el dock en la costura con el estante).
+ */
 @Composable
 fun Modifier.darkGlass(
     shape: Shape = RoundedCornerShape(12.dp),
+    minAlpha: Float = DARK_GLASS_MIN,
 ): Modifier {
     val skin = LocalSkin.current
-    val a = max(0.25f, skin.alpha * 0.6f)
+    val a = max(minAlpha, skin.alpha * 0.6f)
     return this
         .clip(shape)
         .background(P.shade.copy(alpha = a))
@@ -240,6 +245,9 @@ fun Modifier.darkGlass(
         .liquidSheen(0.7f)
         .border(1.dp, rimBrush(Color.White.copy(alpha = 0.28f)), shape)
 }
+
+/** Suelo de la tinta de [darkGlass] (con la transparencia del cristal al mínimo). */
+const val DARK_GLASS_MIN = 0.25f
 
 /**
  * `liquidGlass()` — cristal semitransparente sin base opaca.
