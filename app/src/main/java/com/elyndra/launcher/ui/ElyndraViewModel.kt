@@ -295,19 +295,22 @@ class ElyndraViewModel @Inject constructor(
         is LibraryItem.App -> "Android"
     }
 
-    /** Hoja de "Ordenar por" del carrusel. */
-    fun sortOptions() {
-        showSheet(
-            ActionSheetSpec(
-                UiText.res(R.string.sort_by),
-                null,
-                SortMode.entries.map { mode ->
-                    SheetAction(UiText.res(mode.label), selected = settings.sortMode == mode) {
-                        settings.setSort(mode)
-                    }
-                },
-            ),
-        )
+    /** El menú de orden de la biblioteca (bajo su botón, junto al dock de secciones). */
+    var sortMenuOpen by mutableStateOf(false); private set
+
+    fun openSortMenu() {
+        sortMenuOpen = true
+        input.onSortMenuShown(SortMode.entries.indexOf(settings.sortMode))
+    }
+
+    fun closeSortMenu() {
+        sortMenuOpen = false
+    }
+
+    /** Elegir un orden lo aplica (el mismo ajuste que Ajustes → Biblioteca) y cierra el menú. */
+    fun pickSort(mode: SortMode) {
+        settings.setSort(mode)
+        sortMenuOpen = false
     }
 
     fun selected(): LibraryItem? {
@@ -406,11 +409,12 @@ class ElyndraViewModel @Inject constructor(
     fun go(target: Screen) {
         if (target == Screen.Add) add.onOpen()
         if (target == Screen.Settings) settings.onOpen(fromPage = screen.isSettingsPage)
+        sortMenuOpen = false
         screen = target
     }
 
     val canGoBack: Boolean
-        get() = intro.visible || dialog != null || sheet != null || artPicker != null || identify.state != null || detailsKey != null || screen != Screen.Library || searchOpen
+        get() = intro.visible || dialog != null || sheet != null || artPicker != null || identify.state != null || detailsKey != null || sortMenuOpen || screen != Screen.Library || searchOpen
 
     /** Lo que hay abierto, para [BackPriority] ([keyboard]: el teclado en pantalla, que lo cierra el mando). */
     fun backState(keyboard: Boolean = false) = BackPriority.State(
@@ -421,6 +425,7 @@ class ElyndraViewModel @Inject constructor(
         artPicker = artPicker != null,
         identify = identify.state != null,
         details = detailsKey != null,
+        sortMenu = sortMenuOpen,
         screen = screen,
         priorityGrab = settings.priorityGrab != null,
         settingsPageOpen = settings.compact && settings.detailOpen,
@@ -435,6 +440,7 @@ class ElyndraViewModel @Inject constructor(
             BackPriority.Target.ArtPicker -> closeArtPicker()
             BackPriority.Target.Identify -> identify.close()
             BackPriority.Target.Details -> closeDetails()
+            BackPriority.Target.SortMenu -> closeSortMenu()
             // En Ajustes, atrás suelta la fuente cogida y, en ventana estrecha, vuelve a la lista.
             BackPriority.Target.PriorityGrab -> settings.releaseGrab()
             BackPriority.Target.SettingsCategory -> settings.closeCategory()

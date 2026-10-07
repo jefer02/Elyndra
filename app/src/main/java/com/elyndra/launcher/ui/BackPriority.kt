@@ -5,14 +5,14 @@ package com.elyndra.launcher.ui
  * solo orden para toda la app: lo de más arriba primero.
  *
  * Teclado → intro → diálogo → menú → selector de arte → editar nombre →
- * ficha → (en Ajustes) fuente cogida → página de Ajustes → pantalla →
+ * ficha → menú de orden → (en Ajustes) fuente cogida → página de Ajustes → pantalla →
  * buscador. Lógica pura: la usan [ElyndraViewModel.back] y el
  * [InputController], y se prueba en la JVM.
  */
 object BackPriority {
 
     enum class Target {
-        Keyboard, Intro, Dialog, Sheet, ArtPicker, Identify, Details,
+        Keyboard, Intro, Dialog, Sheet, ArtPicker, Identify, Details, SortMenu,
         PriorityGrab, SettingsCategory, SettingsPage, Screen, Search, None,
     }
 
@@ -24,6 +24,8 @@ object BackPriority {
         val artPicker: Boolean = false,
         val identify: Boolean = false,
         val details: Boolean = false,
+        /** El menú de orden de la biblioteca. */
+        val sortMenu: Boolean = false,
         val screen: Screen = Screen.Library,
         val priorityGrab: Boolean = false,
         /** Ajustes en ventana estrecha con una categoría abierta. */
@@ -39,6 +41,7 @@ object BackPriority {
         s.artPicker -> Target.ArtPicker
         s.identify -> Target.Identify
         s.details -> Target.Details
+        s.sortMenu -> Target.SortMenu
         s.screen == Screen.Settings && s.priorityGrab -> Target.PriorityGrab
         s.screen == Screen.Settings && s.settingsPageOpen -> Target.SettingsCategory
         s.screen.isSettingsPage -> Target.SettingsPage
