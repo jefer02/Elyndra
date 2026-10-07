@@ -44,7 +44,6 @@
 
     <!-- Dossier -->
     <string name="rom_chip">ROM · %1$s</string>
-    <string name="roms_header">ROMs</string>
     <string name="folder_empty">Aucune ROM dans ce dossier. Relancez l\'analyse ou vérifiez le système choisi.</string>
     <plurals name="roms_summary">
         <item quantity="one">%1$d ROM · %2$s</item>
@@ -67,6 +66,7 @@
     <string name="art_cleared">Image retirée</string>
 
     <string name="sort_by">Trier par</string>
+    <string name="sort_button_a11y">Trier par : %1$s</string>
     <string name="sort_name">Nom (A–Z)</string>
     <string name="sort_playtime">Temps de jeu</string>
     <string name="sort_platform">Plateforme</string>
@@ -553,7 +553,7 @@
     <string name="masha_high_refresh">Masha : haute fluidité (120 Hz)</string>
     <string name="masha_high_refresh_desc">Désactivé, Masha tourne à 60 i/s : tout aussi fluide pour un hologramme, avec deux fois moins de travail GPU, moins de batterie et moins de chaleur lors de longues conversations.</string>
     <string name="masha_particles_title">Couleur des particules</string>
-    <string name="masha_particles_desc">La traînée phosphorescente que laisse Masha quand on la déplace.</string>
+    <string name="masha_particles_desc">Les particules qui flottent autour de l’emblème de Masha dans la bibliothèque.</string>
     <string name="masha_particles_hue">Teinte</string>
     <string name="masha_particles_preview">Aperçu</string>
     <string name="section_selection">Sélection</string>
