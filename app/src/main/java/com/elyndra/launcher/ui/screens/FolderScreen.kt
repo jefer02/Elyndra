@@ -1,6 +1,16 @@
 package com.elyndra.launcher.ui.screens
 
 import com.elyndra.launcher.ui.components.NeedsNameBadge
+import com.elyndra.launcher.ui.ShelfLayout
+import com.elyndra.launcher.ui.DockPalettes
+import com.elyndra.launcher.ui.components.COVER_RATIO
+import com.elyndra.launcher.ui.components.CapsuleShape
+import com.elyndra.launcher.ui.components.dockSurface
+import com.elyndra.launcher.ui.theme.Springs
+import com.elyndra.launcher.ui.theme.motion
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.layout.layout
 import androidx.compose.animation.AnimatedContent
 import com.elyndra.launcher.ui.LibraryItem
 import com.elyndra.launcher.ui.components.ConsoleGlyph
@@ -133,8 +143,46 @@ fun FolderScreen(vm: ElyndraViewModel) {
     val floatClock = rememberFloatClock()
     // El marco de la selección (Ajustes → Apariencia): halo, partículas y su color.
     val look = rememberSelectionLook(vm.settings.selectionParticleColor, vm.settings.selectionGlow, vm.settings.selectionParticles)
+    val labelBlock = labelBlock(FOLDER_LABEL_SP)
 
-    Column(Modifier.fillMaxSize().animFadeIn(key = Screen.Folder)) {
+    BoxWithConstraints(Modifier.fillMaxSize().animFadeIn(key = Screen.Folder)) {
+        // Mismo reparto que la biblioteca (ver ShelfLayout): la carátula se centra
+        // bajo las fichas del estante y el arte del hero baja por detrás.
+        val shelfH = (maxHeight - m.heroH).value
+        val shelf = ShelfLayout.compute(
+            available = shelfH,
+            hintsVisible = vm.input.gamepadPresent,
+            aspect = COVER_RATIO,
+            base = m.romTileH.value,
+            topInset = FOLDER_CHIPS_INSET,
+            labelBlock = labelBlock,
+            minTile = if (m.landscape) 72f else 104f,
+            maxTile = m.romTileH.value * ShelfLayout.GROW,
+        )
+        // Sin ROMs no hay escena que continuar: el estado vacío va sobre el estante liso.
+        val extension = if (roms.isEmpty()) 0.dp else ShelfLayout.artExtension(shelfH, maxHeight.value, shelf.labelTop).dp
+        val rowY = animateFloatAsState(m.heroH.value + shelf.tileTop, motion(Springs.enter()), label = "folderRow")
+        FolderContent(vm, item, roms, rom, m, shelf, extension, { rowY.value }, emulatorLabel, carousel, floatClock, look, reduced)
+    }
+}
+
+@Composable
+private fun FolderContent(
+    vm: ElyndraViewModel,
+    item: LibraryItem.Folder,
+    roms: List<RomEntry>,
+    rom: RomEntry?,
+    m: Metrics,
+    shelf: ShelfLayout.Result,
+    extension: Dp,
+    rowY: () -> Float,
+    emulatorLabel: String,
+    carousel: androidx.compose.foundation.lazy.LazyListState,
+    floatClock: FloatClock,
+    look: SelectionLook,
+    reduced: Boolean,
+) {
+    Column(Modifier.fillMaxSize()) {
 
         Hero(
             fallback = rom?.let { vm.romFallback(it) } ?: vm.fallbackOf(item),
@@ -143,6 +191,7 @@ fun FolderScreen(vm: ElyndraViewModel) {
             backgroundVanishing = rom?.let { vm.isVanishingArt(it.key, ArtKind.Background) } == true,
             onBackgroundVanished = { vm.finishVanish() },
             height = m.heroH,
+            extension = extension,
             imagePath = rom?.let { it.meta.hero ?: it.meta.screenshot },
             topBar = {
                 BoxWithConstraints(
@@ -238,118 +287,149 @@ fun FolderScreen(vm: ElyndraViewModel) {
         )
 
         // ── ROMS ──
-        Column(Modifier.weight(1f).shelfSurface().padding(top = 10.dp)) {
-            Row(
-                Modifier.fillMaxWidth().padding(start = m.pad, end = m.pad, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                ElyText(stringResource(R.string.roms_header), size = 9.5f, weight = FontWeight.SemiBold, color = P.ink2, letterSpacing = tracking(0.24f))
-                // PS4: los .pkg que aún no se han extraído no son juegos; se
-                // cuentan aquí, discretos, y llevan a Bachata para instalarlos.
-                val notInstalled = vm.ps4NotInstalled[item.folder.id] ?: 0
-                if (notInstalled > 0) {
-                    Spacer(Modifier.width(8.dp))
-                    val pillShape = RoundedCornerShape(9.dp)
-                    Box(
-                        Modifier
-                            .weight(1f, fill = false)
-                            .clip(pillShape)
-                            .background(P.chip)
-                            .border(1.dp, P.ink.copy(alpha = 0.12f), pillShape)
-                            .shapeClickable(pillShape) { vm.openBachata() }
-                            .padding(horizontal = 8.dp, vertical = 3.dp),
-                    ) {
-                        ElyText(
-                            pluralStringResource(R.plurals.ps4_pkgs_not_installed, notInstalled, notInstalled),
-                            size = 8.5f,
-                            weight = FontWeight.Medium,
-                            color = P.ink2,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                Spacer(Modifier.weight(1f))
-                ElyText(
-                    pluralStringResource(R.plurals.roms_summary, roms.size, roms.size, fmtMinutes(item.minutes)),
-                    size = 9f,
-                    weight = FontWeight.Medium,
-                    color = P.ink2.copy(alpha = 0.8f),
-                    letterSpacing = tracking(0.18f),
-                    uppercase = true,
+        Box(Modifier.fillMaxWidth().weight(1f).shelfSurface(extension)) {
+            if (roms.isEmpty()) {
+                EmptyState(
+                    title = null,
+                    message = stringResource(R.string.folder_empty),
+                    actionLabel = stringResource(R.string.rescan_folder),
+                    onAction = { vm.rescanFolder(item.folder) },
+                    modifier = Modifier.fillMaxSize().padding(top = FOLDER_CHIPS_INSET.dp, bottom = if (vm.input.gamepadPresent) PAD_HINTS_HEIGHT else 0.dp),
+                    glyph = ConsoleGlyph.Folder,
                 )
-            }
-
-            Box(Modifier.fillMaxWidth().weight(1f)) {
-                if (roms.isEmpty()) {
-                    EmptyState(
-                        title = null,
-                        message = stringResource(R.string.folder_empty),
-                        actionLabel = stringResource(R.string.rescan_folder),
-                        onAction = { vm.rescanFolder(item.folder) },
-                        modifier = Modifier.fillMaxSize().padding(bottom = if (vm.input.gamepadPresent) PAD_HINTS_HEIGHT else 0.dp),
-                        glyph = ConsoleGlyph.Folder,
-                    )
-                } else {
-                    LazyRow(
-                        Modifier.fillMaxSize(),
-                        state = carousel,
-                        contentPadding = PaddingValues(
-                            start = m.pad,
-                            end = m.pad,
-                            // Hueco para la card seleccionada, que sube y se amplía: sin él
-                            // se metía sobre el rótulo de ROMS.
-                            top = m.carouselTop,
-                            bottom = m.carouselBottom,
-                        ),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.Top,
-                    ) {
-                        itemsIndexed(roms, key = { _, r -> r.id }) { i, r ->
-                            // Quitar el juego deshace la card entera; quitar solo
-                            // su carátula deshace únicamente la imagen, dentro.
-                            val selected = r.key == rom?.key
-                            DisintegratingContainer(
-                                isDisintegrating = vm.vanishing == r.key,
-                                onAnimationEnd = { vm.finishVanish() },
-                                // La seleccionada, por encima de sus vecinas: su halo no queda debajo.
-                                modifier = Modifier.zIndex(if (selected) 1f else 0f),
-                            ) {
-                                RomTile(
-                                    rom = r,
-                                    floatClock = floatClock,
-                                    time = playedLabel(r),
-                                    index = i,
-                                    selected = selected,
-                                    look = look,
-                                    fallback = vm.romFallback(r),
-                                    width = m.romW,
-                                    height = m.romTileH,
-                                    coverVanishing = vm.isVanishingArt(r.key, ArtKind.Cover),
-                                    onCoverVanished = { vm.finishVanish() },
-                                    coverMaterializing = vm.isMaterializingArt(r.key, ArtKind.Cover),
-                                    onCoverMaterialized = { vm.finishMaterializeArt() },
-                                    onTap = { vm.selectRom(r.key) },
-                                    onOpen = { vm.openRom(r) },
-                                    onBounds = vm::noteSelectedCard,
-                                    onLongPress = { bounds ->
-                                        vm.selectRom(r.key)
-                                        vm.markSheetOrigin(bounds)
-                                        vm.romOptions(r)
-                                    },
-                                )
-                            }
+            } else {
+                LazyRow(
+                    Modifier
+                        .fillMaxSize()
+                        .offset { IntOffset(0, (rowY() - m.heroH.value - shelf.tileTop).dp.roundToPx()) },
+                    state = carousel,
+                    contentPadding = PaddingValues(
+                        start = m.pad,
+                        end = m.pad,
+                        // Por encima queda el hueco para lo que la seleccionada sube, crece y alumbra.
+                        top = shelf.tileTop.dp,
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    itemsIndexed(roms, key = { _, r -> r.id }) { i, r ->
+                        // Quitar el juego deshace la card entera; quitar solo
+                        // su carátula deshace únicamente la imagen, dentro.
+                        val selected = r.key == rom?.key
+                        DisintegratingContainer(
+                            isDisintegrating = vm.vanishing == r.key,
+                            onAnimationEnd = { vm.finishVanish() },
+                            // La seleccionada, por encima de sus vecinas: su halo no queda debajo.
+                            modifier = Modifier.zIndex(if (selected) 1f else 0f),
+                        ) {
+                            RomTile(
+                                rom = r,
+                                floatClock = floatClock,
+                                time = playedLabel(r),
+                                index = i,
+                                selected = selected,
+                                look = look,
+                                fallback = vm.romFallback(r),
+                                width = shelf.tileWidth.dp,
+                                height = shelf.tileHeight.dp,
+                                coverVanishing = vm.isVanishingArt(r.key, ArtKind.Cover),
+                                onCoverVanished = { vm.finishVanish() },
+                                coverMaterializing = vm.isMaterializingArt(r.key, ArtKind.Cover),
+                                onCoverMaterialized = { vm.finishMaterializeArt() },
+                                onTap = { vm.selectRom(r.key) },
+                                onOpen = { vm.openRom(r) },
+                                onBounds = vm::noteSelectedCard,
+                                onLongPress = { bounds ->
+                                    vm.selectRom(r.key)
+                                    vm.markSheetOrigin(bounds)
+                                    vm.romOptions(r)
+                                },
+                            )
                         }
                     }
                 }
-                PadHints(
-                    hints = FOLDER_HINTS,
-                    visible = vm.input.gamepadPresent,
-                    modifier = Modifier.align(Alignment.BottomStart).padding(start = m.pad - 10.dp, bottom = 2.dp),
-                )
             }
+            FolderChips(vm, item, roms.size, Modifier.align(Alignment.TopStart).padding(start = m.pad, end = m.pad, top = FOLDER_CHIPS_TOP.dp))
+            PadHints(
+                hints = FOLDER_HINTS,
+                visible = vm.input.gamepadPresent,
+                modifier = Modifier.align(Alignment.BottomStart).padding(start = m.pad - 10.dp, bottom = 2.dp),
+            )
         }
 
+    }
+}
+
+/** Cuerpo (sp) del nombre bajo la carátula. */
+private const val FOLDER_LABEL_SP = 8.5f
+
+/** Las fichas de arriba del estante: margen, alto y lo que ocupan en total (dp). */
+private const val FOLDER_CHIPS_TOP = 8f
+private const val FOLDER_CHIPS_H = 24f
+private const val FOLDER_CHIPS_INSET = FOLDER_CHIPS_TOP + FOLDER_CHIPS_H + 4f
+
+/**
+ * El resumen de la carpeta (cuántas ROMs y cuánto se ha jugado) y, en PS4,
+ * los .pkg sin instalar, que llevan a Bachata. Van en fichas de la misma
+ * lámina que el dock: arriba del estante pasa el arte del juego y así se leen
+ * sobre cualquier imagen.
+ */
+@Composable
+private fun FolderChips(vm: ElyndraViewModel, item: LibraryItem.Folder, count: Int, modifier: Modifier = Modifier) {
+    val ink2 = Color(DockPalettes.ink2(P.isDark))
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .height(FOLDER_CHIPS_H.dp)
+                .dockSurface(CapsuleShape, elevation = 6.dp)
+                .padding(horizontal = 11.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            ElyText(
+                pluralStringResource(R.plurals.roms_summary, count, count, fmtMinutes(item.minutes)),
+                size = 8.5f,
+                weight = FontWeight.SemiBold,
+                color = ink2,
+                letterSpacing = tracking(0.16f),
+                uppercase = true,
+                maxLines = 1,
+            )
+        }
+        // PS4: los .pkg que aún no se han extraído no son juegos; se
+        // cuentan aquí, discretos, y llevan a Bachata para instalarlos.
+        val notInstalled = vm.ps4NotInstalled[item.folder.id] ?: 0
+        if (notInstalled > 0) {
+            // Se ve de 24 dp, pero la zona táctil sobresale hasta 48.
+            Box(
+                Modifier
+                    .weight(1f, fill = false)
+                    .layout { measurable, constraints ->
+                        val touch = 48.dp.roundToPx()
+                        val h = FOLDER_CHIPS_H.dp.roundToPx()
+                        val placeable = measurable.measure(constraints.copy(minHeight = touch, maxHeight = touch))
+                        layout(placeable.width, h) { placeable.place(0, (h - touch) / 2) }
+                    }
+                    .shapeClickable(CapsuleShape) { vm.openBachata() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier
+                        .height(FOLDER_CHIPS_H.dp)
+                        .dockSurface(CapsuleShape, elevation = 6.dp)
+                        .padding(horizontal = 10.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                ElyText(
+                    pluralStringResource(R.plurals.ps4_pkgs_not_installed, notInstalled, notInstalled),
+                    size = 8.5f,
+                    weight = FontWeight.Medium,
+                    color = ink2,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                }
+            }
+        }
     }
 }
 
