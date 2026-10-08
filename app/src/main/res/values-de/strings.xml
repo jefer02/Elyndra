@@ -872,4 +872,26 @@
     <string name="licenses_voice_title">Mashas natürliche Stimme</string>
     <string name="licenses_voice_notice">Mashas natürliche Stimme entsteht auf deinem Gerät mit den Gewichten des Modells Supertonic 3 von Supertone Inc. unter der Lizenz BigScience OpenRAIL-M. Die Stimme ist synthetisch (KI-generiert). Mit der Nutzung stimmst du zu, sie nicht für die eingeschränkten Zwecke aus Anhang A dieser Lizenz zu verwenden, unter anderem: Gesetze zu brechen, Minderjährigen zu schaden, Personen ohne ihre Zustimmung nachzuahmen, falsche Informationen zu verbreiten, um anderen zu schaden, zu belästigen oder die erzeugte Sprache auszugeben, ohne kenntlich zu machen, dass sie maschinell erzeugt ist.</string>
     <string name="licenses_voice_open">OpenRAIL-M-Lizenz lesen</string>
+
+    <!-- Ajustes: nombres de las muestras de color (lector de pantalla y rótulos). -->
+    <string name="tint_mist">Nebel</string>
+    <string name="tint_graphite">Graphit</string>
+    <string name="tint_haze">Dunst</string>
+    <string name="tint_paper">Papier</string>
+    <string name="tint_sand">Sand</string>
+    <string name="tint_amber">Bernstein</string>
+    <string name="tint_copper">Kupfer</string>
+    <string name="tint_mint">Minze</string>
+    <string name="tint_sky">Himmel</string>
+    <string name="tint_lilac">Flieder</string>
+    <string name="tint_smoke">Rauch</string>
+    <string name="tint_label">Glastönung: %1$s</string>
+    <string name="signature_label">Palette: %1$s</string>
+    <string name="signature_custom">Eigene Mischung (keine Palette)</string>
+    <string name="color_phosphor_green">Phosphorgrün</string>
+    <string name="color_amber">Bernstein</string>
+    <string name="color_magenta">Magenta</string>
+    <string name="color_red">Rot</string>
+    <string name="color_blue">Blau</string>
+    <string name="color_white">Weiß</string>
 </resources>

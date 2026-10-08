@@ -889,4 +889,26 @@
     <string name="licenses_voice_title">La voix naturelle de Masha</string>
     <string name="licenses_voice_notice">La voix naturelle de Masha est générée sur votre appareil avec les poids du modèle Supertonic 3 de Supertone Inc., sous licence BigScience OpenRAIL-M. La voix est synthétique (générée par IA). En l’utilisant, vous acceptez de ne pas l’employer pour les usages restreints de l’annexe A de cette licence, entre autres : enfreindre la loi, nuire à des mineurs, usurper l’identité de personnes sans leur consentement, diffuser de fausses informations pour nuire à autrui, harceler, ou présenter la voix générée sans indiquer qu’elle est produite par une machine.</string>
     <string name="licenses_voice_open">Lire la licence OpenRAIL-M</string>
+
+    <!-- Ajustes: nombres de las muestras de color (lector de pantalla y rótulos). -->
+    <string name="tint_mist">Brume</string>
+    <string name="tint_graphite">Graphite</string>
+    <string name="tint_haze">Voile</string>
+    <string name="tint_paper">Papier</string>
+    <string name="tint_sand">Sable</string>
+    <string name="tint_amber">Ambre</string>
+    <string name="tint_copper">Cuivre</string>
+    <string name="tint_mint">Menthe</string>
+    <string name="tint_sky">Ciel</string>
+    <string name="tint_lilac">Lilas</string>
+    <string name="tint_smoke">Fumée</string>
+    <string name="tint_label">Teinte du verre : %1$s</string>
+    <string name="signature_label">Palette : %1$s</string>
+    <string name="signature_custom">Mélange perso (aucune palette)</string>
+    <string name="color_phosphor_green">Vert phosphore</string>
+    <string name="color_amber">Ambre</string>
+    <string name="color_magenta">Magenta</string>
+    <string name="color_red">Rouge</string>
+    <string name="color_blue">Bleu</string>
+    <string name="color_white">Blanc</string>
 </resources>
