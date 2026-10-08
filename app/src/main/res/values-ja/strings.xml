@@ -818,7 +818,7 @@
     <string name="update_auto_title">自動で確認</string>
     <string name="update_auto_desc">Elyndra を開いたとき、1日に1回まで。</string>
     <string name="update_prerelease_title">ベータ版を含める</string>
-    <string name="update_prerelease_desc">現在 Elyndra はベータとして公開されています。オフにすると安定版のみが提案されます。</string>
+    <string name="update_prerelease_desc">ベータ版は次のバージョンの先行版で、不具合がある場合があります。オンにすると、安定版に加えてベータ版も提案されます。</string>
     <string name="update_privacy">確認では GitHub から Elyndra の公開リリース一覧をダウンロードするだけです。個人データは送信されません。</string>
     <string name="update_available_title">Elyndra %1$s が利用できます</string>
     <string name="update_available_msg">現在のバージョンは %1$s です。新機能：</string>

@@ -359,9 +359,9 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("update.auto", true)
         set(v) = prefs.edit { putBoolean("update.auto", v) }
 
-    /** Ofrecer también las pre-releases: las builds de Elyndra salen como beta. */
+    /** Ofrecer también las pre-releases (betas). Apagado de serie desde la 1.0.0, la primera estable. */
     var updatePrereleases: Boolean
-        get() = prefs.getBoolean("update.prereleases", true)
+        get() = prefs.getBoolean("update.prereleases", false)
         set(v) = prefs.edit { putBoolean("update.prereleases", v) }
 
     /** Última comprobación que llegó a GitHub (epoch ms); 0 = nunca. */

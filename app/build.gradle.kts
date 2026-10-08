@@ -40,12 +40,12 @@ android {
         applicationId = "com.elyndra.launcher"
         minSdk = 26
         targetSdk = 35
-        // versionName = la etiqueta de la release sin la "v" (v0.3.0-beta → "0.3.0-beta"):
+        // versionName = la etiqueta de la release sin la "v" (v1.0.0 → "1.0.0", v1.1.0-beta → "1.1.0-beta"):
         // el actualizador compara las dos como semver. versionCode sube siempre en 1 por
         // release y nunca baja (Android no instala por encima una versión menor).
         // Pasos para publicar: docs/RELEASING.md.
-        versionCode = 3
-        versionName = "0.3.0-beta"
+        versionCode = 4
+        versionName = "1.0.0"
         buildConfigField("String", "MASHA_API_KEY", quoted(localProp("masha.apiKey")))
         buildConfigField("String", "MASHA_MODEL", quoted(localProp("masha.model").ifEmpty { "deepseek-chat" }))
         buildConfigField("String", "MASHA_BASE_URL", quoted(localProp("masha.baseUrl").ifEmpty { "https://api.deepseek.com" }))
