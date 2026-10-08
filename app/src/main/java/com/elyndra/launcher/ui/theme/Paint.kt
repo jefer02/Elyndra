@@ -100,6 +100,13 @@ fun heroEdgeScrimBrush(scrim: Float, size: Size): Brush = cssLinearGradient(
     stops = listOf(0f, 0.30f, 0.58f, 1f),
 )
 
+/**
+ * El color con el que acaba cada velo del hero en su canto inferior: la
+ * extensión del arte arranca de él para que no se vea la costura.
+ */
+fun heroScrimBottom(scrim: Float, art: Boolean): Color =
+    if (art) Color.Black.copy(alpha = scrim * 0.85f) else P.shade.copy(alpha = minOf(0.96f, scrim + 0.30f))
+
 /** Velo del rótulo de consola: `linear-gradient(90deg, rgba(51,51,51,.55), rgba(51,51,51,.12))`. */
 fun consoleFaceBrush(size: Size): Brush = cssLinearGradient(
     90f,

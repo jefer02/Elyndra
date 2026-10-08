@@ -15,7 +15,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
@@ -37,6 +36,15 @@ import com.elyndra.launcher.ui.theme.Springs
 import com.elyndra.launcher.ui.theme.motion
 import com.elyndra.launcher.ui.theme.heroEdgeScrimBrush
 import com.elyndra.launcher.ui.theme.heroScrimBrush
+import com.elyndra.launcher.ui.theme.heroScrimBottom
+import com.elyndra.launcher.ui.theme.shelfColor
+import com.elyndra.launcher.ui.ShelfLayout
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.layout
 import com.elyndra.launcher.ui.theme.liquidGlass
 import java.io.File
 
@@ -147,8 +155,11 @@ fun metrics(): Metrics {
     val screen = LocalScreenSize.current
     val w = screen.width.value
     val h = screen.height.value
-    // Alto fijo que no es ni hero ni card: la fila de filtros (pestañas con
-    // zona táctil de 40 dp), el nombre bajo la card y el aire entre medias.
+    // Alto fijo que no es ni hero ni card: el nombre bajo la card y el aire
+    // entre medias, más el alto de la antigua fila de filtros. Esa fila ya no
+    // existe (el dock va en la barra o en la costura), pero se sigue
+    // descontando para que el hero no cambie: ese alto es ahora del estante,
+    // y `ShelfLayout` lo reparte entre una card algo mayor y aire alrededor.
     val fixed = if (l) 66f else 78f
     val bottom = (if (l) 6f else 10f) + if (LocalPadHints.current) PAD_HINTS_HEIGHT.value else 0f
     // La card seleccionada sube [SelectionLift] y se amplía [SelectionScale]
@@ -229,6 +240,13 @@ fun metrics(): Metrics {
  * una deriva muy lenta) y encima el velo entero del diseño, para que el
  * texto blanco se lea. Sin juego ([fallback] null), el cristal, que deja ver
  * la aurora.
+ *
+ * Con [extension] el fondo sigue hacia abajo, por detrás del estante: es la
+ * misma imagen (el mismo `AsyncImage`, anclado arriba y recortado), más alta,
+ * y se funde con su velo en el color liso del estante ([shelfColor]). Así el
+ * estante es parte de la escena y no un panel suelto. El estante tiene que
+ * pintarse con `shelfSurface(extension)`, que deja ese tramo sin fondo. El
+ * alto que ocupa el hero en la columna sigue siendo [height].
  */
 @Composable
 fun Hero(
@@ -237,69 +255,162 @@ fun Hero(
     modifier: Modifier = Modifier,
     height: Dp,
     imagePath: String? = null,
+    extension: Dp = 0.dp,
     /** El fondo se está quitando: se deshace en polvo antes de irse. */
     backgroundVanishing: Boolean = false,
     onBackgroundVanished: () -> Unit = {},
+    /** Sin juego: el escenario del estado vacío en vez del cristal (ver [HeroArtLayer]). */
+    stage: (@Composable () -> Unit)? = null,
     topBar: @Composable BoxScope.() -> Unit,
     info: @Composable BoxScope.() -> Unit,
 ) {
     val skin = LocalSkin.current
-    val context = LocalContext.current
-    val reduced = LocalReducedMotion.current
-    // Un fondo que *acaba de llegar* —lo ha bajado el motor de metadatos, o lo
-    // acaba de poner el usuario— se monta desde el polvo. Uno que solo cambia
-    // porque se ha seleccionado otro juego no: ahí el fondo no es una novedad,
-    // es otro juego (ver [rememberArtArrival]).
-    val arriving = rememberArtArrival(imagePath, heroKey)
-    val target = HeroBackdrop(imagePath, fallback, heroKey)
+    val shelf = shelfColor()
     Box(
         modifier
             .fillMaxWidth()
-            .height(height)
-            .clipToBounds(),
+            .height(height),
     ) {
-        // Cambiar de juego funde un fondo en otro, y el nuevo se asienta con un
-        // acercamiento muy lento (en la capa: no recompone nada).
-        Crossfade(targetState = target, animationSpec = motion(Springs.fade()), label = "heroBackdrop") { bg ->
-            val current = bg == target
-            Box(Modifier.fillMaxSize().slowSettle(reduced)) {
-                if (bg.imagePath != null) {
-                    val file = remember(bg.imagePath) { File(context.filesDir, bg.imagePath) }
-                    MaterializingContainer(
-                        isMaterializing = current && arriving.active,
-                        onAnimationEnd = arriving::done,
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
-                        DisintegratingContainer(
-                            isDisintegrating = current && backgroundVanishing,
-                            onAnimationEnd = onBackgroundVanished,
-                            modifier = Modifier.fillMaxSize(),
-                        ) {
-                            AsyncImage(
-                                model = file,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        }
-                    }
-                } else if (bg.fallback != null) {
-                    FallbackArt(bg.fallback, ArtVariant.Banner, Modifier.fillMaxSize(), drift = true)
-                } else {
-                    // El cristal es material de la pantalla, no del juego.
-                    Box(Modifier.fillMaxSize().liquidGlass(RectangleShape, Color.Transparent))
+        // El fondo mide hero + extensión, pero en la columna solo cuenta el hero:
+        // el resto asoma por debajo, detrás del estante.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .layout { measurable, constraints ->
+                    val h = height.roundToPx() + extension.roundToPx()
+                    val placeable = measurable.measure(constraints.copy(minHeight = h, maxHeight = h))
+                    layout(placeable.width, constraints.maxHeight) { placeable.place(0, 0) }
                 }
+                .clipToBounds(),
+        ) {
+            HeroArtLayer(
+                fallback = fallback,
+                heroKey = heroKey,
+                imagePath = imagePath,
+                backgroundVanishing = backgroundVanishing,
+                onBackgroundVanished = onBackgroundVanished,
+                modifier = Modifier.fillMaxSize(),
+                stage = stage,
+            ) { art ->
+                // Con fondo, solo los cantos; sin él, el velo entero del diseño.
+                // Debajo del hero, la franja del titular se apaga.
+                Box(Modifier.fillMaxSize().heroScrims(height, art = art, skin.scrim))
             }
-            // Con fondo, solo los cantos; sin él, el velo entero del diseño.
-            Box(
-                Modifier.fillMaxSize().drawBehind {
-                    drawRect(if (bg.imagePath != null) heroEdgeScrimBrush(skin.scrim, size) else heroScrimBrush(skin.scrim, size))
-                },
-            )
+            if (extension > 0.dp) Box(Modifier.fillMaxSize().shelfRise(height, shelf))
         }
         topBar()
         info()
     }
+}
+
+/**
+ * El arte del hero: la imagen del juego (o su arte de reserva, o el cristal
+ * si no hay juego). Cambiar de juego funde un fondo en otro, y el nuevo se
+ * asienta con un acercamiento muy lento (en la capa: no recompone nada).
+ *
+ * Un fondo que *acaba de llegar* —lo ha bajado el motor de metadatos, o lo
+ * acaba de poner el usuario— se monta desde el polvo; uno que solo cambia
+ * porque se ha seleccionado otro juego no (ver [rememberArtArrival]). Quitarlo
+ * lo deshace en polvo antes de borrarlo.
+ *
+ * [layer] da la capa de cada fondo según su clave (el paralaje de Meridian);
+ * [overlay] se pinta encima de cada uno, dentro del fundido (los velos del hero).
+ * [stage] sustituye al cristal cuando no hay juego (el escenario del estado
+ * vacío, ver [EmptyStageBackdrop]); ese fondo ya lleva su propia luz y no
+ * recibe [overlay]: los velos están pensados para leer texto sobre arte.
+ */
+@Composable
+internal fun HeroArtLayer(
+    fallback: ArtFallback?,
+    heroKey: Any,
+    imagePath: String?,
+    backgroundVanishing: Boolean,
+    onBackgroundVanished: () -> Unit,
+    modifier: Modifier = Modifier,
+    layer: (key: Any) -> Modifier = { Modifier },
+    stage: (@Composable () -> Unit)? = null,
+    overlay: @Composable (art: Boolean) -> Unit = {},
+) {
+    val context = LocalContext.current
+    val reduced = LocalReducedMotion.current
+    val arriving = rememberArtArrival(imagePath, heroKey)
+    val target = HeroBackdrop(imagePath, fallback, heroKey)
+    Crossfade(targetState = target, modifier = modifier, animationSpec = motion(Springs.fade()), label = "heroBackdrop") { bg ->
+        val current = bg == target
+        Box(Modifier.fillMaxSize().then(layer(bg.key)).slowSettle(reduced)) {
+            if (bg.imagePath != null) {
+                val file = remember(bg.imagePath) { File(context.filesDir, bg.imagePath) }
+                MaterializingContainer(
+                    isMaterializing = current && arriving.active,
+                    onAnimationEnd = arriving::done,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    DisintegratingContainer(
+                        isDisintegrating = current && backgroundVanishing,
+                        onAnimationEnd = onBackgroundVanished,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        AsyncImage(
+                            model = file,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            alignment = Alignment.TopCenter,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+            } else if (bg.fallback != null) {
+                FallbackArt(bg.fallback, ArtVariant.Banner, Modifier.fillMaxSize(), drift = true)
+            } else if (stage != null) {
+                stage()
+            } else {
+                // El cristal es material de la pantalla, no del juego.
+                Box(Modifier.fillMaxSize().liquidGlass(RectangleShape, Color.Transparent))
+            }
+        }
+        if (bg.imagePath != null || bg.fallback != null || stage == null) overlay(bg.imagePath != null)
+    }
+}
+
+/**
+ * Los velos del hero y de su extensión, con mezcla normal y sin capas aparte:
+ * el del hero en su alto y, debajo, la franja oscura del titular que se apaga
+ * ([ShelfLayout.TITLE_BAND]). Van con cada fondo, dentro del fundido.
+ */
+internal fun Modifier.heroScrims(heroHeight: Dp, art: Boolean, scrim: Float): Modifier = drawWithCache {
+    val heroPx = heroHeight.roundToPx().toFloat().coerceAtMost(size.height)
+    val ext = size.height - heroPx
+    val heroSize = Size(size.width, heroPx)
+    val hero = if (art) heroEdgeScrimBrush(scrim, heroSize) else heroScrimBrush(scrim, heroSize)
+    val band = rampBrush(ShelfLayout.TITLE_BAND, heroScrimBottom(scrim, art), heroPx, size.height)
+    val top = Offset(0f, heroPx)
+    val extSize = Size(size.width, ext)
+    onDrawBehind {
+        drawRect(hero, size = heroSize)
+        if (ext > 0f) drawRect(band, topLeft = top, size = extSize)
+    }
+}
+
+/**
+ * El color del estante que sube de transparente a liso sobre la extensión
+ * ([ShelfLayout.SHELF_RAMP]). Se pinta **una vez**, encima del fundido entre
+ * fondos: dentro de él, a mitad de un cambio de juego, las dos capas a medio
+ * fundir dejaban ver el fondo justo en la costura con el estante.
+ */
+internal fun Modifier.shelfRise(heroHeight: Dp, shelf: Color): Modifier = drawWithCache {
+    val heroPx = heroHeight.roundToPx().toFloat().coerceAtMost(size.height)
+    val rise = rampBrush(ShelfLayout.SHELF_RAMP, shelf, heroPx, size.height)
+    val top = Offset(0f, heroPx)
+    val extSize = Size(size.width, size.height - heroPx)
+    onDrawBehind {
+        if (extSize.height > 0f) drawRect(rise, topLeft = top, size = extSize)
+    }
+}
+
+/** Un degradado vertical de [color] con la rampa de alfas [stops] (pares posición, factor) entre [startY] y [endY]. */
+private fun rampBrush(stops: FloatArray, color: Color, startY: Float, endY: Float): Brush {
+    val pairs = Array(stops.size / 2) { i -> stops[i * 2] to color.copy(alpha = color.alpha * stops[i * 2 + 1]) }
+    return Brush.verticalGradient(*pairs, startY = startY, endY = endY)
 }
 
 /** Lo que pinta el fondo del hero: cambia (y se funde) cuando cambia cualquiera de los tres. */

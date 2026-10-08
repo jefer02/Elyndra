@@ -28,6 +28,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.data.P
+import com.elyndra.launcher.data.argb
+import com.elyndra.launcher.ui.ShelfLayout
 import kotlinx.coroutines.delay
 
 /* ─────────────────────────────────────────────────────────────
@@ -104,6 +106,15 @@ fun Modifier.topGlint(strength: Float = 1f): Modifier = drawWithCache {
     }
 }
 
+/** El color liso del estante: el papel con un velo del acento (perla en claro, tinta honda en oscuro). */
+@Composable
+fun shelfColor(): Color {
+    val skin = LocalSkin.current
+    val dark = P.isDark
+    val paper = P.paper
+    return remember(paper, skin.a1, dark) { Color(ShelfLayout.shelfColor(paper.argb(), skin.a1.argb(), dark)) }
+}
+
 /**
  * El estante de Biblioteca y Carpeta: la mitad baja, donde viven las cards.
  *
@@ -111,11 +122,27 @@ fun Modifier.topGlint(strength: Float = 1f): Modifier = drawWithCache {
  * papel con un velo del acento, nunca gris) y tinta honda en oscuro; arriba,
  * la sombra que el hero proyecta sobre él y un filo de luz champán donde se
  * tocan. El fondo vivo de la selección se sigue adivinando a través.
+ *
+ * Con [extension] (el arte del hero sigue por detrás, ver `Hero`) el tramo de
+ * arriba se queda sin fondo —lo pinta el velo del hero, que acaba en este
+ * mismo color— y desde ahí el estante es liso y se aclara apenas hacia el pie.
+ * Sin costura: ni sombra ni filo, es la misma escena.
  */
 @Composable
-fun Modifier.shelfSurface(): Modifier {
+fun Modifier.shelfSurface(extension: Dp = 0.dp): Modifier {
     val skin = LocalSkin.current
     val dark = P.isDark
+    if (extension > 0.dp) {
+        val solid = shelfColor()
+        val bottom = ShelfLayout.shelfBottomAlpha(dark)
+        return drawWithCache {
+            val top = extension.roundToPx().toFloat().coerceAtMost(size.height)
+            val brush = Brush.verticalGradient(listOf(solid, solid.copy(alpha = bottom)), startY = top, endY = size.height)
+            onDrawBehind {
+                if (top < size.height) drawRect(brush, topLeft = Offset(0f, top), size = Size(size.width, size.height - top))
+            }
+        }
+    }
     // Los degradados se crean una vez por tamaño: el estante se repinta al
     // desplazar el carrusel y no puede crear objetos en cada fotograma.
     return drawWithCache {
@@ -125,7 +152,7 @@ fun Modifier.shelfSurface(): Modifier {
                 P.paper.copy(alpha = if (dark) 0.9f else 0.94f),
             ),
         )
-        val tint = skin.a1.copy(alpha = if (dark) 0.05f else 0.035f)
+        val tint = skin.a1.copy(alpha = ShelfLayout.shelfTintAlpha(dark))
         val cast = Brush.verticalGradient(
             listOf(P.shade.copy(alpha = if (dark) 0.32f else 0.10f), Color.Transparent),
             endY = 22.dp.toPx(),

@@ -35,6 +35,8 @@ import com.elyndra.launcher.data.RomFolder
 import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.data.fmtMinutes
 import com.elyndra.launcher.ui.components.ArtFallback
+import com.elyndra.launcher.update.UpdateInstaller
+import com.elyndra.launcher.update.UpdateRepository
 import com.elyndra.launcher.sound.BackgroundMusic
 import com.elyndra.launcher.sound.SoundManager
 import com.elyndra.launcher.sound.UiSound
@@ -88,6 +90,9 @@ class ElyndraViewModel @Inject constructor(
     val translations: TranslationCache,
     /** Paquetes de idioma para traducir y su descarga (ver [TranslationPacks]). */
     val packs: TranslationPacks,
+    /** Releases de GitHub y su instalación (ver [UpdateController]). */
+    updateRepository: UpdateRepository,
+    updateInstaller: UpdateInstaller,
 ) : AndroidViewModel(application) {
 
     val app = application as ElyndraApplication
@@ -151,6 +156,12 @@ class ElyndraViewModel @Inject constructor(
     /** El mando: traduce sus botones a lo que hace cada capa (ver [InputController]). */
     val input = InputController(this)
 
+    /** Tras abrir algo (con el dedo o con el mando), un momento en el que no se abre nada más (ver [OpenGuard]). */
+    private val openGuard = OpenGuard()
+
+    /** ¿Se puede abrir ya? Si sí, cuenta como apertura: la siguiente espera su turno. */
+    fun tryOpen(): Boolean = openGuard.tryOpen(android.os.SystemClock.uptimeMillis())
+
     /** La intro de arranque, encima de todo mientras se ve. */
     val intro = IntroController()
 
@@ -161,6 +172,8 @@ class ElyndraViewModel @Inject constructor(
     /** "Editar nombre / Identificar juego" (ver [IdentifyController]). */
     val identify = IdentifyController(this)
     val masha = MashaController(this, brain)
+    /** Actualizaciones desde las releases de GitHub. */
+    val updates = UpdateController(this, updateRepository, updateInstaller)
 
     private var launchJob: Job? = null
     private var toastJob: Job? = null
@@ -295,19 +308,22 @@ class ElyndraViewModel @Inject constructor(
         is LibraryItem.App -> "Android"
     }
 
-    /** Hoja de "Ordenar por" del carrusel. */
-    fun sortOptions() {
-        showSheet(
-            ActionSheetSpec(
-                UiText.res(R.string.sort_by),
-                null,
-                SortMode.entries.map { mode ->
-                    SheetAction(UiText.res(mode.label), selected = settings.sortMode == mode) {
-                        settings.setSort(mode)
-                    }
-                },
-            ),
-        )
+    /** El menú de orden de la biblioteca (bajo su botón, junto al dock de secciones). */
+    var sortMenuOpen by mutableStateOf(false); private set
+
+    fun openSortMenu() {
+        sortMenuOpen = true
+        input.onSortMenuShown(SortMode.entries.indexOf(settings.sortMode))
+    }
+
+    fun closeSortMenu() {
+        sortMenuOpen = false
+    }
+
+    /** Elegir un orden lo aplica (el mismo ajuste que Ajustes → Biblioteca) y cierra el menú. */
+    fun pickSort(mode: SortMode) {
+        settings.setSort(mode)
+        sortMenuOpen = false
     }
 
     fun selected(): LibraryItem? {
@@ -406,21 +422,23 @@ class ElyndraViewModel @Inject constructor(
     fun go(target: Screen) {
         if (target == Screen.Add) add.onOpen()
         if (target == Screen.Settings) settings.onOpen(fromPage = screen.isSettingsPage)
+        sortMenuOpen = false
         screen = target
     }
 
     val canGoBack: Boolean
-        get() = intro.visible || dialog != null || sheet != null || artPicker != null || identify.state != null || detailsKey != null || screen != Screen.Library || searchOpen
+        get() = intro.visible || dialog != null || updates.dialog != null || sheet != null || artPicker != null || identify.state != null || detailsKey != null || sortMenuOpen || screen != Screen.Library || searchOpen
 
     /** Lo que hay abierto, para [BackPriority] ([keyboard]: el teclado en pantalla, que lo cierra el mando). */
     fun backState(keyboard: Boolean = false) = BackPriority.State(
         keyboard = keyboard,
         intro = intro.visible,
-        dialog = dialog != null,
+        dialog = dialog != null || updates.dialog != null,
         sheet = sheet != null,
         artPicker = artPicker != null,
         identify = identify.state != null,
         details = detailsKey != null,
+        sortMenu = sortMenuOpen,
         screen = screen,
         priorityGrab = settings.priorityGrab != null,
         settingsPageOpen = settings.compact && settings.detailOpen,
@@ -430,11 +448,13 @@ class ElyndraViewModel @Inject constructor(
     fun back() {
         when (BackPriority.next(backState())) {
             BackPriority.Target.Intro -> intro.skip()
-            BackPriority.Target.Dialog -> dialog = null
+            // El de actualización se pinta encima del resto: se cierra primero.
+            BackPriority.Target.Dialog -> if (updates.dialog != null) updates.dismiss() else dialog = null
             BackPriority.Target.Sheet -> sheet = null
             BackPriority.Target.ArtPicker -> closeArtPicker()
             BackPriority.Target.Identify -> identify.close()
             BackPriority.Target.Details -> closeDetails()
+            BackPriority.Target.SortMenu -> closeSortMenu()
             // En Ajustes, atrás suelta la fuente cogida y, en ventana estrecha, vuelve a la lista.
             BackPriority.Target.PriorityGrab -> settings.releaseGrab()
             BackPriority.Target.SettingsCategory -> settings.closeCategory()
@@ -840,6 +860,7 @@ class ElyndraViewModel @Inject constructor(
     fun onForeground() {
         settings.refreshLanguage()
         app.settings.lastOpenedAt = System.currentTimeMillis()
+        updates.onForeground()
         refreshInventory()
         viewModelScope.launch {
             repo.awaitLoaded()

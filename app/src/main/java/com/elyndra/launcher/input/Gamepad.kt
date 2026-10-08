@@ -279,9 +279,18 @@ class DirectionalRepeater(
     private val held = EnumMap<Channel, Pad>(Channel::class.java)
     private var active: Pad? = null
 
+    /**
+     * Repeticiones de la dirección mantenida hasta el disparo en curso: 0 en la
+     * pulsación y 1, 2… en cada repetición. Quien lo quiera (la rueda de
+     * Meridian) acelera con esto; el ritmo de los disparos no cambia.
+     */
+    var repeats = 0
+        private set
+
     private val tick = object : Runnable {
         override fun run() {
             val pad = active ?: return
+            repeats++
             fire(pad)
             handler.postDelayed(this, repeatMs)
         }
@@ -295,6 +304,7 @@ class DirectionalRepeater(
         if (active == pad) return
         handler.removeCallbacks(tick)
         active = pad
+        repeats = 0
         fire(pad)
         handler.postDelayed(tick, firstDelayMs)
     }
@@ -309,6 +319,7 @@ class DirectionalRepeater(
         // Si otra fuente sigue empujando, toma el relevo sin disparar de nuevo.
         val next = held.values.lastOrNull()
         active = next
+        repeats = 0
         if (next != null) handler.postDelayed(tick, firstDelayMs)
     }
 
@@ -316,6 +327,7 @@ class DirectionalRepeater(
     fun releaseAll() {
         held.clear()
         active = null
+        repeats = 0
         handler.removeCallbacks(tick)
     }
 }

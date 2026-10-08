@@ -16,3 +16,13 @@ annotation class LegacyLibraryFile
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class MashaHttp
+
+/** Cliente HTTP del actualizador: sin tope de tiempo total, que un APK pesa ~100 MB. */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class UpdateHttp
+
+/** La dirección de la API de releases (en las pruebas, la de un MockWebServer). */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class UpdateReleasesUrl

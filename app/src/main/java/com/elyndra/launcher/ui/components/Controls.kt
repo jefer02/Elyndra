@@ -10,7 +10,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.indication
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import com.elyndra.launcher.ui.theme.MinTouch
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -296,13 +300,15 @@ fun OpenButton(
     onClick: () -> Unit,
 ) {
     val glyph by animateFloatAsState(if (focused) 1.14f else 1f, motion(Springs.snappy()), label = "openGlyph")
+    val interaction = remember { MutableInteractionSource() }
     Row(
         modifier
+            .touchTarget(Modifier.clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick))
             .height(HeroBarHeight)
             .alpha(if (enabled) 1f else 0.45f)
             .darkGlass(RoundedCornerShape(12.dp))
             .consoleFocus(focused)
-            .clickable(enabled = enabled, onClick = onClick)
+            .indication(interaction, LocalIndication.current)
             .padding(start = 8.dp, end = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -332,16 +338,53 @@ fun ConsoleIconButton(
     content: @Composable (Modifier) -> Unit,
 ) {
     val glyph by animateFloatAsState(if (focused) 1.14f else 1f, motion(Springs.snappy()), label = "iconGlyph")
+    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier
+            .touchTarget(Modifier.clickable(interactionSource = interaction, indication = null, onClick = onClick))
             .size(HeroBarHeight)
             .then(if (glass) Modifier.darkGlass(RoundedCornerShape(12.dp)) else Modifier)
             .consoleFocus(focused)
-            .clickable(onClick = onClick),
+            .indication(interaction, LocalIndication.current),
         contentAlignment = Alignment.Center,
     ) {
         content(Modifier.graphicsLayer { scaleX = glyph; scaleY = glyph })
     }
+}
+
+/**
+ * Se toca en [min] × [min] como poco (solo [click]: suele ser el `clickable`)
+ * sin cambiar lo que mide ni cómo se ve la pieza: la zona táctil sobresale
+ * por igual alrededor. Para las píldoras de 34 dp de las barras.
+ */
+@Composable
+fun Modifier.touchTarget(click: Modifier, min: Dp = MinTouch): Modifier {
+    val box = remember { TouchBox() }
+    return this
+        .layout { measurable, constraints ->
+            box.constraints = constraints
+            val minPx = min.roundToPx()
+            val loose = Constraints(0, maxOf(constraints.maxWidth, minPx), 0, maxOf(constraints.maxHeight, minPx))
+            val p = measurable.measure(loose)
+            layout(box.width, box.height) { p.place((box.width - p.width) / 2, (box.height - p.height) / 2) }
+        }
+        .then(click)
+        .layout { measurable, _ ->
+            val minPx = min.roundToPx()
+            val p = measurable.measure(box.constraints)
+            box.width = p.width
+            box.height = p.height
+            val w = maxOf(p.width, minPx)
+            val h = maxOf(p.height, minPx)
+            layout(w, h) { p.place((w - p.width) / 2, (h - p.height) / 2) }
+        }
+}
+
+/** Lo que se pasan las dos mitades de [touchTarget] en una misma medida. */
+private class TouchBox {
+    var constraints = Constraints()
+    var width = 0
+    var height = 0
 }
 
 /** `spinner` — cuadrado redondeado de 24dp girando, con el borde superior abierto. */

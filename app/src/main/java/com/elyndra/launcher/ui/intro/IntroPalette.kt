@@ -4,10 +4,21 @@ import androidx.annotation.StringRes
 import com.elyndra.launcher.R
 import com.elyndra.launcher.data.BrandTokens
 import com.elyndra.launcher.data.ColorMath
+import com.elyndra.launcher.data.ColorPair
+import com.elyndra.launcher.data.SignaturePalettes
+import com.elyndra.launcher.data.SignaturePreset
 
-/** Colores de la intro que se pueden elegir en Ajustes. [Accent] toma el acento activo. */
-enum class IntroColor(val id: String, @StringRes val nameRes: Int, private val argb: Int?) {
-    Gold("gold", R.string.intro_color_gold, 0xFFE9B44C.toInt()),
+/**
+ * Colores de la intro que se pueden elegir en Ajustes. Las paletas de firma
+ * llevan su par (primario, secundario y destello); los colores de siempre son
+ * un solo tono y se ven igual que antes. [Accent] toma el acento activo.
+ */
+enum class IntroColor(val id: String, @StringRes val nameRes: Int, private val argb: Int?, private val signature: SignaturePreset? = null) {
+    Plasma("plasma", R.string.palette_plasma, SignaturePreset.Plasma.pair.primary, SignaturePreset.Plasma),
+    Ember("ember", R.string.palette_ember, SignaturePreset.Ember.pair.primary, SignaturePreset.Ember),
+    Aurora("aurora", R.string.palette_aurora, SignaturePreset.Aurora.pair.primary, SignaturePreset.Aurora),
+    NeonRose("neon_rose", R.string.palette_neon_rose, SignaturePreset.NeonRose.pair.primary, SignaturePreset.NeonRose),
+    Gold("gold", R.string.intro_color_gold, SignaturePalettes.SOLAR_GOLD),
     Cyan("cyan", R.string.intro_color_cyan, 0xFF4FD6EA.toInt()),
     Violet("violet", R.string.intro_color_violet, 0xFFA07CFF.toInt()),
     Crimson("crimson", R.string.intro_color_crimson, 0xFFE5485F.toInt()),
@@ -17,15 +28,22 @@ enum class IntroColor(val id: String, @StringRes val nameRes: Int, private val a
 
     fun base(accent: Int): Int = argb ?: accent
 
-    companion object {
-        /**
-         * El de partida según el tema: oro sobre el ámbar ahumado del oscuro; en
-         * claro, el acento (el índigo de serie), que es el que luce sobre el perla.
-         */
-        fun defaultFor(dark: Boolean): IntroColor = if (dark) Gold else Accent
+    /**
+     * El par con el que se pinta: el de la paleta de firma; con [Accent], el
+     * del acento activo ([accent]); los colores de un solo tono, ese tono solo.
+     */
+    fun pair(accent: ColorPair): ColorPair = when {
+        signature != null -> signature.pair
+        argb != null -> IntroPalettes.mono(argb)
+        else -> accent
+    }
 
-        /** El elegido en Ajustes; sin elegir (o uno que ya no existe), el de partida del tema. */
-        fun resolve(id: String?, dark: Boolean): IntroColor = entries.firstOrNull { it.id == id } ?: defaultFor(dark)
+    companion object {
+        /** Plasma en los dos temas: la paleta de firma de partida. */
+        val DEFAULT = Plasma
+
+        /** El elegido en Ajustes; sin elegir (o uno que ya no existe), el de partida. Lo guardado nunca se pisa. */
+        fun resolve(id: String?): IntroColor = entries.firstOrNull { it.id == id } ?: DEFAULT
     }
 }
 
@@ -35,7 +53,7 @@ enum class IntroColor(val id: String, @StringRes val nameRes: Int, private val a
  * El fondo no depende del color elegido: es el mismo que pinta el splash del
  * sistema antes del primer fotograma, y así el paso de uno a otro no se ve.
  */
-class IntroPalette(
+data class IntroPalette(
     val dark: Boolean,
     val background: Int,
     /** Niebla cálida (oscuro) o degradado champán (claro), pintado con [fogAlpha]. */
@@ -74,6 +92,42 @@ object IntroPalettes {
     private const val BLACK = 0xFF000000.toInt()
 
     fun derive(base: Int, dark: Boolean): IntroPalette = if (dark) dark(ColorMath.opaque(base)) else light(ColorMath.opaque(base))
+
+    /** Un solo tono en los tres papeles: la intro de siempre, sin cambios. */
+    fun mono(argb: Int): ColorPair = ColorMath.opaque(argb).let { ColorPair(it, it, it) }
+
+    /**
+     * La intro de un par: el primario hace el filo y las partículas (lo mismo
+     * que con un solo tono, así el contraste no cambia), el secundario el
+     * resplandor y el halo de las letras, y el destello los núcleos de luz, la
+     * raya, el barrido y el brillo de las partículas.
+     */
+    fun derive(pair: ColorPair, dark: Boolean): IntroPalette {
+        val p = ColorPair(ColorMath.opaque(pair.primary), ColorMath.opaque(pair.secondary), ColorMath.opaque(pair.spark))
+        val base = derive(p.primary, dark)
+        if (p.secondary == p.primary && p.spark == p.primary) return base
+        return if (dark) {
+            // El resplandor, con el mismo suelo de contraste que el tono principal.
+            val bloom = ColorMath.ensureContrast(ColorMath.ensureContrast(p.secondary, base.background, 5.0), base.fogPeak, 5.0)
+            base.copy(
+                glow = bloom,
+                depth = bloom,
+                core = ColorMath.mix(p.spark, WHITE, 0.3f),
+                streak = ColorMath.mix(p.spark, bloom, 0.35f),
+                sheen = ColorMath.mix(p.spark, WHITE, 0.25f),
+                particleLight = ColorMath.mix(p.spark, WHITE, 0.5f),
+            )
+        } else {
+            val (h2) = ColorMath.toHsl(p.secondary)
+            base.copy(
+                glow = ColorMath.fromHsl(h2, 0.75f, 0.8f),
+                streak = ColorMath.fromHsl(h2, 0.8f, 0.7f),
+                core = ColorMath.mix(p.spark, WHITE, 0.55f),
+                sheen = p.spark,
+                particleLight = ColorMath.mix(p.spark, WHITE, 0.3f),
+            )
+        }
+    }
 
     /**
      * Oscuro: luz que suma sobre ámbar ahumado. El color base ya brilla de por

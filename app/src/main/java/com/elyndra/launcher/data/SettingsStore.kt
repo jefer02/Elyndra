@@ -260,10 +260,29 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("selection.particles", DEFAULT_SELECTION_PARTICLES)
         set(v) = prefs.edit { putBoolean("selection.particles", v) }
 
-    /** Color (ARGB) de la selección: marco, halo y partículas. */
+    /** Color (ARGB) de la selección: marco, halo y partículas. Sin nada guardado, el primario de Plasma. */
     var selectionParticleColor: Int
         get() = prefs.getInt("selection.particleColor", DEFAULT_SELECTION_PARTICLE_COLOR)
         set(v) = prefs.edit { putInt("selection.particleColor", v) }
+
+    /**
+     * Cómo se ve la lista con la ventana apaisada y ancha: "meridian" (rueda
+     * vertical) o "classic" (carrusel). Null = nunca elegido: Meridian (ver
+     * `LayoutStyle.byId`), también para quien ya tenía la app instalada.
+     */
+    var layoutStyle: String?
+        get() = prefs.getString("layout.style", null)
+        set(v) = prefs.edit { if (v == null) remove("layout.style") else putString("layout.style", v) }
+
+    /** Meridian: el fondo de la rueda toma el color del arte seleccionado. Apagado, el velo neutro del tema. */
+    var meridianAdaptiveColor: Boolean
+        get() = prefs.getBoolean("meridian.adaptiveColor", DEFAULT_MERIDIAN_ADAPTIVE_COLOR)
+        set(v) = prefs.edit { putBoolean("meridian.adaptiveColor", v) }
+
+    /** Biblioteca y Carpeta: un toque en lo seleccionado lo abre. Apagado, se abre con doble toque, como antes. */
+    var tapOpensSelected: Boolean
+        get() = prefs.getBoolean("tap.openSelected", DEFAULT_TAP_OPENS_SELECTED)
+        set(v) = prefs.edit { putBoolean("tap.openSelected", v) }
 
     /* ── Masha: voz y ambiente sonoro ─────────────────────────── */
 
@@ -333,6 +352,33 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("perm.notificationsAsked", false)
         set(v) = prefs.edit { putBoolean("perm.notificationsAsked", v) }
 
+    /* ── actualizaciones (releases de GitHub) ─────────────────── */
+
+    /** Mirar solo, al abrir la app, si hay versión nueva (como mucho una vez al día). */
+    var updateAutoCheck: Boolean
+        get() = prefs.getBoolean("update.auto", true)
+        set(v) = prefs.edit { putBoolean("update.auto", v) }
+
+    /** Ofrecer también las pre-releases: las builds de Elyndra salen como beta. */
+    var updatePrereleases: Boolean
+        get() = prefs.getBoolean("update.prereleases", true)
+        set(v) = prefs.edit { putBoolean("update.prereleases", v) }
+
+    /** Última comprobación que llegó a GitHub (epoch ms); 0 = nunca. */
+    var updateLastCheckAt: Long
+        get() = prefs.getLong("update.lastCheckAt", 0L)
+        set(v) = prefs.edit { putLong("update.lastCheckAt", v) }
+
+    /** ETag de la última lista de releases, para pedirla de forma condicional. */
+    var updateEtag: String?
+        get() = prefs.getString("update.etag", null)
+        set(v) = prefs.edit { if (v == null) remove("update.etag") else putString("update.etag", v) }
+
+    /** Versión (etiqueta) que se canceló: la comprobación automática no vuelve a ofrecerla. */
+    var updateSkippedTag: String?
+        get() = prefs.getString("update.skipped", null)
+        set(v) = prefs.edit { if (v == null) remove("update.skipped") else putString("update.skipped", v) }
+
     /* ── opciones de desarrollador ────────────────────────────── */
 
     /** Opciones de desarrollador desbloqueadas (siete toques en la versión, en Ajustes → Acerca de). */
@@ -357,10 +403,16 @@ class SettingsStore(context: Context) {
         /** Cian de fósforo: se ve bien sobre el tema claro y sobre el oscuro. */
         const val DEFAULT_PARTICLE_COLOR = 0xFF5CF2FF.toInt()
 
-        /** El mismo cian de fósforo, el primero de la paleta de partículas. */
-        const val DEFAULT_SELECTION_PARTICLE_COLOR = DEFAULT_PARTICLE_COLOR
+        /** El primario de Plasma, la paleta de firma de partida (halo y partículas de la selección). */
+        const val DEFAULT_SELECTION_PARTICLE_COLOR = 0xFF7C5CFF.toInt()
 
         const val DEFAULT_SELECTION_GLOW = true
+
+        /** Un toque en lo seleccionado lo abre; apagado, se abre con doble toque como antes. */
+        const val DEFAULT_TAP_OPENS_SELECTED = true
+
+        /** El fondo de Meridian toma el color del arte (encendido de serie). */
+        const val DEFAULT_MERIDIAN_ADAPTIVE_COLOR = true
         const val DEFAULT_SELECTION_PARTICLES = true
 
         /*

@@ -119,8 +119,36 @@ fun Color.argb(): Int {
 /** Tinte del cristal. */
 data class Tint(val id: String, val color: Color)
 
-/** El primero es el de partida: Índigo Obsidiana. Los de siempre siguen detrás. */
+/**
+ * Primero, las paletas de firma (Plasma es la de partida): el relleno va del
+ * primario a un tono hondo hacia el secundario, con blanco encima ≥ 4,5:1 en
+ * todo el degradado salvo en el arranque de las muy luminosas (como Mandarina
+ * o Menta), y [Accent.c] es el secundario de la paleta. Detrás, la marca de
+ * siempre y los demás acentos, para quien los tenga guardados.
+ */
 val ACCENTS = listOf(
+    // El arranque es #7958FF y no el #7C5CFF de la paleta: lo justo para que el
+    // blanco de los botones llegue al 4,5:1 (el primario de luz sigue siendo #7C5CFF).
+    Accent(
+        "plasma", com.elyndra.launcher.R.string.palette_plasma,
+        Color(0xFF7958FF), Color(0xFF3769FF), Color(0xFF2BD9FF),
+        Color(0xFF6740FF), Color(0xFFA38DFF),
+    ),
+    Accent(
+        "ember", com.elyndra.launcher.R.string.palette_ember,
+        Color(0xFFFF8A1F), Color(0xFFEE0024), Color(0xFFFF3D5A),
+        Color(0xFFA64F00), Color(0xFFFFAD62),
+    ),
+    Accent(
+        "aurora", com.elyndra.launcher.R.string.palette_aurora,
+        Color(0xFF19E3A5), Color(0xFF0078D6), Color(0xFF3AA8FF),
+        Color(0xFF0D7657), Color(0xFF5EEBC0),
+    ),
+    Accent(
+        "neon_rose", com.elyndra.launcher.R.string.palette_neon_rose,
+        Color(0xFFFF4FA3), Color(0xFFA23DFF), Color(0xFFB15CFF),
+        Color(0xFFCC0062), Color(0xFFFF84BF),
+    ),
     Accent(
         "indigo", com.elyndra.launcher.R.string.accent_indigo,
         Color(BrandTokens.PRIMARY), Color(BrandTokens.PRIMARY_DEEP), Color(BrandTokens.SECONDARY),
@@ -169,7 +197,8 @@ val TINTS = listOf(
  */
 object Palettes {
 
-    const val DEFAULT_ACCENT = "indigo"
+    /** Plasma (la paleta de firma de partida); quien eligió otro acento lo conserva. */
+    const val DEFAULT_ACCENT = "plasma"
     const val DEFAULT_TINT = "niebla"
     const val DEFAULT_DARK = false
     const val DEFAULT_BLUR = 18

@@ -14,14 +14,14 @@ val LocalUiSounds = staticCompositionLocalOf<SoundManager?> { null }
 
 /**
  * Lo que se ve de la interfaz, en lo que al sonido respecta: cuántas capas
- * hay encima (diálogo, menú, selector de arte, ficha), si el diálogo es un
+ * hay encima (diálogo, menú, selector de arte, ficha, menú de orden), si el diálogo es un
  * error y lo hondo que está la pantalla.
  */
 data class UiSoundState(val overlays: Int, val errorDialog: Boolean, val screen: Screen) {
 
     companion object {
         fun of(vm: ElyndraViewModel) = UiSoundState(
-            overlays = listOfNotNull(vm.dialog, vm.sheet, vm.artPicker, vm.identify.state, vm.detailsKey).size,
+            overlays = listOfNotNull(vm.dialog, vm.sheet, vm.artPicker, vm.identify.state, vm.detailsKey, vm.sortMenuOpen.takeIf { it }).size,
             errorDialog = vm.dialog?.error == true,
             screen = vm.screen,
         )

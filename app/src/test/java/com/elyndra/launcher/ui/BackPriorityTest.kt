@@ -48,4 +48,11 @@ class BackPriorityTest {
         assertEquals(Target.SettingsPage, next(State(screen = Screen.Licenses)))
         assertEquals(Target.SettingsPage, next(State(screen = Screen.VoiceSync)))
     }
+
+    @Test
+    fun `el menu de orden se cierra antes que el buscador y despues de la ficha`() {
+        assertEquals(Target.SortMenu, next(State(sortMenu = true, searchOpen = true)))
+        assertEquals(Target.Details, next(State(sortMenu = true, details = true)))
+        assertEquals(Target.Sheet, next(State(sortMenu = true, sheet = true)))
+    }
 }

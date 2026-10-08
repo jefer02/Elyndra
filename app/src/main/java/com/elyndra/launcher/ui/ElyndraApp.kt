@@ -64,11 +64,13 @@ import com.elyndra.launcher.ui.screens.LicensesScreen
 import com.elyndra.launcher.ui.screens.MashaScreen
 import com.elyndra.launcher.ui.screens.SettingsScreen
 import com.elyndra.launcher.ui.screens.VoiceSyncScreen
+import com.elyndra.launcher.ui.screens.UpdateDialogView
 import com.elyndra.launcher.ui.theme.ElyndraTheme
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.masha.Holo
 import com.elyndra.launcher.ui.intro.BootIntro
 import androidx.compose.runtime.key
+import com.elyndra.launcher.data.SignaturePalettes
 import com.elyndra.launcher.data.argb
 
 /**
@@ -119,9 +121,9 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                 throw c
             }
         }
-        val screenBack = vm.screen != Screen.Library && vm.dialog == null && vm.detailsKey == null && vm.sheet == null
+        val screenBack = vm.screen != Screen.Library && vm.dialog == null && vm.updates.dialog == null && vm.detailsKey == null && vm.sheet == null
         // Capas con foco propio encima de la pantalla.
-        val overlayOpen = vm.dialog != null || vm.sheet != null || vm.detailsKey != null || vm.artPicker != null || vm.identify.state != null
+        val overlayOpen = vm.dialog != null || vm.updates.dialog != null || vm.sheet != null || vm.detailsKey != null || vm.artPicker != null || vm.identify.state != null
 
         // Lanzar un juego saca la pantalla igual que abrir una carpeta: se
         // desliza una décima del ancho, se funde y crece hasta 1.02.
@@ -253,6 +255,8 @@ fun ElyndraApp(vm: ElyndraViewModel) {
             OverlayHost(vm.dialog, "dialog") { spec, open, progress ->
                 ElyDialogView(spec, open, progress, onDismiss = vm::dismissDialog, focus = vm.input.dialogFocus, text = vm.dialogText, onText = vm::updateDialogText)
             }
+            // Actualización disponible / descargando: encima del resto de diálogos.
+            OverlayHost(vm.updates.dialog, "update") { d, open, progress -> UpdateDialogView(vm, d, open, progress) }
             // Un paquete de idioma bajándose: arriba, pequeño, sin tapar nada.
             TranslationPackBanner(
                 vm,
@@ -275,7 +279,9 @@ fun ElyndraApp(vm: ElyndraViewModel) {
             // MainActivity) o al pedir la vista previa en Ajustes. La biblioteca
             // ya se compone debajo, así que al fundirse no hay espera.
             if (vm.intro.visible) {
-                key(vm.intro.run) { BootIntro(vm.intro, vm.settings.introColor.base(LocalSkin.current.a1.argb())) }
+                val skin = LocalSkin.current
+                val accent = SignaturePalettes.accentPair(skin.accent.id, skin.a1.argb(), skin.secondary.argb())
+                key(vm.intro.run) { BootIntro(vm.intro, vm.settings.introColor.pair(accent)) }
             }
         }
     }

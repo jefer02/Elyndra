@@ -16,6 +16,7 @@ import com.elyndra.launcher.data.Emulators
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.data.Palettes
 import com.elyndra.launcher.data.SecretKeys
+import com.elyndra.launcher.data.SignaturePreset
 import com.elyndra.launcher.data.TINTS
 import com.elyndra.launcher.display.FrameRate
 import com.elyndra.launcher.masha.MashaError
@@ -23,6 +24,8 @@ import com.elyndra.launcher.metadata.ApiException
 import com.elyndra.launcher.metadata.FailureKind
 import com.elyndra.launcher.metadata.Service
 import com.elyndra.launcher.ui.intro.IntroColor
+import com.elyndra.launcher.ui.meridian.LayoutStyle
+import com.elyndra.launcher.ui.meridian.MeridianMode
 import com.elyndra.launcher.sound.UiSound
 import com.elyndra.launcher.ui.masha.lipsync.AudioRoute
 import com.elyndra.launcher.ui.masha.lipsync.AudioRouteOffsets
@@ -94,11 +97,11 @@ class SettingsController(private val vm: ElyndraViewModel) {
     /* ── intro de arranque ────────────────────────────────────── */
 
     var introEnabled by mutableStateOf(store.introEnabled); private set
-    /** Color elegido a mano (id); null = el de partida, que depende del tema (ver [IntroColor.defaultFor]). */
+    /** Color elegido a mano (id); null = el de partida (ver [IntroColor.DEFAULT]). */
     private var introColorId by mutableStateOf(store.introColor)
 
-    /** El color con el que sale la intro: lo elegido o, si no, el de partida del tema activo. */
-    val introColor: IntroColor get() = IntroColor.resolve(introColorId, darkMode)
+    /** El color con el que sale la intro: lo elegido o, si no, el de partida. */
+    val introColor: IntroColor get() = IntroColor.resolve(introColorId)
 
     fun toggleIntro() {
         introEnabled = !introEnabled
@@ -167,23 +170,7 @@ class SettingsController(private val vm: ElyndraViewModel) {
 
     /* ── botón de Masha ───────────────────────────────────────── */
 
-    /**
-     * Dónde está el botón de Masha, en dp desde la esquina superior izquierda.
-     * `null` en cualquiera de los dos = nunca se ha movido, y entonces manda
-     * su esquina de siempre.
-     */
-    var mashaX by mutableStateOf(store.mashaX); private set
-    var mashaY by mutableStateOf(store.mashaY); private set
-
-    /** Masha se queda donde se la suelte, también al volver a abrir la app. */
-    fun moveMasha(x: Float, y: Float) {
-        mashaX = x
-        mashaY = y
-        store.mashaX = x
-        store.mashaY = y
-    }
-
-    /** Color (ARGB) de la estela de partículas de Masha al arrastrarla. */
+    /** Color (ARGB) de Masha: las partículas que rodean su emblema en la biblioteca. */
     var mashaParticleColor by mutableIntStateOf(store.mashaParticleColor); private set
 
     fun updateMashaParticleColor(argb: Int) {
@@ -213,6 +200,48 @@ class SettingsController(private val vm: ElyndraViewModel) {
     fun updateSelectionParticleColor(argb: Int) {
         selectionParticleColor = argb
         store.selectionParticleColor = argb
+    }
+
+    /* ── paleta de firma y estilo de la lista ─────────────────── */
+
+    /**
+     * La paleta de firma que está puesta entera (acento, selección e intro);
+     * null si alguno de los tres se cambió a mano por separado.
+     */
+    val signature: SignaturePreset?
+        get() = SignaturePreset.entries.firstOrNull {
+            it.accentId == accentId && it.pair.primary == selectionParticleColor && it.introId == introColor.id
+        }
+
+    /** Pone de una vez el acento, el halo y las partículas de la selección y la intro de [preset]. */
+    fun applySignature(preset: SignaturePreset) {
+        setAccent(preset.accentId)
+        updateSelectionParticleColor(preset.pair.primary)
+        updateIntroColor(IntroColor.resolve(preset.introId))
+    }
+
+    /** Tocar lo seleccionado lo abre (apagado: doble toque, como antes). Rueda y carrusel. */
+    var tapOpensSelected by mutableStateOf(store.tapOpensSelected); private set
+
+    fun toggleTapOpensSelected() {
+        tapOpensSelected = !tapOpensSelected
+        store.tapOpensSelected = tapOpensSelected
+    }
+
+    /** Meridian: el fondo de la rueda toma el color del arte seleccionado (apagado: el velo neutro del tema). */
+    var meridianAdaptiveColor by mutableStateOf(store.meridianAdaptiveColor); private set
+
+    fun toggleMeridianAdaptiveColor() {
+        meridianAdaptiveColor = !meridianAdaptiveColor
+        store.meridianAdaptiveColor = meridianAdaptiveColor
+    }
+
+    /** Rueda vertical o carrusel con la ventana apaisada y ancha (ver [MeridianMode]). */
+    var layoutStyle by mutableStateOf(LayoutStyle.byId(store.layoutStyle)); private set
+
+    fun updateLayoutStyle(style: LayoutStyle) {
+        layoutStyle = style
+        store.layoutStyle = style.id
     }
 
     /* ── Masha: voz y ambiente sonoro ─────────────────────────── */

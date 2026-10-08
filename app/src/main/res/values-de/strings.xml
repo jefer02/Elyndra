@@ -42,7 +42,6 @@
 
     <!-- Ordner -->
     <string name="rom_chip">ROM · %1$s</string>
-    <string name="roms_header">ROMs</string>
     <string name="folder_empty">Keine ROMs in diesem Ordner. Scanne ihn erneut oder prüfe, ob das System stimmt.</string>
     <plurals name="roms_summary">
         <item quantity="one">%1$d ROM · %2$s</item>
@@ -64,6 +63,7 @@
     <string name="art_cleared">Bild entfernt</string>
 
     <string name="sort_by">Sortieren nach</string>
+    <string name="sort_button_a11y">Sortieren nach: %1$s</string>
     <string name="sort_name">Name (A–Z)</string>
     <string name="sort_playtime">Spielzeit</string>
     <string name="sort_platform">Plattform</string>
@@ -539,7 +539,7 @@
     <string name="masha_high_refresh">Masha: hohe Flüssigkeit (120 Hz)</string>
     <string name="masha_high_refresh_desc">Aus: Masha läuft mit 60 fps – für ein Hologramm genauso flüssig, mit halber GPU-Last, weniger Akkuverbrauch und weniger Wärme bei langen Gesprächen.</string>
     <string name="masha_particles_title">Partikelfarbe</string>
-    <string name="masha_particles_desc">Die leuchtende Spur, die Masha beim Ziehen hinterlässt.</string>
+    <string name="masha_particles_desc">Die Partikel, die in der Bibliothek um Mashas Emblem schweben.</string>
     <string name="masha_particles_hue">Farbton</string>
     <string name="masha_particles_preview">Vorschau</string>
     <string name="section_selection">Auswahl</string>
@@ -760,11 +760,11 @@
     <string name="settings_cat_display_desc">Design, Intro, Bildrate und Sprache</string>
     <string name="settings_cat_sound_desc">Oberflächentöne und eigene Töne</string>
     <string name="settings_cat_music_desc">Menümusik und eigener Hintergrund</string>
-    <string name="settings_cat_appearance_desc">Akzentfarbe, Liquid Glass und Partikel</string>
+    <string name="settings_cat_appearance_desc">Listenstil, Palette, Akzentfarbe, Liquid Glass und Partikel</string>
     <string name="settings_cat_library_desc">Sortierung, Neuscans und geladene Bilder</string>
     <string name="settings_cat_metadata_desc">Quellen, Konten, Priorität und Übersetzung</string>
     <string name="settings_cat_masha_desc">KI, Stimme, Präsenz und Datenschutz</string>
-    <string name="settings_cat_about_desc">Version und Lizenzen</string>
+    <string name="settings_cat_about_desc">Updates, Version und Lizenzen</string>
     <plurals name="sound_events_count">
         <item quantity="one">%d Ereignis</item>
         <item quantity="other">%d Ereignisse</item>
@@ -796,4 +796,80 @@
     <string name="maker_sega">Sega</string>
     <string name="maker_others">Atari und andere</string>
     <string name="maker_pc">PC</string>
+    <!-- Meridian y paletas de firma -->
+    <string name="palette_plasma">Plasma</string>
+    <string name="palette_ember">Glut</string>
+    <string name="palette_aurora">Aurora</string>
+    <string name="palette_neon_rose">Neonrosa</string>
+    <string name="palette_solar">Solar</string>
+    <string name="meridian_position">%1$d von %2$d</string>
+    <string name="layout_style_title">Listenstil</string>
+    <string name="layout_style_desc">Gilt für die Bibliothek und die ROM-Ordner, wenn das Fenster im Querformat und mindestens 640 dp breit ist. Im Hochformat oder in schmalen Fenstern wird immer das klassische Karussell verwendet.</string>
+    <string name="layout_meridian">Meridian</string>
+    <string name="layout_meridian_desc">Vertikales Rad</string>
+    <string name="layout_classic">Klassisch</string>
+    <string name="layout_classic_desc">Horizontales Karussell</string>
+    <string name="signature_title">Signaturpalette</string>
+    <string name="signature_desc">Setzt Akzentfarbe, Auswahlleuchten und -partikel sowie die Intro-Farbe mit einem Tipp. Darunter lässt sich jede weiterhin einzeln ändern.</string>
+    <!-- Tocar para abrir -->
+    <string name="tap_open_title">Ausgewähltes antippen zum Öffnen</string>
+    <string name="tap_open_desc">Ein Tipp auf das ausgewählte Spiel, den Ordner oder die ROM öffnet es. Aus: zum Öffnen doppelt tippen.</string>
+    <string name="hint_gestures_tap">Tippen wählt · Erneut tippen öffnet · Gedrückt halten für Optionen</string>
+    <!-- Meridian: fondo adaptable, fila de Añadir y fichas -->
+    <string name="meridian_adaptive_color_title">Adaptive Hintergrundfarbe</string>
+    <string name="meridian_adaptive_color_desc">In Meridian übernimmt der Hintergrund hinter der Liste die Farbe des Artworks des ausgewählten Spiels. Aus: der neutrale Hintergrund des Designs.</string>
+    <string name="meridian_add_short">Hinzufügen</string>
+    <plurals name="meridian_roms">
+        <item quantity="one">%d ROM</item>
+        <item quantity="other">%d ROMs</item>
+    </plurals>
+
+    <!-- Actualizaciones (GitHub Releases), autor y licencia -->
+    <string name="section_updates">Updates</string>
+    <string name="update_current_version">Installierte Version</string>
+    <string name="update_check">Nach Updates suchen</string>
+    <string name="update_check_now">Jetzt suchen</string>
+    <string name="update_view">Ansehen</string>
+    <string name="update_last_check">Zuletzt geprüft: %1$s</string>
+    <string name="update_never_checked">Noch nicht geprüft</string>
+    <string name="update_state_checking">Wird geprüft…</string>
+    <string name="update_state_up_to_date">Du bist auf dem neuesten Stand</string>
+    <string name="update_state_available">Version %1$s ist verfügbar</string>
+    <string name="update_state_error_network">GitHub ist nicht erreichbar. Prüfe die Verbindung.</string>
+    <string name="update_state_error_rate">GitHub begrenzt gerade die Anfragen. Versuch es später erneut.</string>
+    <string name="update_state_error">Die Suche nach Updates ist fehlgeschlagen.</string>
+    <string name="update_auto_title">Automatisch suchen</string>
+    <string name="update_auto_desc">Beim Öffnen von Elyndra, höchstens einmal am Tag.</string>
+    <string name="update_prerelease_title">Beta-Versionen einbeziehen</string>
+    <string name="update_prerelease_desc">Elyndra erscheint vorerst als Beta. Ausschalten, um nur stabile Versionen angeboten zu bekommen.</string>
+    <string name="update_privacy">Die Prüfung lädt nur die öffentliche Versionsliste von Elyndra von GitHub. Es werden keine persönlichen Daten gesendet.</string>
+    <string name="update_available_title">Elyndra %1$s ist verfügbar</string>
+    <string name="update_available_msg">Du hast %1$s. Neu:</string>
+    <string name="update_notes_empty">Keine Versionshinweise.</string>
+    <string name="update_action">Aktualisieren</string>
+    <string name="update_permission_title">Elyndra das Installieren von Updates erlauben</string>
+    <string name="update_permission_msg">Android braucht einmalig deine Erlaubnis. Tippe auf „Einstellungen öffnen“, aktiviere „Dieser Quelle vertrauen“ und komm zurück: Der Download startet von selbst.</string>
+    <string name="update_permission_action">Einstellungen öffnen</string>
+    <string name="update_downloading_title">Elyndra %1$s wird heruntergeladen</string>
+    <string name="update_downloading_msg">Du kannst Elyndra weiter benutzen; die Installation startet nach dem Download.</string>
+    <string name="update_installing_title">Wird installiert…</string>
+    <string name="update_installing_msg">Bestätige die Installation im Android-Dialog. Elyndra startet danach neu.</string>
+    <string name="update_failed_title">Update fehlgeschlagen</string>
+    <string name="update_error_download">Der Download ist fehlgeschlagen. Prüfe die Verbindung und versuch es erneut, oder lade die APK von der Release-Seite.</string>
+    <string name="update_error_checksum">Die heruntergeladene Datei passt nicht zur veröffentlichten Prüfsumme und wurde gelöscht. Versuch es später erneut oder lade die APK von der Release-Seite.</string>
+    <string name="update_error_signature">Dieses Update ist mit einem anderen Schlüssel signiert als das installierte Elyndra (zum Beispiel ein Debug-Build). Android ersetzt es nicht. Zum Wechseln Elyndra deinstallieren und die Version von GitHub installieren; das Deinstallieren löscht die Daten von Elyndra auf diesem Gerät.</string>
+    <string name="update_error_install">Android konnte das Update nicht installieren. Du kannst die APK von der Release-Seite laden.</string>
+    <string name="update_no_asset">Diese Version hat keine APK für dieses Gerät. Die Release-Seite wird geöffnet…</string>
+    <string name="update_cancelled">Update abgebrochen</string>
+    <string name="update_open_page">Release-Seite öffnen</string>
+    <string name="about_created_by">Erstellt von %1$s</string>
+    <string name="about_source">Quellcode</string>
+    <string name="about_license">Lizenz</string>
+    <string name="about_license_desc">Quellcode auf GitHub nur zum Lesen sichtbar. Offizielle Versionen sind für den persönlichen, nicht kommerziellen Gebrauch kostenlos.</string>
+    <string name="about_license_value">Alle Rechte vorbehalten</string>
+    <string name="licenses_app_copyright">Copyright © 2026 %1$s. Alle Rechte vorbehalten.</string>
+    <string name="licenses_app_terms">Der Quellcode wird auf GitHub nur zum Lesen veröffentlicht. Du darfst die offiziellen Versionen für den persönlichen, nicht kommerziellen Gebrauch installieren und nutzen. Kopieren, Ändern, Weiterverbreiten oder abgeleitete Werke erfordern eine schriftliche Erlaubnis. Die Drittkomponenten unten behalten ihre eigenen Lizenzen.</string>
+    <string name="licenses_voice_title">Mashas natürliche Stimme</string>
+    <string name="licenses_voice_notice">Mashas natürliche Stimme entsteht auf deinem Gerät mit den Gewichten des Modells Supertonic 3 von Supertone Inc. unter der Lizenz BigScience OpenRAIL-M. Die Stimme ist synthetisch (KI-generiert). Mit der Nutzung stimmst du zu, sie nicht für die eingeschränkten Zwecke aus Anhang A dieser Lizenz zu verwenden, unter anderem: Gesetze zu brechen, Minderjährigen zu schaden, Personen ohne ihre Zustimmung nachzuahmen, falsche Informationen zu verbreiten, um anderen zu schaden, zu belästigen oder die erzeugte Sprache auszugeben, ohne kenntlich zu machen, dass sie maschinell erzeugt ist.</string>
+    <string name="licenses_voice_open">OpenRAIL-M-Lizenz lesen</string>
 </resources>

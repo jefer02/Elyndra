@@ -102,3 +102,58 @@ data class DetailsInfo(
         }
     }
 }
+
+/**
+ * Cómo se reparte la ficha en ventana ancha: los bloques (sinopsis, lo que
+ * recuerda Masha, información y logros) van a dos columnas equilibradas por
+ * lo que ocupan, para que ninguna se quede con un hueco grande. Si solo hay
+ * un bloque, una columna. Lógica pura: se prueba en `DetailsInfoTest`.
+ */
+object DetailsLayout {
+
+    enum class Block { About, Memory, Facts, Achievements }
+
+    /** Lo que ocupa más o menos la sinopsis, en líneas de media columna (~55 caracteres). */
+    fun aboutWeight(textLength: Int): Float = 2f + textLength / 55f
+
+    /** Lo que recuerda Masha: un bloque corto de pocas líneas. */
+    const val MEMORY_WEIGHT = 3f
+
+    /** La información: rótulo, rejilla de datos (dos por fila) y las líneas de géneros, fuentes y paquete. */
+    fun factsWeight(info: DetailsInfo, noMetadataNote: Boolean): Float {
+        var w = if (noMetadataNote) 2f else 0f
+        if (!info.isEmpty) {
+            w += 1.5f + (info.facts.size + 1) / 2 * 2f
+            if (info.genres.isNotEmpty()) w += 1.5f
+            if (info.sources.isNotEmpty()) w += 1.5f
+            if (info.packageName != null) w += 1f
+        }
+        return w
+    }
+
+    /** Los logros: resumen y barra, y cada logro cargado en su fila. */
+    fun achievementsWeight(loaded: Int): Float = 4f + loaded * 2.5f
+
+    /**
+     * Reparte [blocks] (en orden de lectura, con su peso) entre la columna
+     * izquierda y la derecha: cada uno a la que lleve menos, la izquierda si
+     * empatan. Los de peso 0 (no se enseñan) no cuentan.
+     */
+    fun columns(blocks: List<Pair<Block, Float>>): Pair<List<Block>, List<Block>> {
+        val left = ArrayList<Block>()
+        val right = ArrayList<Block>()
+        var l = 0f
+        var r = 0f
+        for ((block, weight) in blocks) {
+            if (weight <= 0f) continue
+            if (l <= r) {
+                left += block
+                l += weight
+            } else {
+                right += block
+                r += weight
+            }
+        }
+        return left to right
+    }
+}

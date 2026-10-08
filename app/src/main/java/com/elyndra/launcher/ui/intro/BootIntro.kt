@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.runtime.withFrameNanos
+import com.elyndra.launcher.data.ColorPair
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.IntroController
 import com.elyndra.launcher.ui.masha.MashaQuality
@@ -72,12 +73,12 @@ private const val EMBERS_HIGH = 36
 private const val EMBERS_LITE = 16
 
 @Composable
-fun BootIntro(intro: IntroController, baseColor: Int) {
+fun BootIntro(intro: IntroController, colors: ColorPair) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
     val reduced = LocalReducedMotion.current
     val run = intro.run
-    val palette = remember(run, baseColor) { IntroPalettes.derive(baseColor, P.isDark) }
+    val palette = remember(run, colors) { IntroPalettes.derive(colors, P.isDark) }
     val dust = remember(run) {
         val lite = MashaQuality.detect(context) == MashaQuality.Lite
         when {
@@ -110,6 +111,7 @@ fun BootIntro(intro: IntroController, baseColor: Int) {
             IntroTimeline.fill(t, reduced, intro.skipAt, frame)
             clock.floatValue = t
             layerAlpha.floatValue = frame.alpha
+            if (frame.alpha < 1f) intro.onFading()
             frame.done
         }
     }

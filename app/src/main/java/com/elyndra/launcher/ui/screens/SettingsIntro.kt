@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
 import com.elyndra.launcher.data.P
+import com.elyndra.launcher.data.SignaturePalettes
 import com.elyndra.launcher.data.argb
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.components.CssGrid
@@ -30,6 +31,9 @@ import com.elyndra.launcher.ui.intro.IntroColor
 import com.elyndra.launcher.ui.intro.IntroPalettes
 import com.elyndra.launcher.ui.theme.LocalSkin
 
+/** Muestras de color de la intro por fila (dos filas). */
+private const val INTRO_COLUMNS = 5
+
 /**
  * Ajustes → Apariencia → intro de arranque: mostrarla o no, su color (con
  * muestras tal como se verán en el tema activo) y una vista previa.
@@ -37,7 +41,8 @@ import com.elyndra.launcher.ui.theme.LocalSkin
 @Composable
 internal fun IntroSection(vm: ElyndraViewModel) {
     val s = vm.settings
-    val accent = LocalSkin.current.a1.argb()
+    val skin = LocalSkin.current
+    val accent = remember(skin.accent) { SignaturePalettes.accentPair(skin.accent.id, skin.a1.argb(), skin.secondary.argb()) }
     val dark = P.isDark
 
     SectionLabel(stringResource(R.string.section_intro))
@@ -48,14 +53,15 @@ internal fun IntroSection(vm: ElyndraViewModel) {
         ElyText(stringResource(R.string.intro_color), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
         Spacer(Modifier.height(8.dp))
         CssGrid(
-            columns = IntroColor.entries.size,
+            columns = INTRO_COLUMNS,
             horizontalGap = 8.dp,
             verticalGap = 8.dp,
             items = IntroColor.entries.map { color ->
                 {
+                    // El filo de las letras y, al final, su resplandor (el secundario del par).
                     val brush = remember(color, accent, dark) {
-                        val p = IntroPalettes.derive(color.base(accent), dark)
-                        Brush.linearGradient(listOf(Color(p.rimLight), Color(p.rim), Color(p.rimDeep)))
+                        val p = IntroPalettes.derive(color.pair(accent), dark)
+                        Brush.linearGradient(listOf(Color(p.rimLight), Color(p.rim), Color(p.rimDeep), Color(p.glow)))
                     }
                     Swatch(
                         brush = brush,

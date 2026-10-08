@@ -68,19 +68,18 @@ class IntroPaletteTest {
     }
 
     @Test
-    fun defaultIsGoldInDarkAndTheAccentInLight() {
+    fun defaultIsPlasmaAndStoredChoicesAreKept() {
         val accent = 0xFF4E56D8.toInt()
         assertEquals(accent, IntroColor.Accent.base(accent))
-        // Sin elegir: oro en oscuro y el acento en claro.
-        assertEquals(IntroColor.Gold, IntroColor.resolve(null, dark = true))
-        assertEquals(IntroColor.Accent, IntroColor.resolve(null, dark = false))
-        // Un id que ya no existe cuenta como "sin elegir".
-        assertEquals(IntroColor.Gold, IntroColor.resolve("nope", dark = true))
-        assertEquals(IntroColor.Accent, IntroColor.resolve("nope", dark = false))
-        // Lo elegido a mano manda en los dos temas.
-        assertEquals(IntroColor.Emerald, IntroColor.resolve("emerald", dark = false))
-        assertEquals(IntroColor.Gold, IntroColor.resolve("gold", dark = false))
-        assertEquals(IntroColor.Accent, IntroColor.resolve("accent", dark = true))
+        // Sin elegir (o con un id que ya no existe): Plasma, en los dos temas.
+        assertEquals(IntroColor.Plasma, IntroColor.resolve(null))
+        assertEquals(IntroColor.Plasma, IntroColor.resolve("nope"))
+        assertEquals(IntroColor.Plasma, IntroColor.DEFAULT)
+        // Lo elegido a mano manda: también el oro y "igual que el acento" de antes.
+        assertEquals(IntroColor.Emerald, IntroColor.resolve("emerald"))
+        assertEquals(IntroColor.Gold, IntroColor.resolve("gold"))
+        assertEquals(IntroColor.Accent, IntroColor.resolve("accent"))
+        assertEquals(IntroColor.NeonRose, IntroColor.resolve("neon_rose"))
     }
 
     private fun hueDistance(a: Float, b: Float): Float {

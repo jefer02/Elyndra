@@ -44,7 +44,6 @@
 
     <!-- Pasta -->
     <string name="rom_chip">ROM · %1$s</string>
-    <string name="roms_header">ROMs</string>
     <string name="folder_empty">Não há ROMs nesta pasta. Escaneie de novo ou confira se o sistema está certo.</string>
     <plurals name="roms_summary">
         <item quantity="one">%1$d ROM · %2$s</item>
@@ -67,6 +66,7 @@
     <string name="art_cleared">Imagem removida</string>
 
     <string name="sort_by">Ordenar por</string>
+    <string name="sort_button_a11y">Ordenar por: %1$s</string>
     <string name="sort_name">Nome (A–Z)</string>
     <string name="sort_playtime">Tempo de jogo</string>
     <string name="sort_platform">Plataforma</string>
@@ -553,7 +553,7 @@
     <string name="masha_high_refresh">Masha: alta fluidez (120 Hz)</string>
     <string name="masha_high_refresh_desc">Desligado, a Masha roda a 60 fps: igualmente fluida para um holograma, com metade do trabalho da GPU, menos bateria e menos calor em conversas longas.</string>
     <string name="masha_particles_title">Cor das partículas</string>
-    <string name="masha_particles_desc">O rastro fosforescente que a Masha deixa ao ser arrastada.</string>
+    <string name="masha_particles_desc">As partículas que flutuam ao redor do emblema da Masha na biblioteca.</string>
     <string name="masha_particles_hue">Tom</string>
     <string name="masha_particles_preview">Pré-visualização</string>
     <string name="section_selection">Seleção</string>
@@ -774,11 +774,11 @@
     <string name="settings_cat_display_desc">Tema, abertura, quadros e idioma</string>
     <string name="settings_cat_sound_desc">Sons da interface e sons próprios</string>
     <string name="settings_cat_music_desc">Música do menu e fundo personalizado</string>
-    <string name="settings_cat_appearance_desc">Cor de destaque, liquid glass e partículas</string>
+    <string name="settings_cat_appearance_desc">Estilo da lista, paleta, destaque, liquid glass e partículas</string>
     <string name="settings_cat_library_desc">Ordem, novas verificações e imagens baixadas</string>
     <string name="settings_cat_metadata_desc">Fontes, contas, prioridade e tradução</string>
     <string name="settings_cat_masha_desc">IA, voz, presença e privacidade</string>
-    <string name="settings_cat_about_desc">Versão e licenças</string>
+    <string name="settings_cat_about_desc">Atualizações, versão e licenças</string>
     <plurals name="sound_events_count">
         <item quantity="one">%d evento</item>
         <item quantity="many">%d eventos</item>
@@ -813,4 +813,80 @@
     <string name="maker_sega">Sega</string>
     <string name="maker_others">Atari e outros</string>
     <string name="maker_pc">PC</string>
+    <!-- Meridian y paletas de firma -->
+    <string name="palette_plasma">Plasma</string>
+    <string name="palette_ember">Brasa</string>
+    <string name="palette_aurora">Aurora</string>
+    <string name="palette_neon_rose">Rosa neon</string>
+    <string name="palette_solar">Solar</string>
+    <string name="meridian_position">%1$d de %2$d</string>
+    <string name="layout_style_title">Estilo da lista</string>
+    <string name="layout_style_desc">Vale para a biblioteca e as pastas de ROMs quando a janela está na horizontal e tem pelo menos 640 dp de largura. Na vertical ou em janelas estreitas, sempre se usa o carrossel clássico.</string>
+    <string name="layout_meridian">Meridian</string>
+    <string name="layout_meridian_desc">Roda vertical</string>
+    <string name="layout_classic">Clássico</string>
+    <string name="layout_classic_desc">Carrossel horizontal</string>
+    <string name="signature_title">Paleta de assinatura</string>
+    <string name="signature_desc">Aplica de uma vez a cor de destaque, o brilho e as partículas da seleção e a cor da intro. Abaixo você ainda pode mudar cada uma separadamente.</string>
+    <!-- Tocar para abrir -->
+    <string name="tap_open_title">Tocar no selecionado para abrir</string>
+    <string name="tap_open_desc">Um toque no jogo, na pasta ou na ROM selecionados abre. Desligado: toque duplo para abrir.</string>
+    <string name="hint_gestures_tap">Toque para selecionar · Toque de novo para abrir · Segure para opções</string>
+    <!-- Meridian: fondo adaptable, fila de Añadir y fichas -->
+    <string name="meridian_adaptive_color_title">Cor de fundo adaptável</string>
+    <string name="meridian_adaptive_color_desc">No Meridian, o fundo atrás da lista assume a cor da arte do jogo selecionado. Desligado: o fundo neutro do tema.</string>
+    <string name="meridian_add_short">Adicionar</string>
+    <plurals name="meridian_roms">
+        <item quantity="one">%d ROM</item>
+        <item quantity="other">%d ROMs</item>
+    </plurals>
+
+    <!-- Actualizaciones (GitHub Releases), autor y licencia -->
+    <string name="section_updates">Atualizações</string>
+    <string name="update_current_version">Versão instalada</string>
+    <string name="update_check">Procurar atualizações</string>
+    <string name="update_check_now">Procurar agora</string>
+    <string name="update_view">Ver</string>
+    <string name="update_last_check">Última verificação: %1$s</string>
+    <string name="update_never_checked">Ainda não verificado</string>
+    <string name="update_state_checking">Verificando…</string>
+    <string name="update_state_up_to_date">Você está com a versão mais recente</string>
+    <string name="update_state_available">A versão %1$s está disponível</string>
+    <string name="update_state_error_network">Não foi possível acessar o GitHub. Verifique a conexão.</string>
+    <string name="update_state_error_rate">O GitHub está limitando as solicitações agora. Tente mais tarde.</string>
+    <string name="update_state_error">Não foi possível procurar atualizações.</string>
+    <string name="update_auto_title">Procurar automaticamente</string>
+    <string name="update_auto_desc">Ao abrir o Elyndra, no máximo uma vez por dia.</string>
+    <string name="update_prerelease_title">Incluir versões beta</string>
+    <string name="update_prerelease_desc">Por enquanto o Elyndra é publicado como beta. Desative para receber só versões estáveis.</string>
+    <string name="update_privacy">A verificação só baixa do GitHub a lista pública de versões do Elyndra. Nenhum dado pessoal é enviado.</string>
+    <string name="update_available_title">Elyndra %1$s está disponível</string>
+    <string name="update_available_msg">Você tem a %1$s. Novidades:</string>
+    <string name="update_notes_empty">Sem notas da versão.</string>
+    <string name="update_action">Atualizar</string>
+    <string name="update_permission_title">Permita que o Elyndra instale atualizações</string>
+    <string name="update_permission_msg">O Android precisa da sua permissão uma única vez. Toque em “Abrir configurações”, ative “Permitir desta fonte” e volte: o download começa sozinho.</string>
+    <string name="update_permission_action">Abrir configurações</string>
+    <string name="update_downloading_title">Baixando Elyndra %1$s</string>
+    <string name="update_downloading_msg">Você pode continuar usando o Elyndra; a instalação começa quando o download terminar.</string>
+    <string name="update_installing_title">Instalando…</string>
+    <string name="update_installing_msg">Confirme a instalação na janela do Android. O Elyndra reinicia ao terminar.</string>
+    <string name="update_failed_title">Não foi possível atualizar</string>
+    <string name="update_error_download">O download falhou. Verifique a conexão e tente de novo, ou baixe o APK na página da versão.</string>
+    <string name="update_error_checksum">O arquivo baixado não corresponde à soma de verificação publicada, então foi apagado. Tente mais tarde ou baixe o APK na página da versão.</string>
+    <string name="update_error_signature">Esta atualização está assinada com uma chave diferente da do Elyndra instalado (por exemplo, um build de depuração). O Android não a substitui. Para trocar, desinstale o Elyndra e instale a versão do GitHub; desinstalar apaga os dados do Elyndra neste dispositivo.</string>
+    <string name="update_error_install">O Android não conseguiu instalar a atualização. Você pode baixar o APK na página da versão.</string>
+    <string name="update_no_asset">Essa versão não tem um APK para este dispositivo. Abrindo a página da versão…</string>
+    <string name="update_cancelled">Atualização cancelada</string>
+    <string name="update_open_page">Abrir a página da versão</string>
+    <string name="about_created_by">Criado por %1$s</string>
+    <string name="about_source">Código-fonte</string>
+    <string name="about_license">Licença</string>
+    <string name="about_license_desc">Código visível no GitHub apenas para leitura. As versões oficiais são gratuitas para uso pessoal e não comercial.</string>
+    <string name="about_license_value">Todos os direitos reservados</string>
+    <string name="licenses_app_copyright">Copyright © 2026 %1$s. Todos os direitos reservados.</string>
+    <string name="licenses_app_terms">O código-fonte é publicado no GitHub apenas para leitura. Você pode instalar e usar as versões oficiais para uso pessoal e não comercial. Copiar, modificar, redistribuir ou criar obras derivadas exige permissão por escrito. Os componentes de terceiros abaixo mantêm suas próprias licenças.</string>
+    <string name="licenses_voice_title">A voz natural da Masha</string>
+    <string name="licenses_voice_notice">A voz natural da Masha é gerada no seu dispositivo com os pesos do modelo Supertonic 3 da Supertone Inc., sob a licença BigScience OpenRAIL-M. A voz é sintética (gerada por IA). Ao usá-la, você concorda em não empregá-la nos usos restritos do Anexo A dessa licença, entre outros: violar a lei, prejudicar menores, se passar por pessoas sem consentimento, espalhar informação falsa para prejudicar outros, assediar ou apresentar a fala gerada sem informar que foi criada por uma máquina.</string>
+    <string name="licenses_voice_open">Ler a licença OpenRAIL-M</string>
 </resources>

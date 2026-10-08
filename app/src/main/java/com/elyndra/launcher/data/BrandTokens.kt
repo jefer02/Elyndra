@@ -6,8 +6,9 @@ package com.elyndra.launcher.data
  * Compose, para poder comprobar contrastes en la JVM.
  *
  * Dirección: panel de consola de gama alta. Neutros de tinta y grafito fríos,
- * un índigo profundo como primario y un cian suave de secundario. Nada de
- * neón ni de colores de caramelo.
+ * un índigo profundo como primario y un cian suave de secundario. Los tonos
+ * vivos de la luz (el eje de Meridian, el halo de la selección, la intro)
+ * salen de las paletas de firma (`SignaturePalette.kt`), no de aquí.
  *
  * Contraste (WCAG AA, comprobado en PaletteTest): texto ≥ 4,5:1 y piezas de
  * interfaz (aro de foco, selección) ≥ 3:1, en claro y en oscuro, sobre papel

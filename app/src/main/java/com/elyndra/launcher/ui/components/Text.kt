@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,7 +38,10 @@ fun ElyText(
     overflow: TextOverflow = TextOverflow.Clip,
     uppercase: Boolean = false,
     align: TextAlign? = null,
+    /** [LineBreak.Heading] reparte las líneas de un titular (sin una palabra sola en la última). */
+    lineBreak: LineBreak = LineBreak.Unspecified,
 ) {
+    val base = LocalTextStyle.current
     Text(
         text = if (uppercase) text.uppercase() else text,
         modifier = modifier,
@@ -50,7 +54,7 @@ fun ElyText(
         textAlign = align,
         maxLines = maxLines,
         overflow = overflow,
-        style = if (shadow != null) LocalTextStyle.current.copy(shadow = shadow) else LocalTextStyle.current,
+        style = if (shadow != null || lineBreak != LineBreak.Unspecified) base.copy(shadow = shadow ?: base.shadow, lineBreak = lineBreak) else base,
     )
 }
 

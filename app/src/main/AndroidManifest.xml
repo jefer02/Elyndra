@@ -12,6 +12,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Actualizaciones desde las releases de GitHub (Ajustes → Acerca de →
+         Actualizaciones). No se concede en un diálogo: Android pide al usuario
+         activar "Instalar apps desconocidas" para Elyndra la primera vez. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- Hablar con Masha (reconocimiento de voz). Se pide solo al pulsar el
          micrófono, nunca al abrir la app. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />

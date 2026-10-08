@@ -69,14 +69,12 @@ import com.elyndra.launcher.ui.AchievementsState
 import com.elyndra.launcher.ui.DescriptionsController
 import com.elyndra.launcher.ui.DetailsInfo
 import com.elyndra.launcher.ui.ElyndraViewModel
-import com.elyndra.launcher.ui.LibraryItem
 import com.elyndra.launcher.ui.PadScrollBinding
 import com.elyndra.launcher.ui.SheetAction
 import com.elyndra.launcher.ui.SheetHero
 import com.elyndra.launcher.ui.SheetIcon
 import com.elyndra.launcher.ui.UiText
 import com.elyndra.launcher.ui.rememberDescription
-import com.elyndra.launcher.ui.components.ActionTile
 import com.elyndra.launcher.ui.components.ArcSpinner
 import com.elyndra.launcher.ui.components.ArtFallback
 import com.elyndra.launcher.ui.components.ArtImage
@@ -96,7 +94,13 @@ import com.elyndra.launcher.ui.components.PANEL_MARGIN
 import com.elyndra.launcher.ui.components.PadFocusGroup
 import com.elyndra.launcher.ui.components.PadHint
 import com.elyndra.launcher.ui.components.PadHints
-import com.elyndra.launcher.ui.components.PlayButton
+import com.elyndra.launcher.ui.DetailsLayout
+import com.elyndra.launcher.ui.resolve
+import com.elyndra.launcher.ui.components.SheetGlyph
+import com.elyndra.launcher.ui.theme.pressFeedback
+import com.elyndra.launcher.ui.theme.shapeClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.heightIn
 import com.elyndra.launcher.ui.components.SECTION_GAP
 import com.elyndra.launcher.ui.components.ScrollHints
 import com.elyndra.launcher.ui.components.ScrollViewport
@@ -128,8 +132,10 @@ import java.util.Locale
        arte, el arte de reserva del juego.
      · El color del juego (ArtPalette) en el botón principal, el aro del
        foco y los rótulos de sección.
-     · "Jugar" grande con la pista de A; actualizar metadatos y editar
-       nombre, como piezas compactas.
+     · Bajo la cabecera, una fila compacta con actualizar metadatos y
+       editar nombre (para jugar están la card y A en el carrusel).
+     · En ventana ancha, dos columnas equilibradas por lo que ocupa cada
+       bloque (DetailsLayout): ninguna se queda vacía.
      · "Masha recuerda", la sinopsis y la información (géneros en
        etiquetas, datos en rejilla, fuentes en insignias, paquete en
        pequeño). Lo vacío no se enseña.
@@ -264,18 +270,7 @@ private fun DetailsContent(
                 )
 
                 val actions: @Composable () -> Unit = {
-                    Column(Modifier.staggered(open, 1, reduced), verticalArrangement = Arrangement.spacedBy(GAP)) {
-                        val play = remember { SheetAction(UiText.res(R.string.sheet_play), icon = SheetIcon.Play, primary = true) {} }
-                        PlayButton(
-                            play,
-                            focused = false,
-                            accent = accent,
-                            gamepad = vm.input.active,
-                            modifier = Modifier.padInitialFocus(),
-                        ) {
-                            vm.closeDetails()
-                            if (rom != null) vm.openRom(rom) else vm.open(LibraryItem.App(app!!, installed = true))
-                        }
+                    Column(Modifier.staggered(open, 1, reduced)) {
                         val needsName = vm.needsName(title)
                         val refresh = remember { SheetAction(UiText.res(R.string.refresh_metadata), icon = SheetIcon.Refresh) {} }
                         val identify = remember(needsName) {
@@ -287,10 +282,11 @@ private fun DetailsContent(
                             ) {}
                         }
                         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(GAP)) {
-                            ActionTile(refresh, focused = false, accent = accent, modifier = Modifier.weight(1f).fillMaxHeight()) {
+                            // Con mando, el foco entra por aquí.
+                            CompactAction(refresh, accent, Modifier.weight(1f).fillMaxHeight().padInitialFocus()) {
                                 vm.refreshMetadata(listOf(key))
                             }
-                            ActionTile(identify, focused = false, accent = accent, modifier = Modifier.weight(1f).fillMaxHeight()) {
+                            CompactAction(identify, accent, Modifier.weight(1f).fillMaxHeight()) {
                                 vm.identify.open(key)
                             }
                         }
@@ -334,22 +330,36 @@ private fun DetailsContent(
                     meta.ra?.let { AchievementsBlock(vm, key, it, accent, stop) }
                 }
 
-                val body = Modifier.fillMaxWidth().padding(start = PAD, end = PAD, bottom = PAD)
-                if (wide) {
-                    Row(body, horizontalArrangement = Arrangement.spacedBy(PAD)) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SECTION_GAP)) {
-                            actions()
-                            memory()
-                            facts()
-                        }
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SECTION_GAP)) {
-                            about()
-                            achievements()
-                        }
+                val noMetadataNote = !meta.matched && meta.description == null
+                val loadedAchievements = (vm.achievements as? AchievementsState.Loaded)?.progress?.achievements?.size ?: 0
+                val (left, right) = remember(description?.text, info, noMetadataNote, meta.ra != null, loadedAchievements) {
+                    DetailsLayout.columns(
+                        listOf(
+                            DetailsLayout.Block.About to (description?.let { DetailsLayout.aboutWeight(it.text.length) } ?: 0f),
+                            DetailsLayout.Block.Memory to DetailsLayout.MEMORY_WEIGHT,
+                            DetailsLayout.Block.Facts to DetailsLayout.factsWeight(info, noMetadataNote),
+                            DetailsLayout.Block.Achievements to (if (meta.ra != null) DetailsLayout.achievementsWeight(loadedAchievements) else 0f),
+                        ),
+                    )
+                }
+                val block: @Composable (DetailsLayout.Block) -> Unit = {
+                    when (it) {
+                        DetailsLayout.Block.About -> about()
+                        DetailsLayout.Block.Memory -> memory()
+                        DetailsLayout.Block.Facts -> facts()
+                        DetailsLayout.Block.Achievements -> achievements()
                     }
-                } else {
-                    Column(body, verticalArrangement = Arrangement.spacedBy(SECTION_GAP)) {
-                        actions()
+                }
+
+                val body = Modifier.fillMaxWidth().padding(start = PAD, end = PAD, bottom = PAD)
+                Column(body, verticalArrangement = Arrangement.spacedBy(SECTION_GAP)) {
+                    actions()
+                    if (wide && right.isNotEmpty()) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(PAD)) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SECTION_GAP)) { left.forEach { block(it) } }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SECTION_GAP)) { right.forEach { block(it) } }
+                        }
+                    } else {
                         memory()
                         about()
                         facts()
@@ -373,6 +383,44 @@ private fun DetailsContent(
 }
 
 private val DETAILS_HINTS = listOf(PadHint("A", R.string.hint_select), PadHint("B", R.string.close))
+
+/**
+ * Una acción secundaria de la ficha en una pieza baja: el glifo a la
+ * izquierda y el rótulo (dos líneas como mucho) con su aviso debajo.
+ */
+@Composable
+private fun CompactAction(action: SheetAction, accent: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(TILE_RADIUS)
+    val interaction = remember { MutableInteractionSource() }
+    Row(
+        modifier
+            .heightIn(min = 48.dp)
+            .pressFeedback(interaction)
+            .clip(shape)
+            .background(tileFill())
+            .border(1.dp, P.hairline.copy(alpha = 0.8f), shape)
+            .shapeClickable(shape, interactionSource = interaction, color = accent, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        action.icon?.let { SheetGlyph(it, accent, size = 18.dp) }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            ElyText(
+                action.label.resolve(),
+                size = 10.5f,
+                weight = FontWeight.SemiBold,
+                color = P.ink,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                lineHeightRatio = 1.25f,
+            )
+            action.detail?.let {
+                ElyText(it.resolve(), size = 8.5f, color = P.ink2, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
 
 /**
  * La cabecera: el fondo del juego a sangre por arriba (se acerca un poco al

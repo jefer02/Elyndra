@@ -2,6 +2,8 @@ package com.elyndra.launcher.ui.selection
 
 import com.elyndra.launcher.data.BrandTokens
 import com.elyndra.launcher.data.ColorMath
+import com.elyndra.launcher.data.ColorPair
+import com.elyndra.launcher.data.SignaturePalettes
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.pow
@@ -160,8 +162,16 @@ object SelectionPalettes {
         return intArrayOf(n.paper, n.surface)
     }
 
-    fun derive(base: Int, dark: Boolean): SelectionPalette =
-        if (dark) dark(ColorMath.opaque(base)) else light(ColorMath.opaque(base))
+    /**
+     * La paleta de un color de selección. Si es el primario de una paleta de
+     * firma, se pinta con su par: el filo va del primario al secundario, el
+     * polvo mezcla los dos tonos y el brillo y los núcleos salen de su destello.
+     */
+    fun derive(base: Int, dark: Boolean): SelectionPalette {
+        val c = ColorMath.opaque(base)
+        val pair = SignaturePalettes.presetOf(c)?.pair
+        return if (dark) dark(c, pair) else light(c, pair)
+    }
 
     private fun legible(c: Int, dark: Boolean, ratio: Double = MIN_CONTRAST): Int {
         var out = c
@@ -169,24 +179,27 @@ object SelectionPalettes {
         return out
     }
 
-    private fun dark(base: Int): SelectionPalette {
+    private fun dark(base: Int, pair: ColorPair?): SelectionPalette {
         val vivid = legible(base, dark = true, ratio = 4.0)
         val (h, _, l) = ColorMath.toHsl(vivid)
         val s = saturation(vivid)
         val champagneWhite = ColorMath.mix(BrandTokens.CHAMPAGNE, WHITE, 0.55f)
+        val second = pair?.let { legible(it.secondary, dark = true, ratio = 4.0) }
         return SelectionPalette(
             dark = true,
             rim = vivid,
-            rimLight = ColorMath.mix(vivid, WHITE, 0.55f),
+            rimLight = second?.let { ColorMath.mix(it, WHITE, 0.3f) } ?: ColorMath.mix(vivid, WHITE, 0.55f),
             keyline = BLACK,
             bloom = vivid,
-            underglow = vivid,
-            sheen = ColorMath.mix(BrandTokens.CHAMPAGNE, WHITE, 0.6f),
-            core = champagneWhite,
+            underglow = second ?: vivid,
+            sheen = pair?.let { ColorMath.mix(it.spark, WHITE, 0.35f) } ?: ColorMath.mix(BrandTokens.CHAMPAGNE, WHITE, 0.6f),
+            core = pair?.let { ColorMath.mix(it.spark, WHITE, 0.5f) } ?: champagneWhite,
             particles = IntArray(SelectionFx.VARIANTS) { i ->
-                val dh = HUE_SHIFTS[i]
-                val dl = LIGHT_SHIFTS[i]
-                legible(ColorMath.fromHsl(h + dh, s, (l + dl).coerceIn(0.35f, 0.92f)), dark = true)
+                // Con par, la mitad del polvo es del secundario.
+                val tone = second?.takeIf { i % 2 == 1 }
+                val (th, _, tl) = if (tone != null) ColorMath.toHsl(tone) else floatArrayOf(h, s, l)
+                val ts = if (tone != null) saturation(tone) else s
+                legible(ColorMath.fromHsl(th + HUE_SHIFTS[i], ts, (tl + LIGHT_SHIFTS[i]).coerceIn(0.35f, 0.92f)), dark = true)
             },
             bloomAlphas = floatArrayOf(0.42f, 0.2f, 0.09f),
             underglowAlpha = 0.34f,
@@ -198,24 +211,35 @@ object SelectionPalettes {
      * Claro: sobre el perla la luz no suma, así que el marco se vuelve metal de
      * color, algo más saturado y hondo que la base, oscurecido lo justo para el 3:1.
      */
-    private fun light(base: Int): SelectionPalette {
+    private fun light(base: Int, pair: ColorPair?): SelectionPalette {
         val (h, _, l) = ColorMath.toHsl(base)
         val s = saturation(base)
         // Un color casi neutro (el blanco de la paleta) se queda neutro: grafito, no azul.
         val sat = if (s < GRAY_CHROMA) s else (s + 0.15f).coerceAtMost(1f)
         val deep = legible(ColorMath.fromHsl(h, sat, l.coerceAtMost(0.5f)), dark = false, ratio = 3.4)
         val dl = ColorMath.toHsl(deep)[2]
+        // El secundario de la paleta de firma, hondo y saturado como el primario.
+        val second = pair?.let {
+            val (h2, _, l2) = ColorMath.toHsl(it.secondary)
+            val s2 = (saturation(it.secondary) + 0.15f).coerceAtMost(1f)
+            legible(ColorMath.fromHsl(h2, s2, l2.coerceAtMost(0.5f)), dark = false, ratio = 3.4)
+        }
         return SelectionPalette(
             dark = false,
             rim = deep,
-            rimLight = legible(ColorMath.fromHsl(h, sat, (dl + 0.14f).coerceAtMost(0.8f)), dark = false),
+            rimLight = second ?: legible(ColorMath.fromHsl(h, sat, (dl + 0.14f).coerceAtMost(0.8f)), dark = false),
             keyline = WHITE,
             bloom = deep,
-            underglow = deep,
-            sheen = ColorMath.mix(BrandTokens.CHAMPAGNE, WHITE, 0.75f),
+            underglow = second ?: deep,
+            sheen = pair?.let { ColorMath.mix(it.spark, WHITE, 0.6f) } ?: ColorMath.mix(BrandTokens.CHAMPAGNE, WHITE, 0.75f),
             core = ColorMath.mix(deep, WHITE, 0.45f),
             particles = IntArray(SelectionFx.VARIANTS) { i ->
-                legible(ColorMath.fromHsl(h + HUE_SHIFTS[i], sat, (dl + LIGHT_SHIFTS[i] * 0.6f).coerceIn(0.12f, 0.6f)), dark = false)
+                if (second != null && i % 2 == 1) {
+                    val (h2, s2, l2) = ColorMath.toHsl(second)
+                    legible(ColorMath.fromHsl(h2 + HUE_SHIFTS[i], s2, (l2 + LIGHT_SHIFTS[i] * 0.6f).coerceIn(0.12f, 0.6f)), dark = false)
+                } else {
+                    legible(ColorMath.fromHsl(h + HUE_SHIFTS[i], sat, (dl + LIGHT_SHIFTS[i] * 0.6f).coerceIn(0.12f, 0.6f)), dark = false)
+                }
             },
             bloomAlphas = floatArrayOf(0.3f, 0.14f, 0.06f),
             underglowAlpha = 0.2f,

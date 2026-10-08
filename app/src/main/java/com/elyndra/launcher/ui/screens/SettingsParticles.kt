@@ -65,6 +65,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
+import com.elyndra.launcher.data.SignaturePreset
+import com.elyndra.launcher.ui.components.CssGrid
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.components.ElyText
@@ -88,10 +90,11 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
- * Colores de fósforo de partida: los típicos de monitor y de LED de consola.
- * Con el deslizador de tono se puede elegir cualquier otro.
+ * Colores de partida: primero los primarios de las paletas de firma y luego
+ * los fósforos de siempre (los típicos de monitor y de LED de consola). Con
+ * el deslizador de tono se puede elegir cualquier otro.
  */
-private val PRESETS = listOf(
+private val PRESETS = SignaturePreset.entries.map { it.pair.primary } + listOf(
     0xFF5CF2FF, // cian
     0xFF6CFF8E, // verde fósforo
     0xFFFFC857, // ámbar
@@ -102,6 +105,9 @@ private val PRESETS = listOf(
     0xFFF4F7FF, // blanco
 ).map { it.toInt() }
 
+/** Muestras por fila: con las paletas de firma ya no caben todas en una. */
+private const val CHOICE_COLUMNS = 7
+
 /** Saturación y brillo de los colores elegidos con el deslizador: vivos, que brillen. */
 private const val PICK_SATURATION = 0.68f
 private const val PICK_VALUE = 1f
@@ -109,7 +115,7 @@ private const val PICK_VALUE = 1f
 /**
  * Ajustes → Masha → color de las partículas: vista previa animada, colores de
  * partida y un deslizador de tono. Se guarda al momento (SettingsStore) y el
- * botón de Masha lo usa en el siguiente arrastre.
+ * polvo que rodea el emblema de Masha en la biblioteca cambia enseguida.
  */
 @Composable
 internal fun ParticleColorGroup(vm: ElyndraViewModel) {
@@ -194,16 +200,20 @@ private fun ColorChoices(argb: Int, onPick: (Int) -> Unit) {
     val custom = argb !in PRESETS
     var customOpen by rememberSaveable { mutableStateOf(false) }
     Column {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            PRESETS.forEach { preset ->
-                ColorDot(Color(preset), selected = preset == argb, modifier = Modifier.weight(1f)) { onPick(preset) }
-            }
-            CustomHueDot(
-                selected = custom,
-                expanded = customOpen || custom,
-                modifier = Modifier.weight(1f),
-            ) { customOpen = !customOpen }
-        }
+        CssGrid(
+            columns = CHOICE_COLUMNS,
+            horizontalGap = 4.dp,
+            verticalGap = 0.dp,
+            items = PRESETS.map<Int, @Composable () -> Unit> { preset ->
+                { ColorDot(Color(preset), selected = preset == argb, modifier = Modifier.fillMaxWidth()) { onPick(preset) } }
+            } + listOf<@Composable () -> Unit> {
+                CustomHueDot(
+                    selected = custom,
+                    expanded = customOpen || custom,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { customOpen = !customOpen }
+            },
+        )
         Expandable(customOpen || custom) {
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {

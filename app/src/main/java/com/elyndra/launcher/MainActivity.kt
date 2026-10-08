@@ -384,6 +384,7 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("RestrictedApi")
     private fun deliverDirection(pad: Pad) {
         enterKeyboardMode()
+        vm.input.repeats = repeater.repeats
         // El paso suena si alguien lo ha movido (el carrusel o el foco de Compose).
         if (vm.input.handle(pad)) {
             vm.sound.play(UiSound.Navigate)

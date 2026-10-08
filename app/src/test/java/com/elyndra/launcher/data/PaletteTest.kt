@@ -108,7 +108,7 @@ class PaletteTest {
 
     @Test
     fun brandAccentsCarryWhiteTextAcrossTheWholeFill() {
-        for (id in listOf("indigo", "abismo", "medianoche")) {
+        for (id in listOf("plasma", "indigo", "abismo", "medianoche")) {
             val accent = ACCENTS.first { it.id == id }
             assertAtLeast("$id blanco sobre a", ColorMath.contrast(white, accent.a.argb()), 4.5)
             assertAtLeast("$id blanco sobre b", ColorMath.contrast(white, accent.b.argb()), 4.5)
@@ -140,7 +140,8 @@ class PaletteTest {
     fun accentIdsAreUniqueAndBrandPalettesComeFirst() {
         assertEquals(ACCENTS.size, ACCENTS.map { it.id }.toSet().size)
         assertEquals(TINTS.size, TINTS.map { it.id }.toSet().size)
-        assertEquals(listOf("indigo", "abismo", "medianoche"), ACCENTS.take(3).map { it.id })
+        // Primero las paletas de firma y luego la marca de siempre.
+        assertEquals(listOf("plasma", "ember", "aurora", "neon_rose", "indigo", "abismo", "medianoche"), ACCENTS.take(7).map { it.id })
         // Los acentos de siempre siguen ahí para quien los tenga guardados.
         val legacy = listOf("mandarina", "fuego", "menta", "cobalto", "lila", "coral", "turquesa", "oro", "chicle", "grafito")
         assertTrue(ACCENTS.map { it.id }.containsAll(legacy))
@@ -152,7 +153,7 @@ class PaletteTest {
     fun nothingStoredPicksTheNewDefaults() {
         val accents = ACCENTS.map { it.id }
         val tints = TINTS.map { it.id }
-        assertEquals("indigo", Palettes.accentId(null, accents))
+        assertEquals("plasma", Palettes.accentId(null, accents))
         assertEquals("niebla", Palettes.tintId(null, tints))
         assertTrue(Palettes.DEFAULT_ACCENT in accents)
         assertTrue(Palettes.DEFAULT_TINT in tints)
@@ -165,6 +166,8 @@ class PaletteTest {
         val accents = ACCENTS.map { it.id }
         val tints = TINTS.map { it.id }
         assertEquals("mandarina", Palettes.accentId("mandarina", accents))
+        // Quien tenía el índigo de antes lo conserva: el nuevo de partida no pisa nada guardado.
+        assertEquals("indigo", Palettes.accentId("indigo", accents))
         assertEquals("grafito", Palettes.accentId("grafito", accents))
         assertEquals("papel", Palettes.tintId("papel", tints))
         assertEquals("humo", Palettes.tintId("humo", tints))
@@ -172,7 +175,7 @@ class PaletteTest {
 
     @Test
     fun unknownStoredValueFallsBackToDefault() {
-        assertEquals("indigo", Palettes.accentId("neon-que-ya-no-existe", ACCENTS.map { it.id }))
+        assertEquals("plasma", Palettes.accentId("neon-que-ya-no-existe", ACCENTS.map { it.id }))
         assertEquals("niebla", Palettes.tintId("", TINTS.map { it.id }))
     }
 }
