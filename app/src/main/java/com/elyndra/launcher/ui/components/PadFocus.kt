@@ -22,7 +22,6 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -125,9 +124,30 @@ fun PadFocusGroup(
                 if (modal) exit = { FocusRequester.Cancel }
             }
             .focusGroup()
-            // Grupo de dentro: recuerda lo último señalado.
+            // Grupo de dentro: recuerda lo último señalado (lo que hacía
+            // `focusRestorer`), pero solo redirige con el mando.
+            //
+            // Ojo: en Compose, `requestFocus()` de un hijo sin foco pasa por el
+            // `enter` de sus grupos padre. Con `focusRestorer` eso devolvía el
+            // foco a lo último señalado (Cancel) o lo mandaba a [padInitialFocus]
+            // (el raíl de Ajustes): un campo de texto tocado nunca llegaba a
+            // tener el foco y el teclado no salía. Con el dedo (el mando no está
+            // en uso: [InputController.onTouch] lo apaga antes del toque) el
+            // foco va a lo que se ha tocado.
             .focusRequester(scope.entry)
-            .focusRestorer { scope.initial ?: FocusRequester.Default }
+            .focusProperties {
+                exit = {
+                    scope.entry.saveFocusedChild()
+                    FocusRequester.Default
+                }
+                enter = {
+                    when {
+                        input?.active != true -> FocusRequester.Default
+                        scope.entry.restoreFocusedChild() -> FocusRequester.Cancel
+                        else -> scope.initial ?: FocusRequester.Default
+                    }
+                }
+            }
             .focusGroup(),
     ) {
         CompositionLocalProvider(LocalPadScope provides scope) { content() }
