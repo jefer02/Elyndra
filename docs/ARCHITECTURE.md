@@ -65,6 +65,7 @@ flowchart TB
 | `core/device/` | `DeviceStateMonitor` (batería, temperatura, red) | Sí |
 | `work/` · `widget/` · `notify/` | WorkManager, widget Glance, avisos | Sí |
 | `di/` | Módulos Hilt | Sí |
+| `update/` | Actualizaciones desde GitHub Releases: `UpdateLogic` (semver, elección del APK, cadencia; puro), `UpdateRepository` (OkHttp + ETag + SHA-256), `UpdateInstaller` (`PackageInstaller`). La UI es `ui/UpdateController` + `ui/screens/UpdateDialog.kt` | Solo repositorio e instalador |
 | `ui/` | Compose: pantallas, controladores, componentes | Sí |
 
 **Inyección:** Hilt. `ElyndraApplication` es `@HiltAndroidApp` y sigue exponiendo
@@ -379,6 +380,7 @@ metadatos, revisión y arcos, y lo resuelve con **las mismas capacidades**
 | `FOREGROUND_SERVICE_DATA_SYNC` | Pasada completa de metadatos | Declarado |
 | `PACKAGE_USAGE_STATS` | **Opcional**: tiempo de juego exacto | Solo desde Ajustes → Masha, en la pantalla del sistema |
 | `<queries>` | Ver emuladores y juegos instalados | Declarado; **sin** `QUERY_ALL_PACKAGES` |
+| `REQUEST_INSTALL_PACKAGES` | Instalar las actualizaciones de Elyndra | Declarado; Android pide al usuario "Instalar apps desconocidas" la primera vez que actualiza |
 
 - **Sin root**, sin accesibilidad, sin superposición, sin leer otros archivos.
 - **A DeepSeek solo viaja**: títulos, sistemas, tiempo de juego, estado del
@@ -386,6 +388,12 @@ metadatos, revisión y arcos, y lo resuelve con **las mismas capacidades**
   nombres de cuenta ni credenciales (hay una prueba que lo comprueba:
   `MashaLocalTest.theContextNeverCarriesPathsOrUris`).
 - La IA se puede apagar (Ajustes → Masha): Masha sigue funcionando en local.
+- **Actualizaciones:** solo `GET` a la lista pública de releases de
+  `jefer02/Elyndra` (sin token, User-Agent genérico `Elyndra-Updater`,
+  condicional con ETag) y al APK elegido. No viaja ningún dato del usuario ni
+  del dispositivo (`UpdateRepositoryTest` comprueba que la petición no lleva
+  cuerpo ni autorización). Como mucho una vez al día sola; se apaga en
+  Ajustes → Acerca de → Actualizaciones. Publicar: [RELEASING.md](RELEASING.md).
 - "Olvidar todo lo que sabe Masha" borra recuerdos, hilo y caché.
 - Credenciales cifradas con AES-GCM y una clave del Android Keystore;
   `allowBackup=false`.
