@@ -50,8 +50,28 @@ champán de la intro (`P.champagne`) es un brillo de 1 dp en el canto superior
 de las superficies; nunca rellena nada, no lleva texto y no entra en el foco
 (un trazo dorado en el canto de un botón pequeño se leía como un fallo).
 
-**Intro** — Sin color elegido en Ajustes, oro en tema oscuro e "Igual que el
-acento" (el índigo de serie) en tema claro (`IntroColor.defaultFor`).
+**Intro** — Sin color elegido en Ajustes, Plasma en los dos temas
+(`IntroColor.DEFAULT`). Lo elegido antes (oro, "Igual que el acento"…) se respeta.
+
+**Paletas de firma** (`data/SignaturePalette.kt`) — Cada una es un par de luz:
+primario (filos, eje, nodo, partículas), secundario (halo, degradados) y
+destello (núcleos, brillos, barridos).
+
+| Paleta | Primario | Secundario | Destello |
+|---|---|---|---|
+| Plasma (de partida) | `#7C5CFF` | `#2BD9FF` | `#FFF1C9` |
+| Ember | `#FF8A1F` | `#FF3D5A` | `#FFE2B8` |
+| Aurora | `#19E3A5` | `#3AA8FF` | `#E6FFF6` |
+| Neon Rose | `#FF4FA3` | `#B15CFF` | `#FFE6F3` |
+| Solar | el oro de siempre (`#E9B44C`, acento "oro", intro "gold") | `#F3CE7A` | `#FFF1D6` |
+
+Un color propio (deslizador de tono) completa su par solo: secundario con el
+tono +35° y destello claro. En claro cada tono se vuelve algo más saturado y
+hondo hasta el 3:1 frente a la perla, el papel y la superficie; el texto sale
+de `SignaturePalettes.text` (4,5:1). En oscuro la luz suma tal cual. De
+partida: acento Plasma, halo y partículas de la selección Plasma e intro
+Plasma; nada guardado se pisa. El acento Plasma arranca su relleno en
+`#7958FF` (no `#7C5CFF`) para que el blanco de los botones llegue al 4,5:1.
 
 ## 3. Superficies
 
@@ -185,13 +205,15 @@ Vistas previas en claro y oscuro: `ConsolePreviews.kt` (anotación `@ConsolePrev
 | Pantalla y tema | Modo oscuro, intro, fotogramas por segundo, alta fluidez de Masha, hora y batería, idioma |
 | Sonido | Sonidos de la interfaz, volumen, sonido al navegar, paquete, sonidos propios (plegados) |
 | Música y fondo | Música del menú, fondo de la interfaz |
-| Apariencia | Color de acento, liquid glass, selección (halo y partículas, con su color) |
+| Apariencia | Estilo de la lista (Meridian o Clásico, con miniaturas), color de fondo adaptable (Meridian), paleta de firma, color de acento, liquid glass, selección (halo y partículas, con su color) |
 | Biblioteca | Ordenar por, reescanear, imágenes descargadas, build de BannerHub |
 | Metadatos | Fuentes sin cuenta, servicios con cuenta, prioridad, traducción, descarga automática y manual |
 | Masha | IA, voz, presencia, color de su estela, tiempo de juego exacto, privacidad |
-| Acerca de | Versión, licencias, opciones de desarrollador |
+| Acerca de | Actualizaciones (GitHub Releases), autor y enlaces, versión, licencia, licencias de terceros, opciones de desarrollador |
 
 Las claves de `SettingsStore` no cambian: solo cambia dónde se enseña cada opción.
+Las únicas claves nuevas son `layout.style` ("meridian" o "classic"; sin valor, Meridian) y
+`meridian.adaptiveColor` (encendida de serie).
 La lógica pura (categorías, prioridad, grupos de sistemas, resúmenes) está en
 `ui/SettingsNav.kt` y `ui/ConsoleLogic.kt`, con sus pruebas en `ConsoleLogicTest`.
 
@@ -258,3 +280,171 @@ orbe y suben con un rizo. Solo esa pieza tiene reloj; con "reducir
 movimiento" quedan quietas. Su línea ambiental sale debajo,
 alineada a su izquierda, sobre el arte del hero, y se recoge a los 14 s.
 
+## 11. Meridian: la rueda vertical
+
+Con la ventana apaisada y de al menos 640 dp de ancho (`MeridianMode`, por
+tamaño de ventana, nunca por tipo de aparato) la lista de Biblioteca y de
+Carpeta deja el carrusel por una rueda vertical. En vertical o en una ventana
+estrecha el carrusel sigue igual. Ajustes → Apariencia → "Estilo de la lista"
+permite quedarse siempre con el clásico. Selección, sección, orden y búsqueda
+viven en el ViewModel, así que girar, plegar o cambiar el tamaño no pierde
+nada: la rueda (y el carrusel) nacen ya en la selección (`WheelMath.restoreIndex`).
+
+**Reparto** (`MeridianGeometry`): la rueda ocupa ~42 % del ancho (300–600 dp);
+en una ventana baja (< 480 dp de alto, `MeridianMode.compact`) el 40 %
+(280–520 dp). La línea de foco va en el centro. Arriba de la rueda, el
+emblema de Masha y el dock de secciones y el orden. A la derecha, el arte del
+juego a sangre (`HeroArtLayer`), ensanchado un 35 % y anclado a la izquierda
+(`MeridianArtFrame`), el bloque del hero abajo (margen inferior del 8 % del
+alto; 6 % en ventana baja) y la barra arriba a la derecha. Entre el dial y el
+bloque, 96 dp: ahí va el contador. Los insets (barras del sistema y recortes)
+ya los respeta la raíz de la app (`systemBars ∪ displayCutout`).
+
+**Tarjetas y profundidad** (`WheelTransform`, tablas por fila de distancia
+0, ±1, ±2, ±3, ±4, interpoladas en línea):
+
+| | 0 | ±1 | ±2 | ±3 | ±4 |
+|---|---|---|---|---|---|
+| Escala | 1 | 0,64 | 0,46 | 0,32 | 0,24 |
+| Opacidad | 1 | 0,85 | 0,5 | 0,25 | 0 |
+| Giro Y | 0° | 6° | 12° | 18° | 18° |
+| Niebla | 0 | 0,12 | 0,26 | 0,42 | 0,55 |
+| Texto | sí | sí (2 líneas) | no | no | no |
+
+La tarjeta enfocada mide el 48 % del alto de la rueda (carátulas, como mucho
+el 24 % del ancho de la ventana) o el 38 % (iconos y apaisadas), y nunca más
+ancha que el 42 % de la rueda (al nombre le queda sitio); entre 88 y 380 dp.
+Se leen tres filas (la enfocada y sus vecinas, que pueden asomar recortadas
+en los cantos) y, con iconos, dos tenues más. Cada fila sigue el **círculo**
+de `WheelArc`: su centro queda fuera de la pantalla, a la izquierda, a la
+altura de la línea de foco (radio 1,6 altos de la rueda); el dial usa la misma
+función, así que filas y arco nunca se separan. La niebla es el color del
+fondo. Titular de la enfocada a 20–24 sp (18–20 en ventana baja), dos líneas,
+sobre un óvalo suave del color del fondo que se apaga hacia sus bordes (no es
+una placa); el de las vecinas, 20 sp escalado (~13 sp), dos líneas. En la
+enfocada, como mucho dos fichas (plataforma y cantidad; el emulador va en el
+hero), que saltan de línea en vez de cortarse. La fila de "Añadir" lleva un
+rótulo corto ("Añadir"; el largo es para el lector de pantalla).
+
+**Listas cortas** (`ShortList`): con 1 a 4 filas la pila entera se centra en
+la rueda (con 5, a medias): la línea de foco se mueve entre su sitio y la que
+centra la pila, en función continua de la posición (filas, nodo y dial van
+juntos, sin saltos) y sin que la enfocada se salga.
+
+**Tarjetas claras**: todas llevan un filo de 1 dp del tema y una sombra de
+contacto suave; los dos se refuerzan cuando la luminancia del canto de la
+tarjeta se parece a la del fondo (`ArtWash.tileEdgeStrength`, leída de una
+copia de 16 px fuera del hilo principal).
+
+**El dial orbital** (`MeridianDial`): un arco fino (1,5 dp) del primario al
+secundario con resplandor de dos trazos, que se apaga hacia las puntas; una
+marca por juego, perpendicular al arco, que rueda con la lista como un dial
+físico (16 dp entre marcas hasta 24 juegos, 11 dp hasta 120 con mayores cada
+5, 6 dp pintando una de cada 2 hasta 600 y 4 dp una de cada 3 más allá:
+`DialScale`); una muesca fija en la línea de foco con el nodo de luz, que late
+con cada cambio de selección. La marca que pasa por la muesca se alarga y se
+enciende; las lejanas siguen la caída de opacidad de la rueda. Con pocos
+juegos, un arco corto; sin juegos, nada. El nodo va en "línea de foco +
+desplazamiento", el mismo valor que coloca la tarjeta: con la rueda parada,
+en su centro exacto. En claro, marcas de grafito; en oscuro, claras y el
+resplandor suma (≥ 3:1 sobre el fondo). Un solo lienzo que lee la rueda al
+dibujar, sin objetos por fotograma. Al lado, el **contador** (`DialCounterChip`):
+cápsula de cristal con cifras tabulares, la posición grande y el total
+apagado, siempre con las mismas cifras (2 a 4, `DialCounter`), que ruedan como
+un cuentakilómetros al cambiar (fundido con "reducir movimiento"); en
+"Añadir", un "+".
+
+**Fondo adaptable** (`ArtWash`, `MeridianWash`; Ajustes → Apariencia →
+"Color de fondo adaptable", encendido de serie). Del arte enfocado se pide a
+Coil una copia de software de 48 px (nunca se leen píxeles de un bitmap de
+hardware) y, fuera del hilo principal, se saca de una muestra de 24 × 24 el
+dominante (cubetas de tono pesadas por saturación y medios tonos), un
+secundario, 5 colores de la franja que cae detrás de la rueda y sus píxeles
+más claro y más oscuro; la copia de 48 px se desenfoca una vez. Todo queda
+en una caché en memoria por ruta. Detrás de la rueda, en una capa del ancho
+justo: el arte desenfocado alineado con el de verdad (un desenfoque gratis,
+sin desenfocar por fotograma), el tono del velo encima (oscuro: luminosidad
+8–16 %, saturación viva; claro: pastel al 80–88 %, saturación 30–45 %), una
+modulación vertical con los colores del canto del arte, grano fijo al 3,5 %
+y la máscara de la niebla (`MeridianFog`): 0,86 desde el canto hasta el eje
+(detrás de las tarjetas no hace falta más) y, pasado el eje, una caída
+graduada `(1 − smoothstep)^1,7` hasta el 58 % del ancho (densa junto a la
+rueda, un tercio a mitad del tramo). El perfil se curva con el círculo de la
+rueda (`WheelArc`): a cada altura se corre lo mismo que la fila que pasa por
+ahí, así que el texto de cada fila tiene detrás el mismo velo que la fila
+enfocada y, arriba y abajo, el arte queda más limpio (una media luna, no una
+banda). Es una imagen pequeña (celdas de 6 dp) calculada una vez por tamaño y
+ampliada con filtrado. Lo que cubre el velo se calcula para que los
+nombres lleguen al 4,5:1 sobre el peor píxel de la franja; si no llegaría ni
+cubriendo del todo, el velo neutro del tema. Sin arte o con arte gris, el
+tono sale del primario de la paleta de firma. Al cambiar de selección los
+colores se funden en 520 ms (al instante con "reducir movimiento"). Apagado
+el ajuste, el velo neutro de siempre (perla cálida en claro, tinta en oscuro).
+
+**Barra y píldoras**: arriba, un velo de la tinta honda del arte (luminosidad
+10 %) que se mantiene lo que mide la barra y se apaga en 24 dp, con la
+opacidad justa para el texto blanco (≥ 4,5:1 sobre el píxel más claro de esa
+zona). La cabecera de Carpeta: nombre en una línea, ruta en otra recortada
+por el centro, a 12 dp de la píldora de la batería. Todas las píldoras de
+cristal oscuro (volver, Abrir, emulador, hora, buscar, Ajustes, contador)
+llevan en Meridian un suelo de tinta de 0,66 (`MeridianGlass`, `LocalGlassFloor`):
+texto ≥ 4,5:1 e iconos ≥ 3:1 sobre cualquier fondo. Se tocan en 48 dp
+aunque se vean de 34 (`touchTarget`).
+
+**Bocadillo de Masha** (`BubbleSlot`): va en la columna de la rueda, bajo el
+botón de Masha, sin pisar el dock ni el orden (si el dock baja a otra línea,
+el bocadillo se coloca a su lado o debajo). Mientras se ve, la rueda le deja
+sitio con un muelle: baja la mitad de lo que ocupa y las filas que quedarían
+debajo se apagan antes de tocarlo (`RailEdge`). En ventana baja, una sola
+línea con "Ahora no" al lado.
+
+**Bloque del hero**: fichas (saltan de línea), logo (o titular), sinopsis (dos
+líneas) y las acciones, con ritmo de 8 dp. El logo se encaja (`LogoFit`) en una
+caja de ancho min(60 % de la zona del hero, 640 dp, el bloque) y alto entre
+el 14 % y el 26 % de la ventana, sin deformar; si es pequeño se amplía al doble
+(hasta 2,5 veces en pantallas densas, sin pasar de 1,25 dp por píxel); se pide
+la imagen al tamaño de la caja. En ventana baja: dos fichas en una línea, sin
+sinopsis, logo hasta el 20 % del alto y botones de 40 dp. Los tres botones
+miden lo mismo y crecen juntos con la letra grande. Los glifos A, X, Y (y la B
+de "Volver" en Carpeta) solo salen con un mando conectado.
+
+**Tocar para abrir** (Biblioteca y Carpeta, rueda y carrusel; `TapGate`,
+`OpenGuard`): un toque selecciona; un toque en lo seleccionado lo abre. Dos
+toques rápidos en el mismo sitio abren lo que seleccionó el primero. Un toque
+con la lista moviéndose solo la para. Tras abrir algo, 600 ms en los que no se
+abre nada más. Ajustes → Biblioteca → "Tocar lo seleccionado para abrir".
+
+**Calidad ligera** (la de Masha, `MashaQuality.Lite`): solo ±2 filas, sin
+giro, sin niebla y sin grano; el arco sin su resplandor ancho.
+
+**Movimiento** (`MeridianMotion`): al entrar, el dial se enciende desde la
+muesca mientras se funde la intro, las 8 primeras filas entran en cascada y el
+arte se funde. Al moverse, filas con muelle (acelera al mantener la cruceta),
+marcas que ruedan, nodo que late, arte con fundido y paralaje, colores del
+fondo con fundido, titular con barrido de máscara y brillo. Cambiar de sección
+desliza la rueda en vertical. Con "reducir movimiento": sin giro, paralaje ni
+cascada; fundidos, escala, niebla y la misma curva (es geometría, no
+movimiento).
+
+### 11.x Estado vacío (Meridian y clásico)
+
+Un solo bloque para los tres diseños (`ui/components/EmptyLibrary.kt`):
+
+- **Escenario** (`EmptyStageBackdrop`, colores en `EmptyStage`): sustituye al
+  arte cuando no hay juego (biblioteca o sección vacía, fila "Añadir"). Fondo
+  hondo teñido con el tono del primario de la paleta de firma (HSL 14→6 % de
+  noche, 30→18 % de día, saturación ≤ 58 %), resplandor del primario, halo
+  del secundario, tres órbitas finas del destello con su nodo (eco del dial),
+  sombra de suelo y grano. Estático (`drawWithCache`), sin animación por
+  fotograma. El blanco llega al 4,5:1 en su punto más claro: si una paleta no
+  lo cumple se baja la luz. En el clásico lleva un filo de luz en la costura
+  con el estante.
+- **Bloque** (`EmptyLibraryHero`): titular del hero en dos líneas del mayor
+  cuerpo que cabe (`TitleFit`; si ni 18 sp caben, una tercera línea; nunca
+  puntos suspensivos), la línea de qué hacer y la acción principal de
+  Meridian ("Añadir juegos o ROMs", con la A si hay mando).
+- **Tarjeta "Añadir"**: la de cada lista (fila de la rueda o card del
+  carrusel), señalada cuando es lo único que hay; el mando ya tiene el foco en
+  ella y la A abre Añadir.
+- Sin arte, el óvalo oscuro y la franja de arriba de Meridian se apagan
+  (`meridianScrims(artShown)`): eran las manchas grises sobre el cristal claro.
