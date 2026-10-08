@@ -766,11 +766,11 @@
     <string name="settings_cat_display_desc">Theme, intro, frame rate and language</string>
     <string name="settings_cat_sound_desc">Interface sounds and custom sounds</string>
     <string name="settings_cat_music_desc">Menu music and custom background</string>
-    <string name="settings_cat_appearance_desc">Accent color, liquid glass and particles</string>
+    <string name="settings_cat_appearance_desc">Layout, palette, accent color, liquid glass and particles</string>
     <string name="settings_cat_library_desc">Sorting, rescans and downloaded images</string>
     <string name="settings_cat_metadata_desc">Sources, accounts, priority and translation</string>
     <string name="settings_cat_masha_desc">AI, voice, presence and privacy</string>
-    <string name="settings_cat_about_desc">Version and licenses</string>
+    <string name="settings_cat_about_desc">Updates, version and licenses</string>
     <plurals name="sound_events_count">
         <item quantity="one">%d event</item>
         <item quantity="other">%d events</item>
@@ -802,4 +802,80 @@
     <string name="maker_sega">Sega</string>
     <string name="maker_others">Atari and others</string>
     <string name="maker_pc">PC</string>
+    <!-- Meridian y paletas de firma -->
+    <string name="palette_plasma">Plasma</string>
+    <string name="palette_ember">Ember</string>
+    <string name="palette_aurora">Aurora</string>
+    <string name="palette_neon_rose">Neon Rose</string>
+    <string name="palette_solar">Solar</string>
+    <string name="meridian_position">%1$d of %2$d</string>
+    <string name="layout_style_title">Layout style</string>
+    <string name="layout_style_desc">Applies to the library and ROM folders when the window is landscape and at least 640 dp wide. In portrait or in narrow windows the classic carousel is always used.</string>
+    <string name="layout_meridian">Meridian</string>
+    <string name="layout_meridian_desc">Vertical wheel</string>
+    <string name="layout_classic">Classic</string>
+    <string name="layout_classic_desc">Horizontal carousel</string>
+    <string name="signature_title">Signature palette</string>
+    <string name="signature_desc">Sets the accent color, the selection glow and particles, and the intro color in one tap. You can still change each one separately below.</string>
+    <!-- Tocar para abrir -->
+    <string name="tap_open_title">Tap selected item to open</string>
+    <string name="tap_open_desc">A tap on the selected game, folder or ROM opens it. Off: double tap to open.</string>
+    <string name="hint_gestures_tap">Tap to select · Tap again to open · Hold for options</string>
+    <!-- Meridian: fondo adaptable, fila de Añadir y fichas -->
+    <string name="meridian_adaptive_color_title">Adaptive background color</string>
+    <string name="meridian_adaptive_color_desc">In Meridian, the background behind the list takes its color from the selected game’s art. Off: the neutral theme background.</string>
+    <string name="meridian_add_short">Add</string>
+    <plurals name="meridian_roms">
+        <item quantity="one">%d ROM</item>
+        <item quantity="other">%d ROMs</item>
+    </plurals>
+
+    <!-- Actualizaciones (GitHub Releases), autor y licencia -->
+    <string name="section_updates">Updates</string>
+    <string name="update_current_version">Installed version</string>
+    <string name="update_check">Check for updates</string>
+    <string name="update_check_now">Check now</string>
+    <string name="update_view">View</string>
+    <string name="update_last_check">Last checked: %1$s</string>
+    <string name="update_never_checked">Not checked yet</string>
+    <string name="update_state_checking">Checking…</string>
+    <string name="update_state_up_to_date">You’re up to date</string>
+    <string name="update_state_available">Version %1$s is available</string>
+    <string name="update_state_error_network">Couldn’t reach GitHub. Check your connection.</string>
+    <string name="update_state_error_rate">GitHub is limiting requests right now. Try again later.</string>
+    <string name="update_state_error">Couldn’t check for updates.</string>
+    <string name="update_auto_title">Check automatically</string>
+    <string name="update_auto_desc">When Elyndra opens, at most once a day.</string>
+    <string name="update_prerelease_title">Include beta versions</string>
+    <string name="update_prerelease_desc">Elyndra is published as betas for now. Turn off to be offered stable versions only.</string>
+    <string name="update_privacy">The check only downloads Elyndra’s public release list from GitHub. No personal data is sent.</string>
+    <string name="update_available_title">Elyndra %1$s is available</string>
+    <string name="update_available_msg">You have %1$s. What’s new:</string>
+    <string name="update_notes_empty">No release notes.</string>
+    <string name="update_action">Update</string>
+    <string name="update_permission_title">Allow Elyndra to install updates</string>
+    <string name="update_permission_msg">Android needs your permission once. Tap “Open settings”, turn on “Allow from this source” and come back: the download starts on its own.</string>
+    <string name="update_permission_action">Open settings</string>
+    <string name="update_downloading_title">Downloading Elyndra %1$s</string>
+    <string name="update_downloading_msg">You can keep using Elyndra; the installation starts when the download finishes.</string>
+    <string name="update_installing_title">Installing…</string>
+    <string name="update_installing_msg">Confirm the installation in the Android dialog. Elyndra restarts when it’s done.</string>
+    <string name="update_failed_title">Couldn’t update</string>
+    <string name="update_error_download">The download failed. Check your connection and try again, or get the APK from the release page.</string>
+    <string name="update_error_checksum">The downloaded file doesn’t match the published checksum, so it was deleted. Try again later or get the APK from the release page.</string>
+    <string name="update_error_signature">This update is signed with a different key than the installed Elyndra (for example, a debug build). Android won’t replace it. To switch, uninstall Elyndra and install the release from GitHub; uninstalling deletes Elyndra’s data on this device.</string>
+    <string name="update_error_install">Android couldn’t install the update. You can get the APK from the release page.</string>
+    <string name="update_no_asset">That release has no APK for this device. Opening the release page…</string>
+    <string name="update_cancelled">Update cancelled</string>
+    <string name="update_open_page">Open release page</string>
+    <string name="about_created_by">Created by %1$s</string>
+    <string name="about_source">Source code</string>
+    <string name="about_license">License</string>
+    <string name="about_license_desc">Source visible on GitHub for reading only. Official releases are free for personal, non-commercial use.</string>
+    <string name="about_license_value">All rights reserved</string>
+    <string name="licenses_app_copyright">Copyright © 2026 %1$s. All rights reserved.</string>
+    <string name="licenses_app_terms">The source code is published on GitHub for reading only. You may install and use the official releases for personal, non-commercial use. Copying, modifying, redistributing or making derivative works requires written permission. The third-party components below keep their own licenses.</string>
+    <string name="licenses_voice_title">Masha’s natural voice</string>
+    <string name="licenses_voice_notice">Masha’s natural voice runs on your device with the Supertonic 3 model weights by Supertone Inc., licensed under the BigScience OpenRAIL-M license. The voice is synthetic (AI-generated). By using it you agree not to use it for the restricted uses in Attachment A of that license, among others: breaking the law, harming minors, impersonating people without their consent, spreading false information to harm others, harassment, or presenting the generated speech without disclosing that it is machine-generated.</string>
+    <string name="licenses_voice_open">Read the OpenRAIL-M license</string>
 </resources>
