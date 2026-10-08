@@ -12,18 +12,15 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -36,10 +33,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
@@ -50,11 +44,11 @@ import com.elyndra.launcher.data.SignaturePreset
 import com.elyndra.launcher.data.argb
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.components.ConsolePreviews
-import com.elyndra.launcher.ui.components.CssGrid
+import com.elyndra.launcher.ui.components.ColorSwatch
+import com.elyndra.launcher.ui.components.SwatchRow
 import com.elyndra.launcher.ui.components.PreviewTheme
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.SettingsGroup
-import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.meridian.LayoutStyle
 import com.elyndra.launcher.ui.meridian.WheelArc
 import com.elyndra.launcher.ui.meridian.WheelTransform
@@ -244,54 +238,32 @@ internal fun SignatureChooser(current: SignaturePreset?, onPick: (SignaturePrese
     SettingsGroup {
         ElyText(stringResource(R.string.signature_desc), size = TypeScale.Caption, color = P.ink2, lineHeightRatio = 1.45f)
         Spacer(Modifier.height(10.dp))
-        CssGrid(
-            columns = SignaturePreset.entries.size,
-            horizontalGap = 8.dp,
-            verticalGap = 8.dp,
-            modifier = Modifier.selectableGroup(),
-            items = SignaturePreset.entries.map { preset ->
-                { SignatureChip(preset, selected = preset == current) { onPick(preset) } }
-            },
+        SwatchRow(SignaturePreset.entries.size) { i ->
+            val preset = SignaturePreset.entries[i]
+            SignatureSwatch(preset, selected = preset == current) { onPick(preset) }
+        }
+        Spacer(Modifier.height(6.dp))
+        ElyText(
+            if (current != null) stringResource(R.string.signature_label, stringResource(current.nameRes)) else stringResource(R.string.signature_custom),
+            size = 10.5f,
+            color = P.ink2,
         )
         Spacer(Modifier.height(6.dp))
     }
 }
 
-/** Una paleta de firma: su degradado (primario → secundario) con el destello, y el nombre debajo. */
+/** Una paleta de firma: su degradado (primario → secundario) con el destello. */
 @Composable
-internal fun SignatureChip(preset: SignaturePreset, selected: Boolean, onClick: () -> Unit) {
-    val name = stringResource(preset.nameRes)
-    val shape = RoundedCornerShape(12.dp)
+internal fun SignatureSwatch(preset: SignaturePreset, selected: Boolean, onClick: () -> Unit) {
     val pair = preset.pair
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .semantics { contentDescription = name }
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(36.dp)
-                .clip(shape)
-                .drawBehind {
-                    drawRect(Brush.linearGradient(listOf(Color(pair.primary), Color(pair.secondary)), Offset.Zero, Offset(size.width, size.height)))
-                    drawCircle(
-                        Brush.radialGradient(listOf(Color(pair.spark), Color(pair.spark).copy(alpha = 0f)), center = Offset(size.width * 0.72f, size.height * 0.38f), radius = size.height * 0.5f),
-                        radius = size.height * 0.5f,
-                        center = Offset(size.width * 0.72f, size.height * 0.38f),
-                    )
-                }
-                .border(if (selected) 2.5.dp else 1.dp, if (selected) P.ink else P.ink.copy(alpha = 0.12f), shape),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (selected) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(Color.White))
-            }
-        }
-        Spacer(Modifier.height(5.dp))
-        ElyText(name, size = 9.5f, weight = if (selected) FontWeight.SemiBold else FontWeight.Medium, color = if (selected) P.ink else P.ink2, align = TextAlign.Center, letterSpacing = tracking(0.02f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    ColorSwatch(label = stringResource(preset.nameRes), selected = selected, onClick = onClick) {
+        drawRect(Brush.linearGradient(listOf(Color(pair.primary), Color(pair.secondary)), Offset.Zero, Offset(size.width, size.height)))
+        val spark = Offset(size.width * 0.7f, size.height * 0.32f)
+        drawCircle(
+            Brush.radialGradient(listOf(Color(pair.spark), Color(pair.spark).copy(alpha = 0f)), center = spark, radius = size.minDimension * 0.42f),
+            radius = size.minDimension * 0.42f,
+            center = spark,
+        )
     }
 }
 
