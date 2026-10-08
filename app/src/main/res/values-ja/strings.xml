@@ -849,4 +849,26 @@
     <string name="licenses_voice_title">Masha の自然な声</string>
     <string name="licenses_voice_notice">Masha の自然な声は、Supertone Inc. の Supertonic 3 モデルの重み（BigScience OpenRAIL-M ライセンス）を使って端末上で生成されます。この声は合成音声（AI 生成）です。使用することで、同ライセンスの付属書 A にある制限された用途に使わないことに同意したものとみなされます。たとえば、法律違反、未成年者への危害、本人の同意のないなりすまし、他者を害する目的での虚偽情報の拡散、嫌がらせ、機械生成であることを明示せずに生成音声を提示することなどです。</string>
     <string name="licenses_voice_open">OpenRAIL-M ライセンスを読む</string>
+
+    <!-- Ajustes: nombres de las muestras de color (lector de pantalla y rótulos). -->
+    <string name="tint_mist">ミスト</string>
+    <string name="tint_graphite">グラファイト</string>
+    <string name="tint_haze">ヘイズ</string>
+    <string name="tint_paper">ペーパー</string>
+    <string name="tint_sand">サンド</string>
+    <string name="tint_amber">アンバー</string>
+    <string name="tint_copper">カッパー</string>
+    <string name="tint_mint">ミント</string>
+    <string name="tint_sky">スカイ</string>
+    <string name="tint_lilac">ライラック</string>
+    <string name="tint_smoke">スモーク</string>
+    <string name="tint_label">ガラスの色合い: %1$s</string>
+    <string name="signature_label">パレット: %1$s</string>
+    <string name="signature_custom">カスタム（パレットなし）</string>
+    <string name="color_phosphor_green">蛍光グリーン</string>
+    <string name="color_amber">アンバー</string>
+    <string name="color_magenta">マゼンタ</string>
+    <string name="color_red">レッド</string>
+    <string name="color_blue">ブルー</string>
+    <string name="color_white">ホワイト</string>
 </resources>
