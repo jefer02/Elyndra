@@ -38,6 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -91,11 +92,17 @@ import com.elyndra.launcher.ui.theme.shapeClickable
    pistas del mando.
    ───────────────────────────────────────────────────────────── */
 
+/**
+ * Ajustes en ventana ancha y apaisada: filas y cabeceras con algo menos de
+ * aire (ver `SettingsFrame.dense`). En vertical y en el móvil, el de siempre.
+ */
+val LocalDenseSettings = staticCompositionLocalOf { false }
+
 /** Cabecera de sección: versalitas pequeñas y espaciadas. */
 @Composable
 fun SectionHeader(text: String, modifier: Modifier = Modifier, trailing: (@Composable RowScope.() -> Unit)? = null) {
     Row(
-        modifier.fillMaxWidth().padding(top = 18.dp, bottom = 2.dp),
+        modifier.fillMaxWidth().padding(top = if (LocalDenseSettings.current) 13.dp else 18.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ElyText(
@@ -128,7 +135,7 @@ fun SettingRow(
             .fillMaxWidth()
             .heightIn(min = MinTouch)
             .alpha(if (enabled) 1f else 0.5f)
-            .padding(vertical = 10.dp),
+            .padding(vertical = if (LocalDenseSettings.current) 7.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
