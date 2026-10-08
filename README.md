@@ -2,7 +2,7 @@
 
 **A console-style game launcher for Android that puts your Android games and emulator ROMs in one library, built for gamepads.**
 
-[![Latest release](https://img.shields.io/github/v/release/jefer02/Elyndra?include_prereleases&label=release)](https://github.com/jefer02/Elyndra/releases)
+[![Latest release](https://img.shields.io/github/v/release/jefer02/Elyndra?label=release)](https://github.com/jefer02/Elyndra/releases)
 [![License: All rights reserved](https://img.shields.io/badge/license-All%20rights%20reserved-lightgrey)](LICENSE)
 [![minSdk 26](https://img.shields.io/badge/minSdk-26%20(Android%208.0)-3ddc84)](app/build.gradle.kts)
 
@@ -92,7 +92,7 @@ and offers new versions with their release notes. Choose **Update** and it
 downloads the right APK for your device, verifies its SHA-256 checksum and
 opens Android's install dialog. The first time, Android asks you to allow
 Elyndra to install apps. You can also check by hand, turn the automatic check
-off, or choose whether beta versions are offered, in
+off, or opt in to beta versions (off by default), in
 **Settings → About → Updates**. The check only downloads the public release
 list from GitHub; no personal data is sent.
 
