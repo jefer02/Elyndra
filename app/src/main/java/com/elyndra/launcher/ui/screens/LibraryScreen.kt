@@ -2,8 +2,10 @@ package com.elyndra.launcher.ui.screens
 
 import com.elyndra.launcher.ui.components.NeedsNameBadge
 import androidx.compose.animation.AnimatedContent
-import com.elyndra.launcher.ui.components.ConsoleGlyph
-import com.elyndra.launcher.ui.components.EmptyState
+import com.elyndra.launcher.ui.components.EmptyLibraryHero
+import com.elyndra.launcher.ui.components.EmptyStageBackdrop
+import com.elyndra.launcher.ui.EmptyStage
+import com.elyndra.launcher.ui.meridian.LogoFit
 import com.elyndra.launcher.ui.components.PAD_HINTS_HEIGHT
 import com.elyndra.launcher.ui.components.PadHint
 import com.elyndra.launcher.ui.components.PadHints
@@ -11,6 +13,9 @@ import com.elyndra.launcher.ui.components.DotTabs
 import com.elyndra.launcher.ui.components.SortButton
 import com.elyndra.launcher.ui.components.SortPopover
 import com.elyndra.launcher.ui.DockPlacement
+import com.elyndra.launcher.ui.meridian.MeridianLibrary
+import com.elyndra.launcher.ui.meridian.MeridianMode
+import com.elyndra.launcher.ui.meridian.WheelMath
 import com.elyndra.launcher.ui.DockPalettes
 import com.elyndra.launcher.ui.theme.DARK_GLASS_MIN
 import com.elyndra.launcher.ui.DotTabsLayout
@@ -39,6 +44,16 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import android.os.SystemClock
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.selected
+import com.elyndra.launcher.ui.TapAction
+import com.elyndra.launcher.ui.TapAnchor
+import com.elyndra.launcher.ui.TapGate
+import com.elyndra.launcher.ui.rememberTapSlop
+import com.elyndra.launcher.ui.rememberUserScrolling
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -111,6 +126,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
@@ -171,18 +187,50 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun LibraryScreen(vm: ElyndraViewModel) {
+    // Ventana apaisada y ancha: la rueda de Meridian (salvo que se haya elegido
+    // el carrusel). Se decide por el tamaño de la ventana, así que girar o
+    // cambiar el tamaño cambia de modo sin perder selección, sección ni búsqueda.
+    val window = LocalScreenSize.current
+    val meridian = MeridianMode.active(window.width.value, window.height.value, vm.settings.layoutStyle)
+    SideEffect { vm.input.meridian = meridian }
+    if (meridian) {
+        SideEffect { vm.input.dockInBar = false }
+        MeridianLibrary(vm)
+        return
+    }
     val m = metrics()
     val reduced = LocalReducedMotion.current
     val items = vm.items()
     val sel = vm.selected()
-    // Con mando la selección se mueve sin tocar el carrusel, así que el
-    // carrusel va detrás de ella: si no, se estaría eligiendo a ciegas.
-    val carousel = rememberLazyListState()
     // La card de "Añadir" también se alcanza con el mando: va la última, detrás de los juegos.
     val addFocused = vm.input.isAddFocused()
+    // Con mando la selección se mueve sin tocar el carrusel, así que el
+    // carrusel va detrás de ella: si no, se estaría eligiendo a ciegas. Nace ya
+    // en la selección (al girar desde la rueda no hay que recorrerlo otra vez).
+    val carousel = rememberLazyListState(
+        initialFirstVisibleItemIndex = remember { WheelMath.restoreIndex(items.map { it.key }, sel?.key, addFocused, vm.loaded) },
+    )
     LaunchedEffect(sel?.key, items.size, addFocused) {
         val index = if (addFocused) items.size else items.indexOfFirst { it.key == sel?.key }
         if (index >= 0) runCatching { carousel.animateScrollToItem(index) }
+    }
+    // Tocar: lo no seleccionado se selecciona; lo seleccionado se abre (ver TapGate).
+    val gate = remember { TapGate() }
+    val slop = rememberTapSlop()
+    val userScrolling = rememberUserScrolling(carousel)
+    val openItem: (LibraryItem) -> Unit = {
+        if (vm.tryOpen()) {
+            vm.select(it.key)
+            vm.requestOpen(it)
+        }
+    }
+    val onItemTap: (LibraryItem, Offset, Boolean) -> Unit = { item, at, moving ->
+        val d = gate.tap(item.key, sel?.key, moving, vm.settings.tapOpensSelected, SystemClock.uptimeMillis(), at.x, at.y, slop)
+        when (d.action) {
+            TapAction.Select -> vm.select(item.key)
+            TapAction.Open -> items.firstOrNull { it.key == d.key }?.let(openItem)
+            TapAction.Ignore -> Unit
+        }
     }
     // Un solo reloj para la flotación de todos los logos de juego de la pantalla.
     val floatClock = rememberFloatClock()
@@ -241,6 +289,8 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                 onBackgroundVanished = { vm.finishVanish() },
                 height = m.iconHeroH,
                 extension = extension,
+                // Sin juego (biblioteca o sección vacía): el escenario de la paleta, no el cristal.
+                stage = { EmptyStageBackdrop(EmptyStage.CLASSIC, Modifier.fillMaxSize(), horizon = true) },
                 imagePath = when (sel) {
                     is LibraryItem.App -> sel.app.meta.hero ?: sel.app.meta.screenshot
                     is LibraryItem.Folder -> sel.heroPath
@@ -298,7 +348,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         transitionSpec = { heroInfoTransition(reduced) },
                         label = "heroInfo",
                     ) { item ->
-                        HeroInfo(vm, item, m, floatClock, searching = vm.query.isNotBlank())
+                        HeroInfo(vm, item, m, floatClock, searching = vm.query.isNotBlank()) { if (vm.tryOpen()) vm.go(Screen.Add) }
                     }
                 },
             )
@@ -314,16 +364,6 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         contentAlignment = Alignment.Center,
                     ) {
                         ElyText(stringResource(R.string.no_results), size = 11f, color = P.ink2, align = TextAlign.Center)
-                    }
-                    showEmpty -> Box(Modifier.fillMaxSize().padding(top = dockInset, bottom = bottomPad), contentAlignment = Alignment.Center) {
-                        EmptyState(
-                            title = null,
-                            message = stringResource(R.string.empty_library_message),
-                            actionLabel = stringResource(R.string.add_long),
-                            onAction = { vm.go(Screen.Add) },
-                            glyph = ConsoleGlyph.Gamepad,
-                            focused = addFocused,
-                        )
                     }
                     else -> LazyRow(
                         Modifier
@@ -364,8 +404,9 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                                         tile = tile,
                                         landscape = m.landscape,
                                         fallback = vm.fallbackOf(item),
-                                        onTap = { vm.select(item.key) },
-                                        onOpen = { vm.requestOpen(item) },
+                                        scrolling = userScrolling,
+                                        onTap = { at, moving -> onItemTap(item, at, moving) },
+                                        onOpen = { openItem(item) },
                                         onBounds = vm::noteSelectedCard,
                                         onLongPress = { bounds ->
                                             vm.select(item.key)
@@ -382,7 +423,8 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         // de estar a mano. El `loaded` evita que la card asome
                         // mientras se lee la biblioteca del disco.
                         if (vm.loaded) {
-                            item(key = "add") { AddTile(tile, addFocused, look) { vm.go(Screen.Add) } }
+                            // Sin juegos es lo único que hay (como la fila "Añadir" de Meridian): va señalada.
+                            item(key = "add") { AddTile(tile, addFocused || showEmpty, look) { if (vm.tryOpen()) vm.go(Screen.Add) } }
                         }
                     }
                 }
@@ -437,7 +479,7 @@ private fun heroInfoBottomPad(m: Metrics): Dp = if (m.landscape) 8.dp else 18.dp
 
 /** El dock de secciones con el botón de orden al lado. */
 @Composable
-private fun SectionDock(
+internal fun SectionDock(
     vm: ElyndraViewModel,
     modifier: Modifier = Modifier,
     glassMinAlpha: Float = DARK_GLASS_MIN,
@@ -490,19 +532,19 @@ private val EMPTY_HINTS = listOf(
 )
 
 /** En el dock: A elige la sección señalada. */
-private val DOCK_HINTS = listOf(
+internal val DOCK_HINTS = listOf(
     PadHint("A", R.string.hint_select),
     PadHint("LB / RB", R.string.hint_section),
     PadHint("B", R.string.hint_back),
 )
 
-private val SORT_HINTS = listOf(
+internal val SORT_HINTS = listOf(
     PadHint("A", R.string.sort_by),
     PadHint("LB / RB", R.string.hint_section),
     PadHint("B", R.string.hint_back),
 )
 
-private val SORT_MENU_HINTS = listOf(
+internal val SORT_MENU_HINTS = listOf(
     PadHint("A", R.string.hint_select),
     PadHint("B", R.string.close),
 )
@@ -513,7 +555,7 @@ private val SORT_MENU_HINTS = listOf(
  * dice qué pasa: biblioteca vacía, sección vacía o búsqueda sin resultados.
  */
 @Composable
-private fun HeroInfo(vm: ElyndraViewModel, sel: LibraryItem?, m: Metrics, floatClock: FloatClock, searching: Boolean) {
+private fun HeroInfo(vm: ElyndraViewModel, sel: LibraryItem?, m: Metrics, floatClock: FloatClock, searching: Boolean, onAdd: () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -568,16 +610,11 @@ private fun HeroInfo(vm: ElyndraViewModel, sel: LibraryItem?, m: Metrics, floatC
                     )
                 }
             }
+        } else if (sel == null) {
+            if (vm.loaded) EmptyHeroBlock(vm, m, searching, onAdd)
         } else {
-            val libraryEmpty = vm.library.apps.isEmpty() && vm.library.folders.isEmpty()
             ElyText(
-                when {
-                    sel != null -> sel.name
-                    !vm.loaded -> ""
-                    searching -> stringResource(R.string.no_results)
-                    libraryEmpty -> stringResource(R.string.empty_library_title)
-                    else -> stringResource(R.string.empty_filter_title)
-                },
+                sel.name,
                 size = m.titleSize,
                 weight = FontWeight.ExtraBold,
                 color = Color.White,
@@ -609,7 +646,7 @@ private fun HeroInfo(vm: ElyndraViewModel, sel: LibraryItem?, m: Metrics, floatC
         } else if (sel != null && !vm.input.gamepadPresent) {
             // Con mando, las pistas de sus botones ya van al pie del estante.
             ElyText(
-                stringResource(R.string.hint_gestures),
+                stringResource(if (vm.settings.tapOpensSelected) R.string.hint_gestures_tap else R.string.hint_gestures),
                 modifier = Modifier
                     .padding(top = if (m.landscape) 4.dp else 7.dp)
                     .alpha(pulseHintAlpha()),
@@ -625,8 +662,62 @@ private fun HeroInfo(vm: ElyndraViewModel, sel: LibraryItem?, m: Metrics, floatC
     }
 }
 
+/**
+ * El estado vacío del hero clásico (horizontal y vertical): el bloque
+ * compartido con Meridian ([EmptyLibraryHero]) sobre el escenario de la
+ * paleta. El titular toma el mayor cuerpo que cabe en dos líneas dentro de
+ * lo que deja el hero (barra, línea y botón aparte), sin pasar de [Metrics.titleSize].
+ * Buscando sin resultados, solo el aviso.
+ */
 @Composable
-private fun heroSubline(sel: LibraryItem): String = when (sel) {
+private fun EmptyHeroBlock(vm: ElyndraViewModel, m: Metrics, searching: Boolean, onAdd: () -> Unit) {
+    val libraryEmpty = vm.library.apps.isEmpty() && vm.library.folders.isEmpty()
+    val compact = m.iconHeroH < EMPTY_COMPACT_HERO
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val reserve = if (searching) EMPTY_RESERVE_SEARCH else if (compact) EMPTY_RESERVE_COMPACT else EMPTY_RESERVE
+        val room = (m.iconHeroH.value - reserve).coerceAtLeast(EMPTY_TITLE_MIN_ROOM)
+        // En horizontal, más estrecho y más bajo: dos líneas equilibradas que no suben hasta la barra.
+        val box = LogoFit.Box(
+            maxWidth = minOf(maxWidth.value * if (m.landscape) EMPTY_TITLE_WIDE_FRACTION else 1f, EMPTY_TITLE_MAX_WIDTH),
+            maxHeight = minOf(m.titleSize * if (m.landscape) EMPTY_TITLE_LINES_WIDE else EMPTY_TITLE_LINES, room),
+            minHeight = 0f,
+        )
+        EmptyLibraryHero(
+            title = stringResource(
+                when {
+                    searching -> R.string.no_results
+                    libraryEmpty -> R.string.empty_library_title
+                    else -> R.string.empty_filter_title
+                },
+            ),
+            message = if (searching) null else stringResource(R.string.empty_library_message),
+            action = if (searching) null else stringResource(R.string.add_long),
+            onAction = onAdd,
+            titleBox = box,
+            padGlyphs = vm.input.gamepadPresent,
+            compact = compact,
+            titleMaxSp = m.titleSize,
+        )
+    }
+}
+
+/** Por debajo de este alto de hero, el bloque vacío va en su versión compacta (un móvil en horizontal). */
+private val EMPTY_COMPACT_HERO = 300.dp
+
+/** Lo que el hero guarda para la barra, la línea, el botón y los márgenes (dp): el resto es para el titular. */
+private const val EMPTY_RESERVE = 200f
+private const val EMPTY_RESERVE_COMPACT = 160f
+private const val EMPTY_RESERVE_SEARCH = 90f
+private const val EMPTY_TITLE_MIN_ROOM = 40f
+private const val EMPTY_TITLE_MAX_WIDTH = 820f
+
+/** Alto del titular en cuerpos de [Metrics.titleSize] (dos líneas) y el ancho que toma en horizontal. */
+private const val EMPTY_TITLE_LINES = 1.9f
+private const val EMPTY_TITLE_LINES_WIDE = 1.35f
+private const val EMPTY_TITLE_WIDE_FRACTION = 0.58f
+
+@Composable
+internal fun heroSubline(sel: LibraryItem): String = when (sel) {
     is LibraryItem.Folder -> pluralStringResource(
         R.plurals.roms_with_emulator,
         sel.romCount,
@@ -668,7 +759,7 @@ internal fun HeroChip(label: String) {
 
 /** Buscador plegable de la barra superior. */
 @Composable
-private fun SearchField(vm: ElyndraViewModel, m: Metrics) {
+internal fun SearchField(vm: ElyndraViewModel, m: Metrics) {
     val open = vm.searchOpen
     // Al cerrarse, el campo suelta el foco para que el teclado no siga escribiendo en un buscador invisible.
     // Al abrirse lo pide, con su teclado: el buscador también se abre con el
@@ -744,7 +835,7 @@ private val MASHA_BUTTON = 40.dp
  * ventana: de ahí sale el bocadillo.
  */
 @Composable
-private fun MashaButton(vm: ElyndraViewModel, onBounds: (Rect) -> Unit) {
+internal fun MashaButton(vm: ElyndraViewModel, onBounds: (Rect) -> Unit) {
     val shape = CircleShape
     val interaction = remember { MutableInteractionSource() }
     Box(
@@ -786,7 +877,16 @@ private fun MashaButton(vm: ElyndraViewModel, onBounds: (Rect) -> Unit) {
  * para enterarse de un vistazo, no para quedarse tapando el hero.
  */
 @Composable
-private fun MashaInsight(vm: ElyndraViewModel, anchor: Rect, host: Offset) {
+internal fun MashaInsight(
+    vm: ElyndraViewModel,
+    anchor: Rect,
+    host: Offset,
+    /** Meridian: la zona en la que puede ir (la columna de la rueda) y lo que no puede tapar, en la ventana. */
+    region: Rect? = null,
+    obstacles: List<Rect> = emptyList(),
+    oneLine: Boolean = false,
+    onPlaced: ((Rect?) -> Unit)? = null,
+) {
     val screen = LocalScreenSize.current
     val density = LocalDensity.current
     val insight = vm.masha.insight
@@ -810,6 +910,10 @@ private fun MashaInsight(vm: ElyndraViewModel, anchor: Rect, host: Offset) {
             onDismiss = { vm.masha.dismissInsight() },
             key = insight.id,
             below = true,
+            region = region?.let { DpRect((it.left - host.x).toDp(), (it.top - host.y).toDp(), (it.right - host.x).toDp(), (it.bottom - host.y).toDp()) },
+            obstacles = obstacles.filter { it != Rect.Zero }.map { DpRect((it.left - host.x).toDp(), (it.top - host.y).toDp(), (it.right - host.x).toDp(), (it.bottom - host.y).toDp()) },
+            oneLine = oneLine,
+            onPlaced = onPlaced,
         )
     }
 }
@@ -878,7 +982,10 @@ private fun LibraryTile(
     tile: Dp,
     landscape: Boolean,
     fallback: ArtFallback,
-    onTap: () -> Unit,
+    /** ¿Se está moviendo la fila con el dedo? Un toque que la para no selecciona ni abre. */
+    scrolling: () -> Boolean,
+    /** Un toque, en [Offset] de la ventana; el Boolean dice si la fila se movía al apoyar el dedo. */
+    onTap: (Offset, Boolean) -> Unit,
     onOpen: () -> Unit,
     /** Recibe el rectángulo de la card en la ventana: el menú de acciones sale de ahí. */
     onLongPress: (Rect) -> Unit,
@@ -905,6 +1012,10 @@ private fun LibraryTile(
     val tap by rememberUpdatedState(onTap)
     val open by rememberUpdatedState(onOpen)
     val longPress by rememberUpdatedState(onLongPress)
+    val moving by rememberUpdatedState(scrolling)
+    val anchor = remember { TapAnchor() }
+    val openLabel = stringResource(R.string.open)
+    val optionsLabel = stringResource(R.string.hint_options)
 
     Column(
         Modifier
@@ -912,6 +1023,7 @@ private fun LibraryTile(
             .offset(y = lift)
             .onGloballyPositioned {
                 cardBounds = it.boundsInWindow()
+                anchor.coordinates = it
                 if (selected) onBounds(cardBounds)
             }
             // La escala del tirón se lee en fase de dibujo: mover la card no
@@ -924,10 +1036,13 @@ private fun LibraryTile(
                 compositingStrategy = CompositingStrategy.ModulateAlpha
             }
             .pointerInput(item.key) {
+                var wasMoving = false
                 detectTapGestures(
-                    onPress = { press.track(this) },
-                    onTap = { tap() },
-                    onDoubleTap = { open() },
+                    onPress = {
+                        wasMoving = moving()
+                        press.track(this)
+                    },
+                    onTap = { tap(anchor.toWindow(it), wasMoving) },
                     onLongPress = {
                         // Primero el tirón —la card se hunde y rebota— y solo
                         // cuando se ha sentido el agarre sale el menú.
@@ -937,6 +1052,15 @@ private fun LibraryTile(
                             longPress(cardBounds)
                         }
                     },
+                )
+            }
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                this.selected = selected
+                onClick(label = if (selected) openLabel else null) { if (selected) open() else tap(Offset.Unspecified, false); true }
+                customActions = listOf(
+                    CustomAccessibilityAction(openLabel) { open(); true },
+                    CustomAccessibilityAction(optionsLabel) { longPress(cardBounds); true },
                 )
             },
         horizontalAlignment = Alignment.CenterHorizontally,
