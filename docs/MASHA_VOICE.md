@@ -136,7 +136,7 @@ la recreación de la actividad) no apague la voz:
 |---|---|---|---|
 | ONNX Runtime (`onnxruntime-android` 1.28.0) | MIT | ✅ | **Fijado en 1.28.0**: desde 1.29 el AAR añade un `TelemetryInitializer` que arranca con la app (comprobado en el manifiesto fusionado). Solo se empaqueta el de 64 bits (arm64-v8a, x86_64) |
 | Código de inferencia portado | Apache-2.0 (sherpa-onnx, © zengyw/Xiaomi) + MIT (Supertone `helper.py`) | ✅ | Atribución en el KDoc de `SupertonicModel`/`SupertonicText` |
-| Pesos de Supertonic 3 | OpenRAIL-M | ✅ con restricciones de uso | Hay que trasladar sus restricciones de uso (Anexo A) a los términos de la app y avisar de que la voz es sintética (hecho en Ajustes: `settings_masha_voice_notice`). **Pendiente: añadirlas a los términos/EULA** |
+| Pesos de Supertonic 3 | OpenRAIL-M | ✅ con restricciones de uso | Hay que trasladar sus restricciones de uso (Anexo A) a los términos de la app y avisar de que la voz es sintética (hecho en Ajustes: `settings_masha_voice_notice`). Restricciones trasladadas a los términos (2026-10-08): punto 5 de `LICENSE`, `THIRD_PARTY_NOTICES.md` y Ajustes → Acerca de → Licencias (`licenses_voice_notice`, con enlace a la licencia) |
 | Datos de entrenamiento de Supertonic | no publicados | ⚠️ desconocido | Riesgo bajo-medio: los publica el propio titular (Supertone) bajo OpenRAIL-M |
 | CMUdict (detección de inglés) | BSD-2 | ✅ | Ya estaba en assets |
 | Listas de palabras de `LanguageSpans` | propias | ✅ | Hechas a mano, sin fuente con licencia |
