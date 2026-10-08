@@ -259,18 +259,12 @@ fun Hero(
     /** El fondo se está quitando: se deshace en polvo antes de irse. */
     backgroundVanishing: Boolean = false,
     onBackgroundVanished: () -> Unit = {},
+    /** Sin juego: el escenario del estado vacío en vez del cristal (ver [HeroArtLayer]). */
+    stage: (@Composable () -> Unit)? = null,
     topBar: @Composable BoxScope.() -> Unit,
     info: @Composable BoxScope.() -> Unit,
 ) {
     val skin = LocalSkin.current
-    val context = LocalContext.current
-    val reduced = LocalReducedMotion.current
-    // Un fondo que *acaba de llegar* —lo ha bajado el motor de metadatos, o lo
-    // acaba de poner el usuario— se monta desde el polvo. Uno que solo cambia
-    // porque se ha seleccionado otro juego no: ahí el fondo no es una novedad,
-    // es otro juego (ver [rememberArtArrival]).
-    val arriving = rememberArtArrival(imagePath, heroKey)
-    val target = HeroBackdrop(imagePath, fallback, heroKey)
     val shelf = shelfColor()
     Box(
         modifier
@@ -289,47 +283,92 @@ fun Hero(
                 }
                 .clipToBounds(),
         ) {
-            // Cambiar de juego funde un fondo en otro, y el nuevo se asienta con un
-            // acercamiento muy lento (en la capa: no recompone nada).
-            Crossfade(targetState = target, animationSpec = motion(Springs.fade()), label = "heroBackdrop") { bg ->
-                val current = bg == target
-                Box(Modifier.fillMaxSize().slowSettle(reduced)) {
-                    if (bg.imagePath != null) {
-                        val file = remember(bg.imagePath) { File(context.filesDir, bg.imagePath) }
-                        MaterializingContainer(
-                            isMaterializing = current && arriving.active,
-                            onAnimationEnd = arriving::done,
-                            modifier = Modifier.fillMaxSize(),
-                        ) {
-                            DisintegratingContainer(
-                                isDisintegrating = current && backgroundVanishing,
-                                onAnimationEnd = onBackgroundVanished,
-                                modifier = Modifier.fillMaxSize(),
-                            ) {
-                                AsyncImage(
-                                    model = file,
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    alignment = Alignment.TopCenter,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                            }
-                        }
-                    } else if (bg.fallback != null) {
-                        FallbackArt(bg.fallback, ArtVariant.Banner, Modifier.fillMaxSize(), drift = true)
-                    } else {
-                        // El cristal es material de la pantalla, no del juego.
-                        Box(Modifier.fillMaxSize().liquidGlass(RectangleShape, Color.Transparent))
-                    }
-                }
+            HeroArtLayer(
+                fallback = fallback,
+                heroKey = heroKey,
+                imagePath = imagePath,
+                backgroundVanishing = backgroundVanishing,
+                onBackgroundVanished = onBackgroundVanished,
+                modifier = Modifier.fillMaxSize(),
+                stage = stage,
+            ) { art ->
                 // Con fondo, solo los cantos; sin él, el velo entero del diseño.
                 // Debajo del hero, la franja del titular se apaga.
-                Box(Modifier.fillMaxSize().heroScrims(height, art = bg.imagePath != null, skin.scrim))
+                Box(Modifier.fillMaxSize().heroScrims(height, art = art, skin.scrim))
             }
             if (extension > 0.dp) Box(Modifier.fillMaxSize().shelfRise(height, shelf))
         }
         topBar()
         info()
+    }
+}
+
+/**
+ * El arte del hero: la imagen del juego (o su arte de reserva, o el cristal
+ * si no hay juego). Cambiar de juego funde un fondo en otro, y el nuevo se
+ * asienta con un acercamiento muy lento (en la capa: no recompone nada).
+ *
+ * Un fondo que *acaba de llegar* —lo ha bajado el motor de metadatos, o lo
+ * acaba de poner el usuario— se monta desde el polvo; uno que solo cambia
+ * porque se ha seleccionado otro juego no (ver [rememberArtArrival]). Quitarlo
+ * lo deshace en polvo antes de borrarlo.
+ *
+ * [layer] da la capa de cada fondo según su clave (el paralaje de Meridian);
+ * [overlay] se pinta encima de cada uno, dentro del fundido (los velos del hero).
+ * [stage] sustituye al cristal cuando no hay juego (el escenario del estado
+ * vacío, ver [EmptyStageBackdrop]); ese fondo ya lleva su propia luz y no
+ * recibe [overlay]: los velos están pensados para leer texto sobre arte.
+ */
+@Composable
+internal fun HeroArtLayer(
+    fallback: ArtFallback?,
+    heroKey: Any,
+    imagePath: String?,
+    backgroundVanishing: Boolean,
+    onBackgroundVanished: () -> Unit,
+    modifier: Modifier = Modifier,
+    layer: (key: Any) -> Modifier = { Modifier },
+    stage: (@Composable () -> Unit)? = null,
+    overlay: @Composable (art: Boolean) -> Unit = {},
+) {
+    val context = LocalContext.current
+    val reduced = LocalReducedMotion.current
+    val arriving = rememberArtArrival(imagePath, heroKey)
+    val target = HeroBackdrop(imagePath, fallback, heroKey)
+    Crossfade(targetState = target, modifier = modifier, animationSpec = motion(Springs.fade()), label = "heroBackdrop") { bg ->
+        val current = bg == target
+        Box(Modifier.fillMaxSize().then(layer(bg.key)).slowSettle(reduced)) {
+            if (bg.imagePath != null) {
+                val file = remember(bg.imagePath) { File(context.filesDir, bg.imagePath) }
+                MaterializingContainer(
+                    isMaterializing = current && arriving.active,
+                    onAnimationEnd = arriving::done,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    DisintegratingContainer(
+                        isDisintegrating = current && backgroundVanishing,
+                        onAnimationEnd = onBackgroundVanished,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        AsyncImage(
+                            model = file,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            alignment = Alignment.TopCenter,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+            } else if (bg.fallback != null) {
+                FallbackArt(bg.fallback, ArtVariant.Banner, Modifier.fillMaxSize(), drift = true)
+            } else if (stage != null) {
+                stage()
+            } else {
+                // El cristal es material de la pantalla, no del juego.
+                Box(Modifier.fillMaxSize().liquidGlass(RectangleShape, Color.Transparent))
+            }
+        }
+        if (bg.imagePath != null || bg.fallback != null || stage == null) overlay(bg.imagePath != null)
     }
 }
 
