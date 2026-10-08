@@ -841,7 +841,7 @@
     <string name="update_auto_title">Automatisch suchen</string>
     <string name="update_auto_desc">Beim Öffnen von Elyndra, höchstens einmal am Tag.</string>
     <string name="update_prerelease_title">Beta-Versionen einbeziehen</string>
-    <string name="update_prerelease_desc">Elyndra erscheint vorerst als Beta. Ausschalten, um nur stabile Versionen angeboten zu bekommen.</string>
+    <string name="update_prerelease_desc">Betas zeigen die nächste Version vorab und können Fehler haben. Einschalten, um sie zusätzlich zu den stabilen Versionen angeboten zu bekommen.</string>
     <string name="update_privacy">Die Prüfung lädt nur die öffentliche Versionsliste von Elyndra von GitHub. Es werden keine persönlichen Daten gesendet.</string>
     <string name="update_available_title">Elyndra %1$s ist verfügbar</string>
     <string name="update_available_msg">Du hast %1$s. Neu:</string>

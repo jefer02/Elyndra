@@ -9,16 +9,16 @@ as it is published.
 
 | Thing | Rule | Example |
 |---|---|---|
-| Tag | `v` + semver, optional pre-release suffix | `v0.4.0-beta`, `v0.4.0-beta.2`, `v1.0.0` |
-| `versionName` | The tag without the `v`. Must match exactly | `0.4.0-beta` |
-| `versionCode` | Previous release + 1. **Never lower it**: Android refuses to install a lower code over a higher one | `4` |
-| APK name | Ends in `.apk` and carries the ABI as its own token, or `universal` | `Elyndra-v0.4.0-beta-arm64-v8a.apk`, `Elyndra-v0.4.0-beta-universal.apk` |
+| Tag | `v` + semver, optional pre-release suffix | `v1.0.0`, `v1.1.0-beta`, `v1.1.0-beta.2` |
+| `versionName` | The tag without the `v`. Must match exactly | `1.0.0` |
+| `versionCode` | Previous release + 1. **Never lower it**: Android refuses to install a lower code over a higher one | `4` for 1.0.0, then `5`, `6`… |
+| APK name | Ends in `.apk` and carries the ABI as its own token, or `universal` | `Elyndra-v1.1.0-arm64-v8a.apk`, `Elyndra-v1.1.0-universal.apk` |
 | Signing key | Always the same release keystore | — |
 | Draft | Drafts are ignored | — |
-| Pre-release | Offered only to users with "Include beta versions" on (the default) | betas: yes |
+| Pre-release | Offered only to users with "Include beta versions" on (off by default since 1.0.0) | stable: no, betas: yes |
 
 The updater compares the tag with the installed `versionName` using semver
-(`0.4.0-beta` < `0.4.0-beta.2` < `0.4.0` < `0.4.1`). It picks the APK by
+(`1.0.0` < `1.1.0-beta` < `1.1.0-beta.2` < `1.1.0` < `1.1.1`). It picks the APK by
 matching the device's ABIs (`Build.SUPPORTED_ABIS`, preferred first) against
 the asset names, then falls back to the `universal` APK, then to a single APK
 with no ABI in its name. If none fits, it opens the release page instead.
@@ -32,8 +32,8 @@ The ABI tokens it recognises are `arm64-v8a` (also `arm64`, `aarch64`),
 In `app/build.gradle.kts`:
 
 ```kotlin
-versionCode = 4              // previous + 1
-versionName = "0.4.0-beta"   // = tag without the "v"
+versionCode = 5              // previous + 1
+versionName = "1.1.0"        // = tag without the "v" (a beta would be "1.1.0-beta")
 ```
 
 ### 2. Test
@@ -61,19 +61,19 @@ arm64 build (what most handhelds and phones use):
 ```
 
 Output: `app/build/intermediates/apk/release/app-release.apk`. Copy and rename
-it to `Elyndra-v0.4.0-beta-arm64-v8a.apk` before building the next one (the
+it to `Elyndra-v1.1.0-arm64-v8a.apk` before building the next one (the
 next build overwrites it).
 
 Universal build (every ABI, larger): run the same command **without** the last
 two `-Pandroid.injected.invoked.from.ide` / `-Pandroid.injected.build.abi`
 lines. Output: `app/build/outputs/apk/release/app-release.apk`. Rename it to
-`Elyndra-v0.4.0-beta-universal.apk`.
+`Elyndra-v1.1.0-universal.apk`.
 
 Check that both are signed with the release key (the certificate digest must
 be the same as in previous releases):
 
 ```bash
-apksigner verify --print-certs Elyndra-v0.4.0-beta-arm64-v8a.apk
+apksigner verify --print-certs Elyndra-v1.1.0-arm64-v8a.apk
 ```
 
 `apksigner` is in `<Android SDK>/build-tools/<version>/`.
@@ -86,29 +86,30 @@ only a fallback (and handy for people who download by hand). Name it after the
 APK plus `.sha256`:
 
 ```bash
-sha256sum Elyndra-v0.4.0-beta-arm64-v8a.apk > Elyndra-v0.4.0-beta-arm64-v8a.apk.sha256
+sha256sum Elyndra-v1.1.0-arm64-v8a.apk > Elyndra-v1.1.0-arm64-v8a.apk.sha256
 ```
 
 On Windows PowerShell:
 
 ```powershell
-(Get-FileHash Elyndra-v0.4.0-beta-arm64-v8a.apk -Algorithm SHA256).Hash.ToLower() + "  Elyndra-v0.4.0-beta-arm64-v8a.apk" |
-  Out-File -Encoding ascii Elyndra-v0.4.0-beta-arm64-v8a.apk.sha256
+(Get-FileHash Elyndra-v1.1.0-arm64-v8a.apk -Algorithm SHA256).Hash.ToLower() + "  Elyndra-v1.1.0-arm64-v8a.apk" |
+  Out-File -Encoding ascii Elyndra-v1.1.0-arm64-v8a.apk.sha256
 ```
 
 ### 5. Publish on GitHub
 
 1. Commit the version bump and push it.
 2. Go to **Releases → Draft a new release**.
-3. **Choose a tag**: type `v0.4.0-beta` and create it on the commit you just
+3. **Choose a tag**: type `v1.1.0` (or `v1.1.0-beta` for a beta) and create it on the commit you just
    pushed.
-4. **Title**: for example `Elyndra v0.4.0-beta`. **Notes**: Markdown. The app
+4. **Title**: for example `Elyndra v1.1.0`. **Notes**: Markdown. The app
    shows roughly the first 12 lines / 600 characters, so put the highlights
    first.
-5. Attach `Elyndra-v0.4.0-beta-arm64-v8a.apk`, `Elyndra-v0.4.0-beta-universal.apk`
+5. Attach `Elyndra-v1.1.0-arm64-v8a.apk`, `Elyndra-v1.1.0-universal.apk`
    and, if you made them, the `.sha256` files.
-6. Tick **Set as a pre-release** for betas. Leave it unticked for a stable
-   version.
+6. Leave **Set as a pre-release** unticked for a stable version. Tick it only
+   for a beta (tag with `-beta`): only users who turned on "Include beta
+   versions" will be offered it.
 7. **Publish release** (not "Save draft": drafts are invisible to the app).
 
 ### 6. Check

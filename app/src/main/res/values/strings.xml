@@ -847,7 +847,7 @@
     <string name="update_auto_title">Check automatically</string>
     <string name="update_auto_desc">When Elyndra opens, at most once a day.</string>
     <string name="update_prerelease_title">Include beta versions</string>
-    <string name="update_prerelease_desc">Elyndra is published as betas for now. Turn off to be offered stable versions only.</string>
+    <string name="update_prerelease_desc">Betas preview the next version and may have bugs. Turn on to be offered them as well as stable versions.</string>
     <string name="update_privacy">The check only downloads Elyndra’s public release list from GitHub. No personal data is sent.</string>
     <string name="update_available_title">Elyndra %1$s is available</string>
     <string name="update_available_msg">You have %1$s. What’s new:</string>
