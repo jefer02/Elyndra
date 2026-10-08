@@ -741,11 +741,11 @@
     <string name="settings_cat_display_desc">テーマ、イントロ、フレームレート、言語</string>
     <string name="settings_cat_sound_desc">インターフェース音とカスタムサウンド</string>
     <string name="settings_cat_music_desc">メニュー音楽とカスタム背景</string>
-    <string name="settings_cat_appearance_desc">アクセントカラー、リキッドグラス、パーティクル</string>
+    <string name="settings_cat_appearance_desc">リストのスタイル、パレット、アクセントカラー、リキッドグラス、パーティクル</string>
     <string name="settings_cat_library_desc">並べ替え、再スキャン、ダウンロード画像</string>
     <string name="settings_cat_metadata_desc">ソース、アカウント、優先順位、翻訳</string>
     <string name="settings_cat_masha_desc">AI、音声、表示、プライバシー</string>
-    <string name="settings_cat_about_desc">バージョンとライセンス</string>
+    <string name="settings_cat_about_desc">アップデート、バージョン、ライセンス</string>
     <plurals name="sound_events_count">
         <item quantity="other">%d 件のイベント</item>
     </plurals>
@@ -774,4 +774,79 @@
     <string name="maker_sega">Sega</string>
     <string name="maker_others">Atari ほか</string>
     <string name="maker_pc">PC</string>
+    <!-- Meridian y paletas de firma -->
+    <string name="palette_plasma">プラズマ</string>
+    <string name="palette_ember">エンバー</string>
+    <string name="palette_aurora">オーロラ</string>
+    <string name="palette_neon_rose">ネオンローズ</string>
+    <string name="palette_solar">ソーラー</string>
+    <string name="meridian_position">%2$d件中%1$d件目</string>
+    <string name="layout_style_title">リストのスタイル</string>
+    <string name="layout_style_desc">ウィンドウが横向きで幅 640 dp 以上のとき、ライブラリと ROM フォルダに適用されます。縦向きや幅の狭いウィンドウでは常にクラシックのカルーセルを使います。</string>
+    <string name="layout_meridian">メリディアン</string>
+    <string name="layout_meridian_desc">縦型ホイール</string>
+    <string name="layout_classic">クラシック</string>
+    <string name="layout_classic_desc">横型カルーセル</string>
+    <string name="signature_title">シグネチャーパレット</string>
+    <string name="signature_desc">アクセントカラー、選択のグローとパーティクル、イントロの色をまとめて設定します。下でそれぞれ個別に変更することもできます。</string>
+    <!-- Tocar para abrir -->
+    <string name="tap_open_title">選択中をタップで開く</string>
+    <string name="tap_open_desc">選択中のゲーム、フォルダ、ROM をタップすると開きます。オフ：ダブルタップで開きます。</string>
+    <string name="hint_gestures_tap">タップで選択 · もう一度タップで起動 · 長押しでオプション</string>
+    <!-- Meridian: fondo adaptable, fila de Añadir y fichas -->
+    <string name="meridian_adaptive_color_title">アダプティブ背景色</string>
+    <string name="meridian_adaptive_color_desc">Meridian で、リストの背景が選択中のゲームのアートの色になります。オフ：テーマの標準の背景。</string>
+    <string name="meridian_add_short">追加</string>
+    <plurals name="meridian_roms">
+        <item quantity="other">%d 本の ROM</item>
+    </plurals>
+
+    <!-- Actualizaciones (GitHub Releases), autor y licencia -->
+    <string name="section_updates">アップデート</string>
+    <string name="update_current_version">インストール済みのバージョン</string>
+    <string name="update_check">アップデートを確認</string>
+    <string name="update_check_now">今すぐ確認</string>
+    <string name="update_view">表示</string>
+    <string name="update_last_check">最終確認：%1$s</string>
+    <string name="update_never_checked">まだ確認していません</string>
+    <string name="update_state_checking">確認中…</string>
+    <string name="update_state_up_to_date">最新の状態です</string>
+    <string name="update_state_available">バージョン %1$s が利用できます</string>
+    <string name="update_state_error_network">GitHub に接続できません。接続を確認してください。</string>
+    <string name="update_state_error_rate">GitHub がリクエストを制限しています。しばらくしてからお試しください。</string>
+    <string name="update_state_error">アップデートを確認できませんでした。</string>
+    <string name="update_auto_title">自動で確認</string>
+    <string name="update_auto_desc">Elyndra を開いたとき、1日に1回まで。</string>
+    <string name="update_prerelease_title">ベータ版を含める</string>
+    <string name="update_prerelease_desc">現在 Elyndra はベータとして公開されています。オフにすると安定版のみが提案されます。</string>
+    <string name="update_privacy">確認では GitHub から Elyndra の公開リリース一覧をダウンロードするだけです。個人データは送信されません。</string>
+    <string name="update_available_title">Elyndra %1$s が利用できます</string>
+    <string name="update_available_msg">現在のバージョンは %1$s です。新機能：</string>
+    <string name="update_notes_empty">リリースノートはありません。</string>
+    <string name="update_action">アップデート</string>
+    <string name="update_permission_title">Elyndra にアップデートのインストールを許可</string>
+    <string name="update_permission_msg">Android で一度だけ許可が必要です。「設定を開く」をタップし、「この提供元のアプリを許可」をオンにして戻ってください。ダウンロードが自動で始まります。</string>
+    <string name="update_permission_action">設定を開く</string>
+    <string name="update_downloading_title">Elyndra %1$s をダウンロード中</string>
+    <string name="update_downloading_msg">そのまま Elyndra を使えます。ダウンロードが終わるとインストールが始まります。</string>
+    <string name="update_installing_title">インストール中…</string>
+    <string name="update_installing_msg">Android のダイアログでインストールを確定してください。完了すると Elyndra が再起動します。</string>
+    <string name="update_failed_title">アップデートできませんでした</string>
+    <string name="update_error_download">ダウンロードに失敗しました。接続を確認してもう一度お試しいただくか、リリースページから APK を入手してください。</string>
+    <string name="update_error_checksum">ダウンロードしたファイルが公開されたチェックサムと一致しないため削除しました。後でもう一度お試しいただくか、リリースページから APK を入手してください。</string>
+    <string name="update_error_signature">このアップデートは、インストール済みの Elyndra（例：デバッグビルド）とは異なる鍵で署名されています。Android は置き換えません。切り替えるには Elyndra をアンインストールして GitHub のリリースをインストールしてください。アンインストールするとこの端末の Elyndra のデータは削除されます。</string>
+    <string name="update_error_install">Android がアップデートをインストールできませんでした。リリースページから APK を入手できます。</string>
+    <string name="update_no_asset">このリリースにはこの端末用の APK がありません。リリースページを開きます…</string>
+    <string name="update_cancelled">アップデートをキャンセルしました</string>
+    <string name="update_open_page">リリースページを開く</string>
+    <string name="about_created_by">作者：%1$s</string>
+    <string name="about_source">ソースコード</string>
+    <string name="about_license">ライセンス</string>
+    <string name="about_license_desc">ソースコードは GitHub で閲覧のみ可能です。公式リリースは個人的・非商用の利用に限り無料です。</string>
+    <string name="about_license_value">All rights reserved</string>
+    <string name="licenses_app_copyright">Copyright © 2026 %1$s. All rights reserved.</string>
+    <string name="licenses_app_terms">ソースコードは閲覧のみを目的として GitHub で公開されています。公式リリースは個人的・非商用の目的でインストールして使用できます。複製、改変、再配布、派生物の作成には書面による許可が必要です。以下のサードパーティ製コンポーネントはそれぞれのライセンスに従います。</string>
+    <string name="licenses_voice_title">Masha の自然な声</string>
+    <string name="licenses_voice_notice">Masha の自然な声は、Supertone Inc. の Supertonic 3 モデルの重み（BigScience OpenRAIL-M ライセンス）を使って端末上で生成されます。この声は合成音声（AI 生成）です。使用することで、同ライセンスの付属書 A にある制限された用途に使わないことに同意したものとみなされます。たとえば、法律違反、未成年者への危害、本人の同意のないなりすまし、他者を害する目的での虚偽情報の拡散、嫌がらせ、機械生成であることを明示せずに生成音声を提示することなどです。</string>
+    <string name="licenses_voice_open">OpenRAIL-M ライセンスを読む</string>
 </resources>
