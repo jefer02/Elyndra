@@ -26,6 +26,17 @@ class IntroController {
     /** Tiempo del primer fotograma (base de `withFrameNanos`, la de System.nanoTime); 0 = aún no ha empezado. */
     var startNanos = 0L
 
+    /**
+     * La intro ya ha empezado a fundirse: lo que hay debajo puede ir entrando
+     * (el eje de Meridian se enciende mientras se apaga el rótulo).
+     */
+    var fading by mutableStateOf(false); private set
+
+    /** Lo avisa la propia intro en el primer fotograma de su fundido de salida. */
+    fun onFading() {
+        if (!fading) fading = true
+    }
+
     /** Arranque en frío: lo decide MainActivity con la compuerta del proceso. */
     fun start() = restart()
 
@@ -34,6 +45,7 @@ class IntroController {
 
     private fun restart() {
         startNanos = 0L
+        fading = false
         skipAt = IntroTimeline.NO_SKIP
         run++
         visible = true
