@@ -4,7 +4,6 @@ import com.elyndra.launcher.ui.components.SwitchRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -21,18 +20,15 @@ import com.elyndra.launcher.data.P
 import com.elyndra.launcher.data.SignaturePalettes
 import com.elyndra.launcher.data.argb
 import com.elyndra.launcher.ui.ElyndraViewModel
-import com.elyndra.launcher.ui.components.CssGrid
+import com.elyndra.launcher.ui.components.ColorSwatch
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GhostButton
 import com.elyndra.launcher.ui.components.GlowingSwitch
 import com.elyndra.launcher.ui.components.SettingsGroup
-import com.elyndra.launcher.ui.components.Swatch
+import com.elyndra.launcher.ui.components.SwatchRow
 import com.elyndra.launcher.ui.intro.IntroColor
 import com.elyndra.launcher.ui.intro.IntroPalettes
 import com.elyndra.launcher.ui.theme.LocalSkin
-
-/** Muestras de color de la intro por fila (dos filas). */
-private const val INTRO_COLUMNS = 5
 
 /**
  * Ajustes → Apariencia → intro de arranque: mostrarla o no, su color (con
@@ -51,28 +47,22 @@ internal fun IntroSection(vm: ElyndraViewModel) {
 
         Spacer(Modifier.height(6.dp))
         ElyText(stringResource(R.string.intro_color), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
-        Spacer(Modifier.height(8.dp))
-        CssGrid(
-            columns = INTRO_COLUMNS,
-            horizontalGap = 8.dp,
-            verticalGap = 8.dp,
-            items = IntroColor.entries.map { color ->
-                {
-                    // El filo de las letras y, al final, su resplandor (el secundario del par).
-                    val brush = remember(color, accent, dark) {
-                        val p = IntroPalettes.derive(color.pair(accent), dark)
-                        Brush.linearGradient(listOf(Color(p.rimLight), Color(p.rim), Color(p.rimDeep), Color(p.glow)))
-                    }
-                    Swatch(
-                        brush = brush,
-                        selected = s.introColor == color,
-                        onClick = { s.updateIntroColor(color) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            },
-        )
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(4.dp))
+        SwatchRow(IntroColor.entries.size) { i ->
+            val color = IntroColor.entries[i]
+            // El filo de las letras y, al final, su resplandor (el secundario del par).
+            val brush = remember(color, accent, dark) {
+                val p = IntroPalettes.derive(color.pair(accent), dark)
+                Brush.linearGradient(listOf(Color(p.rimLight), Color(p.rim), Color(p.rimDeep), Color(p.glow)))
+            }
+            ColorSwatch(
+                label = stringResource(color.nameRes),
+                brush = brush,
+                selected = s.introColor == color,
+                onClick = { s.updateIntroColor(color) },
+            )
+        }
+        Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             ElyText(
                 stringResource(R.string.intro_color_label, stringResource(s.introColor.nameRes)),
