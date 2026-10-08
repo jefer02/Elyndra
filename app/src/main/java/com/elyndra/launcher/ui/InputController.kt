@@ -12,6 +12,7 @@ import androidx.lifecycle.viewModelScope
 import com.elyndra.launcher.R
 import com.elyndra.launcher.input.Pad
 import com.elyndra.launcher.ui.components.PadFocusScope
+import com.elyndra.launcher.ui.meridian.MeridianInput
 import androidx.compose.ui.focus.FocusRequester
 import kotlinx.coroutines.launch
 
@@ -72,6 +73,20 @@ class InputController(private val vm: ElyndraViewModel) {
      * costura hero/estante: lo publica la pantalla, que es quien lo coloca.
      */
     var dockInBar: Boolean = true
+
+    /**
+     * La biblioteca o la carpeta se ven en Meridian (rueda vertical): arriba y
+     * abajo mueven la rueda y los lados llevan al dock y a la barra. Lo publica
+     * la pantalla, que es quien decide el modo por el tamaño de la ventana.
+     */
+    var meridian: Boolean = false
+
+    /**
+     * Repeticiones de la dirección mantenida en el paso en curso (0 = la
+     * pulsación). Lo pone MainActivity antes de cada paso; la rueda acelera con
+     * esto (ver [MeridianInput.stepFor]).
+     */
+    var repeats: Int = 0
 
     /** Pantalla en la que se eligió [barFocus]: al cambiar de pantalla se olvida. */
     private var barScreen: Screen? = null
@@ -202,6 +217,8 @@ class InputController(private val vm: ElyndraViewModel) {
         return when {
             // La intro tapa todo: cualquier botón la salta y no llega a lo de debajo.
             vm.intro.visible -> { vm.intro.skip(); true }
+            // El diálogo de actualización va encima de los demás (ver UpdateController.pad).
+            vm.updates.dialog != null -> vm.updates.pad(pad)
             // Mientras se lanza un juego no se toca nada: el velo se va solo.
             vm.dialog != null -> dialog(pad)
             vm.sheet != null -> sheet(pad)
@@ -291,9 +308,11 @@ class InputController(private val vm: ElyndraViewModel) {
     private fun activate(item: BarItem) {
         when (item) {
             BarItem.Masha -> vm.go(Screen.Masha)
-            BarItem.Open -> when (vm.screen) {
-                Screen.Folder -> vm.selectedRom()?.let { vm.openRom(it) }
-                else -> vm.selected()?.let { vm.requestOpen(it) }
+            BarItem.Open -> if (vm.tryOpen()) {
+                when (vm.screen) {
+                    Screen.Folder -> vm.selectedRom()?.let { vm.openRom(it) }
+                    else -> vm.selected()?.let { vm.requestOpen(it) }
+                }
             }
             BarItem.Search -> vm.toggleSearch()
             BarItem.Settings -> vm.go(Screen.Settings)
@@ -352,7 +371,9 @@ class InputController(private val vm: ElyndraViewModel) {
 
     /* ── biblioteca ───────────────────────────────────────────── */
 
-    private fun library(pad: Pad): Boolean = libraryTop(pad) { p ->
+    private fun library(pad: Pad): Boolean = libraryTop(pad) { p -> if (meridian) wheel(p) else carousel(p) }
+
+    private fun carousel(p: Pad): Boolean {
         val items = vm.items()
         val index = items.indexOfFirst { it.key == vm.selected()?.key }.coerceAtLeast(0)
         // Sin juegos en la sección, "Añadir" es lo único que hay: ya está señalada.
@@ -365,35 +386,88 @@ class InputController(private val vm: ElyndraViewModel) {
                         addFocus = false
                         vm.select(items.last().key)
                     }
-                    return@libraryTop true
+                    return true
                 }
-                Pad.Right, Pad.Down -> return@libraryTop true
-                Pad.Confirm -> { vm.go(Screen.Add); return@libraryTop true }
+                Pad.Right, Pad.Down -> return true
+                Pad.Confirm -> { if (vm.tryOpen()) vm.go(Screen.Add); return true }
                 // No es un juego: ni ficha ni opciones.
-                Pad.Details, Pad.Options -> return@libraryTop true
+                Pad.Details, Pad.Options -> return true
                 else -> Unit
             }
         }
-        when (p) {
+        return when (p) {
             Pad.Left -> moveLibrary(items, index, -1)
             // Pasado el último juego, la card de "Añadir".
             Pad.Right -> if (items.isNotEmpty() && index >= items.lastIndex && vm.loaded) { addFocus = true; true } else moveLibrary(items, index, 1)
-            // L1/R1 son el atajo estándar de mando para cambiar de sección:
-            // Todos, Android, Consolas.
-            Pad.PagePrev -> cycleFilter(-1)
-            Pad.PageNext -> cycleFilter(1)
             // Arriba sube al dock de secciones (o al buscador, si está abierto).
             Pad.Up -> { focusTop(LibraryFocus.fromCarousel(vm.searchOpen)); true }
             Pad.Down -> true
-            // Con mando se abre igual que con el dedo.
-            Pad.Confirm -> vm.selected()?.let { vm.requestOpen(it); true } ?: false
-            Pad.Details -> vm.selected()?.let { vm.showDetails(it.key); true } ?: false
-            Pad.Options -> vm.selected()?.let { vm.itemOptions(it); true } ?: false
-            Pad.Menu -> { vm.go(Screen.Settings); true }
-            Pad.Search -> { vm.toggleSearch(); true }
-            Pad.AppMenu -> { vm.mainMenu(); true }
-            Pad.Back -> if (vm.canGoBack) { vm.back(); true } else false
+            else -> libraryCommon(p)
         }
+    }
+
+    /**
+     * La rueda de Meridian: arriba y abajo recorren la lista (mantener acelera,
+     * ver [MeridianInput]) y pasado el último juego está la fila de "Añadir".
+     * Izquierda lleva al dock de secciones (arriba de la rueda) y derecha a la
+     * barra (Abrir, buscar, Ajustes); abajo o B vuelven. Arriba desde el primer
+     * juego también sube al dock, pero solo con una pulsación nueva: mantener
+     * la cruceta para llegar al principio no se sale de la lista.
+     */
+    private fun wheel(p: Pad): Boolean {
+        val items = vm.items()
+        val index = items.indexOfFirst { it.key == vm.selected()?.key }.coerceAtLeast(0)
+        val step = MeridianInput.stepFor(repeats)
+        if (items.isEmpty()) addFocus = vm.loaded && vm.query.isBlank()
+        if (addFocus) {
+            when (p) {
+                Pad.Up -> {
+                    if (items.isNotEmpty()) {
+                        addFocus = false
+                        vm.select(items[(items.size - step).coerceAtLeast(0)].key)
+                    } else if (repeats == 0) {
+                        focusTop(LibraryFocus.fromCarousel(vm.searchOpen))
+                    }
+                    return true
+                }
+                Pad.Down -> return true
+                Pad.Confirm -> { if (vm.tryOpen()) vm.go(Screen.Add); return true }
+                Pad.Details, Pad.Options -> return true
+                else -> Unit
+            }
+        }
+        return when (p) {
+            Pad.Up -> {
+                if (items.isEmpty() || index == 0) {
+                    if (repeats == 0) focusTop(LibraryFocus.fromCarousel(vm.searchOpen))
+                    true
+                } else {
+                    moveLibrary(items, index, -step)
+                }
+            }
+            Pad.Down -> if (items.isNotEmpty() && index >= items.lastIndex && vm.loaded) { addFocus = true; true } else moveLibrary(items, index, step)
+            Pad.Left -> { focusTop(BarItem.Sections); true }
+            Pad.Right -> { focusTop(LibraryFocus.up(LibraryFocus.rows(dockInBar = false, searchOpen = vm.searchOpen), BarItem.Sections)); true }
+            else -> libraryCommon(p)
+        }
+    }
+
+    /** Lo que hace la biblioteca igual con carrusel y con rueda. */
+    private fun libraryCommon(p: Pad): Boolean = when (p) {
+        // L1/R1 son el atajo estándar de mando para cambiar de sección:
+        // Todos, Android, Consolas.
+        Pad.PagePrev -> cycleFilter(-1)
+        Pad.PageNext -> cycleFilter(1)
+        // Con mando se abre igual que con el dedo.
+        // Una sola pulsación abre: carpeta, juego o app (nada que seleccionar antes).
+        Pad.Confirm -> vm.selected()?.let { if (vm.tryOpen()) vm.requestOpen(it); true } ?: false
+        Pad.Details -> vm.selected()?.let { vm.showDetails(it.key); true } ?: false
+        Pad.Options -> vm.selected()?.let { vm.itemOptions(it); true } ?: false
+        Pad.Menu -> { vm.go(Screen.Settings); true }
+        Pad.Search -> { vm.toggleSearch(); true }
+        Pad.AppMenu -> { vm.mainMenu(); true }
+        Pad.Back -> if (vm.canGoBack) { vm.back(); true } else false
+        Pad.Up, Pad.Down, Pad.Left, Pad.Right -> true
     }
 
     private fun moveLibrary(items: List<LibraryItem>, from: Int, delta: Int): Boolean {
@@ -442,15 +516,23 @@ class InputController(private val vm: ElyndraViewModel) {
             vm.selectRom(rom.key)
             return true
         }
+        // En la rueda de Meridian la lista va de arriba abajo: los lados suben a
+        // la barra y, desde el primer juego, arriba también (con una pulsación nueva).
+        val wheel = meridian
+        val step = MeridianInput.stepFor(repeats)
         when (p) {
-            Pad.Left -> move(-1)
-            Pad.Right -> move(1)
+            Pad.Left -> if (wheel) { barFocus = BarItem.Open; true } else move(-1)
+            Pad.Right -> if (wheel) { barFocus = BarItem.Open; true } else move(1)
             Pad.PagePrev -> move(-PAGE)
             Pad.PageNext -> move(PAGE)
             // Arriba sube a la barra: volver, "Abrir" y el selector de emulador.
-            Pad.Up -> { barFocus = BarItem.Open; true }
-            Pad.Down -> true
-            Pad.Confirm -> vm.selectedRom()?.let { vm.openRom(it); true } ?: false
+            Pad.Up -> when {
+                !wheel -> { barFocus = BarItem.Open; true }
+                roms.isEmpty() || index == 0 -> { if (repeats == 0) barFocus = BarItem.Open; true }
+                else -> move(-step)
+            }
+            Pad.Down -> { if (wheel) move(step); true }
+            Pad.Confirm -> vm.selectedRom()?.let { if (vm.tryOpen()) vm.openRom(it); true } ?: false
             Pad.Details -> vm.selectedRom()?.let { vm.showDetails(it.key); true } ?: false
             Pad.Options -> vm.selectedRom()?.let { vm.romOptions(it); true } ?: false
             Pad.Menu -> { vm.go(Screen.Settings); true }
