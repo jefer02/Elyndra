@@ -558,11 +558,21 @@ private fun BackgroundSection(vm: ElyndraViewModel) {
     }
 }
 
-/** Apariencia: acento, liquid glass y el marco de la selección (halo y partículas). */
+/**
+ * Apariencia: estilo de la lista (Meridian o carrusel), paleta de firma,
+ * acento, liquid glass y el marco de la selección (halo y partículas).
+ */
 @Composable
 private fun AppearancePage(vm: ElyndraViewModel) {
     val skin = LocalSkin.current
     val s = vm.settings
+
+    SectionLabel(stringResource(R.string.layout_style_title))
+    LayoutStyleGroup(vm)
+
+    // Acento, selección e intro de una vez; cada uno sigue aquí debajo por separado.
+    SectionLabel(stringResource(R.string.signature_title))
+    SignatureGroup(vm)
 
     SectionLabel(stringResource(R.string.section_accent))
     SettingsGroup {
@@ -663,6 +673,8 @@ private fun LibraryPage(vm: ElyndraViewModel) {
 
     SectionLabel(stringResource(R.string.section_library))
     SettingsGroup {
+        SwitchRow(stringResource(R.string.tap_open_title), stringResource(R.string.tap_open_desc), s.tapOpensSelected, s::toggleTapOpensSelected)
+        SettingsDivider()
         SettingRow(
             stringResource(R.string.rescan_all),
             description = pluralStringResource(R.plurals.folders_count, vm.library.folders.size, vm.library.folders.size),
