@@ -1,6 +1,10 @@
 package com.elyndra.launcher.ui.screens
 
 import com.elyndra.launcher.ui.components.NeedsNameBadge
+import com.elyndra.launcher.ui.theme.focusRing
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.indication
+import com.elyndra.launcher.ui.components.touchTarget
 import com.elyndra.launcher.ui.ShelfLayout
 import com.elyndra.launcher.ui.DockPalettes
 import com.elyndra.launcher.ui.components.COVER_RATIO
@@ -13,6 +17,11 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.layout.layout
 import androidx.compose.animation.AnimatedContent
 import com.elyndra.launcher.ui.LibraryItem
+import com.elyndra.launcher.ui.components.LocalScreenSize
+import com.elyndra.launcher.ui.meridian.MeridianFolder
+import com.elyndra.launcher.ui.meridian.MeridianMode
+import com.elyndra.launcher.ui.meridian.WheelMath
+import androidx.compose.runtime.SideEffect
 import com.elyndra.launcher.ui.components.ConsoleGlyph
 import com.elyndra.launcher.ui.components.EmptyState
 import com.elyndra.launcher.ui.components.Metrics
@@ -33,6 +42,20 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import android.os.SystemClock
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import com.elyndra.launcher.ui.TapAction
+import com.elyndra.launcher.ui.TapAnchor
+import com.elyndra.launcher.ui.TapGate
+import com.elyndra.launcher.ui.rememberTapSlop
+import com.elyndra.launcher.ui.rememberUserScrolling
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -129,16 +152,44 @@ fun FolderScreen(vm: ElyndraViewModel) {
         LaunchedEffect(Unit) { vm.go(Screen.Library) }
         return
     }
+    val window = LocalScreenSize.current
+    val meridian = MeridianMode.active(window.width.value, window.height.value, vm.settings.layoutStyle)
+    SideEffect { vm.input.meridian = meridian }
+    if (meridian) {
+        MeridianFolder(vm, item)
+        return
+    }
     val roms = vm.folderRoms(item.folder.id)
     val rom = vm.selectedRom()
     val emulatorLabel = item.emulatorName ?: stringResource(R.string.choose_emulator)
     // Con mando la selección se mueve sin arrastrar el carrusel: va detrás.
-    val carousel = rememberLazyListState()
+    // Nace ya en la selección (al girar desde la rueda no hay que recorrerlo otra vez).
+    val carousel = rememberLazyListState(
+        initialFirstVisibleItemIndex = remember { WheelMath.restoreIndex(roms.map { it.key }, rom?.key, addFocused = false, hasAdd = false) },
+    )
     LaunchedEffect(rom?.key, roms.size) {
         val index = roms.indexOfFirst { it.key == rom?.key }
         if (index >= 0) runCatching { carousel.animateScrollToItem(index) }
     }
 
+    // Tocar: lo no seleccionado se selecciona; lo seleccionado se abre (ver TapGate).
+    val gate = remember { TapGate() }
+    val slop = rememberTapSlop()
+    val userScrolling = rememberUserScrolling(carousel)
+    val openRom: (RomEntry) -> Unit = {
+        if (vm.tryOpen()) {
+            vm.selectRom(it.key)
+            vm.openRom(it)
+        }
+    }
+    val onRomTap: (RomEntry, Offset, Boolean) -> Unit = { r, at, moving ->
+        val d = gate.tap(r.key, rom?.key, moving, vm.settings.tapOpensSelected, SystemClock.uptimeMillis(), at.x, at.y, slop)
+        when (d.action) {
+            TapAction.Select -> vm.selectRom(r.key)
+            TapAction.Open -> roms.firstOrNull { it.key == d.key }?.let(openRom)
+            TapAction.Ignore -> Unit
+        }
+    }
     // Un solo reloj para la flotación de todos los logos de juego de la pantalla.
     val floatClock = rememberFloatClock()
     // El marco de la selección (Ajustes → Apariencia): halo, partículas y su color.
@@ -162,7 +213,7 @@ fun FolderScreen(vm: ElyndraViewModel) {
         // Sin ROMs no hay escena que continuar: el estado vacío va sobre el estante liso.
         val extension = if (roms.isEmpty()) 0.dp else ShelfLayout.artExtension(shelfH, maxHeight.value, shelf.labelTop).dp
         val rowY = animateFloatAsState(m.heroH.value + shelf.tileTop, motion(Springs.enter()), label = "folderRow")
-        FolderContent(vm, item, roms, rom, m, shelf, extension, { rowY.value }, emulatorLabel, carousel, floatClock, look, reduced)
+        FolderContent(vm, item, roms, rom, m, shelf, extension, { rowY.value }, emulatorLabel, carousel, floatClock, look, reduced, userScrolling, onRomTap, openRom)
     }
 }
 
@@ -181,6 +232,9 @@ private fun FolderContent(
     floatClock: FloatClock,
     look: SelectionLook,
     reduced: Boolean,
+    userScrolling: () -> Boolean,
+    onRomTap: (RomEntry, Offset, Boolean) -> Unit,
+    openRom: (RomEntry) -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
 
@@ -220,26 +274,7 @@ private fun FolderContent(
                         // El selector lleva un tope fijo y no un peso: con
                         // `weight(fill = false)` la parte que no usaba se quedaba sin
                         // repartir y el bloque de la derecha no llegaba al borde.
-                        Box(
-                            Modifier
-                                .widthIn(max = emulatorMax)
-                                .height(HeroBarHeight)
-                                .alpha(if (item.emulatorInstalled) 1f else 0.6f)
-                                .darkGlass(RoundedCornerShape(11.dp))
-                                .consoleFocus(vm.input.isBarFocused(BarItem.Emulator), cornerRadius = 11.dp)
-                                .shapeClickable(RoundedCornerShape(11.dp)) { vm.pickFolderEmulator(item.folder) }
-                                .padding(horizontal = 11.dp),
-                            contentAlignment = Alignment.CenterStart,
-                        ) {
-                            ElyText(
-                                emulatorLabel,
-                                size = 10f,
-                                weight = FontWeight.SemiBold,
-                                color = Color.White,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
+                        EmulatorSelector(vm, item, emulatorLabel, Modifier.widthIn(max = emulatorMax))
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
                             ElyText(
@@ -336,8 +371,9 @@ private fun FolderContent(
                                 onCoverVanished = { vm.finishVanish() },
                                 coverMaterializing = vm.isMaterializingArt(r.key, ArtKind.Cover),
                                 onCoverMaterialized = { vm.finishMaterializeArt() },
-                                onTap = { vm.selectRom(r.key) },
-                                onOpen = { vm.openRom(r) },
+                                scrolling = userScrolling,
+                                onTap = { at, moving -> onRomTap(r, at, moving) },
+                                onOpen = { openRom(r) },
                                 onBounds = vm::noteSelectedCard,
                                 onLongPress = { bounds ->
                                     vm.selectRom(r.key)
@@ -360,6 +396,32 @@ private fun FolderContent(
     }
 }
 
+/** El selector de emulador de la carpeta (en la barra): su nombre en cristal oscuro; apagado si no está instalado. */
+@Composable
+internal fun EmulatorSelector(vm: ElyndraViewModel, item: LibraryItem.Folder, label: String, modifier: Modifier = Modifier) {
+    val interaction = remember { MutableInteractionSource() }
+    Box(
+        modifier
+            .touchTarget(Modifier.clickable(interactionSource = interaction, indication = null) { vm.pickFolderEmulator(item.folder) })
+            .height(HeroBarHeight)
+            .alpha(if (item.emulatorInstalled) 1f else 0.6f)
+            .darkGlass(RoundedCornerShape(11.dp))
+            .consoleFocus(vm.input.isBarFocused(BarItem.Emulator), cornerRadius = 11.dp)
+            .indication(interaction, focusRing(RoundedCornerShape(11.dp)))
+            .padding(horizontal = 11.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        ElyText(
+            label,
+            size = 10f,
+            weight = FontWeight.SemiBold,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
 /** Cuerpo (sp) del nombre bajo la carátula. */
 private const val FOLDER_LABEL_SP = 8.5f
 
@@ -375,7 +437,7 @@ private const val FOLDER_CHIPS_INSET = FOLDER_CHIPS_TOP + FOLDER_CHIPS_H + 4f
  * sobre cualquier imagen.
  */
 @Composable
-private fun FolderChips(vm: ElyndraViewModel, item: LibraryItem.Folder, count: Int, modifier: Modifier = Modifier) {
+internal fun FolderChips(vm: ElyndraViewModel, item: LibraryItem.Folder, count: Int, modifier: Modifier = Modifier) {
     val ink2 = Color(DockPalettes.ink2(P.isDark))
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(
@@ -526,7 +588,7 @@ private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: 
         } else if (!vm.input.gamepadPresent) {
             // Con mando, las pistas de sus botones ya van al pie del estante.
             ElyText(
-                stringResource(R.string.hint_gestures),
+                stringResource(if (vm.settings.tapOpensSelected) R.string.hint_gestures_tap else R.string.hint_gestures),
                 modifier = Modifier
                     .padding(top = if (m.landscape) 4.dp else 7.dp)
                     .alpha(pulseHintAlpha()),
@@ -543,7 +605,7 @@ private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: 
 }
 
 @Composable
-private fun playedLabel(rom: RomEntry): String =
+internal fun playedLabel(rom: RomEntry): String =
     if (rom.stats.minutes > 0) stringResource(R.string.played_time, fmtMinutes(rom.stats.minutes))
     else stringResource(R.string.never_played)
 
@@ -564,7 +626,10 @@ private fun RomTile(
     onCoverVanished: () -> Unit,
     coverMaterializing: Boolean,
     onCoverMaterialized: () -> Unit,
-    onTap: () -> Unit,
+    /** ¿Se está moviendo la fila con el dedo? Un toque que la para no selecciona ni abre. */
+    scrolling: () -> Boolean,
+    /** Un toque, en [Offset] de la ventana; el Boolean dice si la fila se movía al apoyar el dedo. */
+    onTap: (Offset, Boolean) -> Unit,
     onOpen: () -> Unit,
     /** Recibe el rectángulo de la card en la ventana: el menú sale de ahí. */
     onLongPress: (Rect) -> Unit,
@@ -586,6 +651,10 @@ private fun RomTile(
     val tap by rememberUpdatedState(onTap)
     val open by rememberUpdatedState(onOpen)
     val longPress by rememberUpdatedState(onLongPress)
+    val moving by rememberUpdatedState(scrolling)
+    val anchor = remember { TapAnchor() }
+    val openLabel = stringResource(R.string.open)
+    val optionsLabel = stringResource(R.string.hint_options)
 
     Column(
         Modifier
@@ -594,14 +663,27 @@ private fun RomTile(
             .animPopIn(delayMs = minOf(index, 12) * 35, key = rom.id)
             .onGloballyPositioned {
                 bounds[0] = it.boundsInWindow()
+                anchor.coordinates = it
                 if (selected) onBounds(bounds[0])
             }
             .pointerInput(rom.id) {
+                var wasMoving = false
                 detectTapGestures(
-                    onPress = { press.track(this) },
-                    onTap = { tap() },
-                    onDoubleTap = { open() },
+                    onPress = {
+                        wasMoving = moving()
+                        press.track(this)
+                    },
+                    onTap = { tap(anchor.toWindow(it), wasMoving) },
                     onLongPress = { longPress(bounds[0]) },
+                )
+            }
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                this.selected = selected
+                onClick(label = if (selected) openLabel else null) { if (selected) open() else tap(Offset.Unspecified, false); true }
+                customActions = listOf(
+                    CustomAccessibilityAction(openLabel) { open(); true },
+                    CustomAccessibilityAction(optionsLabel) { longPress(bounds[0]); true },
                 )
             },
         horizontalAlignment = Alignment.CenterHorizontally,
