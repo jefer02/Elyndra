@@ -774,11 +774,11 @@
     <string name="settings_cat_display_desc">Thème, intro, images par seconde et langue</string>
     <string name="settings_cat_sound_desc">Sons de l\'interface et sons personnalisés</string>
     <string name="settings_cat_music_desc">Musique du menu et fond personnalisé</string>
-    <string name="settings_cat_appearance_desc">Couleur d\'accent, liquid glass et particules</string>
+    <string name="settings_cat_appearance_desc">Style de liste, palette, accent, liquid glass et particules</string>
     <string name="settings_cat_library_desc">Tri, réanalyses et images téléchargées</string>
     <string name="settings_cat_metadata_desc">Sources, comptes, priorité et traduction</string>
     <string name="settings_cat_masha_desc">IA, voix, présence et confidentialité</string>
-    <string name="settings_cat_about_desc">Version et licences</string>
+    <string name="settings_cat_about_desc">Mises à jour, version et licences</string>
     <plurals name="sound_events_count">
         <item quantity="one">%d événement</item>
         <item quantity="many">%d événements</item>
@@ -813,4 +813,80 @@
     <string name="maker_sega">Sega</string>
     <string name="maker_others">Atari et autres</string>
     <string name="maker_pc">PC</string>
+    <!-- Meridian y paletas de firma -->
+    <string name="palette_plasma">Plasma</string>
+    <string name="palette_ember">Braise</string>
+    <string name="palette_aurora">Aurore</string>
+    <string name="palette_neon_rose">Rose néon</string>
+    <string name="palette_solar">Solaire</string>
+    <string name="meridian_position">%1$d sur %2$d</string>
+    <string name="layout_style_title">Style de la liste</string>
+    <string name="layout_style_desc">S’applique à la bibliothèque et aux dossiers de ROM quand la fenêtre est en paysage et fait au moins 640 dp de large. En portrait ou dans une fenêtre étroite, le carrousel classique est toujours utilisé.</string>
+    <string name="layout_meridian">Meridian</string>
+    <string name="layout_meridian_desc">Roue verticale</string>
+    <string name="layout_classic">Classique</string>
+    <string name="layout_classic_desc">Carrousel horizontal</string>
+    <string name="signature_title">Palette signature</string>
+    <string name="signature_desc">Applique d’un coup la couleur d’accent, le halo et les particules de la sélection et la couleur de l’intro. Chacune reste modifiable séparément plus bas.</string>
+    <!-- Tocar para abrir -->
+    <string name="tap_open_title">Toucher la sélection pour ouvrir</string>
+    <string name="tap_open_desc">Un toucher sur le jeu, le dossier ou la ROM sélectionnés l’ouvre. Désactivé : double toucher pour ouvrir.</string>
+    <string name="hint_gestures_tap">Toucher pour choisir · Toucher à nouveau pour ouvrir · Appui long pour les options</string>
+    <!-- Meridian: fondo adaptable, fila de Añadir y fichas -->
+    <string name="meridian_adaptive_color_title">Couleur de fond adaptative</string>
+    <string name="meridian_adaptive_color_desc">Dans Meridian, le fond derrière la liste prend la couleur de l’illustration du jeu sélectionné. Désactivé : le fond neutre du thème.</string>
+    <string name="meridian_add_short">Ajouter</string>
+    <plurals name="meridian_roms">
+        <item quantity="one">%d ROM</item>
+        <item quantity="other">%d ROM</item>
+    </plurals>
+
+    <!-- Actualizaciones (GitHub Releases), autor y licencia -->
+    <string name="section_updates">Mises à jour</string>
+    <string name="update_current_version">Version installée</string>
+    <string name="update_check">Rechercher des mises à jour</string>
+    <string name="update_check_now">Rechercher</string>
+    <string name="update_view">Voir</string>
+    <string name="update_last_check">Dernière vérification : %1$s</string>
+    <string name="update_never_checked">Pas encore vérifié</string>
+    <string name="update_state_checking">Vérification…</string>
+    <string name="update_state_up_to_date">Vous êtes à jour</string>
+    <string name="update_state_available">La version %1$s est disponible</string>
+    <string name="update_state_error_network">Impossible de joindre GitHub. Vérifiez la connexion.</string>
+    <string name="update_state_error_rate">GitHub limite les requêtes en ce moment. Réessayez plus tard.</string>
+    <string name="update_state_error">Impossible de rechercher des mises à jour.</string>
+    <string name="update_auto_title">Rechercher automatiquement</string>
+    <string name="update_auto_desc">À l’ouverture d’Elyndra, au plus une fois par jour.</string>
+    <string name="update_prerelease_title">Inclure les versions bêta</string>
+    <string name="update_prerelease_desc">Pour l’instant, Elyndra est publiée en bêta. Désactivez pour ne recevoir que des versions stables.</string>
+    <string name="update_privacy">La vérification télécharge seulement la liste publique des versions d’Elyndra sur GitHub. Aucune donnée personnelle n’est envoyée.</string>
+    <string name="update_available_title">Elyndra %1$s est disponible</string>
+    <string name="update_available_msg">Vous avez la %1$s. Nouveautés :</string>
+    <string name="update_notes_empty">Pas de notes de version.</string>
+    <string name="update_action">Mettre à jour</string>
+    <string name="update_permission_title">Autorisez Elyndra à installer les mises à jour</string>
+    <string name="update_permission_msg">Android a besoin de votre autorisation une seule fois. Touchez « Ouvrir les paramètres », activez « Autoriser cette source » et revenez : le téléchargement démarre tout seul.</string>
+    <string name="update_permission_action">Ouvrir les paramètres</string>
+    <string name="update_downloading_title">Téléchargement d’Elyndra %1$s</string>
+    <string name="update_downloading_msg">Vous pouvez continuer à utiliser Elyndra ; l’installation démarre à la fin du téléchargement.</string>
+    <string name="update_installing_title">Installation…</string>
+    <string name="update_installing_msg">Confirmez l’installation dans la fenêtre d’Android. Elyndra redémarre une fois terminé.</string>
+    <string name="update_failed_title">Mise à jour impossible</string>
+    <string name="update_error_download">Le téléchargement a échoué. Vérifiez la connexion et réessayez, ou récupérez l’APK sur la page de la version.</string>
+    <string name="update_error_checksum">Le fichier téléchargé ne correspond pas à la somme de contrôle publiée ; il a été supprimé. Réessayez plus tard ou récupérez l’APK sur la page de la version.</string>
+    <string name="update_error_signature">Cette mise à jour est signée avec une clé différente de celle d’Elyndra installée (par exemple un build de débogage). Android ne la remplace pas. Pour changer, désinstallez Elyndra puis installez la version de GitHub ; la désinstallation efface les données d’Elyndra sur cet appareil.</string>
+    <string name="update_error_install">Android n’a pas pu installer la mise à jour. Vous pouvez récupérer l’APK sur la page de la version.</string>
+    <string name="update_no_asset">Cette version n’a pas d’APK pour cet appareil. Ouverture de la page de la version…</string>
+    <string name="update_cancelled">Mise à jour annulée</string>
+    <string name="update_open_page">Ouvrir la page de la version</string>
+    <string name="about_created_by">Créé par %1$s</string>
+    <string name="about_source">Code source</string>
+    <string name="about_license">Licence</string>
+    <string name="about_license_desc">Code visible sur GitHub en lecture seule. Les versions officielles sont gratuites pour un usage personnel et non commercial.</string>
+    <string name="about_license_value">Tous droits réservés</string>
+    <string name="licenses_app_copyright">Copyright © 2026 %1$s. Tous droits réservés.</string>
+    <string name="licenses_app_terms">Le code source est publié sur GitHub en lecture seule. Vous pouvez installer et utiliser les versions officielles pour un usage personnel et non commercial. Copier, modifier, redistribuer ou créer des œuvres dérivées nécessite une autorisation écrite. Les composants tiers ci-dessous restent sous leurs propres licences.</string>
+    <string name="licenses_voice_title">La voix naturelle de Masha</string>
+    <string name="licenses_voice_notice">La voix naturelle de Masha est générée sur votre appareil avec les poids du modèle Supertonic 3 de Supertone Inc., sous licence BigScience OpenRAIL-M. La voix est synthétique (générée par IA). En l’utilisant, vous acceptez de ne pas l’employer pour les usages restreints de l’annexe A de cette licence, entre autres : enfreindre la loi, nuire à des mineurs, usurper l’identité de personnes sans leur consentement, diffuser de fausses informations pour nuire à autrui, harceler, ou présenter la voix générée sans indiquer qu’elle est produite par une machine.</string>
+    <string name="licenses_voice_open">Lire la licence OpenRAIL-M</string>
 </resources>
