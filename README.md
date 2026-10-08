@@ -1,236 +1,208 @@
 # Elyndra
 
-**Lanzador nativo para Android — Kotlin + Jetpack Compose**
+**A console-style game launcher for Android that puts your Android games and emulator ROMs in one library, built for gamepads.**
 
-Elyndra unifica en una sola biblioteca los juegos Android instalados y las
-carpetas de ROMs de emulador, con una interfaz pensada para mando y para
-usarse desde el sofá. La app **solo indexa y lanza títulos: nunca emula
-nada**; cada ROM se entrega al emulador que el usuario eligió para su
-carpeta, a través del intent exacto de ese emulador.
+[![Latest release](https://img.shields.io/github/v/release/jefer02/Elyndra?include_prereleases&label=release)](https://github.com/jefer02/Elyndra/releases)
+[![License: All rights reserved](https://img.shields.io/badge/license-All%20rights%20reserved-lightgrey)](LICENSE)
+[![minSdk 26](https://img.shields.io/badge/minSdk-26%20(Android%208.0)-3ddc84)](app/build.gradle.kts)
 
-## Características
+![Elyndra library in the Meridian layout, with Geometry Dash selected](docs/screenshots/meridian-library.jpg)
 
-- **Biblioteca unificada.** Apps Android y carpetas de ROMs conviven en un
-  único carrusel, con filtros por tipo (Todos / Android / Emuladores) y
-  varios criterios de orden.
-- **Metadatos automáticos.** Carátulas, logos, capturas, sinopsis, fechas,
-  géneros y logros de hasta cuatro servicios (ScreenScraper, IGDB,
-  SteamGridDB, RetroAchievements), identificados por hash del archivo y
-  aplicables a toda la biblioteca de una pasada, en segundo plano.
-- **~130 perfiles de emulador** ya configurados (componente, acción, extras),
-  con instalación asistida cuando falta el emulador elegido.
-- **Carpetas de ROMs vía SAF**, sin permisos de almacenamiento: detección
-  automática del sistema por el nombre de carpeta, alta masiva de carpetas
-  raíz con subcarpetas por sistema, y un escaneo que ignora bios/saves/media
-  y agrupa correctamente discos multipista y juegos de PS3.
-- **Pensada para mando.** Toda la app —biblioteca, carpetas, ajustes,
-  diálogos— se maneja con cruceta y sticks; funciona igual con Xbox,
-  PlayStation, Switch Pro, mandos genéricos y el mando a distancia de una
-  tele.
-- **Tiempo de juego real**: con acceso de uso (opcional), el que el emulador
-  estuvo de verdad en primer plano; si no, entre el lanzamiento y la vuelta a
-  Elyndra. Cada sesión recuerda con qué emulador se jugó.
-- **Multiidioma**: español, inglés, portugués, francés, alemán y japonés,
-  sin reiniciar la app.
-- **Masha**, la inteligencia que orquesta Elyndra (DeepSeek): elige el
-  emulador que mejor va con cada juego *en este dispositivo*, recuerda cómo y
-  cuánto se jugó, revisa la biblioteca (duplicados, discos que faltan, nombres
-  raros, sagas), arma minisesiones ("tengo 30-40 minutos") y arcos, habla desde
-  el carrusel, el velo de lanzamiento, la ficha, el widget y avisos contados, y
-  actúa de verdad desde el chat. Sin clave o sin red sigue funcionando en local.
-  Detalle en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-- **Interfaz "liquid glass"** hecha a mano en Compose: degradados,
-  desenfoques, auroras y animaciones de entrada calcadas del diseño
-  original.
+Elyndra **only indexes and launches games, it never emulates anything**: each
+ROM is handed to the emulator you picked for its folder, with that emulator's
+exact intent.
 
-## Compilar
+## Features
 
-```
-./gradlew assembleDebug
-./gradlew installDebug        # con un dispositivo o emulador conectado
-./gradlew testDebugUnitTest   # pruebas unitarias (hashes, parsers, lanzador…)
-```
+- **One library for everything.** Installed Android games and ROM folders
+  live side by side, with filters (All / Android / Emulators), sorting and
+  search.
+- **Two layouts.** *Meridian*, a vertical wheel with a large hero (landscape),
+  and *Classic*, a horizontal carousel (always used in portrait and narrow
+  windows).
+- **Built for gamepads.** The whole app works with a D-pad and sticks: Xbox,
+  PlayStation, Switch Pro, generic and built-in handheld controllers, and TV
+  remotes. Touch works everywhere too.
+- **About 130 emulator profiles** with the exact intent of each emulator
+  (component, action, extras), based on ES-DE's Android configuration,
+  including RetroArch cores, Switch, Wii U, PlayStation 2/4, PSP and Windows
+  PC games through Winlator-style runtimes. If the chosen emulator is missing,
+  Elyndra offers to install it or pick another one.
+- **ROM folders through the Storage Access Framework**, with no storage
+  permission. The system is detected from the folder name; multi-track discs
+  and PS3 folders are grouped correctly.
+- **Automatic metadata.** Cover art, logos, screenshots, descriptions, dates,
+  genres and achievements from ScreenScraper, IGDB, SteamGridDB and
+  RetroAchievements (your own accounts, entered in Settings and stored
+  encrypted), plus key-less sources (Google Play and Steam store pages,
+  libretro thumbnails). You choose the source priority.
+- **On-device translation** of game descriptions with ML Kit, downloaded per
+  language on demand.
+- **Real play time.** With optional usage access, the time the game was really
+  in the foreground; otherwise, from launch until you come back.
+- **Masha, the built-in assistant.** A 3D holographic avatar with lip-sync and
+  facial expressions, an on-device natural voice (64-bit devices), chat and
+  voice input. She picks the emulator that runs each game best on *this*
+  device, remembers what and how you play, reviews the library (duplicates,
+  missing discs, odd names) and plans short sessions ("I've got 30–40
+  minutes"). See [Masha and the AI key](#masha-and-the-ai-key).
+- **Look and feel.** Liquid-glass interface, signature color palettes, accent
+  colors, selection glow and particles, an animated intro, optional video or
+  image background, UI sounds and music.
+- **Home-screen widget** and occasional Masha reminders.
+- **Six languages:** English, Spanish, Portuguese, French, German and
+  Japanese, switchable without restarting.
+- **In-app updates** from GitHub Releases (see below).
 
-Requiere JDK 17+ y el SDK de Android (compileSdk 35, minSdk 26).
+## Screenshots
 
-Para probar en el emulador usa una imagen de sistema estándar (por ejemplo
-"Google Play · x86_64", Android 15). La imagen experimental "16 KB Page Size"
-de x86_64 es inestable en Windows (WHPX): cierra al azar cualquier proceso
-(sistema, Servicios de Google Play, la propia app) a los pocos segundos. No
-hace falta para comprobar la compatibilidad con 16 KB: la única librería
-nativa del APK (`libandroidx.graphics.path.so`, de Compose) ya está alineada a
-16 KB.
+| | |
+|---|---|
+| ![Classic layout: hero with the game logo over a horizontal carousel of covers](docs/screenshots/classic-library.jpg) | ![Game details sheet with description, developer, rating and metadata sources](docs/screenshots/game-details.jpg) |
+| Classic layout | Game details |
+| ![Masha, the holographic 3D assistant, with play-time stats and chat suggestions](docs/screenshots/masha.jpg) | ![Add to library: three steps to add a ROM folder (folder, system, emulator)](docs/screenshots/add-rom-folder.jpg) |
+| Masha | Add a ROM folder |
+| ![Appearance settings: Meridian or Classic layout and adaptive background color](docs/screenshots/settings-appearance.jpg) | ![Settings, About: updates section with version, check button and toggles, and author credit](docs/screenshots/settings-updates-about.jpg) |
+| Appearance settings | Updates and About |
 
-## `local.properties`
+<p align="center">
+  <img src="docs/screenshots/portrait-library.jpg" width="320" alt="Library in portrait: Geometry Dash hero over the cover carousel">
+  <br><sub>Portrait</sub>
+</p>
 
-No se versiona. Además de `sdk.dir=...`, admite:
+Screenshots taken on a Lenovo Legion Y700 tablet. Game names, logos and cover
+art belong to their owners.
 
-```
-masha.apiKey=...                 # Masha (DeepSeek); sin clave, responde en local
-masha.model=deepseek-chat        # opcional
-masha.baseUrl=https://api.deepseek.com   # opcional (p. ej. un backend propio)
-screenscraper.devId=...          # credenciales de DESARROLLADOR de ScreenScraper
-screenscraper.devPassword=...
-screenscraper.softname=Elyndra   # opcional
-```
+## Download and install
 
-Las credenciales de desarrollador de ScreenScraper se piden en el foro de
-screenscraper.fr presentando la app; sin ellas la API no responde a ninguna
-llamada. Si no se compilan, el usuario puede escribirlas en Ajustes.
+1. Open the [Releases page](https://github.com/jefer02/Elyndra/releases) and
+   download the APK for your device:
+   - `…-arm64-v8a.apk` for almost every current phone, tablet and handheld;
+   - `…-universal.apk` if you are not sure (bigger, works everywhere).
+2. Open the APK. Android asks you to allow installing apps from the app you
+   used to open it (browser or file manager): turn on **Allow from this
+   source** and go back.
+3. If Google Play Protect asks to scan the app, you can let it scan, or open
+   **More details** to install without scanning.
 
-## Servicios de metadatos (Ajustes → APIs de metadatos)
+### Updates
 
-Cada panel tiene sus campos, "Probar conexión" (una llamada real), el enlace
-a la página donde se consiguen las claves y el estado (conectado, sin
-verificar, error concreto). Todo se guarda cifrado con AES-GCM y una clave
-del Android Keystore (`SecretStore`).
+Elyndra checks GitHub Releases by itself when it opens, at most once a day,
+and offers new versions with their release notes. Choose **Update** and it
+downloads the right APK for your device, verifies its SHA-256 checksum and
+opens Android's install dialog. The first time, Android asks you to allow
+Elyndra to install apps. You can also check by hand, turn the automatic check
+off, or choose whether beta versions are offered, in
+**Settings → About → Updates**. The check only downloads the public release
+list from GitHub; no personal data is sent.
 
-| Servicio | Qué pide el usuario | Dónde se consigue | Qué aporta |
-|---|---|---|---|
-| ScreenScraper | usuario + contraseña (opcional, sube el cupo) | screenscraper.fr | identificación por hash (CRC/MD5/SHA-1 + nombre + tamaño), carátulas, logos, capturas, sinopsis |
-| IGDB | Client ID + Client Secret | dev.twitch.tv/console/apps (redirect `http://localhost`) | textos, fechas, géneros, estudios, carátulas; token OAuth client-credentials renovado solo |
-| SteamGridDB | API key | steamgriddb.com → Preferences → API | grids, heroes y logos (sobre todo para apps Android) |
-| RetroAchievements | usuario + Web API Key | retroachievements.org → Settings → Keys | juego y progreso de logros; hash rcheevos o, si no se puede, título |
+Updates install over the existing app only when both are signed with the same
+key, so builds you compile yourself (debug) can't be updated from Releases.
 
-"Aplicar metadatos a toda la biblioteca" identifica cada juego por el hash del
-archivo en ScreenScraper (`jeuInfos`, y `jeuRecherche` si no hay coincidencia)
-y completa con IGDB, SteamGridDB y RetroAchievements. **El orden lo elige el
-usuario** (Ajustes → Metadatos → Prioridad de fuentes), por separado para
-textos e imágenes; cada imagen guarda de qué servicio salió. Una vez al día,
-con wifi, se completa sola lo que falte. Respeta los límites de cada API (1 hilo en ScreenScraper,
-4 req/s en IGDB, reintentos ante 429) y deja de usar un servicio en la pasada
-si se queda sin cupo o las credenciales fallan, indicándolo en Ajustes. La
-pasada corre en un servicio en primer plano (`ScrapeService`, tipo dataSync)
-para que siga aunque se salga a jugar.
+## Requirements
 
-Los hashes de RetroAchievements replican rcheevos: cartuchos con cabeceras
-(NES/FDS, SNES, Lynx, 7800, PC Engine), Nintendo 64 en cualquier orden de
-bytes, Nintendo DS, arcade por nombre de set, y discos PS1/PS2/PSP en
-ISO o BIN/CUE. Para CHD, CSO o 7z se usa el título.
+- Android 8.0 (API 26) or later. Tested mostly on Android 15.
+- Masha's natural voice needs a 64-bit device and a one-time download of about
+  145 MB. Elsewhere, Masha uses the system text-to-speech voice.
+- A gamepad is optional.
+- Internet is only needed for metadata, Masha's online AI, translations and
+  updates. Everything else works offline.
 
-## Carpetas de ROMs
+## Build from source
 
-- Se eligen con el selector del sistema (Storage Access Framework): no hace
-  falta ningún permiso de almacenamiento y el acceso se conserva.
-- El sistema se detecta por el nombre de la carpeta ("psp", "Game Boy
-  Advance"…). Si se elige una carpeta raíz con subcarpetas por sistema,
-  "Añadir todos" las da de alta de una vez.
-- El escaneo oculta las pistas de `.cue`/`.gdi`/`.m3u`/`.ccd`, trata como un
-  juego las carpetas de PS3 (JB) y se salta `bios`, `media`, `saves`…
-- Se reescanea al abrir la app (cada 6 h como mucho) o a mano.
+You need JDK 17 and the Android SDK (compileSdk 35).
 
-## Lanzamiento
-
-`data/Emulators.kt` tiene ~130 perfiles con el intent exacto de cada
-emulador (componente, acción, categoría, `data` y extras), sacados de la
-configuración Android de ES-DE. Cada perfil recibe la ROM de una de estas
-formas: URI SAF con permiso de lectura, URI de `RomProvider` (equivalente al
-`%ROMPROVIDER%` de ES-DE) o ruta absoluta (RetroArch y otros). También se puede
-elegir cualquier app instalada como emulador ("Otra app…"). Si falta el
-emulador, la app ofrece instalarlo o elegir otro.
-
-El tiempo de juego se mide entre el lanzamiento y la vuelta a Elyndra.
-
-## Mando
-
-Elyndra normaliza cualquier mando —Xbox, PlayStation, Switch Pro, clónicos
-genéricos y el mando a distancia de una tele— a un único juego de acciones
-(`input/Gamepad.kt`), así que la app no distingue de qué mando viene la
-pulsación:
-
-- **Cruceta / stick izquierdo**: mover la selección en el carrusel de la
-  biblioteca o de una carpeta, una card a la vez.
-- **L1/R1**: cambiar de categoría en la biblioteca (Todos / Android /
-  Emuladores) o saltar de página dentro de una carpeta.
-- **A**: abrir. **B**: volver. **X**: ficha del juego. **Y**: menú del
-  juego. **Start**: menú de la app. **Select**: buscador.
-
-Los sticks llegan como movimiento continuo, no como pulsaciones discretas:
-`StickRepeater` los convierte en una pulsación por inclinación y, si se
-mantiene, en repeticiones espaciadas, con un umbral e histéresis pensados
-para que un solo gesto mueva un solo elemento, incluso con un mando algo
-gastado.
-
-## Idiomas
-
-Español, inglés, portugués, francés, alemán y japonés (`res/values-*`). El
-idioma se cambia en Ajustes sin reiniciar la app; en Android 13+ usa el
-idioma por aplicación del sistema (`res/xml/locales_config.xml`). Para
-añadir uno: copiar `values/strings.xml` a `values-xx/`, traducir y añadirlo a
-`AppLocale.SUPPORTED` y a `locales_config.xml`.
-
-## Estructura
-
-```
-app/src/main/java/com/elyndra/launcher/
-  ElyndraApplication.kt        raíz Hilt (@HiltAndroidApp) y configuración de WorkManager
-  MainActivity.kt              arranque, idioma, ciclo de vida (sesiones de juego)
-  data/                        modelos, sistemas, perfiles de emuladores, repositorio
-                               de la biblioteca (instantánea en memoria sobre Room),
-                               ajustes, secretos cifrados, idioma
-  input/                       normalización de mandos (botones, sticks, repetición)
-  library/                     escáner SAF, hojas de disco, apps instaladas, nombres
-  launch/                      planificador de intents, lanzador, RomProvider
-  metadata/                    clientes ScreenScraper / IGDB / SteamGridDB /
-                               RetroAchievements, hashes, caché de imágenes,
-                               motor de metadatos y servicio en primer plano
-  data/db/                     Room: tablas, DAOs, diferencias instantánea → filas
-  di/                          módulos Hilt
-  domain/                      lógica de Masha en Kotlin puro: perfiles, emuladores,
-                               revisión, listas, minisesiones, arcos, sugerencias
-  masha/                       MashaAI + DeepSeek, prompt, herramientas, contexto,
-                               caché, memoria, Masha sin conexión
-  session/                     sesiones (UsageStatsManager + respaldo)
-  core/device/                 batería, temperatura y red
-  work/ widget/ notify/        WorkManager, widget Glance, avisos de Masha
-  ui/
-    ElyndraViewModel.kt        estado y navegación; Add/Settings/MashaController
-    ElyndraApp.kt              pantallas + capas (diálogos, hojas, ficha, avisos)
-    InputController.kt         traduce el mando a acciones según la capa activa
-    theme/                     tipografía, degradados CSS, cristal, animaciones
-    components/                texto, controles, hero, carátulas, capas
-    screens/                   Library, Folder, Add, Settings (+APIs, Masha), Details, Masha
+```bash
+./gradlew assembleDebug        # build
+./gradlew installDebug         # install on a connected device
+./gradlew testDebugUnitTest    # unit tests
 ```
 
-## Cómo se tradujo el diseño
+Optional keys go in `local.properties` at the project root, which is ignored
+by git and must never be committed. Only the names are listed here:
 
-Las medidas del diseño son px CSS sobre un lienzo de 412 de ancho, que es el
-ancho en dp de un móvil corriente, así que **los números pasan a dp/sp tal
-cual**: `heroH` 330, `tileH` 96, `pad` 18, radios 16/17/18, etc. La bandera `L`
-del diseño (el layout ancho de 892×412) aquí es la orientación real del
-dispositivo, no un par de botones.
+| Key | What for |
+|---|---|
+| `sdk.dir` | Android SDK path (Android Studio writes it) |
+| `masha.apiKey` | DeepSeek API key for Masha's online AI. Without it, Masha runs offline |
+| `masha.model` | Chat model (optional, defaults to `deepseek-chat`) |
+| `masha.baseUrl` | API base URL (optional, e.g. your own backend) |
+| `screenscraper.devId`, `screenscraper.devPassword` | ScreenScraper developer credentials |
+| `screenscraper.softname` | Registered software name (optional) |
 
-Piezas que había que construir a mano porque Compose no las trae:
+Users' own service accounts (ScreenScraper, IGDB, SteamGridDB,
+RetroAchievements) and their own DeepSeek key are entered inside the app and
+stored encrypted with an Android Keystore key.
 
-- **Degradados CSS.** `linear-gradient(150deg, …)` mide el ángulo en sentido
-  horario desde "hacia arriba"; Compose quiere dos puntos. `Paint.kt` hace la
-  conversión, incluida la longitud de la línea de degradado.
-- **Carátulas procedurales** (`art()`): el degradado a 150° más la trama de
-  rayas a 115°. Siguen debajo de cada imagen descargada: se ven mientras carga
-  o si un juego no tiene carátula.
-- **Aurora**: degradados radiales que caen a transparente en lugar del
-  `blur(64px)`.
-- **Slider** e **iconos** dibujados a mano, como en el diseño.
-- **Animación de entrada**: fundido, acercamiento sutil y una pequeña subida
-  con la curva `cubic-bezier(.2,.8,.2,1)` de todo el diseño (`Anim.kt`), para
-  que el primer fotograma al abrir la app se sienta pulido y no un simple
-  parpadeo.
+How to publish a version that the in-app updater picks up:
+[docs/RELEASING.md](docs/RELEASING.md).
 
-**Tipografía.** Poppins va incluida (`res/font/`, licencia OFL en
-`POPPINS-OFL.txt`). El rótulo de la intro usa Cinzel Bold (subconjunto latino,
-licencia OFL en `CINZEL-OFL.txt`). Para japonés Android usa la fuente CJK del sistema.
+## Project structure
 
-**Liquid glass.** Compose no tiene backdrop-filter; se replican tinte,
-opacidad, borde, sombra y realce, y el desenfoque se traduce en lechosidad.
+A single Gradle module (`:app`), Kotlin and Jetpack Compose, Hilt, Room and
+WorkManager. The main packages are:
 
-## Masha y la API key
+| Package | What it holds |
+|---|---|
+| `data/` | Library repository, Room database, settings, encrypted secrets, emulator and system profiles |
+| `domain/` | Pure Kotlin logic (Masha's planning, emulator ranking, curation), tested on the JVM |
+| `launch/` · `library/` | Intent planning and launching, SAF scanning, installed apps |
+| `metadata/` | Metadata service clients, hashing, image cache, translation |
+| `masha/` · `ui/masha/` | Masha's AI, tools, memory and offline mode; 3D avatar, voice and lip-sync |
+| `update/` | In-app updates from GitHub Releases |
+| `ui/` | Compose screens, controllers and the "Elyndra Console" design system |
 
-`MashaConfig` lee la clave de `local.properties` (`masha.apiKey=...`) vía
-`BuildConfig`, y el usuario puede poner la suya en Ajustes → Masha (se guarda
-cifrada). Sin clave, sin red o con la IA apagada, Masha contesta en local con
-los datos reales. Llamar a la API desde el móvil vale para probar, **no** para
-publicar: cualquier clave dentro de un APK se puede extraer, así que en
-producción la llamada debe salir de un backend propio (`masha.baseUrl`).
+More in [`docs/`](docs/):
+[ARCHITECTURE.md](docs/ARCHITECTURE.md) (layers, data model, flows, privacy),
+[UI_DESIGN.md](docs/UI_DESIGN.md) (design system),
+[MASHA.md](docs/MASHA.md) (3D avatar),
+[MASHA_VOICE.md](docs/MASHA_VOICE.md) (voice),
+[MASHA_LIPSYNC.md](docs/MASHA_LIPSYNC.md) (lip-sync) and
+[RELEASING.md](docs/RELEASING.md) (publishing). Most of the internal docs are
+written in Spanish.
 
-Arquitectura, modelo de datos, flujos, privacidad y plan por fases:
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+## Masha and the AI key
+
+Masha's free-form conversation uses DeepSeek. The key comes from
+`local.properties` (`masha.apiKey`) at build time, and each user can set their
+own in **Settings → Masha** (stored encrypted). With no key, no network or the
+AI turned off, Masha keeps working offline: plans, lists, launches and stats
+come from your local data; only free-form chat is lost.
+
+Only titles, systems, play time, device state, Masha's memories and the
+conversation are sent to DeepSeek; never file paths, folders, account names
+or credentials. Any key compiled into an APK can be extracted, so a public
+build should route the AI through its own backend (`masha.baseUrl`).
+
+## Roadmap
+
+- A shelf for Masha's lists and arcs right in the library (today they live in
+  the chat).
+- AI-written ambient suggestions with daily caching.
+- Instrumented tests for Room migrations and Compose.
+- An own backend for the AI key.
+- Splitting the app into Gradle modules and giving each screen its own
+  ViewModel.
+- Optional weekly summary and an encrypted library backup.
+
+## Credits
+
+Elyndra builds on the work of many projects: AndroidX and Jetpack Compose,
+Kotlin, Hilt, OkHttp, Coil, SceneView and Filament, ONNX Runtime, ML Kit,
+ES-DE's emulator configuration, the Supertonic voice model, CMUdict, MPFB2 and
+the MakeHuman assets, and the Poppins and Cinzel fonts. The full list, with
+licenses, is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and in the
+app under **Settings → About → Open-source licenses**.
+
+## License
+
+Copyright © 2026 Jeferson Manuel Morillo Vallejo. **All rights reserved.**
+
+The source code is public on GitHub for reading only. You may install and use
+the official releases for personal, non-commercial use. Copying, modifying,
+redistributing or creating derivative works requires written permission. See
+[LICENSE](LICENSE). Third-party components keep their own licenses.
+
+## Author
+
+Created by [Jeferson Manuel Morillo Vallejo](https://github.com/jefer02).

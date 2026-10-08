@@ -1,0 +1,77 @@
+Copyright (c) 2026 Jeferson Manuel Morillo Vallejo. All rights reserved.
+
+Elyndra (https://github.com/jefer02/Elyndra)
+
+1. Source code. The source code of Elyndra is published on GitHub so that it
+   can be read. Publishing it does not grant any license to it beyond
+   viewing it on GitHub.
+
+2. Permitted use. You may download, install and use the official releases of
+   Elyndra published at https://github.com/jefer02/Elyndra/releases, free of
+   charge, for personal and non-commercial use.
+
+3. Restrictions. Without the prior written permission of the copyright
+   holder, you may not copy, modify, adapt, translate, redistribute, sell,
+   sublicense or publish the source code or the application, in whole or in
+   part, nor create derivative works based on them.
+
+4. Third-party components. Elyndra includes or downloads third-party
+   components (libraries, fonts, emulator configuration data, 3D assets and
+   machine-learning models). Each of them remains under its own license; see
+   THIRD_PARTY_NOTICES.md. Nothing in this license limits the rights those
+   licenses grant you over those components.
+
+5. Masha's natural voice. The natural voice uses the Supertonic 3 model
+   weights by Supertone Inc., licensed under the BigScience OpenRAIL-M
+   license (https://huggingface.co/Supertone/supertonic-3/blob/main/LICENSE).
+   The voice is synthetic (AI-generated). By using it you agree not to use it
+   for any of the restricted uses listed in Attachment A of that license.
+
+6. No warranty. Elyndra is provided "as is", without warranty of any kind,
+   express or implied. In no event shall the copyright holder be liable for
+   any claim, damages or other liability arising from the use of Elyndra.
+
+To ask for permission, open an issue at https://github.com/jefer02/Elyndra
+or contact the author at https://github.com/jefer02.
+
+--------------------------------------------------------------------------------
+
+Versión en español (informativa; en caso de diferencia prevalece el texto en
+inglés de arriba)
+
+Copyright (c) 2026 Jeferson Manuel Morillo Vallejo. Todos los derechos
+reservados.
+
+1. Código fuente. El código fuente de Elyndra se publica en GitHub para que
+   se pueda leer. Publicarlo no concede ninguna licencia sobre él más allá de
+   verlo en GitHub.
+
+2. Uso permitido. Puedes descargar, instalar y usar gratuitamente las
+   versiones oficiales de Elyndra publicadas en
+   https://github.com/jefer02/Elyndra/releases para uso personal y no
+   comercial.
+
+3. Restricciones. Sin el permiso previo y por escrito del titular de los
+   derechos no puedes copiar, modificar, adaptar, traducir, redistribuir,
+   vender, sublicenciar ni publicar el código fuente ni la aplicación, en todo
+   o en parte, ni crear obras derivadas basadas en ellos.
+
+4. Componentes de terceros. Elyndra incluye o descarga componentes de
+   terceros (bibliotecas, fuentes, datos de configuración de emuladores,
+   recursos 3D y modelos de aprendizaje automático). Cada uno sigue bajo su
+   propia licencia; consulta THIRD_PARTY_NOTICES.md. Nada de esta licencia
+   limita los derechos que esas licencias te dan sobre esos componentes.
+
+5. La voz natural de Masha. La voz natural usa los pesos del modelo
+   Supertonic 3 de Supertone Inc., bajo la licencia BigScience OpenRAIL-M
+   (https://huggingface.co/Supertone/supertonic-3/blob/main/LICENSE). La voz
+   es sintética (generada por IA). Al usarla aceptas no emplearla para ninguno
+   de los usos restringidos del Anexo A (Attachment A) de esa licencia.
+
+6. Sin garantía. Elyndra se ofrece "tal cual", sin garantía de ningún tipo,
+   expresa ni implícita. En ningún caso el titular de los derechos será
+   responsable de reclamaciones, daños u otras responsabilidades derivadas
+   del uso de Elyndra.
+
+Para pedir permiso, abre una incidencia en https://github.com/jefer02/Elyndra
+o contacta con el autor en https://github.com/jefer02.
