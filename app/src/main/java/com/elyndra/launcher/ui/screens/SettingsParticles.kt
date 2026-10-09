@@ -44,7 +44,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.elyndra.launcher.ui.theme.shapeClickable
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -66,7 +65,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
 import com.elyndra.launcher.data.SignaturePreset
-import com.elyndra.launcher.ui.components.CssGrid
+import com.elyndra.launcher.ui.components.ColorSwatch
+import com.elyndra.launcher.ui.components.SwatchRow
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.components.ElyText
@@ -94,19 +94,18 @@ import kotlin.math.sin
  * los fósforos de siempre (los típicos de monitor y de LED de consola). Con
  * el deslizador de tono se puede elegir cualquier otro.
  */
-private val PRESETS = SignaturePreset.entries.map { it.pair.primary } + listOf(
-    0xFF5CF2FF, // cian
-    0xFF6CFF8E, // verde fósforo
-    0xFFFFC857, // ámbar
-    0xFFFF5CD6, // magenta
-    0xFFA78BFF, // violeta
-    0xFFFF5C6C, // rojo
-    0xFF4D9BFF, // azul
-    0xFFF4F7FF, // blanco
-).map { it.toInt() }
+private val PRESETS: List<Pair<Int, Int>> = SignaturePreset.entries.map { it.pair.primary to it.nameRes } + listOf(
+    0xFF5CF2FF to R.string.intro_color_cyan,
+    0xFF6CFF8E to R.string.color_phosphor_green,
+    0xFFFFC857 to R.string.color_amber,
+    0xFFFF5CD6 to R.string.color_magenta,
+    0xFFA78BFF to R.string.intro_color_violet,
+    0xFFFF5C6C to R.string.color_red,
+    0xFF4D9BFF to R.string.color_blue,
+    0xFFF4F7FF to R.string.color_white,
+).map { (argb, name) -> argb.toInt() to name }
 
-/** Muestras por fila: con las paletas de firma ya no caben todas en una. */
-private const val CHOICE_COLUMNS = 7
+private val PRESET_COLORS = PRESETS.map { it.first }
 
 /** Saturación y brillo de los colores elegidos con el deslizador: vivos, que brillen. */
 private const val PICK_SATURATION = 0.68f
@@ -197,23 +196,17 @@ private fun ParticleColorPicker(
  */
 @Composable
 private fun ColorChoices(argb: Int, onPick: (Int) -> Unit) {
-    val custom = argb !in PRESETS
+    val custom = argb !in PRESET_COLORS
     var customOpen by rememberSaveable { mutableStateOf(false) }
     Column {
-        CssGrid(
-            columns = CHOICE_COLUMNS,
-            horizontalGap = 4.dp,
-            verticalGap = 0.dp,
-            items = PRESETS.map<Int, @Composable () -> Unit> { preset ->
-                { ColorDot(Color(preset), selected = preset == argb, modifier = Modifier.fillMaxWidth()) { onPick(preset) } }
-            } + listOf<@Composable () -> Unit> {
-                CustomHueDot(
-                    selected = custom,
-                    expanded = customOpen || custom,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { customOpen = !customOpen }
-            },
-        )
+        SwatchRow(PRESETS.size + 1) { i ->
+            if (i < PRESETS.size) {
+                val (preset, name) = PRESETS[i]
+                ColorDot(Color(preset), stringResource(name), selected = preset == argb) { onPick(preset) }
+            } else {
+                CustomHueDot(selected = custom) { customOpen = !customOpen }
+            }
+        }
         Expandable(customOpen || custom) {
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -226,34 +219,24 @@ private fun ColorChoices(argb: Int, onPick: (Int) -> Unit) {
                 onPick(Color.hsv(hue, PICK_SATURATION, PICK_VALUE).toArgb())
             }
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
     }
 }
 
 /**
- * La muestra del color personalizado: un aro con el arcoíris de tonos. Toca
+ * La muestra del color personalizado: el arcoíris de tonos con un "+". Toca
  * para desplegar (o recoger) el deslizador; seleccionada si el color actual
  * no es uno de partida.
  */
 @Composable
-private fun CustomHueDot(selected: Boolean, expanded: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val label = stringResource(R.string.particle_custom_hue)
-    val action = stringResource(if (expanded) R.string.a11y_collapse else R.string.a11y_expand)
+private fun CustomHueDot(selected: Boolean, onClick: () -> Unit) {
     val sweep = remember { Brush.sweepGradient((0..6).map { Color.hsv(it * 60f % 360f, PICK_SATURATION, PICK_VALUE) }) }
-    Box(modifier.height(44.dp), contentAlignment = Alignment.Center) {
-        Box(
-            Modifier
-                .size(26.dp)
-                .clip(CircleShape)
-                .drawBehind { drawCircle(sweep) }
-                .border(if (selected) 2.5.dp else 1.dp, if (selected) P.ink else P.ink.copy(alpha = 0.15f), CircleShape)
-                .semantics { contentDescription = label }
-                .shapeClickable(CircleShape, onClickLabel = action, onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            ConsoleGlyphIcon(ConsoleGlyph.Plus, Color.White, size = 12.dp)
-        }
-    }
+    ColorSwatch(
+        label = stringResource(R.string.particle_custom_hue),
+        selected = selected,
+        onClick = onClick,
+        content = { ConsoleGlyphIcon(ConsoleGlyph.Plus, Color.White, size = 14.dp) },
+    ) { drawRect(sweep) }
 }
 
 private fun hueOf(argb: Int): Float {
@@ -262,19 +245,17 @@ private fun hueOf(argb: Int): Float {
     return hsv[0]
 }
 
-/** Una muestra redonda de color; seleccionada, con aro de tinta. */
+/** Un color de partida, con un brillo blanco arriba a la izquierda como un LED. */
 @Composable
-private fun ColorDot(color: Color, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Box(modifier.height(44.dp), contentAlignment = Alignment.Center) {
-        Box(
-            Modifier
-                .size(26.dp)
-                .clip(CircleShape)
-                .drawBehind {
-                    drawCircle(Brush.radialGradient(listOf(Color.White, color, color.copy(alpha = 0.7f)), radius = size.minDimension * 0.7f))
-                }
-                .border(if (selected) 2.5.dp else 1.dp, if (selected) P.ink else P.ink.copy(alpha = 0.15f), CircleShape)
-                .shapeClickable(CircleShape, onClick = onClick),
+private fun ColorDot(color: Color, label: String, selected: Boolean, onClick: () -> Unit) {
+    ColorSwatch(label = label, selected = selected, onClick = onClick) {
+        drawRect(color)
+        drawRect(
+            Brush.radialGradient(
+                listOf(Color.White.copy(alpha = 0.55f), Color.Transparent),
+                center = androidx.compose.ui.geometry.Offset(size.width * 0.3f, size.height * 0.28f),
+                radius = size.minDimension * 0.7f,
+            ),
         )
     }
 }

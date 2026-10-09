@@ -51,6 +51,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
+import com.elyndra.launcher.R
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.TextRange
@@ -260,10 +262,12 @@ fun GlassTextField(
     textSize: Float = 11f,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
-    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    keyboardActions: KeyboardActions? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val skin = LocalSkin.current
+    // Sin acciones propias: "Siguiente" baja al campo de debajo y "Hecho" cierra el teclado.
+    val actions = keyboardActions ?: rememberFormKeyboardActions()
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val field = rememberPadField()
@@ -325,7 +329,7 @@ fun GlassTextField(
                     cursorBrush = SolidColor(skin.a2),
                     visualTransformation = visualTransformation,
                     keyboardOptions = keyboardOptions,
-                    keyboardActions = keyboardActions,
+                    keyboardActions = actions,
                     interactionSource = interaction,
                     modifier = Modifier.fillMaxWidth().padTextField(field),
                 )
@@ -341,6 +345,25 @@ fun GlassTextField(
             }
         }
     }
+}
+
+/**
+ * "Mostrar" / "Ocultar" de un campo secreto (va en el `trailing` de
+ * [GlassTextField]). Con recorte y aire: el aro del mando no se pega a las
+ * letras, y Compose amplía su zona táctil hasta los 48 dp.
+ */
+@Composable
+fun SecretToggle(revealed: Boolean, onToggle: () -> Unit) {
+    ElyText(
+        stringResource(if (revealed) R.string.hide else R.string.show),
+        size = 8.5f,
+        weight = FontWeight.SemiBold,
+        color = LocalSkin.current.a2,
+        uppercase = true,
+        modifier = Modifier
+            .shapeClickable(RoundedCornerShape(6.dp), onClick = onToggle)
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+    )
 }
 
 /**

@@ -30,6 +30,9 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.delay
 
 /* ─────────────────────────────────────────────────────────────
@@ -44,8 +47,10 @@ import kotlinx.coroutines.delay
        encima del teclado; se anima con él.
      · [rememberPadField] + [padTextField]: lo que necesita cada campo.
        Se trae a la vista (con su cursor) al recibir el foco y cada vez
-       que el teclado cambia de alto; con mando, el foco pasa por el
-       campo sin abrir el teclado, A lo abre y la cruceta sale del campo.
+       que el teclado cambia de alto; al tocarlo se abre el teclado; con
+       mando, el foco pasa por el campo sin abrirlo, A lo abre, B lo
+       cierra (el foco se queda en el campo) y la cruceta sale del campo.
+     · [rememberFormKeyboardActions]: "Siguiente" baja al campo de debajo.
      · [ImeBridge]: le dice al InputController si el teclado está a la
        vista y cómo cerrarlo, para que B lo cierre antes que la capa.
    ───────────────────────────────────────────────────────────── */
@@ -115,6 +120,25 @@ fun Modifier.padTextField(field: PadField): Modifier {
             runCatching { field.bring.bringIntoView() }
         }
     }
+    // Enfocado y con permiso para escribir: el teclado, sí o sí. El campo de
+    // Compose lo abre al empezar su sesión, pero no si la vista de Android
+    // que lo aloja no tiene el foco (una vista nativa —el vídeo de fondo— se
+    // lo puede quedar), y `show()` sin sesión no hace nada: se espera un
+    // fotograma a que la sesión exista y se pide otra vez.
+    val view = LocalView.current
+    LaunchedEffect(field.focused, field.armed) {
+        if (!field.focused || !field.armed) return@LaunchedEffect
+        if (!view.hasFocus()) view.requestFocus()
+        withFrameNanos { }
+        keyboard?.show()
+    }
+    // Con mando, cerrar el teclado (B) deja de escribir pero no suelta el
+    // campo: el foco sigue donde estaba, la cruceta sale de él y A lo reabre.
+    val wasIme = remember { BooleanArray(1) }
+    LaunchedEffect(ime) {
+        if (wasIme[0] && !ime && field.focused && input?.active == true) field.armed = false
+        wasIme[0] = ime
+    }
     DisposableEffect(field) {
         onDispose { field.armed = false }
     }
@@ -144,6 +168,23 @@ fun Modifier.padTextField(field: PadField): Modifier {
                 else -> false
             }
         }
+}
+
+/**
+ * "Siguiente" en el teclado lleva al campo de debajo (no al botón de al lado,
+ * como haría el orden de foco por defecto); si no hay nada debajo, o con
+ * "Hecho", se cierra el teclado.
+ */
+@Composable
+fun rememberFormKeyboardActions(): KeyboardActions {
+    val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    return remember(focus, keyboard) {
+        KeyboardActions(
+            onNext = { if (!focus.moveFocus(FocusDirection.Down)) keyboard?.hide() },
+            onDone = { keyboard?.hide() },
+        )
+    }
 }
 
 /** La tecla viene de una cruceta o de un mando (no de un teclado físico). */

@@ -2,7 +2,6 @@ package com.elyndra.launcher.ui.screens
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,6 +49,7 @@ import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GhostButton
 import com.elyndra.launcher.ui.components.SettingsGroup
 import com.elyndra.launcher.ui.components.GlassTextField
+import com.elyndra.launcher.ui.components.SecretToggle
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.resolve
 import com.elyndra.launcher.ui.theme.LocalSkin
@@ -96,21 +96,21 @@ fun ApiPanels(vm: ElyndraViewModel) {
                 Spacer(Modifier.height(8.dp))
                 CredentialField(stringResource(R.string.field_dev_id), s.value(Field.SsDevId), secret = false) { s.update(Field.SsDevId, it) }
                 Spacer(Modifier.height(8.dp))
-                CredentialField(stringResource(R.string.field_dev_password), s.value(Field.SsDevPassword), secret = true) { s.update(Field.SsDevPassword, it) }
+                CredentialField(stringResource(R.string.field_dev_password), s.value(Field.SsDevPassword), secret = true, last = true) { s.update(Field.SsDevPassword, it) }
             }
         }
         ApiAccordion(vm, Service.Igdb, R.string.igdb_desc, R.string.igdb_help, R.string.connect) {
             CredentialField(stringResource(R.string.field_client_id), s.value(Field.IgdbClientId), secret = false) { s.update(Field.IgdbClientId, it) }
             Spacer(Modifier.height(8.dp))
-            CredentialField(stringResource(R.string.field_client_secret), s.value(Field.IgdbClientSecret), secret = true) { s.update(Field.IgdbClientSecret, it) }
+            CredentialField(stringResource(R.string.field_client_secret), s.value(Field.IgdbClientSecret), secret = true, last = true) { s.update(Field.IgdbClientSecret, it) }
         }
         ApiAccordion(vm, Service.SteamGridDb, R.string.sgdb_desc, R.string.sgdb_help, R.string.test_connection) {
-            CredentialField(stringResource(R.string.field_api_key), s.value(Field.SgdbKey), secret = true) { s.update(Field.SgdbKey, it) }
+            CredentialField(stringResource(R.string.field_api_key), s.value(Field.SgdbKey), secret = true, last = true) { s.update(Field.SgdbKey, it) }
         }
         ApiAccordion(vm, Service.RetroAchievements, R.string.ra_desc, R.string.ra_help, R.string.test_connection) {
             CredentialField(stringResource(R.string.field_username), s.value(Field.RaUser), secret = false) { s.update(Field.RaUser, it) }
             Spacer(Modifier.height(8.dp))
-            CredentialField(stringResource(R.string.field_web_api_key), s.value(Field.RaKey), secret = true) { s.update(Field.RaKey, it) }
+            CredentialField(stringResource(R.string.field_web_api_key), s.value(Field.RaKey), secret = true, last = true) { s.update(Field.RaKey, it) }
         }
     }
 }
@@ -218,10 +218,14 @@ private fun StatusBadge(status: ServiceState.Status) {
     }
 }
 
-/** Campo de credencial; los secretos van ocultos con opción de mostrarlos. */
+/**
+ * Campo de credencial; los secretos van ocultos con opción de mostrarlos.
+ * Sin autocorrección ni mayúsculas (son claves). "Siguiente" baja al campo
+ * de debajo; en el último del servicio ([last]), "Hecho" cierra el teclado.
+ * El valor no se registra en ningún log.
+ */
 @Composable
-private fun CredentialField(label: String, value: String, secret: Boolean, onChange: (String) -> Unit) {
-    val skin = LocalSkin.current
+private fun CredentialField(label: String, value: String, secret: Boolean, last: Boolean = false, onChange: (String) -> Unit) {
     var reveal by remember { mutableStateOf(false) }
     GlassTextField(
         value = value,
@@ -230,21 +234,13 @@ private fun CredentialField(label: String, value: String, secret: Boolean, onCha
         visualTransformation = if (secret && !reveal) PasswordVisualTransformation() else VisualTransformation.None,
         keyboardOptions = KeyboardOptions(
             capitalization = KeyboardCapitalization.None,
+            autoCorrectEnabled = false,
             keyboardType = if (secret) KeyboardType.Password else KeyboardType.Ascii,
-            imeAction = ImeAction.Next,
+            imeAction = if (last) ImeAction.Done else ImeAction.Next,
         ),
         // "Mostrar" solo tiene sentido en un secreto ya escrito.
         trailing = if (secret && value.isNotEmpty()) {
-            {
-                ElyText(
-                    stringResource(if (reveal) R.string.hide else R.string.show),
-                    size = 8.5f,
-                    weight = FontWeight.SemiBold,
-                    color = skin.a2,
-                    uppercase = true,
-                    modifier = Modifier.clickable { reveal = !reveal },
-                )
-            }
+            { SecretToggle(reveal) { reveal = !reveal } }
         } else {
             null
         },

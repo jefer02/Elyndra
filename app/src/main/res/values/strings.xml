@@ -878,4 +878,26 @@
     <string name="licenses_voice_title">Masha’s natural voice</string>
     <string name="licenses_voice_notice">Masha’s natural voice runs on your device with the Supertonic 3 model weights by Supertone Inc., licensed under the BigScience OpenRAIL-M license. The voice is synthetic (AI-generated). By using it you agree not to use it for the restricted uses in Attachment A of that license, among others: breaking the law, harming minors, impersonating people without their consent, spreading false information to harm others, harassment, or presenting the generated speech without disclosing that it is machine-generated.</string>
     <string name="licenses_voice_open">Read the OpenRAIL-M license</string>
+
+    <!-- Ajustes: nombres de las muestras de color (lector de pantalla y rótulos). -->
+    <string name="tint_mist">Mist</string>
+    <string name="tint_graphite">Graphite</string>
+    <string name="tint_haze">Haze</string>
+    <string name="tint_paper">Paper</string>
+    <string name="tint_sand">Sand</string>
+    <string name="tint_amber">Amber</string>
+    <string name="tint_copper">Copper</string>
+    <string name="tint_mint">Mint</string>
+    <string name="tint_sky">Sky</string>
+    <string name="tint_lilac">Lilac</string>
+    <string name="tint_smoke">Smoke</string>
+    <string name="tint_label">Glass tint: %1$s</string>
+    <string name="signature_label">Palette: %1$s</string>
+    <string name="signature_custom">Custom mix (no single palette)</string>
+    <string name="color_phosphor_green">Phosphor green</string>
+    <string name="color_amber">Amber</string>
+    <string name="color_magenta">Magenta</string>
+    <string name="color_red">Red</string>
+    <string name="color_blue">Blue</string>
+    <string name="color_white">White</string>
 </resources>

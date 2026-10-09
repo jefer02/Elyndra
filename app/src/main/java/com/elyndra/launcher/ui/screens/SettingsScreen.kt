@@ -87,11 +87,14 @@ import com.elyndra.launcher.display.FrameRate
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.SettingsCategory
 import com.elyndra.launcher.ui.SettingsNav
+import com.elyndra.launcher.ui.SettingsFrame
+import com.elyndra.launcher.ui.components.LocalDenseSettings
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import com.elyndra.launcher.ui.SortMode
 import com.elyndra.launcher.ui.components.AccentSlider
 import com.elyndra.launcher.ui.components.ArcSpinner
 import com.elyndra.launcher.ui.components.BackChevron
-import com.elyndra.launcher.ui.components.CssGrid
 import com.elyndra.launcher.ui.components.CtaButton
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GhostButton
@@ -106,7 +109,8 @@ import com.elyndra.launcher.ui.components.SegmentedControl
 import com.elyndra.launcher.ui.components.SettingRow
 import com.elyndra.launcher.ui.components.SettingsDivider
 import com.elyndra.launcher.ui.components.SettingsGroup
-import com.elyndra.launcher.ui.components.Swatch
+import com.elyndra.launcher.ui.components.ColorSwatch
+import com.elyndra.launcher.ui.components.SwatchRow
 import com.elyndra.launcher.ui.components.SwitchRow
 import com.elyndra.launcher.ui.components.metrics
 import com.elyndra.launcher.ui.components.tracking
@@ -149,26 +153,36 @@ fun SettingsScreen(vm: ElyndraViewModel) {
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = SettingsNav.isWide(maxWidth.value)
+        // Apaisada y ancha: algo menos de aire entre filas (el alto es lo que falta).
+        val dense = SettingsFrame.dense(maxWidth.value, maxHeight.value)
+        val railWidth = SettingsFrame.railWidth(maxWidth.value).dp
         SideEffect { s.compact = !wide }
         AuroraBackdrop()
 
-        Column(
-            Modifier
-                .fillMaxSize()
-                .imePadding()
-                .padding(start = m.pad, end = m.pad, top = m.pad),
-        ) {
-            SettingsHeader(vm, wide)
-            Spacer(Modifier.height(Space.s))
-            Box(Modifier.fillMaxWidth().weight(1f)) {
-                if (wide) WideSettings(vm) else CompactSettings(vm)
+        CompositionLocalProvider(LocalDenseSettings provides dense) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .imePadding()
+                    // Ancha: el panel arranca arriba, a un margen normal (las barras
+                    // del sistema ya las descuenta ElyndraApp).
+                    .padding(start = m.pad, end = m.pad, top = if (wide) Space.m else m.pad),
+            ) {
+                // Estrecha: volver y el título encima de la lista. Ancha: van en el raíl.
+                if (!wide) {
+                    SettingsHeader(vm, wide = false)
+                    Spacer(Modifier.height(Space.s))
+                }
+                Box(Modifier.fillMaxWidth().weight(1f)) {
+                    if (wide) WideSettings(vm, railWidth) else CompactSettings(vm)
+                }
+                PadHints(
+                    hints = SETTINGS_HINTS,
+                    visible = vm.input.gamepadPresent,
+                    modifier = Modifier.padding(vertical = 6.dp),
+                )
+                Spacer(Modifier.height(if (vm.input.gamepadPresent) 4.dp else Space.m))
             }
-            PadHints(
-                hints = SETTINGS_HINTS,
-                visible = vm.input.gamepadPresent,
-                modifier = Modifier.padding(vertical = 6.dp),
-            )
-            Spacer(Modifier.height(if (vm.input.gamepadPresent) 4.dp else Space.m))
         }
     }
 }
@@ -181,10 +195,10 @@ private val SETTINGS_HINTS = listOf(
 
 /** Volver y el título; en una página de ventana estrecha, el de la categoría. */
 @Composable
-private fun SettingsHeader(vm: ElyndraViewModel, wide: Boolean) {
+private fun SettingsHeader(vm: ElyndraViewModel, wide: Boolean, modifier: Modifier = Modifier) {
     val s = vm.settings
     val backLabel = stringResource(R.string.hint_back)
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         GlassIconButton(
             onClick = { vm.back() },
             modifier = Modifier.semantics { contentDescription = backLabel },
@@ -219,11 +233,17 @@ private fun SettingsHeader(vm: ElyndraViewModel, wide: Boolean) {
 /* ── ventana ancha: raíl + panel ──────────────────────────────── */
 
 @Composable
-private fun WideSettings(vm: ElyndraViewModel) {
+private fun WideSettings(vm: ElyndraViewModel, railWidth: Dp) {
     val s = vm.settings
     val reduced = LocalReducedMotion.current
+    val dense = LocalDenseSettings.current
     Row(Modifier.fillMaxSize()) {
-        SettingsRail(vm, Modifier.width(RAIL_WIDTH).fillMaxHeight())
+        // El raíl empieza con volver y el título: así raíl y panel comparten la línea de arriba.
+        Column(Modifier.width(railWidth).fillMaxHeight()) {
+            SettingsHeader(vm, wide = true, modifier = Modifier.padding(start = 2.dp))
+            Spacer(Modifier.height(10.dp))
+            SettingsRail(vm, Modifier.fillMaxWidth().weight(1f))
+        }
         Spacer(Modifier.width(Space.m))
         Box(
             Modifier
@@ -241,7 +261,7 @@ private fun WideSettings(vm: ElyndraViewModel) {
                         .fillMaxSize()
                         .focusGroup()
                         .verticalScroll(rememberScrollState())
-                        .padding(start = 20.dp, end = 20.dp, top = Space.m, bottom = Space.l),
+                        .padding(start = 20.dp, end = 20.dp, top = if (dense) 14.dp else Space.m, bottom = Space.l),
                 ) {
                     PaneHeader(category)
                     CategoryContent(vm, category, wide = true)
@@ -263,6 +283,8 @@ private fun SettingsRail(vm: ElyndraViewModel, modifier: Modifier) {
     val categories = SettingsCategory.entries
     val requesters = remember { categories.map { FocusRequester() } }
     val position by animateFloatAsState(s.category.ordinal.toFloat(), motion(Springs.snappy()), label = "rail")
+    // Filas de 50 dp (más con la letra grande del sistema): las ocho caben de sobra debajo del título.
+    val itemHeight = SettingsFrame.railItemHeight(LocalDensity.current.fontScale).dp
     // Con LB/RB el foco sigue a la categoría si estaba en el raíl.
     val railFocused = remember { BooleanArray(1) }
     LaunchedEffect(s.category) {
@@ -277,8 +299,8 @@ private fun SettingsRail(vm: ElyndraViewModel, modifier: Modifier) {
             .focusGroup()
             .verticalScroll(rememberScrollState())
             .drawBehind {
-                val h = RAIL_ITEM_H.toPx()
-                val y = position * (h + RAIL_GAP.toPx())
+                val h = itemHeight.toPx()
+                val y = SettingsFrame.highlightTop(position, h, RAIL_GAP.toPx())
                 drawRoundRect(
                     skin.a2.copy(alpha = if (P.isDark) 0.16f else 0.09f),
                     topLeft = Offset(0f, y),
@@ -296,14 +318,14 @@ private fun SettingsRail(vm: ElyndraViewModel, modifier: Modifier) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .height(RAIL_ITEM_H)
+                    .height(itemHeight)
                     .focusRequester(requesters[i])
                     .semantics { this.selected = selected }
                     .shapeClickable(RoundedCornerShape(Radii.s)) { s.openCategory(category) }
                     .padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                GlyphBadge(category.glyph, active = selected, size = 32.dp)
+                GlyphBadge(category.glyph, active = selected, size = 30.dp)
                 Spacer(Modifier.width(10.dp))
                 ElyText(
                     stringResource(category.title),
@@ -320,15 +342,13 @@ private fun SettingsRail(vm: ElyndraViewModel, modifier: Modifier) {
     }
 }
 
-private val RAIL_WIDTH = 232.dp
-private val RAIL_ITEM_H = 52.dp
-private val RAIL_GAP = 4.dp
+private val RAIL_GAP = SettingsFrame.RAIL_GAP_DP.dp
 
 /** Cabecera del panel: el glifo, el nombre de la categoría y qué hay dentro. */
 @Composable
 private fun PaneHeader(category: SettingsCategory) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        GlyphBadge(category.glyph, active = true, size = 40.dp)
+        GlyphBadge(category.glyph, active = true, size = 36.dp)
         Spacer(Modifier.width(12.dp))
         Column {
             ElyText(stringResource(category.title), size = 17f, weight = FontWeight.SemiBold, color = P.ink)
@@ -576,19 +596,16 @@ private fun AppearancePage(vm: ElyndraViewModel) {
 
     SectionLabel(stringResource(R.string.section_accent))
     SettingsGroup {
-        SwatchGrid(
-            items = ACCENTS.map { accent ->
-                {
-                    Swatch(
-                        brush = Brush.linearGradient(listOf(accent.a, accent.b)),
-                        selected = s.accentId == accent.id,
-                        onClick = { s.setAccent(accent.id) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            },
-        )
-        Spacer(Modifier.height(10.dp))
+        SwatchRow(ACCENTS.size) { i ->
+            val accent = ACCENTS[i]
+            ColorSwatch(
+                label = stringResource(accent.nameRes),
+                brush = Brush.linearGradient(listOf(accent.a, accent.b)),
+                selected = s.accentId == accent.id,
+                onClick = { s.setAccent(accent.id) },
+            )
+        }
+        Spacer(Modifier.height(6.dp))
         ElyText(stringResource(R.string.accent_label, stringResource(skin.accent.nameRes)), size = 10.5f, color = P.ink2)
     }
 
@@ -632,19 +649,20 @@ private fun AppearancePage(vm: ElyndraViewModel) {
         }
         Spacer(Modifier.height(12.dp))
 
-        SwatchGrid(
-            items = TINTS.map { tint ->
-                {
-                    Swatch(
-                        brush = Brush.linearGradient(
-                            listOf(tint.color.copy(alpha = 0.95f), tint.color.copy(alpha = 0.45f)),
-                        ),
-                        selected = s.tintId == tint.id,
-                        onClick = { s.setTint(tint.id) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            },
+        SwatchRow(TINTS.size) { i ->
+            val tint = TINTS[i]
+            ColorSwatch(
+                label = stringResource(tintName(tint.id)),
+                brush = Brush.linearGradient(listOf(tint.color.copy(alpha = 0.95f), tint.color.copy(alpha = 0.45f))),
+                selected = s.tintId == tint.id,
+                onClick = { s.setTint(tint.id) },
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        ElyText(
+            stringResource(R.string.tint_label, stringResource(tintName(s.tintId))),
+            size = 10.5f,
+            color = P.ink2,
         )
 
         SliderRow(stringResource(R.string.blur), "${s.blur} px", s.blur, 0..40, s::updateBlur, topPadding = 14.dp)
@@ -809,10 +827,19 @@ internal fun SectionLabel(text: String) {
     SectionHeader(text)
 }
 
-/** `grid-template-columns: repeat(5,1fr)` con 8dp de hueco. */
-@Composable
-private fun SwatchGrid(items: List<@Composable () -> Unit>) {
-    CssGrid(columns = 5, horizontalGap = 8.dp, verticalGap = 8.dp, items = items)
+/** El nombre de un tinte del cristal (los ids son los guardados de siempre). */
+private fun tintName(id: String): Int = when (id) {
+    "grafito" -> R.string.tint_graphite
+    "bruma" -> R.string.tint_haze
+    "papel" -> R.string.tint_paper
+    "arena" -> R.string.tint_sand
+    "ámbar" -> R.string.tint_amber
+    "cobre" -> R.string.tint_copper
+    "menta" -> R.string.tint_mint
+    "cielo" -> R.string.tint_sky
+    "lila" -> R.string.tint_lilac
+    "humo" -> R.string.tint_smoke
+    else -> R.string.tint_mist
 }
 
 /** Deslizador con su rótulo a la izquierda y el valor a la derecha. */

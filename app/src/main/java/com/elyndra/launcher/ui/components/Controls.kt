@@ -53,7 +53,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -158,7 +157,7 @@ fun SettingsGroup(
 ) {
     androidx.compose.foundation.layout.Column(modifier.fillMaxWidth()) {
         androidx.compose.foundation.layout.Column(
-            Modifier.fillMaxWidth().padding(vertical = (padding * 0.72f).coerceAtLeast(0.dp)),
+            Modifier.fillMaxWidth().padding(vertical = (padding * if (LocalDenseSettings.current) 0.5f else 0.72f).coerceAtLeast(0.dp)),
             content = content,
         )
         SettingsDivider()
@@ -487,36 +486,6 @@ fun AccentSlider(
                 .border(BorderStroke(2.dp, Color.White), CircleShape),
         )
     }
-}
-
-/** Muestra de color de los ajustes (acentos y tintes): 30dp de alto, radio 11. */
-@Composable
-fun Swatch(
-    brush: Brush,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val shape: Shape = RoundedCornerShape(11.dp)
-    Box(
-        modifier
-            .height(30.dp)
-            .shadow(
-                if (selected) 6.dp else 3.dp,
-                shape,
-                clip = false,
-                ambientColor = P.shade.copy(alpha = if (selected) 0.24f else 0.10f),
-                spotColor = P.shade.copy(alpha = if (selected) 0.24f else 0.10f),
-            )
-            .clip(shape)
-            .background(brush)
-            .border(
-                if (selected) 2.5.dp else 1.dp,
-                if (selected) P.ink else P.ink.copy(alpha = 0.12f),
-                shape,
-            )
-            .shapeClickable(shape, onClick = onClick),
-    )
 }
 
 /** Fila de puntos "escribiendo…" con el retardo escalonado del diseño. */

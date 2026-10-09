@@ -48,6 +48,7 @@ import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GhostButton
 import com.elyndra.launcher.ui.components.SettingsGroup
 import com.elyndra.launcher.ui.components.GlassTextField
+import com.elyndra.launcher.ui.components.SecretToggle
 import com.elyndra.launcher.ui.components.GlowingSwitch
 import com.elyndra.launcher.ui.resolve
 import com.elyndra.launcher.ui.theme.LocalSkin
@@ -263,7 +264,6 @@ private fun ToggleRow(title: String, desc: String?, checked: Boolean, onToggle: 
 @Composable
 private fun KeyField(vm: ElyndraViewModel) {
     val s = vm.settings
-    val skin = LocalSkin.current
     var reveal by remember { mutableStateOf(false) }
     GlassTextField(
         value = s.mashaKey,
@@ -273,23 +273,12 @@ private fun KeyField(vm: ElyndraViewModel) {
         visualTransformation = if (reveal) VisualTransformation.None else PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(
             capitalization = KeyboardCapitalization.None,
+            autoCorrectEnabled = false,
             keyboardType = KeyboardType.Password,
             imeAction = ImeAction.Done,
         ),
         trailing = if (s.mashaKey.isNotEmpty()) {
-            {
-                ElyText(
-                    stringResource(if (reveal) R.string.hide else R.string.show),
-                    size = 8.5f,
-                    weight = FontWeight.SemiBold,
-                    color = skin.a2,
-                    uppercase = true,
-                    // Con recorte y aire: el aro del mando no se pega a las letras.
-                    modifier = Modifier
-                        .shapeClickable(RoundedCornerShape(6.dp)) { reveal = !reveal }
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                )
-            }
+            { SecretToggle(reveal) { reveal = !reveal } }
         } else {
             null
         },
