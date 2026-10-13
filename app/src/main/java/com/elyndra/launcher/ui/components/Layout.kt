@@ -261,6 +261,11 @@ fun Hero(
     onBackgroundVanished: () -> Unit = {},
     /** Sin juego: el escenario del estado vacío en vez del cristal (ver [HeroArtLayer]). */
     stage: (@Composable () -> Unit)? = null,
+    /**
+     * Tema claro: sin los velos oscuros de arriba y de abajo ni la franja que
+     * baja al estante; el arte se ve limpio y el texto blanco, sin sombras.
+     */
+    clean: Boolean = false,
     topBar: @Composable BoxScope.() -> Unit,
     info: @Composable BoxScope.() -> Unit,
 ) {
@@ -294,7 +299,7 @@ fun Hero(
             ) { art ->
                 // Con fondo, solo los cantos; sin él, el velo entero del diseño.
                 // Debajo del hero, la franja del titular se apaga.
-                Box(Modifier.fillMaxSize().heroScrims(height, art = art, skin.scrim))
+                if (!clean) Box(Modifier.fillMaxSize().heroScrims(height, art = art, skin.scrim))
             }
             if (extension > 0.dp) Box(Modifier.fillMaxSize().shelfRise(height, shelf))
         }

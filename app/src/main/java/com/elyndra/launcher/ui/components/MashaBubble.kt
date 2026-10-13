@@ -74,6 +74,8 @@ fun MashaInsightBubble(
 ) {
     val skin = LocalSkin.current
     val shape = RoundedCornerShape(if (oneLine) 14.dp else 16.dp)
+    // En una línea cabe más texto a lo ancho sin crecer en alto.
+    val maxWidth = if (oneLine) MAX_WIDTH_ONE_LINE else MAX_WIDTH
     if (onPlaced != null) {
         val placed by rememberUpdatedState(onPlaced)
         DisposableEffect(Unit) { onDispose { placed(null) } }
@@ -84,7 +86,7 @@ fun MashaInsightBubble(
             val gap = 8.dp.roundToPx().toFloat()
             fun area(r: DpRect) = BubbleSlot.Area(r.left.toPx(), r.top.toPx(), r.right.toPx(), r.bottom.toPx())
             val box = area(bounds)
-            val maxW = BubbleSlot.maxWidth(box.width, margin, MAX_WIDTH.toPx()).toInt().coerceAtLeast(1)
+            val maxW = BubbleSlot.maxWidth(box.width, margin, maxWidth.toPx()).toInt().coerceAtLeast(1)
             val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = maxW, minHeight = 0))
             val anchor = BubbleSlot.Area(anchorX.toPx(), anchorY.toPx(), (anchorX + anchorSize).toPx(), (anchorY + anchorSize).toPx())
             val (x, y) = BubbleSlot.place(anchor, placeable.width.toFloat(), placeable.height.toFloat(), box, obstacles.map(::area), gap, margin)
@@ -108,7 +110,7 @@ fun MashaInsightBubble(
                     onRightHalf -> left - gap - margin
                     else -> screenW - (left + size + gap) - margin
                 }
-                val maxW = min(MAX_WIDTH.roundToPx(), room.coerceAtLeast(MIN_WIDTH.roundToPx()))
+                val maxW = min(maxWidth.roundToPx(), room.coerceAtLeast(MIN_WIDTH.roundToPx()))
                 val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = maxW, minHeight = 0))
                 val x = when {
                     below -> left
@@ -125,7 +127,8 @@ fun MashaInsightBubble(
             })
             .then(if (onPlaced != null) Modifier.onGloballyPositioned { onPlaced(it.boundsInWindow()) } else Modifier)
             .animPopIn(420, key = key)
-            .glass(shape, borderColor = skin.a1.copy(alpha = 0.35f))
+            // Base opaca: el bocadillo flota sobre el titular del hero y, transparente, se mezclaban las letras.
+            .glass(shape, borderColor = skin.a1.copy(alpha = 0.35f), solid = true)
             .drawBehind { drawRect(skin.a1, size = Size(2.dp.toPx(), size.height)) }
             .shapeClickable(shape, onClick = onTap)
             .padding(start = 13.dp, end = if (oneLine) 6.dp else 11.dp, top = if (oneLine) 6.dp else 10.dp, bottom = if (oneLine) 6.dp else 9.dp),
@@ -171,4 +174,5 @@ private fun DismissChip(onDismiss: () -> Unit) {
 }
 
 private val MAX_WIDTH = 250.dp
+private val MAX_WIDTH_ONE_LINE = 380.dp
 private val MIN_WIDTH = 150.dp
