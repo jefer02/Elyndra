@@ -449,36 +449,18 @@ class MeridianLogicTest {
         }
     }
 
-    /* ── Tira A–Z ── */
+    /* ── Fondo de la rueda ── */
 
     @Test
-    fun `the index strip shows only when sorted by name and the list is long`() {
-        assertFalse(IndexStrip.visible(sortedByName = true, count = 12))
-        assertTrue(IndexStrip.visible(sortedByName = true, count = 13))
-        assertFalse(IndexStrip.visible(sortedByName = false, count = 300))
-    }
-
-    @Test
-    fun `letters fold accents and group the rest under a hash`() {
-        assertEquals("O", IndexStrip.letterOf("Ödland"))
-        assertEquals("E", IndexStrip.letterOf("  échec"))
-        assertEquals("Z", IndexStrip.letterOf("zelda"))
-        assertEquals("#", IndexStrip.letterOf("007 GoldenEye"))
-        assertEquals("#", IndexStrip.letterOf("ファイナルファンタジー"))
-        assertEquals("#", IndexStrip.letterOf(""))
-    }
-
-    @Test
-    fun `each letter jumps to its first game and the finger maps to an entry`() {
-        val names = listOf("1942", "Alien", "Asteroids", "Bomberman", "Castlevania", "Contra", "Échec")
-        val entries = IndexStrip.entries(names)
-        assertEquals(listOf("#", "A", "B", "C", "E"), entries.map { it.label })
-        assertEquals(listOf(0, 1, 3, 4, 6), entries.map { it.firstIndex })
-        assertEquals(0, IndexStrip.entryAt(0f, entries.size))
-        assertEquals(4, IndexStrip.entryAt(1f, entries.size))
-        assertEquals(2, IndexStrip.entryAt(0.5f, entries.size))
-        assertEquals(0, IndexStrip.entryAt(-0.2f, entries.size))
-        assertEquals(-1, IndexStrip.entryAt(0.5f, 0))
+    fun `the wheel backdrop follows the theme until the user picks one, then it is the same in both`() {
+        // Sin elegir: cristal en claro, difuminado en oscuro (como estaba).
+        assertTrue(WheelBackdrop.glass(null, dark = false))
+        assertFalse(WheelBackdrop.glass(null, dark = true))
+        // Elegido: lo mismo en los dos temas.
+        for (dark in listOf(false, true)) {
+            assertTrue(WheelBackdrop.glass(true, dark))
+            assertFalse(WheelBackdrop.glass(false, dark))
+        }
     }
 
     /* ── Entrada ── */
@@ -507,6 +489,22 @@ class MeridianLogicTest {
         assertEquals(MeridianGeometry.RAIL_MAX, MeridianGeometry.railWidthFor(2_000f), 0f)
         assertEquals(MeridianGeometry.RAIL_MIN, MeridianGeometry.railWidthFor(700f), 0f)
         assertEquals(MeridianGeometry.RAIL_MIN, MeridianGeometry.railWidthFor(640f), 0f)
+        // Solo iconos: la columna se estrecha, sin bajar del mínimo ni pasar de la de siempre, y el icono no cambia.
+        for ((w, h) in listOf(915f to 412f, 1280f to 800f, 1024f to 640f, 800f to 360f)) {
+            val compact = MeridianMode.compact(h)
+            val slim = MeridianGeometry.slimRailWidth(w, h, 1f, compact)
+            assertTrue(slim < MeridianGeometry.railWidthFor(w, compact))
+            assertTrue(slim >= MeridianGeometry.SLIM_MIN)
+            val railH = h - if (compact) MeridianGeometry.HEADER_ESTIMATE_COMPACT else MeridianGeometry.HEADER_ESTIMATE
+            val classic = MeridianGeometry.compute(w, railH, 1f, compact)
+            val narrow = MeridianGeometry.compute(w, railH, 1f, compact, railWidth = slim)
+            assertEquals(classic.rowHeight, narrow.rowHeight, 1e-3f)
+            assertEquals(slim, narrow.railWidth, 0f)
+            // El icono enfocado y el dial no se pisan.
+            assertTrue(narrow.inset + narrow.rowHeight + 30f <= slim)
+        }
+        // Una ventana aún sin medir (0 × 0) no rompe nada.
+        assertEquals(0f, MeridianGeometry.slimRailWidth(0f, 0f), 0f)
         // Nunca más de la mitad.
         assertEquals(280f, MeridianGeometry.railWidthFor(560f), 0f)
         val g = MeridianGeometry.compute(1280f, 600f)
@@ -607,10 +605,5 @@ class MeridianLogicTest {
             assertTrue("%08X".format(bg), ColorMath.contrast(white, hazed) >= 4.5)
             assertTrue(ColorMath.contrast(ColorMath.over(ColorMath.withAlpha(white, 0.8f), hazed), hazed) >= 3.0)
         }
-    }
-
-    @Test
-    fun `an empty list has no index entries`() {
-        assertTrue(IndexStrip.entries(emptyList()).isEmpty())
     }
 }
