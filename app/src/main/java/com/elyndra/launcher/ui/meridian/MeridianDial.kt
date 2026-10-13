@@ -40,7 +40,11 @@ import com.elyndra.launcher.data.argb
 import com.elyndra.launcher.ui.theme.LocalPoppins
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.Swift
+import com.elyndra.launcher.ui.theme.Frost
+import com.elyndra.launcher.ui.theme.LightGlass
+import com.elyndra.launcher.ui.theme.WheelGlass
 import com.elyndra.launcher.ui.theme.darkGlass
+import com.elyndra.launcher.ui.theme.lightGlass
 import kotlin.math.abs
 import kotlin.math.asin
 import kotlin.math.max
@@ -115,6 +119,7 @@ internal fun MeridianDial(
     modifier: Modifier = Modifier,
 ) {
     val dial = DialScale.of(count) ?: return
+    val glass = LocalWheelGlass.current
     val flare = remember { Animatable(0f) }
     LaunchedEffect(selected) {
         if (reduced) return@LaunchedEffect
@@ -155,6 +160,9 @@ internal fun MeridianDial(
                 val span = FloatArray(2)
                 val normal = FloatArray(2)
                 val box = Size(radius * 2f, radius * 2f)
+                // En claro sobre el cristal no hay velo detrás: marcas blancas con una sombra fina debajo.
+                val markShadow = WheelGlass.MARK_SHADOW_DP.dp.toPx()
+                val bareMarks = glass && !ink.dark
                 onDrawBehind {
                     val w = wheel() ?: return@onDrawBehind
                     val ignite = MeridianMotion.ignite(enterMs())
@@ -212,7 +220,13 @@ internal fun MeridianDial(
                             val ex = x + normal[0] * (tickGap + len)
                             val ey = y + normal[1] * (tickGap + len)
                             val a = falloff * ends * fade
-                            drawLine(tickColor, Offset(sx, sy), Offset(ex, ey), strokeWidth = tickWidth + (litWidth - tickWidth) * lit, alpha = tickAlpha * a * (1f - lit))
+                            val tw = tickWidth + (litWidth - tickWidth) * lit
+                            if (!bareMarks) {
+                                drawLine(tickColor, Offset(sx, sy), Offset(ex, ey), strokeWidth = tw, alpha = tickAlpha * a * (1f - lit))
+                            } else {
+                                drawLine(Color.Black, Offset(sx, sy), Offset(ex, ey), strokeWidth = tw + markShadow * 2f, alpha = WheelGlass.MARK_SHADOW_ALPHA * a * (1f - lit), cap = StrokeCap.Round)
+                                drawLine(Color.White, Offset(sx, sy), Offset(ex, ey), strokeWidth = tw, alpha = WheelGlass.MARK_ALPHA * a * (1f - lit))
+                            }
                             if (lit > 0.01f) {
                                 drawLine(ink.primary, Offset(sx, sy), Offset(ex, ey), strokeWidth = litWidth, alpha = a * lit, cap = StrokeCap.Round)
                                 drawLine(ink.spark, Offset(sx, sy), Offset(ex, ey), strokeWidth = litWidth * 3f, alpha = 0.22f * a * lit, cap = StrokeCap.Round, blendMode = ink.blend)
@@ -258,7 +272,7 @@ private val EDGE_PAD = 8.dp
  * movimiento", un fundido). Siempre las mismas cifras ([DialCounter]): no
  * cambia de ancho. En la fila de "Añadir" ([onAdd]) enseña un "+". Lleva un
  * matiz del color del fondo ([tint], ≤ 12 %). Quien la pone la coloca leyendo
- * el nodo en la fase de colocación.
+ * el nodo en la fase de colocación. En claro, cristal claro y cifras en tinta oscura.
  */
 @Composable
 internal fun DialCounterChip(index: Int, total: Int, onAdd: Boolean, tint: () -> Color, enterMs: () -> Float, reduced: Boolean, modifier: Modifier = Modifier) {
@@ -266,10 +280,12 @@ internal fun DialCounterChip(index: Int, total: Int, onAdd: Boolean, tint: () ->
     val measurer = rememberTextMeasurer()
     val family = LocalPoppins.current
     val density = LocalDensity.current
+    val light = !P.isDark
+    val inkColor = if (light) Color(LightGlass.INK) else Color.White
     val digits = DialCounter.digits(total)
-    val glyphs = remember(measurer, family, density) {
-        val big = TextStyle(fontFamily = family, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color.White)
-        val small = TextStyle(fontFamily = family, fontWeight = FontWeight.Medium, fontSize = 9.5.sp, color = Color.White)
+    val glyphs = remember(measurer, family, density, inkColor) {
+        val big = TextStyle(fontFamily = family, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = inkColor)
+        val small = TextStyle(fontFamily = family, fontWeight = FontWeight.Medium, fontSize = 9.5.sp, color = inkColor)
         CounterGlyphs(
             big = Array(10) { measurer.measure(it.toString(), big, density = density) },
             small = Array(10) { measurer.measure(it.toString(), small, density = density) },
@@ -293,12 +309,14 @@ internal fun DialCounterChip(index: Int, total: Int, onAdd: Boolean, tint: () ->
     val width = padH * 2f + digits * glyphs.bigAdvance + gap + glyphs.slash.size.width + gap + digits * glyphs.smallAdvance
     val height = max(glyphs.bigHeight + with(density) { 8.dp.toPx() }, with(density) { COUNTER_HEIGHT.toPx() })
     val shape = RoundedCornerShape(50)
+    // El total, apagado: sobre el cristal claro algo menos (la tinta oscura a 9,5 sp necesita más).
+    val totalAlpha = if (light) Frost.SECONDARY_ALPHA else 0.55f
     Box(
         modifier
             .clearAndSetSemantics { }
             .graphicsLayer { alpha = MeridianMotion.ignite(enterMs()) }
             .size(with(density) { width.toDp() }, with(density) { height.toDp() })
-            .darkGlass(shape, minAlpha = MeridianGlass.FLOOR)
+            .then(if (light) Modifier.lightGlass(shape) else Modifier.darkGlass(shape, minAlpha = MeridianGlass.FLOOR))
             .drawBehind {
                 drawRect(tint(), alpha = COUNTER_TINT)
                 val t = roll.value
@@ -310,11 +328,11 @@ internal fun DialCounterChip(index: Int, total: Int, onAdd: Boolean, tint: () ->
                         x += glyphs.bigAdvance
                     }
                     x += gap
-                    drawText(glyphs.slash, topLeft = Offset(x, cy - glyphs.slash.size.height / 2f + glyphs.bigBaselineShift), alpha = 0.55f)
+                    drawText(glyphs.slash, topLeft = Offset(x, cy - glyphs.slash.size.height / 2f + glyphs.bigBaselineShift), alpha = totalAlpha)
                     x += glyphs.slash.size.width + gap
                     for (c in 0 until digits) {
                         val g = glyphs.small[DialCounter.digitAt(total, digits, c)]
-                        drawText(g, topLeft = Offset(x + (glyphs.smallAdvance - g.size.width) / 2f, cy - g.size.height / 2f + glyphs.bigBaselineShift), alpha = 0.55f)
+                        drawText(g, topLeft = Offset(x + (glyphs.smallAdvance - g.size.width) / 2f, cy - g.size.height / 2f + glyphs.bigBaselineShift), alpha = totalAlpha)
                         x += glyphs.smallAdvance
                     }
                 }

@@ -93,7 +93,6 @@ internal fun MeridianFolder(vm: ElyndraViewModel, item: LibraryItem.Folder) {
     val configuration = LocalConfiguration.current
     val entries = remember(roms, configuration) { roms.map { romEntry(context.resources, it, item) } }
     val keyIndex = remember(roms) { roms.withIndex().associate { (i, it) -> it.key to i } }
-    val index = remember(roms) { if (IndexStrip.visible(true, roms.size)) IndexStrip.entries(roms.map { it.displayTitle }) else null }
     val emulatorLabel = item.emulatorName ?: stringResource(R.string.choose_emulator)
     // Tocar: seleccionar o abrir (ver TapGate); nada se abre dos veces seguidas (vm.tryOpen).
     val gate = remember { TapGate() }
@@ -148,6 +147,7 @@ internal fun MeridianFolder(vm: ElyndraViewModel, item: LibraryItem.Folder) {
         },
         hero = { FolderHero(vm, item, rom, ink, openKey) },
         adaptive = vm.settings.meridianAdaptiveColor,
+        wheelGlass = vm.settings.wheelGlassFor(P.isDark),
     ) { geo, wash ->
         MeridianWheelArea(
             geo = geo,
@@ -166,9 +166,7 @@ internal fun MeridianFolder(vm: ElyndraViewModel, item: LibraryItem.Folder) {
             reduced = reduced,
             lite = LocalMeridianFrame.current.lite,
             current = wheel,
-            index = index,
             onSettle = { row -> roms.getOrNull(row)?.let { vm.selectRom(it.key) } },
-            onJump = { i -> roms.getOrNull(i)?.let { vm.selectRom(it.key) } },
             tile = { e, _, _ -> (e.payload as? RomEntry)?.let { RomWheelTile(vm, it) } },
             wrap = { e, content ->
                 DisintegratingContainer(isDisintegrating = vm.vanishing == e.key, onAnimationEnd = { vm.finishVanish() }) { content() }
