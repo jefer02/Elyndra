@@ -6,7 +6,12 @@ import android.graphics.drawable.BitmapDrawable
 import android.util.LruCache
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
+import com.elyndra.launcher.ui.theme.WheelGlass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -279,6 +284,7 @@ internal val grainTile: ImageBitmap by lazy {
  *
  * [windowWidth] y [axisX] en dp; [artExtra] lo que el arte sobresale arriba
  * y abajo (el paralaje) para que el desenfoque caiga sobre el mismo motivo.
+ *
  */
 @Composable
 internal fun MeridianWashLayer(
@@ -333,6 +339,78 @@ internal fun MeridianWashLayer(
     )
 }
 
+/**
+ * El tema claro detrás de la rueda: un cristal curvo como la lista (ver
+ * [WheelGlass]). Su canto derecho sigue el círculo de la rueda ([arc]): en la
+ * línea de foco pasa el dial y su contador, y arriba y abajo se recoge igual
+ * que las filas. Dentro, [frosted] (el arte de verdad desenfocado y avivado,
+ * API 31+; sin él, la copia diminuta del arte, que ya va desenfocada) y un
+ * tinte pastel del color del juego ([WashState.tone], que se funde al
+ * cambiar); por la curva, un filo de luz con su halo. Sin blanco lechoso: el
+ * texto lleva su propia tarjeta. [axisX] y [windowWidth] en dp.
+ */
+@Composable
+internal fun WheelGlassLayer(
+    state: WashState,
+    windowWidth: Float,
+    axisX: Float,
+    artExtra: Float,
+    modifier: Modifier = Modifier,
+    arc: () -> FogArc = { FogArc.NONE },
+    frosted: (@Composable () -> Unit)? = null,
+) {
+    val sharpUnder = frosted != null
+    Box(
+        modifier
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithCache {
+                val w = windowWidth.dp.toPx()
+                val h = size.height
+                val fog = arc()
+                val focus = fog.top / density + fog.focusY
+                val step = WheelGlass.STEP_DP.dp.toPx()
+                val edge = Path()
+                val area = Path()
+                area.moveTo(0f, 0f)
+                var y = 0f
+                var first = true
+                while (true) {
+                    val x = MeridianScrims.glassEdgeAt(y / density, axisX, focus, fog.radius).dp.toPx().coerceAtMost(size.width)
+                    if (first) edge.moveTo(x, y) else edge.lineTo(x, y)
+                    area.lineTo(x, y)
+                    first = false
+                    if (y >= h) break
+                    y = (y + step).coerceAtMost(h)
+                }
+                area.lineTo(0f, h)
+                area.close()
+                val extra = artExtra.dp.toPx()
+                val fromImage = state.fromAmbient
+                val image = state.ambient
+                val fromFrame = image(fromImage, w * (1f + MeridianArtFrame.FOCAL_SHIFT), h + extra * 2f)
+                val frame = image(image, w * (1f + MeridianArtFrame.FOCAL_SHIFT), h + extra * 2f)
+                val rim = Stroke(WheelGlass.RIM_DP.dp.toPx())
+                val glow = Stroke(WheelGlass.GLOW_DP.dp.toPx())
+                onDrawWithContent {
+                    val t = state.progress.value
+                    clipPath(area) {
+                        this@onDrawWithContent.drawContent()
+                        if (!sharpUnder) {
+                            if (fromImage != null && fromImage !== image && t < 1f) drawAmbient(fromImage, fromFrame, extra, 1f - t)
+                            if (image != null) drawAmbient(image, frame, extra, if (fromImage === image) 1f else t)
+                        }
+                        drawRect(state.tone(), alpha = WheelGlass.TINT_ALPHA)
+                        // El halo de luz por dentro del canto (la mitad que cae fuera se recorta).
+                        drawPath(edge, Color.White, alpha = WheelGlass.GLOW_ALPHA, style = glow)
+                    }
+                    drawPath(edge, Color.White, alpha = WheelGlass.RIM_ALPHA, style = rim)
+                }
+            },
+    ) {
+        frosted?.invoke()
+    }
+}
+
 /** La máscara de la niebla para una capa de [layer] px (ver [MeridianFog.mask]); [top] es donde empieza la rueda. */
 private fun fogMask(layer: Size, axisX: Float, width: Float, top: Float, focusY: Float, radius: Float, cell: Float): ImageBitmap {
     val cols = MeridianFog.samples(layer.width, cell)
@@ -378,7 +456,7 @@ private fun DrawScope.drawAmbient(image: ImageBitmap, frame: AmbientFrame?, extr
  * óvalo van por [artShown] (0 sin arte: sobre el escenario vacío, el óvalo
  * negro sobre un fondo claro eran las manchas grises).
  */
-internal fun Modifier.meridianScrims(heroLeft: Float, scrim: Float, wash: WashState, barHeight: Float, artShown: () -> Float = { 1f }): Modifier = drawWithCache {
+internal fun Modifier.meridianScrims(heroLeft: Float, scrim: Float, wash: WashState, barHeight: Float, clean: Boolean = false, artShown: () -> Float = { 1f }): Modifier = drawWithCache {
     val w = size.width
     val h = size.height
     val shade = P.shade
@@ -420,15 +498,23 @@ internal fun Modifier.meridianScrims(heroLeft: Float, scrim: Float, wash: WashSt
     onDrawBehind {
         val t = wash.progress.value
         val shown = artShown()
-        drawRect(vignetteTop)
-        drawRect(vignetteBottom)
+        // Limpio (los dos temas, en la escena): sin viñeta ni franja oscura arriba.
+        if (!clean) {
+            drawRect(vignetteTop)
+            drawRect(vignetteBottom)
+        }
         if (shown <= 0f) return@onDrawBehind
-        if (t < 1f) drawRect(topFrom, size = band, alpha = (1f - t) * shown)
-        drawRect(topTo, size = band, alpha = t * shown)
-        withTransform({
-            translate(center.x, center.y)
-            scale(rx, ry, Offset.Zero)
-        }) { drawCircle(oval, radius = 1f, center = Offset.Zero, alpha = shown) }
+        if (!clean) {
+            if (t < 1f) drawRect(topFrom, size = band, alpha = (1f - t) * shown)
+            drawRect(topTo, size = band, alpha = t * shown)
+        }
+        // Limpio, sin el óvalo oscuro bajo el hero (se veía como una mancha): el texto lleva su sombra sutil (ver HeroText).
+        if (!clean) {
+            withTransform({
+                translate(center.x, center.y)
+                scale(rx, ry, Offset.Zero)
+            }) { drawCircle(oval, radius = 1f, center = Offset.Zero, alpha = shown) }
+        }
     }
 }
 
