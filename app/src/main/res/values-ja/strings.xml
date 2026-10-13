@@ -794,6 +794,10 @@
     <string name="tap_open_desc">選択中のゲーム、フォルダ、ROM をタップすると開きます。オフ：ダブルタップで開きます。</string>
     <string name="hint_gestures_tap">タップで選択 · もう一度タップで起動 · 長押しでオプション</string>
     <!-- Meridian: fondo adaptable, fila de Añadir y fichas -->
+    <string name="meridian_wheel_backdrop_title">リストの背景</string>
+    <string name="meridian_wheel_backdrop_desc">Meridian でゲームリストの後ろに表示するもの：アートをほぼそのまま見せる曲面ガラス、またはテーマの色に溶け込ませるぼかし。</string>
+    <string name="meridian_wheel_glass">ガラス</string>
+    <string name="meridian_wheel_fog">ぼかし</string>
     <string name="meridian_adaptive_color_title">アダプティブ背景色</string>
     <string name="meridian_adaptive_color_desc">Meridian で、リストの背景が選択中のゲームのアートの色になります。オフ：テーマの標準の背景。</string>
     <string name="meridian_add_short">追加</string>

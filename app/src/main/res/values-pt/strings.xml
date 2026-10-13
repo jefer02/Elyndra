@@ -833,6 +833,10 @@
     <string name="tap_open_desc">Um toque no jogo, na pasta ou na ROM selecionados abre. Desligado: toque duplo para abrir.</string>
     <string name="hint_gestures_tap">Toque para selecionar · Toque de novo para abrir · Segure para opções</string>
     <!-- Meridian: fondo adaptable, fila de Añadir y fichas -->
+    <string name="meridian_wheel_backdrop_title">Fundo da lista</string>
+    <string name="meridian_wheel_backdrop_desc">No Meridian, o que fica atrás da lista de jogos: um vidro curvo que deixa a arte quase como está, ou o desfoque que a funde com a cor do tema.</string>
+    <string name="meridian_wheel_glass">Vidro</string>
+    <string name="meridian_wheel_fog">Desfoque</string>
     <string name="meridian_adaptive_color_title">Cor de fundo adaptável</string>
     <string name="meridian_adaptive_color_desc">No Meridian, o fundo atrás da lista assume a cor da arte do jogo selecionado. Desligado: o fundo neutro do tema.</string>
     <string name="meridian_add_short">Adicionar</string>
