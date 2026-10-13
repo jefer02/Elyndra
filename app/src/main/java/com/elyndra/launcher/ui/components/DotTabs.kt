@@ -64,6 +64,8 @@ import com.elyndra.launcher.ui.theme.Swift
 import com.elyndra.launcher.ui.theme.consoleFocus
 import com.elyndra.launcher.ui.theme.DARK_GLASS_MIN
 import com.elyndra.launcher.ui.theme.darkGlass
+import com.elyndra.launcher.ui.theme.LightGlass
+import com.elyndra.launcher.ui.theme.lightGlass
 import com.elyndra.launcher.ui.theme.outerShadow
 import com.elyndra.launcher.ui.theme.topGlint
 import kotlinx.coroutines.coroutineScope
@@ -135,6 +137,8 @@ fun Modifier.dockSurface(
  * @param focusIndex punto señalado por el mando: lleva un aro y enseña un
  *   momento su rótulo.
  * @param feedback sonido de navegación y un toque háptico al cambiar.
+ * @param light cristal claro (tema claro sobre el velo esmerilado): puntos y
+ *   aro en tinta oscura; la píldora del acento no cambia.
  */
 @Composable
 fun DotTabs(
@@ -148,6 +152,7 @@ fun DotTabs(
     feedback: Boolean = true,
     /** Suelo de la tinta del cristal (ver [darkGlass]); más alto en la costura. */
     glassMinAlpha: Float = DARK_GLASS_MIN,
+    light: Boolean = false,
 ) {
     val n = labels.size
     if (n == 0) return
@@ -265,12 +270,13 @@ fun DotTabs(
     val pillStart = remember(accent) { Color(DockPalettes.pillStart(accent.argb())) }
     val pillEnd = remember(skin.fillEnd) { Color(DockPalettes.pillEnd(skin.fillEnd.argb())) }
     val pillRim = remember(accent) { Color(DockPalettes.pillRim(accent.argb(), true)) }
-    // El dock lleva el cristal oscuro de la barra del hero en los dos temas:
-    // puntos claros y el acento en su tono para fondo oscuro.
-    val dot = Color(DockPalettes.GLASS_DOT)
-    val ring = remember(skin.accent) { Color(DockPalettes.glassAccent(skin.accent.content(true).argb())) }
-    val peekInk = Color.White
-    val peekSurface = P.shade.copy(alpha = DockPalettes.GLASS_PEEK_ALPHA)
+    // Sobre el arte, el cristal oscuro de la barra del hero: puntos claros y el
+    // acento en su tono para fondo oscuro. Sobre el esmerilado claro, al revés.
+    val dot = Color(if (light) LightGlass.DOT else DockPalettes.GLASS_DOT)
+    val ring = remember(skin.accent, light) { if (light) skin.accent.content(false) else Color(DockPalettes.glassAccent(skin.accent.content(true).argb())) }
+    val peekInk = if (light) Color(LightGlass.INK) else Color.White
+    val peekSurface = if (light) Color.White.copy(alpha = DockPalettes.GLASS_PEEK_ALPHA) else P.shade.copy(alpha = DockPalettes.GLASS_PEEK_ALPHA)
+    val shadow = P.shade.copy(alpha = if (light) LightGlass.SHADOW_ALPHA else 0.35f)
     val path = remember { Path() }
     val scratch = remember(n) { FloatArray(n + 1) }
     val e = remember(n) { FloatArray(n) }
@@ -279,7 +285,7 @@ fun DotTabs(
         content = {
             // El cristal va en un hijo aparte: su recorte no puede comerse la
             // zona táctil de las pestañas, que sobresale de la cápsula.
-            Box(Modifier.darkGlass(CapsuleShape, minAlpha = glassMinAlpha))
+            Box(if (light) Modifier.lightGlass(CapsuleShape) else Modifier.darkGlass(CapsuleShape, minAlpha = glassMinAlpha))
             for (i in 0 until n) {
                 Box(
                     Modifier
@@ -305,7 +311,7 @@ fun DotTabs(
                     drawPeek(texts[focusIndex], cx, p, peekSurface, peekInk)
                 }
             }
-            .outerShadow(8.dp, CapsuleShape, ambientColor = P.shade.copy(alpha = 0.35f), spotColor = P.shade.copy(alpha = 0.35f))
+            .outerShadow(8.dp, CapsuleShape, ambientColor = shadow, spotColor = shadow)
             .consoleFocus(focused, CapsuleShape, color = ring)
             .selectableGroup()
             .drawWithContent {

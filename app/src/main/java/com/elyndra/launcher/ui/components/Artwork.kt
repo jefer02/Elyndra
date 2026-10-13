@@ -1,5 +1,13 @@
 package com.elyndra.launcher.ui.components
 
+import android.os.Build
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.unit.dp
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
