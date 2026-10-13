@@ -279,6 +279,14 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("meridian.adaptiveColor", DEFAULT_MERIDIAN_ADAPTIVE_COLOR)
         set(v) = prefs.edit { putBoolean("meridian.adaptiveColor", v) }
 
+    /**
+     * Meridian: detrás de la rueda, cristal (true) o difuminado (false). Null
+     * = nunca elegido: cristal en el tema claro y difuminado en el oscuro.
+     */
+    var meridianWheelGlass: Boolean?
+        get() = if (prefs.contains("meridian.wheelGlass")) prefs.getBoolean("meridian.wheelGlass", true) else null
+        set(v) = prefs.edit { if (v == null) remove("meridian.wheelGlass") else putBoolean("meridian.wheelGlass", v) }
+
     /** Biblioteca y Carpeta: un toque en lo seleccionado lo abre. Apagado, se abre con doble toque, como antes. */
     var tapOpensSelected: Boolean
         get() = prefs.getBoolean("tap.openSelected", DEFAULT_TAP_OPENS_SELECTED)
