@@ -97,7 +97,18 @@ import com.elyndra.launcher.ui.rememberUserScrolling
 import com.elyndra.launcher.ui.selection.SelectionLook
 import com.elyndra.launcher.ui.selection.selectionFrame
 import com.elyndra.launcher.ui.theme.LocalSkin
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+import com.elyndra.launcher.ui.TitleFit
+import com.elyndra.launcher.ui.theme.LocalPoppins
+import com.elyndra.launcher.ui.theme.WheelGlass
+import androidx.compose.ui.semantics.contentDescription
 import com.elyndra.launcher.ui.theme.darkGlass
+import com.elyndra.launcher.ui.theme.lightGlass
 import com.elyndra.launcher.ui.theme.liquidGlass
 import com.elyndra.launcher.ui.theme.outerShadow
 import kotlin.math.roundToInt
@@ -210,6 +221,7 @@ internal fun MeridianRail(
                             enterMs = enterMs,
                             cascadeTop = cascadeTop,
                             position = stringResource(R.string.meridian_position, i + 1, count),
+                            label = if (e.subline.isBlank()) e.title else "${e.title}, ${e.subline}",
                             openLabel = openLabel,
                             optionsLabel = optionsLabel,
                             scrolling = scrolling,
@@ -239,17 +251,6 @@ internal fun MeridianRail(
                                 ) {
                                     tile(e, i, selected)
                                 }
-                                Spacer(Modifier.width(TEXT_GAP))
-                                RowText(
-                                    title = e.title,
-                                    subline = if (selected) null else e.subline,
-                                    chips = if (selected) e.chips.take(MAX_ROW_CHIPS) else emptyList(),
-                                    selected = selected,
-                                    tileHeight = geo.rowHeight,
-                                    compact = geo.compact,
-                                    wash = wash,
-                                    modifier = Modifier.weight(1f).wheelDetail(wheel, i),
-                                )
                             }
                         }
                     }
@@ -271,6 +272,7 @@ internal fun MeridianRail(
                             enterMs = enterMs,
                             cascadeTop = cascadeTop,
                             position = stringResource(R.string.meridian_position, i + 1, count),
+                            label = add.label,
                             openLabel = add.label,
                             optionsLabel = null,
                             scrolling = scrolling,
@@ -281,8 +283,6 @@ internal fun MeridianRail(
                         ) { _ ->
                             Row(Modifier.fillMaxSize().padding(start = startPad, end = RAIL_END), verticalAlignment = Alignment.CenterVertically) {
                                 AddTile(tileH, selected, look)
-                                Spacer(Modifier.width(TEXT_GAP))
-                                RowText(add.title, null, emptyList(), selected, geo.rowHeight, geo.compact, wash, Modifier.weight(1f).wheelDetail(wheel, i))
                             }
                         }
                     }
@@ -298,12 +298,6 @@ private val SNAP_MIN_VELOCITY = 400.dp
 /** Margen derecho de las filas, antes del dial (sus marcas y la muesca no tocan el nombre). */
 private val RAIL_END = 34.dp
 
-/** Entre la tarjeta y su nombre. */
-private val TEXT_GAP = 14.dp
-
-/** Fichas en la fila enfocada: plataforma y cantidad (el emulador va en el hero). */
-private const val MAX_ROW_CHIPS = 2
-
 private val ICON_SHAPE = RoundedCornerShape(16.dp)
 private val COVER_SHAPE = RoundedCornerShape(12.dp)
 
@@ -313,8 +307,9 @@ private val CASCADE_SHIFT = 44.dp
 /**
  * Una fila: su capa gráfica (la profundidad y la cascada de entrada), los
  * gestos (tocar —seleccionar o abrir lo decide quien la usa—, mantener para
- * las opciones) y lo que oye un lector de pantalla: si está seleccionada, su
- * posición y las acciones "Abrir" y "Opciones".
+ * las opciones) y lo que oye un lector de pantalla: su nombre ([label]; en la
+ * rueda solo se ve el icono), si está seleccionada, su posición y las
+ * acciones "Abrir" y "Opciones".
  */
 @Composable
 private fun WheelRow(
@@ -328,6 +323,7 @@ private fun WheelRow(
     enterMs: () -> Float,
     cascadeTop: Int,
     position: String,
+    label: String,
     openLabel: String,
     optionsLabel: String?,
     scrolling: () -> Boolean,
@@ -382,6 +378,7 @@ private fun WheelRow(
             .semantics(mergeDescendants = true) {
                 role = Role.Button
                 this.selected = selected
+                contentDescription = label
                 stateDescription = position
                 // Doble toque de TalkBack: en la seleccionada abre; en las demás, la selecciona.
                 onClick(label = if (selected) openLabel else null) { if (selectedNow) open() else tap(Offset.Unspecified, false); true }
@@ -444,109 +441,6 @@ private fun rememberEdgeLuminance(art: String?, pkg: String?): State<Double?> {
     }
 }
 
-/** El texto de una fila: se apaga con la distancia (las filas lejanas quedan solo con su arte). */
-private fun Modifier.wheelDetail(wheel: WheelState, index: Int): Modifier = graphicsLayer {
-    compositingStrategy = CompositingStrategy.ModulateAlpha
-    alpha = WheelTransform.detail(wheel.distance(index))
-}
-
-/**
- * Nombre (dos líneas como mucho) y, debajo, su línea (plataforma, tiempo) o,
- * en la fila enfocada, sus fichas, que saltan de línea en vez de cortarse.
- * La enfocada va grande y sobre un velo suave del color del fondo que se
- * desvanece hacia todos sus bordes (no se lee como una tarjeta); todas llevan
- * una sombra ligera que las separa del arte.
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun RowText(
-    title: String,
-    subline: String?,
-    chips: List<String>,
-    selected: Boolean,
-    tileHeight: Float,
-    compact: Boolean,
-    wash: WashState,
-    modifier: Modifier,
-) {
-    val dark = P.isDark
-    val shadow = Shadow(color = if (dark) Color.Black.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.65f), blurRadius = 8f)
-    Column(
-        modifier
-            .wrapContentHeight(unbounded = true)
-            .then(if (selected) Modifier.softPlate(wash, dark).padding(vertical = 8.dp) else Modifier),
-        verticalArrangement = Arrangement.Center,
-    ) {
-        ElyText(
-            title,
-            size = WheelTransform.titleSp(tileHeight, selected, compact),
-            weight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-            color = P.ink,
-            letterSpacing = tracking(-0.015f),
-            lineHeightRatio = 1.1f,
-            shadow = shadow,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (chips.isNotEmpty()) {
-            Spacer(Modifier.height(8.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                chips.forEach { RailChip(it) }
-            }
-        } else if (subline != null) {
-            Spacer(Modifier.height(4.dp))
-            ElyText(
-                subline,
-                size = 13f,
-                weight = FontWeight.Medium,
-                color = P.ink2,
-                letterSpacing = tracking(0.02f),
-                shadow = shadow,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-/** El velo bajo el texto de la fila enfocada: un óvalo del color del fondo, lleno en su centro y que se apaga hacia fuera (nunca una tarjeta). */
-private fun Modifier.softPlate(wash: WashState, dark: Boolean): Modifier = drawWithCache {
-    val tone = if (wash.to.adaptive) wash.targetTone else Color(MeridianScrims.plate(dark))
-    val a = MeridianScrims.plateAlpha(dark)
-    val brush = Brush.radialGradient(
-        0f to tone.copy(alpha = a),
-        0.55f to tone.copy(alpha = a),
-        0.82f to tone.copy(alpha = a * 0.45f),
-        1f to tone.copy(alpha = 0f),
-        center = Offset.Zero,
-        radius = 1f,
-    )
-    val rx = size.width * 0.62f + 18.dp.toPx()
-    val ry = size.height * 0.85f + 8.dp.toPx()
-    val cx = size.width * 0.42f
-    val cy = size.height / 2f
-    onDrawBehind {
-        withTransform({
-            translate(cx, cy)
-            scale(rx, ry, Offset.Zero)
-        }) { drawCircle(brush, radius = 1f, center = Offset.Zero) }
-    }
-}
-
-/** Ficha de la fila enfocada: el velo del acento con tinta encima (≥ 4,5:1 sobre el fondo); si no cabe, su texto baja de línea. */
-@Composable
-private fun RailChip(label: String) {
-    val skin = LocalSkin.current
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(7.dp))
-            .background(skin.a2.copy(alpha = if (P.isDark) 0.2f else 0.1f))
-            .padding(horizontal = 7.dp, vertical = 3.dp),
-    ) {
-        ElyText(label, size = 10f, weight = FontWeight.SemiBold, color = P.ink, letterSpacing = tracking(0.1f), uppercase = true, maxLines = 2)
-    }
-}
-
 /** El arte de la fila de "Añadir": cristal con un "+" del acento. */
 @Composable
 private fun AddTile(side: Dp, selected: Boolean, look: SelectionLook) {
@@ -562,80 +456,3 @@ private fun AddTile(side: Dp, selected: Boolean, look: SelectionLook) {
     }
 }
 
-/**
- * La tira A–Z junto al canto de la rueda (solo con el orden por nombre y
- * listas largas, ver [IndexStrip]). Al arrastrar el dedo por ella se salta a
- * la primera entrada de cada letra y una burbuja enseña la letra. Es un
- * atajo táctil: el lector de pantalla la salta (las filas siguen ahí).
- */
-@Composable
-internal fun MeridianIndexStrip(entries: List<IndexEntry>, current: String?, onJump: (Int) -> Unit, modifier: Modifier = Modifier) {
-    if (entries.isEmpty()) return
-    val skin = LocalSkin.current
-    val jump by rememberUpdatedState(onJump)
-    val list by rememberUpdatedState(entries)
-    var dragging by remember { mutableStateOf(false) }
-    var under by remember { mutableIntStateOf(-1) }
-    BoxWithConstraints(modifier.clearAndSetSemantics { }) {
-        val heightPx = constraints.maxHeight.toFloat().coerceAtLeast(1f)
-        Column(
-            Modifier
-                .fillMaxHeight()
-                .width(STRIP_WIDTH)
-                .pointerInput(heightPx) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown()
-                        fun touch(y: Float) {
-                            val i = IndexStrip.entryAt(y / heightPx, list.size)
-                            if (i >= 0 && i != under) {
-                                under = i
-                                jump(list[i].firstIndex)
-                            }
-                        }
-                        dragging = true
-                        down.consume()
-                        touch(down.position.y)
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull() ?: break
-                            if (!change.pressed) break
-                            if (change.positionChange() != Offset.Zero) change.consume()
-                            touch(change.position.y)
-                        }
-                        dragging = false
-                        under = -1
-                    }
-                },
-            verticalArrangement = Arrangement.SpaceEvenly,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            entries.forEach { e ->
-                val on = e.label == current
-                ElyText(
-                    e.label,
-                    size = 8f,
-                    weight = if (on) FontWeight.Bold else FontWeight.Medium,
-                    color = if (on) skin.a2 else P.ink2,
-                    align = TextAlign.Center,
-                    maxLines = 1,
-                )
-            }
-        }
-        if (dragging && under in entries.indices) {
-            val slot = heightPx / entries.size
-            val bubble = with(LocalDensity.current) { BUBBLE.toPx() }
-            Box(
-                Modifier
-                    .offset { IntOffset((STRIP_WIDTH + 10.dp).roundToPx(), (slot * (under + 0.5f) - bubble / 2f).roundToInt()) }
-                    .size(BUBBLE)
-                    .darkGlass(CircleShape, minAlpha = 0.72f),
-                contentAlignment = Alignment.Center,
-            ) {
-                ElyText(entries[under].label, size = 20f, weight = FontWeight.Bold, color = Color.White)
-            }
-        }
-    }
-}
-
-internal val STRIP_WIDTH = 18.dp
-private val BUBBLE = 48.dp

@@ -2,6 +2,7 @@ package com.elyndra.launcher.ui.meridian
 
 import com.elyndra.launcher.data.BrandTokens
 import com.elyndra.launcher.data.ColorMath
+import com.elyndra.launcher.ui.theme.WheelGlass
 import java.text.Normalizer
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -18,7 +19,7 @@ import kotlin.math.sqrt
    Meridian, sin Compose: qué modo toca, cómo se deforma la rueda
    según la distancia a la línea de foco, el círculo que siguen las
    filas y el dial, dónde se para al soltarla, el muelle que la lleva,
-   el dial y su contador, la tira A–Z y el reparto de la pantalla.
+   el dial y su contador y el reparto de la pantalla.
    Todo son números para probarlo en la JVM; el dibujo vive en los
    demás archivos del paquete.
    ───────────────────────────────────────────────────────────── */
@@ -38,6 +39,16 @@ enum class LayoutStyle(val id: String) {
         /** Lo guardado; sin nada guardado (o algo que ya no existe), Meridian. */
         fun byId(id: String?): LayoutStyle = entries.firstOrNull { it.id == id } ?: DEFAULT
     }
+}
+
+/**
+ * El fondo detrás de la rueda de Meridian (Ajustes → Apariencia): cristal
+ * curvo (el arte casi tal cual) o difuminado (el velo de siempre, que funde
+ * el arte con el color del tema). Sin elegir nunca, cristal en el tema claro
+ * y difuminado en el oscuro; elegido, el mismo en los dos.
+ */
+object WheelBackdrop {
+    fun glass(choice: Boolean?, dark: Boolean): Boolean = choice ?: !dark
 }
 
 object MeridianMode {
@@ -548,45 +559,6 @@ object MeridianMotion {
     }
 }
 
-/** Una letra de la tira A–Z y el primer juego que empieza por ella. */
-data class IndexEntry(val label: String, val firstIndex: Int)
-
-/**
- * La tira A–Z para saltar: solo con el orden por nombre y más de
- * [MIN_ITEMS] juegos. Las letras salen de la propia lista, en su orden, así
- * que cualquier idioma funciona: lo que no empieza por una letra latina
- * (números, símbolos, otros alfabetos) va a "#".
- */
-object IndexStrip {
-
-    const val MIN_ITEMS = 12
-
-    fun visible(sortedByName: Boolean, count: Int): Boolean = sortedByName && count > MIN_ITEMS
-
-    /** La letra de un nombre: sin tildes ni diéresis ("Ödland" → "O"); "#" si no es A–Z. */
-    fun letterOf(name: String): String {
-        val first = name.trimStart().firstOrNull() ?: return "#"
-        val base = Normalizer.normalize(first.toString(), Normalizer.Form.NFD).firstOrNull()?.uppercaseChar() ?: return "#"
-        return if (base in 'A'..'Z') base.toString() else "#"
-    }
-
-    fun entries(names: List<String>): List<IndexEntry> {
-        val seen = HashSet<String>()
-        val out = ArrayList<IndexEntry>()
-        names.forEachIndexed { i, name ->
-            val letter = letterOf(name)
-            if (seen.add(letter)) out += IndexEntry(letter, i)
-        }
-        return out
-    }
-
-    /** La entrada bajo el dedo, a la fracción [fraction] (0 arriba, 1 abajo) del alto de la tira. */
-    fun entryAt(fraction: Float, size: Int): Int {
-        if (size <= 0) return -1
-        return (fraction * size).toInt().coerceIn(0, size - 1)
-    }
-}
-
 /**
  * El reparto de la pantalla en Meridian (dp): la rueda a la izquierda (~42 %
  * del ancho; 40 % en una ventana baja), el dial en su canto derecho y el arte
@@ -624,6 +596,32 @@ data class MeridianGeometry(
         const val COMPACT_RAIL_MAX = 520f
         const val RAIL_START = 16f
 
+        /**
+         * La rueda ya no lleva el nombre junto a cada icono (está en el hero): su
+         * columna mide lo que el icono enfocado (con la curva de las vecinas) más
+         * [TILE_TO_DIAL] hasta el dial, entre [SLIM_MIN] y el ancho de antes.
+         */
+        const val TILE_TO_DIAL = 44f
+        const val SLIM_MIN = 200f
+
+        /** Lo que se cuenta para la cabecera de la rueda al estimar su alto (dp): normal y en ventana baja. */
+        const val HEADER_ESTIMATE = 60f
+        const val HEADER_ESTIMATE_COMPACT = 50f
+
+        /**
+         * El ancho de la columna de la rueda (solo iconos) para una ventana de
+         * [width] × [height] dp con tarjetas de proporción [aspect]. El icono
+         * conserva el tamaño de siempre (el que daba la columna ancha).
+         */
+        fun slimRailWidth(width: Float, height: Float, aspect: Float = 1f, compact: Boolean = false): Float {
+            val classic = railWidthFor(width, compact)
+            val railH = (height - if (compact) HEADER_ESTIMATE_COMPACT else HEADER_ESTIMATE).coerceAtLeast(WheelTransform.TILE_MIN)
+            val tile = WheelTransform.tileHeight(railH, width, aspect, classic)
+            val inset = RAIL_START + abs(WheelArc.offset(WheelTransform.center(1f) * tile, WheelArc.radius(railH)))
+            // Nunca más que la de siempre (que con una ventana sin medir aún vale 0).
+            return (inset + tile * aspect + TILE_TO_DIAL).coerceAtLeast(SLIM_MIN).coerceAtMost(classic)
+        }
+
         /** Hueco entre el dial y el arranque del bloque del hero: ahí va el contador del nodo (hasta 4 cifras), que no lo pisa nunca. */
         const val HERO_GAP = 96f
 
@@ -639,11 +637,15 @@ data class MeridianGeometry(
                 (width * RAIL_FRACTION).coerceIn(RAIL_MIN, RAIL_MAX).coerceAtMost(width * 0.5f)
             }
 
-        /** [aspect] es ancho/alto del arte de las tarjetas (1 iconos, 2/3 carátulas). */
-        fun compute(width: Float, railHeight: Float, aspect: Float = 1f, compact: Boolean = false): MeridianGeometry {
+        /**
+         * [aspect] es ancho/alto del arte de las tarjetas (1 iconos, 2/3 carátulas).
+         * [railWidth] es el ancho de la columna (por omisión, el de siempre); el
+         * icono se mide siempre con el de siempre.
+         */
+        fun compute(width: Float, railHeight: Float, aspect: Float = 1f, compact: Boolean = false, railWidth: Float = railWidthFor(width, compact)): MeridianGeometry {
             val h = railHeight.coerceAtLeast(WheelTransform.TILE_MIN)
-            val rail = railWidthFor(width, compact)
-            val tile = WheelTransform.tileHeight(h, width, aspect, rail)
+            val rail = railWidth
+            val tile = WheelTransform.tileHeight(h, width, aspect, railWidthFor(width, compact))
             val focus = (h * WheelTransform.FOCUS_FRACTION).coerceIn(tile / 2f, (h - tile / 2f).coerceAtLeast(tile / 2f))
             return MeridianGeometry(rail, h, tile, focus, compact)
         }
@@ -671,9 +673,12 @@ object MeridianScrims {
     const val EDGE_ALPHA = 0.86f
     const val AXIS_ALPHA = 0.86f
 
-    /** Donde el velo ya es transparente, en fracción del ancho (y como poco esto más allá del eje). */
-    const val CLEAR_AT = 0.58f
-    const val MIN_FADE = 0.14f
+    /**
+     * Donde el velo ya es transparente: esta fracción del ancho más allá del
+     * eje (con la columna ancha de antes, el 58 % del ancho; con la rueda de
+     * solo iconos, el velo se queda junto a ella y deja el arte limpio).
+     */
+    const val FADE_PAST_AXIS = 0.16f
 
     /**
      * La caída más allá del eje: `(1 − smoothstep)^FALLOFF`. Con más de 1 el
@@ -705,7 +710,7 @@ object MeridianScrims {
 
     fun plateAlpha(dark: Boolean): Float = if (dark) PLATE_ALPHA_DARK else PLATE_ALPHA_LIGHT
 
-    fun clearAt(axisX: Float, width: Float): Float = maxOf(width * CLEAR_AT, axisX + width * MIN_FADE).coerceAtMost(width)
+    fun clearAt(axisX: Float, width: Float): Float = (axisX + width * FADE_PAST_AXIS).coerceAtMost(width)
 
     /** Opacidad del velo a [x] (mismas unidades que [axisX] y [width]). */
     fun alphaAt(x: Float, axisX: Float, width: Float): Float {
@@ -718,6 +723,18 @@ object MeridianScrims {
         val rest = 1f - WheelTransform.smoothstep(axisX, end, x)
         return AXIS_ALPHA * rest.toDouble().pow(FALLOFF.toDouble()).toFloat()
     }
+
+    /**
+     * El canto del cristal curvo del tema claro (dp) a la altura [y]: en la
+     * línea de foco ([focusY]) pasa [WheelGlass.PAST_AXIS_DP] del eje, y se
+     * corre a la izquierda lo mismo que las filas al seguir el círculo de la
+     * rueda ([radius]); nunca más allá de [WheelGlass.MIN_EDGE_DP].
+     */
+    fun glassEdgeAt(y: Float, axisX: Float, focusY: Float, radius: Float): Float =
+        (axisX + WheelGlass.PAST_AXIS_DP - MeridianFog.shift(y, focusY, radius)).coerceAtLeast(WheelGlass.MIN_EDGE_DP)
+
+    /** Lo más ancho que llega el cristal (en la línea de foco), en dp. */
+    fun glassRight(axisX: Float, width: Float): Float = (axisX + WheelGlass.PAST_AXIS_DP).coerceAtMost(width)
 
     /** Las paradas del degradado horizontal: (posición 0…1 del ancho, opacidad). */
     fun stops(axisX: Float, width: Float): List<Pair<Float, Float>> {
@@ -732,15 +749,17 @@ object MeridianScrims {
     fun background(art: Int, x: Float, axisX: Float, width: Float, dark: Boolean, tint: Int = tint(dark), coverage: Float = 1f): Int =
         ColorMath.over(ColorMath.withAlpha(tint, alphaAt(x, axisX, width) * coverage), ColorMath.opaque(art))
 
+
     /** Lo mismo con el velo de la fila enfocada encima, en su centro. */
     fun plated(background: Int, dark: Boolean, tint: Int = plate(dark)): Int =
         ColorMath.over(ColorMath.withAlpha(tint, plateAlpha(dark)), background)
 
-    /** Contraste del texto del tema (con su opacidad [textAlpha]) sobre [background]. */
-    fun textContrast(background: Int, dark: Boolean, textAlpha: Float = 1f): Double {
-        val ink = (if (dark) BrandTokens.DARK else BrandTokens.LIGHT).ink
-        return ColorMath.contrast(ColorMath.over(ColorMath.withAlpha(ink, textAlpha), background), background)
-    }
+    /** La tinta de texto del tema. */
+    fun ink(dark: Boolean): Int = (if (dark) BrandTokens.DARK else BrandTokens.LIGHT).ink
+
+    /** Contraste del texto del tema (o de [ink]), con su opacidad [textAlpha], sobre [background]. */
+    fun textContrast(background: Int, dark: Boolean, textAlpha: Float = 1f, ink: Int = ink(dark)): Double =
+        ColorMath.contrast(ColorMath.over(ColorMath.withAlpha(ink, textAlpha), background), background)
 
     /** Lo menos que oscurece la tinta negra bajo el titular, las fichas y los botones (texto blanco). */
     fun titleAlpha(): Float {

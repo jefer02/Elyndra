@@ -71,6 +71,11 @@ annotation class ThresholdPreviews
 @Preview(name = "Letra 1,5 · oscuro", uiMode = Configuration.UI_MODE_NIGHT_YES, widthDp = 1280, heightDp = 800, fontScale = 1.5f)
 annotation class FontScalePreviews
 
+/** La pantalla principal en un móvil apaisado: en claro, sin velo y con cada pieza en su cristal claro; en oscuro, la de siempre. */
+@Preview(name = "Principal · móvil horizontal · claro", uiMode = Configuration.UI_MODE_NIGHT_NO, widthDp = 915, heightDp = 412)
+@Preview(name = "Principal · móvil horizontal · oscuro", uiMode = Configuration.UI_MODE_NIGHT_YES, widthDp = 915, heightDp = 412)
+annotation class MainLandscapePreviews
+
 @Preview(name = "Bloque · claro", uiMode = Configuration.UI_MODE_NIGHT_NO, widthDp = 620, heightDp = 420)
 @Preview(name = "Bloque · oscuro", uiMode = Configuration.UI_MODE_NIGHT_YES, widthDp = 620, heightDp = 420)
 annotation class HeroBlockPreviews
@@ -133,16 +138,16 @@ private fun MeridianTheme(content: @Composable () -> Unit) {
 
 /** Una biblioteca de mentira con [count] juegos (y la fila de "Añadir" si son iconos), sobre [art]. */
 @Composable
-private fun MeridianSample(count: Int, art: SampleArt, covers: Boolean = false, adaptive: Boolean = true, focusedAt: Int? = null) = MeridianTheme {
+private fun MeridianSample(count: Int, art: SampleArt, covers: Boolean = false, adaptive: Boolean = true, focusedAt: Int? = null, focusedTitle: String? = null) = MeridianTheme {
     val ink = rememberMeridianInk()
     val look = rememberSelectionLook(SettingsStore.DEFAULT_SELECTION_PARTICLE_COLOR, glow = true, particles = true)
-    val entries = remember(count) {
+    val focused = focusedAt ?: if (count == 0) 0 else (count / 2).coerceAtMost(count - 1)
+    val entries = remember(count, focused, focusedTitle) {
         List(count) { i ->
-            val name = Names[i % Names.size] + if (i >= Names.size) " ${i / Names.size + 1}" else ""
-            WheelEntry("p:$i", name, "Android · ${i % 7}h ${i * 7 % 60}m", listOf(if (covers) "NSW" else "Android", "${i % 7}h ${i * 7 % 60}m"), payload = i)
+            val name = if (i == focused && focusedTitle != null) focusedTitle else Names[i % Names.size] + if (i >= Names.size) " ${i / Names.size + 1}" else ""
+            WheelEntry("p:$i", name, "Android · ${i % 7}h ${i * 7 % 60}m", listOf(if (covers) "NSW" else "Android", if (i == focused) "Sin jugar" else "${i % 7}h ${i * 7 % 60}m"), payload = i)
         }
     }
-    val focused = focusedAt ?: if (count == 0) 0 else (count / 2).coerceAtMost(count - 1)
     val wheel = remember { mutableStateOf<WheelState?>(null) }
     val title = entries.getOrNull(focused)?.title ?: "Biblioteca vacía"
     val aspect = if (covers) COVER_RATIO else 1f
@@ -160,7 +165,7 @@ private fun MeridianSample(count: Int, art: SampleArt, covers: Boolean = false, 
         },
         railHeader = {
             Box(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp, end = 16.dp), contentAlignment = Alignment.CenterEnd) {
-                DotTabs(labels = listOf("Todo", "Android", "Consolas"), selected = 0, onSelect = {})
+                DotTabs(labels = listOf("Todo", "Android", "Consolas"), selected = 0, onSelect = {}, light = !P.isDark)
             }
         },
         topEnd = {
@@ -204,9 +209,7 @@ private fun MeridianSample(count: Int, art: SampleArt, covers: Boolean = false, 
             reduced = false,
             lite = false,
             current = wheel,
-            index = if (IndexStrip.visible(true, count)) IndexStrip.entries(entries.map { it.title }) else null,
             onSettle = {},
-            onJump = {},
             tile = { _, i, _ -> Box(Modifier.fillMaxSize().background(Brush.linearGradient(Tiles[i % Tiles.size]))) },
             wrap = { _, content -> content() },
             onTap = { _, _, _ -> },
@@ -262,6 +265,16 @@ private fun PhoneTwoCoversBrightPreview() = MeridianSample(2, Bright, covers = t
 @PhonePreviews
 @Composable
 private fun PhoneFiveHundredCoversDarkArtPreview() = MeridianSample(500, Dark, covers = true)
+
+/** "03 / 13", con la tira A–Z y un juego sin logo de nombre largo en la fila enfocada y en el hero. */
+@MainLandscapePreviews
+@Composable
+private fun MainLandscapeLongNameNoLogoPreview() = MeridianSample(13, Colorful, focusedAt = 2, focusedTitle = "Minecraft: Dream it, Build it!")
+
+/** Sobre arte muy oscuro. */
+@MainLandscapePreviews
+@Composable
+private fun MainLandscapeDarkArtPreview() = MeridianSample(13, Dark, focusedAt = 2)
 
 /* ── Umbral y letra grande ── */
 
