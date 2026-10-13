@@ -822,6 +822,10 @@
     <string name="tap_open_desc">A tap on the selected game, folder or ROM opens it. Off: double tap to open.</string>
     <string name="hint_gestures_tap">Tap to select · Tap again to open · Hold for options</string>
     <!-- Meridian: fondo adaptable, fila de Añadir y fichas -->
+    <string name="meridian_wheel_backdrop_title">List background</string>
+    <string name="meridian_wheel_backdrop_desc">In Meridian, what goes behind the game list: a curved glass that leaves the art almost as it is, or the blur that blends it with the theme color.</string>
+    <string name="meridian_wheel_glass">Glass</string>
+    <string name="meridian_wheel_fog">Blur</string>
     <string name="meridian_adaptive_color_title">Adaptive background color</string>
     <string name="meridian_adaptive_color_desc">In Meridian, the background behind the list takes its color from the selected game’s art. Off: the neutral theme background.</string>
     <string name="meridian_add_short">Add</string>
