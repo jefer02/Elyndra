@@ -213,4 +213,12 @@ class PlanningTest {
         )
         assertEquals(listOf(Insight.EmptyLibrary), empty)
     }
+
+    @Test
+    fun aDismissedEmptyLibraryStaysQuiet() {
+        val quiet = MashaInsights.compute(
+            InsightInput(emptyList(), emptyMap(), CurationReport(), emptyList(), null, false, emptyList(), null, setOf(Insight.EmptyLibrary.id), NOW),
+        )
+        assertTrue(quiet.isEmpty())
+    }
 }
