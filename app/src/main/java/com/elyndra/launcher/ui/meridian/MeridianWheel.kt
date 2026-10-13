@@ -36,7 +36,7 @@ import kotlin.math.roundToInt
  * La rueda con todo lo suyo, en el hueco de la columna izquierda: una rueda
  * por sección (al cambiar de sección la nueva entra deslizando en vertical y
  * la vieja se va con su lista de antes), el dial orbital en el canto derecho
- * con su nodo y su contador, y la tira A–Z en el izquierdo si toca.
+ * con su nodo y su contador.
  *
  * [focused] es la fila enfocada de la sección actual ([section]); la rueda de
  * esa sección se publica en [current] (el paralaje del arte y el dial la leen).
@@ -62,9 +62,7 @@ internal fun BoxScope.MeridianWheelArea(
     reduced: Boolean,
     lite: Boolean,
     current: MutableState<WheelState?>,
-    index: List<IndexEntry>?,
     onSettle: (Int) -> Unit,
-    onJump: (Int) -> Unit,
     tile: @Composable (entry: WheelEntry, index: Int, selected: Boolean) -> Unit,
     wrap: @Composable (entry: WheelEntry, content: @Composable () -> Unit) -> Unit,
     /** Un toque en la fila [row] de la sección actual (`entries.size` = "Añadir"), en [at] de la ventana. */
@@ -148,19 +146,6 @@ internal fun BoxScope.MeridianWheelArea(
                 )
             }
         }
-    }
-
-    if (index != null && entries.isNotEmpty()) {
-        val currentLetter = entries.getOrNull(focusedRow)?.let { IndexStrip.letterOf(it.title) }
-        MeridianIndexStrip(
-            entries = index,
-            current = currentLetter,
-            onJump = onJump,
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 2.dp, top = 6.dp, bottom = 6.dp)
-                .fillMaxHeight(),
-        )
     }
 
     // Sin juegos (solo "Añadir", o nada) no hay dial.

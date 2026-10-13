@@ -1,5 +1,4 @@
 package com.elyndra.launcher.ui.screens
-
 import com.elyndra.launcher.ui.components.NeedsNameBadge
 import com.elyndra.launcher.ui.theme.focusRing
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -129,6 +128,7 @@ import com.elyndra.launcher.ui.components.OpenButton
 import com.elyndra.launcher.ui.components.metrics
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.theme.HeroTitleShadow
+import com.elyndra.launcher.ui.theme.HeroText
 import com.elyndra.launcher.ui.theme.animFadeIn
 import com.elyndra.launcher.ui.theme.animFadeUp
 import com.elyndra.launcher.ui.theme.animPopIn
@@ -236,9 +236,12 @@ private fun FolderContent(
     onRomTap: (RomEntry, Offset, Boolean) -> Unit,
     openRom: (RomEntry) -> Unit,
 ) {
+    // Como en la biblioteca, en los dos temas: el arte limpio (sin franjas oscuras) y el texto blanco con su sombra sutil.
+    val heroText = HeroText.CLEAN
     Column(Modifier.fillMaxSize()) {
 
         Hero(
+            clean = heroText.clean,
             fallback = rom?.let { vm.romFallback(it) } ?: vm.fallbackOf(item),
             heroKey = rom?.key ?: item.key,
             // Quitar el fondo lo deshace en polvo antes de borrarlo.
@@ -283,6 +286,7 @@ private fun FolderContent(
                                 size = 12.5f,
                                 weight = FontWeight.SemiBold,
                                 color = Color.White,
+                                shadow = heroText.shadow(null),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 align = TextAlign.End,
@@ -292,7 +296,8 @@ private fun FolderContent(
                                 item.folder.displayPath,
                                 modifier = Modifier.fillMaxWidth(),
                                 size = 8.5f,
-                                color = Color.White.copy(alpha = 0.72f),
+                                color = heroText.secondary(0.72f),
+                                shadow = heroText.shadow(null),
                                 letterSpacing = tracking(0.1f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -506,6 +511,8 @@ private val FOLDER_HINTS = listOf(
 /** El bloque de título del hero de la carpeta: el de la ROM elegida o, sin ella, el del sistema. */
 @Composable
 private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: RomEntry?, m: Metrics, floatClock: FloatClock) {
+    // Blanco, sin franjas oscuras detrás, con la sombra sutil (como en la biblioteca).
+    val heroText = HeroText.CLEAN
     Column(
         Modifier
             .fillMaxWidth()
@@ -531,8 +538,9 @@ private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: 
                 (rom?.let { playedLabel(it) } ?: "") + (rom?.let { " · " + it.extension } ?: ""),
                 size = 9.5f,
                 weight = FontWeight.Medium,
-                color = Color.White.copy(alpha = 0.85f),
+                color = heroText.secondary(0.85f),
                 letterSpacing = tracking(0.1f),
+                shadow = heroText.shadow(null),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -547,12 +555,13 @@ private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: 
                     isDisintegrating = vm.isVanishingArt(rom.key, ArtKind.Logo),
                     onAnimationEnd = { vm.finishVanish() },
                 ) {
-                    LogoImage(
+                    // Igual que en Meridian: a su tamaño, con filtrado de calidad, su sombra y su filo claro;
+                    // con la caja de las carpetas (su hero es más bajo y con la de la biblioteca quedaban diminutos).
+                    HeroLogo(
                         logo,
-                        Modifier
-                            .floating(floatClock, floatPhaseOf(rom.key), amplitude = 3.dp, periodSeconds = 4.2f)
-                            .fillMaxWidth(0.72f)
-                            .height(m.logoH),
+                        maxHeight = m.logoH * if (m.landscape) FOLDER_LOGO_HEIGHT_LANDSCAPE else 1f,
+                        modifier = Modifier.floating(floatClock, floatPhaseOf(rom.key), amplitude = 3.dp, periodSeconds = 4.2f),
+                        widthFraction = FOLDER_LOGO_WIDTH,
                     )
                 }
             }
@@ -561,10 +570,10 @@ private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: 
                 rom?.displayTitle ?: item.system.name,
                 size = m.titleSize,
                 weight = FontWeight.ExtraBold,
-                color = Color.White,
+                color = heroText.title,
                 letterSpacing = tracking(-0.03f),
                 lineHeightRatio = 0.92f,
-                shadow = HeroTitleShadow,
+                shadow = heroText.titleShadow,
                 uppercase = true,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -579,9 +588,10 @@ private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: 
                     .fillMaxWidth(0.86f),
                 size = 10f,
                 weight = FontWeight.Medium,
-                color = Color.White.copy(alpha = 0.72f),
+                color = heroText.secondary(0.72f),
                 letterSpacing = tracking(0.02f),
                 lineHeightRatio = 1.28f,
+                shadow = heroText.shadow(null),
                 maxLines = if (m.landscape) 2 else 3,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -594,8 +604,9 @@ private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: 
                     .alpha(pulseHintAlpha()),
                 size = 9f,
                 weight = FontWeight.Medium,
-                color = Color.White.copy(alpha = 0.8f),
+                color = heroText.secondary(0.8f),
                 letterSpacing = tracking(0.14f),
+                shadow = heroText.shadow(null),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 uppercase = true,
