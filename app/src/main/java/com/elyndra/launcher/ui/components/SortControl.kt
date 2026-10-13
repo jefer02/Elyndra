@@ -73,6 +73,8 @@ import com.elyndra.launcher.ui.theme.TypeScale
 import com.elyndra.launcher.ui.theme.consoleFocus
 import com.elyndra.launcher.ui.theme.DARK_GLASS_MIN
 import com.elyndra.launcher.ui.theme.darkGlass
+import com.elyndra.launcher.ui.theme.LightGlass
+import com.elyndra.launcher.ui.theme.lightGlass
 import com.elyndra.launcher.ui.theme.focusRing
 import com.elyndra.launcher.ui.theme.pressFeedback
 import androidx.compose.foundation.clickable
@@ -100,6 +102,7 @@ fun SortGlyph(color: Color, accent: Color, modifier: Modifier = Modifier) {
 /**
  * El botón de "Ordenar por": una píldora de cristal del alto del dock con el
  * glifo. Abierto el menú, se queda encendido con un velo del acento.
+ * Con [light], el cristal claro del tema claro (glifo en tinta oscura).
  */
 @Composable
 fun SortButton(
@@ -110,10 +113,11 @@ fun SortButton(
     focused: Boolean = false,
     /** Suelo de la tinta del cristal (ver [darkGlass]); más alto en la costura. */
     glassMinAlpha: Float = DARK_GLASS_MIN,
+    light: Boolean = false,
 ) {
     val skin = LocalSkin.current
     val interaction = remember { MutableInteractionSource() }
-    val accent = remember(skin.accent) { Color(DockPalettes.glassAccent(skin.accent.content(true).argb())) }
+    val accent = remember(skin.accent, light) { if (light) skin.accent.content(false) else Color(DockPalettes.glassAccent(skin.accent.content(true).argb())) }
     val toggle by rememberUpdatedState(onClick)
     // En la barra cuenta lo que se ve (44 × 34); la zona táctil sobresale hasta 48 × 48.
     Box(
@@ -137,13 +141,13 @@ fun SortButton(
             Modifier
                 .size(width = SORT_BUTTON_W.dp, height = DotTabsLayout.HEIGHT.dp)
                 .pressFeedback(interaction)
-                .darkGlass(CapsuleShape, minAlpha = glassMinAlpha)
+                .then(if (light) Modifier.lightGlass(CapsuleShape) else Modifier.darkGlass(CapsuleShape, minAlpha = glassMinAlpha))
                 .then(if (open) Modifier.drawBehind { drawRoundRect(skin.a1.copy(alpha = DockPalettes.SORT_OPEN_VEIL), cornerRadius = CornerRadius(size.height / 2f)) } else Modifier)
                 .consoleFocus(focused, CapsuleShape, color = accent)
                 .indication(interaction, focusRing(CapsuleShape)),
             contentAlignment = Alignment.Center,
         ) {
-            SortGlyph(Color.White, accent)
+            SortGlyph(if (light) Color(LightGlass.INK) else Color.White, accent)
         }
     }
 }
