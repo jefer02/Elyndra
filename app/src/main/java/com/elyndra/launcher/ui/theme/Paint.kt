@@ -7,6 +7,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.staticCompositionLocalOf
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.floor
@@ -124,3 +126,33 @@ fun sheenBrush(size: Size): Brush = cssLinearGradient(
 /** Sombra de texto del hero, equivalente a `text-shadow: 0 6px 30px rgba(0,0,0,.55)`. */
 val HeroTitleShadow = Shadow(color = Color.Black.copy(alpha = 0.55f), offset = Offset(0f, 6f), blurRadius = 30f)
 
+/**
+ * El texto del bloque del hero sobre el arte: siempre blanco. Limpio
+ * ([clean], lo que usan las pantallas en los dos temas) el arte va sin velos
+ * oscuros y el texto lleva una sombra negra muy sutil y pegada a las letras
+ * (casi sin difuminar): se lee sobre arte claro sin la nube oscura que se
+ * veía como una mancha. [ON_SCRIM] queda para lo que va sobre un velo.
+ */
+@Immutable
+class HeroText(val clean: Boolean) {
+    val title: Color get() = Color.White
+    val titleShadow: Shadow? get() = if (clean) SUBTLE_SHADOW else HeroTitleShadow
+
+    /** El texto secundario: blanco con la opacidad de cada sitio ([alpha]); sin velo, algo más firme. */
+    fun secondary(alpha: Float): Color = Color.White.copy(alpha = if (clean) maxOf(alpha, CLEAN_SECONDARY_ALPHA) else alpha)
+
+    /** La sombra de un texto: la de cada sitio ([onScrim]) sobre el velo; sin velo, la sutil. */
+    fun shadow(onScrim: Shadow?): Shadow? = if (clean) SUBTLE_SHADOW else onScrim
+
+    companion object {
+        val ON_SCRIM = HeroText(clean = false)
+        val CLEAN = HeroText(clean = true)
+        private const val CLEAN_SECONDARY_ALPHA = 0.92f
+
+        /** Sombra corta y pegada a la letra: lo justo para despegarla del arte, sin nube alrededor. */
+        private val SUBTLE_SHADOW = Shadow(color = Color.Black.copy(alpha = 0.5f), offset = Offset(0f, 1.5f), blurRadius = 3f)
+    }
+}
+
+/** El texto del bloque del hero (lo da la escena; por omisión, sobre el velo). */
+val LocalHeroText = staticCompositionLocalOf { HeroText.ON_SCRIM }
