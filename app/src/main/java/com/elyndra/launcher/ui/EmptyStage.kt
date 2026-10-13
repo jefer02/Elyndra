@@ -142,5 +142,8 @@ object TitleFit {
         if (Normalizer.normalize(text.uppercase(), Normalizer.Form.NFD).any { Character.getType(it) == Character.NON_SPACING_MARK.toInt() }) LINE_HEIGHT_ACCENTED else LINE_HEIGHT
 
     /** Las líneas del titular: dos si cabe así; si no, una más con el cuerpo mínimo. */
-    fun lines(fitted: Float?): Int = if (fitted != null) 2 else 3
+    fun lines(fitted: Float?): Int = if (fitted != null) MAX_LINES else MAX_LINES + 1
+
+    /** Las líneas en que se busca el cuerpo del titular. */
+    const val MAX_LINES = 2
 }
