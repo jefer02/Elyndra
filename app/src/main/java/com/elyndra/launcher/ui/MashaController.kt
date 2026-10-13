@@ -15,6 +15,7 @@ import com.elyndra.launcher.data.AppLocale
 import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.data.fmtMinutes
 import com.elyndra.launcher.domain.insights.Insight
+import com.elyndra.launcher.domain.insights.InsightPacing
 import com.elyndra.launcher.domain.lists.DynamicList
 import com.elyndra.launcher.domain.lists.ListRule
 import com.elyndra.launcher.domain.lists.SmartLists
@@ -69,11 +70,12 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     var insight by mutableStateOf<Insight?>(null); private set
 
     /**
-     * Sube cada vez que se recalcula la sugerencia. La burbuja se recoge sola
-     * al rato; con esto vuelve a asomar al volver a la app aunque la
-     * sugerencia sea la misma de antes.
+     * Sube cada vez que asoma una sugerencia nueva. La burbuja se recoge sola
+     * al rato; la misma sugerencia no vuelve a asomar hasta que [pacing] lo deja.
      */
     var insightRevision by mutableIntStateOf(0); private set
+
+    private val pacing = InsightPacing()
 
     /** Lo que Masha propone cambiar y espera confirmación, y la pila de deshacer. */
     val writes = MashaWrites()
@@ -409,15 +411,19 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
             return
         }
         vm.viewModelScope.launch {
-            insight = runCatching { brain.insights().firstOrNull() }.getOrNull()
+            val next = runCatching { brain.insights().firstOrNull() }.getOrNull()
+            // Lo ya dicho no se repite cada vez que se vuelve a la app: ver InsightPacing.
+            if (next != null && next.id == insight?.id) return@launch
+            insight = next?.takeIf { pacing.admit(it, System.currentTimeMillis()) }
             insightRevision++
         }
     }
 
+    /** "Ahora no": se descarta para hoy y Masha se calla un rato (no salta la siguiente). */
     fun dismissInsight() {
         insight?.let { brain.dismiss(it) }
         insight = null
-        refreshInsight()
+        pacing.dismissed(System.currentTimeMillis())
     }
 
     /** Tocar la sugerencia hace lo que propone (sin lanzar nada a ciegas: los juegos abren su ficha). */

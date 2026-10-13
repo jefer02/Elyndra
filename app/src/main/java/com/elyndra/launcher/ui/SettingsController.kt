@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui
 
+import com.elyndra.launcher.ui.meridian.WheelBackdrop
 import com.elyndra.launcher.core.device.StatusMode
 import android.net.Uri
 import androidx.compose.runtime.getValue
@@ -235,6 +236,17 @@ class SettingsController(private val vm: ElyndraViewModel) {
         meridianAdaptiveColor = !meridianAdaptiveColor
         store.meridianAdaptiveColor = meridianAdaptiveColor
     }
+
+    /** Meridian: cristal (true) o difuminado (false) detrás de la rueda; null = el de cada tema (ver [WheelBackdrop]). */
+    var meridianWheelGlass by mutableStateOf(store.meridianWheelGlass); private set
+
+    fun updateMeridianWheelGlass(glass: Boolean) {
+        meridianWheelGlass = glass
+        store.meridianWheelGlass = glass
+    }
+
+    /** Lo que se usa detrás de la rueda con el tema [dark]. */
+    fun wheelGlassFor(dark: Boolean): Boolean = WheelBackdrop.glass(meridianWheelGlass, dark)
 
     /** Rueda vertical o carrusel con la ventana apaisada y ancha (ver [MeridianMode]). */
     var layoutStyle by mutableStateOf(LayoutStyle.byId(store.layoutStyle)); private set
