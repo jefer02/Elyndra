@@ -833,6 +833,10 @@
     <string name="tap_open_desc">Un toque en el juego, la carpeta o la ROM seleccionados lo abre. Apagado: doble toque para abrir.</string>
     <string name="hint_gestures_tap">Un toque selecciona · Otro toque abre · Mantén para opciones</string>
     <!-- Meridian: fondo adaptable, fila de Añadir y fichas -->
+    <string name="meridian_wheel_backdrop_title">Fondo de la lista</string>
+    <string name="meridian_wheel_backdrop_desc">En Meridian, lo que va detrás de la lista de juegos: un cristal curvo que deja el arte casi tal cual, o el difuminado que lo funde con el color del tema.</string>
+    <string name="meridian_wheel_glass">Cristal</string>
+    <string name="meridian_wheel_fog">Difuminado</string>
     <string name="meridian_adaptive_color_title">Color de fondo adaptable</string>
     <string name="meridian_adaptive_color_desc">En Meridian, el fondo detrás de la lista toma el color del arte del juego seleccionado. Apagado: el fondo neutro del tema.</string>
     <string name="meridian_add_short">Añadir</string>
