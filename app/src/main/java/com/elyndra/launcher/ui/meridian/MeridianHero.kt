@@ -75,6 +75,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -93,6 +94,7 @@ import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.PadButtonGlyph
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.theme.HeroTitleShadow
+import com.elyndra.launcher.ui.theme.LocalHeroText
 import com.elyndra.launcher.ui.theme.LocalReducedMotion
 import com.elyndra.launcher.ui.theme.Springs
 import com.elyndra.launcher.ui.theme.Swift
@@ -152,6 +154,7 @@ internal fun MeridianHeroPanel(
     val reduced = LocalReducedMotion.current
     val screen = LocalScreenSize.current
     val frame = LocalMeridianFrame.current
+    val heroText = LocalHeroText.current
     val density = LocalDensity.current.density
     BoxWithConstraints(modifier) {
         val box = LogoFit.box(frame.heroWidth, maxWidth.value, screen.height.value, frame.compact, density = density)
@@ -182,7 +185,7 @@ internal fun MeridianHeroPanel(
                     if (shown.logo != null) {
                         logoSlot(shown, reveal, box)
                     } else {
-                        MeridianTitle(shown.title, box, reveal)
+                        MeridianTitle(shown.title, box, reveal, color = heroText.title, shadow = heroText.titleShadow)
                     }
                     if (shown.description != null && !frame.compact) {
                         Spacer(Modifier.height(8.dp))
@@ -191,10 +194,10 @@ internal fun MeridianHeroPanel(
                             modifier = Modifier.widthIn(max = (box.maxWidth * 1.35f).dp),
                             size = 11.5f,
                             weight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.88f),
+                            color = heroText.secondary(0.88f),
                             letterSpacing = tracking(0.02f),
                             lineHeightRatio = 1.32f,
-                            shadow = HeroTitleShadow,
+                            shadow = heroText.shadow(HeroTitleShadow),
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -213,7 +216,9 @@ internal fun MeridianHeroPanel(
  * El titular sin logo: el estilo del hero, en dos líneas como mucho y del
  * mayor cuerpo que quepa en [box] (entre [minSp] y [maxSp], ver [TitleFit]).
  * Nunca se corta con puntos suspensivos: si ni el mínimo cabe en dos
- * líneas, baja a una tercera.
+ * líneas, baja a una tercera; con [ellipsize] (el hero en vertical, donde no
+ * hay sitio para una tercera) se queda en dos y se corta. [color] y [shadow]:
+ * blanco con sombra sobre el arte; tinta oscura sobre el esmerilado claro.
  */
 @Composable
 internal fun MeridianTitle(
@@ -223,6 +228,9 @@ internal fun MeridianTitle(
     minSp: Float = TITLE_MIN_SP,
     maxSp: Float = TITLE_MAX_SP,
     align: TextAlign = TextAlign.Start,
+    color: Color = Color.White,
+    shadow: Shadow? = HeroTitleShadow,
+    ellipsize: Boolean = false,
 ) {
     val measurer = rememberTextMeasurer()
     val family = LocalPoppins.current
@@ -248,14 +256,14 @@ internal fun MeridianTitle(
         modifier = modifier.widthIn(max = box.maxWidth.dp),
         size = fitted ?: minSp,
         weight = FontWeight.ExtraBold,
-        color = Color.White,
+        color = color,
         letterSpacing = tracking(-0.03f),
         lineHeightRatio = lineHeight,
-        shadow = HeroTitleShadow,
+        shadow = shadow,
         uppercase = true,
         align = align,
-        maxLines = TitleFit.lines(fitted),
-        overflow = TextOverflow.Clip,
+        maxLines = if (ellipsize) TitleFit.MAX_LINES else TitleFit.lines(fitted),
+        overflow = if (ellipsize) TextOverflow.Ellipsis else TextOverflow.Clip,
         lineBreak = LineBreak.Heading,
     )
 }

@@ -88,6 +88,9 @@ import com.elyndra.launcher.ui.selection.rememberSelectionLook
 import com.elyndra.launcher.ui.theme.LocalReducedMotion
 import com.elyndra.launcher.ui.theme.consoleFaceBrush
 import com.elyndra.launcher.ui.theme.liquidGlass
+import androidx.compose.foundation.shape.RoundedCornerShape
+import com.elyndra.launcher.ui.theme.LightGlass
+import com.elyndra.launcher.ui.theme.lightGlass
 
 /**
  * La biblioteca en Meridian (ventana apaisada y ancha): la rueda vertical a
@@ -136,9 +139,6 @@ internal fun MeridianLibrary(vm: ElyndraViewModel) {
     val configuration = LocalConfiguration.current
     val entries = remember(items, configuration) { items.map { wheelEntry(context.resources, it) } }
     val keyIndex = remember(items) { items.withIndex().associate { (i, it) -> it.key to i } }
-    val index = remember(items, vm.settings.sortMode) {
-        if (IndexStrip.visible(vm.settings.sortMode == SortMode.Name, items.size)) IndexStrip.entries(items.map { it.name }) else null
-    }
     val add = if (hasAdd) WheelAdd(stringResource(R.string.meridian_add_short), stringResource(R.string.add_long)) { if (vm.tryOpen()) vm.go(Screen.Add) } else null
     // Tocar: seleccionar o abrir (ver TapGate); nada se abre dos veces seguidas (vm.tryOpen).
     val gate = remember { TapGate() }
@@ -189,6 +189,7 @@ internal fun MeridianLibrary(vm: ElyndraViewModel) {
             },
             hero = { LibraryHero(vm, hero, onAdd, searchEmpty, items.isEmpty(), ink, openKey) },
             adaptive = vm.settings.meridianAdaptiveColor,
+        wheelGlass = vm.settings.wheelGlassFor(P.isDark),
         ) { geo, wash ->
             MeridianWheelArea(
                 geo = geo,
@@ -207,15 +208,10 @@ internal fun MeridianLibrary(vm: ElyndraViewModel) {
                 reduced = reduced,
                 lite = LocalMeridianFrame.current.lite,
                 current = wheel,
-                index = index,
                 bubbleBottom = bubble.value?.bottom,
                 onSettle = { row ->
                     restOnAdd = row >= items.size
                     items.getOrNull(row)?.let { vm.select(it.key) }
-                },
-                onJump = { i ->
-                    restOnAdd = false
-                    items.getOrNull(i)?.let { vm.select(it.key) }
                 },
                 tile = { e, _, _ -> (e.payload as? LibraryItem)?.let { LibraryWheelTile(it, vm.fallbackOf(it)) } },
                 wrap = { e, content ->
@@ -252,7 +248,7 @@ internal fun MeridianLibrary(vm: ElyndraViewModel) {
         // El bocadillo va en la columna de la rueda, bajo el botón de Masha, sin pisar el dock ni el orden.
         val host = hostBounds.value
         val compact = with(LocalDensity.current) { MeridianMode.compact(host.height.toDp().value) }
-        val railRight = with(LocalDensity.current) { host.left + MeridianGeometry.railWidthFor(host.width.toDp().value, compact).dp.toPx() }
+        val railRight = with(LocalDensity.current) { host.left + MeridianGeometry.slimRailWidth(host.width.toDp().value, host.height.toDp().value, 1f, compact).dp.toPx() }
         MashaInsight(
             vm,
             mashaAnchor.value,
@@ -351,9 +347,10 @@ private fun RailHeader(vm: ElyndraViewModel, onMasha: (Rect) -> Unit, onSort: (R
     Layout(
         content = {
             MashaButton(vm, onMasha)
-            // Sobre el fondo de la rueda: el cristal del dock más denso, como en la costura.
+            // Sobre el fondo de la rueda: el cristal del dock más denso, como en la costura
+            // (en claro, el cristal claro, como todo lo que va sobre el arte en la rueda).
             Box(Modifier.onGloballyPositioned { onDock(it.boundsInWindow()) }) {
-                SectionDock(vm, glassMinAlpha = DockPalettes.SEAM_GLASS_MIN, onSortBounds = onSort)
+                SectionDock(vm, glassMinAlpha = DockPalettes.SEAM_GLASS_MIN, light = !P.isDark, onSortBounds = onSort)
             }
         },
         modifier = Modifier.fillMaxWidth().padding(top = if (compact) 4.dp else 8.dp, bottom = if (compact) 2.dp else 6.dp),
@@ -478,7 +475,17 @@ internal fun RailMessage(text: String, focusY: Float) {
             .padding(start = 28.dp, end = 32.dp, top = with(LocalDensity.current) { (focusY.toDp() - 12.dp).coerceAtLeast(0.dp) }),
         verticalArrangement = Arrangement.Top,
     ) {
-        ElyText(text, size = 13f, weight = FontWeight.SemiBold, color = P.ink2, align = TextAlign.Start, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        val dark = P.isDark
+        ElyText(
+            text,
+            modifier = if (dark) Modifier else Modifier.lightGlass(RoundedCornerShape(LightGlass.CARD_RADIUS_DP.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
+            size = 13f,
+            weight = FontWeight.SemiBold,
+            color = if (dark) P.ink2 else Color(LightGlass.INK),
+            align = TextAlign.Start,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
