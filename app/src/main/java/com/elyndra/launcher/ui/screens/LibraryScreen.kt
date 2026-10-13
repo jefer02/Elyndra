@@ -6,6 +6,17 @@ import com.elyndra.launcher.ui.components.EmptyLibraryHero
 import com.elyndra.launcher.ui.components.EmptyStageBackdrop
 import com.elyndra.launcher.ui.EmptyStage
 import com.elyndra.launcher.ui.meridian.LogoFit
+import com.elyndra.launcher.ui.meridian.MeridianTitle
+import com.elyndra.launcher.ui.meridian.MeridianLogo
+import com.elyndra.launcher.ui.theme.HeroText
+import com.elyndra.launcher.ui.theme.LocalHeroText
+import androidx.compose.runtime.CompositionLocalProvider
+import com.elyndra.launcher.ui.TitleFit
+import com.elyndra.launcher.ui.theme.PortraitHero
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
 import com.elyndra.launcher.ui.components.PAD_HINTS_HEIGHT
 import com.elyndra.launcher.ui.components.PadHint
 import com.elyndra.launcher.ui.components.PadHints
@@ -270,6 +281,18 @@ fun LibraryScreen(vm: ElyndraViewModel) {
         // Con la barra de pistas el hero encoge y la fila se recoloca: se anima su
         // altura en pantalla (no en el estante), así que se desliza con muelle.
         val rowY by animateFloatAsState(m.iconHeroH.value + shelf.tileTop, motion(Springs.enter()), label = "shelfRow")
+        // Vertical por el sitio que hay (no por la orientación del aparato): vale en
+        // tableta y en pantalla partida. Ahí el titular sin logo se ajusta y el logo tiene tope.
+        val portrait = maxHeight > maxWidth
+        val windowHeight = maxHeight.value
+        val heroArt = when (sel) {
+            is LibraryItem.App -> sel.app.meta.hero ?: sel.app.meta.screenshot
+            is LibraryItem.Folder -> sel.heroPath
+            null -> null
+        }
+        // En los dos temas: sin franjas oscuras; el texto blanco del hero, con su sombra sutil.
+        val clean = true
+        val heroText = HeroText.CLEAN
 
         // Fondo vivo: el arte de la selección, desenfocado y teñido con su color.
         DynamicBackdrop(
@@ -291,11 +314,9 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                 extension = extension,
                 // Sin juego (biblioteca o sección vacía): el escenario de la paleta, no el cristal.
                 stage = { EmptyStageBackdrop(EmptyStage.CLASSIC, Modifier.fillMaxSize(), horizon = true) },
-                imagePath = when (sel) {
-                    is LibraryItem.App -> sel.app.meta.hero ?: sel.app.meta.screenshot
-                    is LibraryItem.Folder -> sel.heroPath
-                    null -> null
-                },
+                imagePath = heroArt,
+                // El arte limpio, sin franjas oscuras.
+                clean = clean,
                 topBar = {
                     Row(
                         Modifier
@@ -348,7 +369,9 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         transitionSpec = { heroInfoTransition(reduced) },
                         label = "heroInfo",
                     ) { item ->
-                        HeroInfo(vm, item, m, floatClock, searching = vm.query.isNotBlank()) { if (vm.tryOpen()) vm.go(Screen.Add) }
+                        CompositionLocalProvider(LocalHeroText provides heroText) {
+                            HeroInfo(vm, item, m, floatClock, searching = vm.query.isNotBlank(), portrait = portrait, windowHeight = windowHeight) { if (vm.tryOpen()) vm.go(Screen.Add) }
+                        }
                     }
                 },
             )
@@ -443,12 +466,15 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                 Modifier
                     .align(Alignment.TopCenter)
                     .offset(y = m.iconHeroH - seamRise),
-                // Media cápsula cae sobre el estante, que en claro es perla: cristal más denso.
+                // Media cápsula cae sobre el estante, que en claro es perla: cristal más denso
+                // y, en claro, el cristal claro (como el resto de lo que va sobre el velo claro).
                 glassMinAlpha = DockPalettes.SEAM_GLASS_MIN,
+                light = !P.isDark,
             ) { sortAnchor.value = it }
         }
 
-        MashaInsight(vm, mashaAnchor.value, mashaHost.value)
+        // Ventana baja (teléfono): bocadillo de una línea, que no tape el titular del hero.
+        MashaInsight(vm, mashaAnchor.value, mashaHost.value, oneLine = MeridianMode.compact(LocalScreenSize.current.height.value))
 
         SortPopover(
             visible = vm.sortMenuOpen,
@@ -477,12 +503,13 @@ internal fun labelBlock(sp: Float): Float = ShelfLayout.LABEL_GAP + sp * 1.45f *
 /** Margen bajo el bloque de título del hero (el dock de la costura no puede pasar de ahí). */
 private fun heroInfoBottomPad(m: Metrics): Dp = if (m.landscape) 8.dp else 18.dp
 
-/** El dock de secciones con el botón de orden al lado. */
+/** El dock de secciones con el botón de orden al lado; con [light], en cristal claro (sobre el velo claro, no sobre el arte). */
 @Composable
 internal fun SectionDock(
     vm: ElyndraViewModel,
     modifier: Modifier = Modifier,
     glassMinAlpha: Float = DARK_GLASS_MIN,
+    light: Boolean = false,
     onSortBounds: (Rect) -> Unit,
 ) {
     val filters = vm.availableFilters()
@@ -495,6 +522,7 @@ internal fun SectionDock(
             focused = dockFocused,
             focusIndex = if (dockFocused) vm.input.dockFocus else -1,
             glassMinAlpha = glassMinAlpha,
+            light = light,
         )
         Spacer(Modifier.width(8.dp))
         SortButton(
@@ -503,6 +531,7 @@ internal fun SectionDock(
             onClick = { if (vm.sortMenuOpen) vm.closeSortMenu() else vm.openSortMenu() },
             focused = vm.input.isBarFocused(BarItem.Sort),
             glassMinAlpha = glassMinAlpha,
+            light = light,
             modifier = Modifier.onGloballyPositioned { onSortBounds(it.boundsInWindow()) },
         )
     }
@@ -553,35 +582,33 @@ internal val SORT_MENU_HINTS = listOf(
  * El bloque de título del hero de una selección: chip y línea de datos, logo
  * (o titular) y la sinopsis o la pista de gestos. Sin selección, el titular
  * dice qué pasa: biblioteca vacía, sección vacía o búsqueda sin resultados.
+ *
+ * En vertical ([portrait]) el titular sin logo baja de cuerpo y se ajusta a
+ * dos líneas del ancho que hay (ver [PortraitHero]) y el logo tiene tope de
+ * alto; [windowHeight] es el alto disponible (dp).
  */
 @Composable
-private fun HeroInfo(vm: ElyndraViewModel, sel: LibraryItem?, m: Metrics, floatClock: FloatClock, searching: Boolean, onAdd: () -> Unit) {
+private fun HeroInfo(
+    vm: ElyndraViewModel,
+    sel: LibraryItem?,
+    m: Metrics,
+    floatClock: FloatClock,
+    searching: Boolean,
+    portrait: Boolean,
+    windowHeight: Float,
+    onAdd: () -> Unit,
+) {
     Column(
         Modifier
             .fillMaxWidth()
             .padding(start = m.pad, end = m.pad, bottom = if (m.landscape) 8.dp else 18.dp),
     ) {
         if (sel != null) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = if (m.landscape) 3.dp else 6.dp),
-            ) {
-                HeroChip(
-                    stringResource(
-                        if (sel is LibraryItem.Folder) R.string.chip_emulator_folder else R.string.chip_android_app,
-                    ),
-                )
-                Spacer(Modifier.width(8.dp))
-                ElyText(
-                    heroSubline(sel),
-                    size = 9.5f,
-                    weight = FontWeight.Medium,
-                    color = Color.White.copy(alpha = 0.85f),
-                    letterSpacing = tracking(0.1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            HeroChipRow(
+                stringResource(if (sel is LibraryItem.Folder) R.string.chip_emulator_folder else R.string.chip_android_app),
+                heroSubline(sel),
+                landscape = m.landscape,
+            )
         }
         val logo = when (sel) {
             is LibraryItem.App -> sel.app.meta.logo
@@ -601,48 +628,26 @@ private fun HeroInfo(vm: ElyndraViewModel, sel: LibraryItem?, m: Metrics, floatC
                     isDisintegrating = vm.isVanishingArt(sel.key, ArtKind.Logo),
                     onAnimationEnd = { vm.finishVanish() },
                 ) {
-                    LogoImage(
+                    HeroLogo(
                         logo,
-                        Modifier
-                            .floating(floatClock, floatPhaseOf(sel.key), amplitude = 3.dp, periodSeconds = 4.2f)
-                            .fillMaxWidth(0.72f)
-                            .height(m.logoH),
+                        // Con tope: un logo grande se comía el arte (en vertical, aún más bajo).
+                        maxHeight = if (portrait) PortraitHero.logoMaxHeight(windowHeight, m.logoH.value).dp else m.logoH * HERO_LOGO_HEIGHT,
+                        modifier = Modifier.floating(floatClock, floatPhaseOf(sel.key), amplitude = 3.dp, periodSeconds = 4.2f),
                     )
                 }
             }
         } else if (sel == null) {
             if (vm.loaded) EmptyHeroBlock(vm, m, searching, onAdd)
+        } else if (portrait) {
+            PortraitTitle(sel.name, m.titleSize)
         } else {
-            ElyText(
-                sel.name,
-                size = m.titleSize,
-                weight = FontWeight.ExtraBold,
-                color = Color.White,
-                letterSpacing = tracking(-0.03f),
-                lineHeightRatio = 0.92f,
-                shadow = HeroTitleShadow,
-                uppercase = true,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            LandscapeTitle(sel.name, m.titleSize)
         }
         // Solo las apps tienen sinopsis en el hero; las carpetas no.
         val app = sel as? LibraryItem.App
         val description = rememberDescription(vm, app?.key, app?.app?.meta)
         if (description != null) {
-            ElyText(
-                heroDescription(description, vm.settings.lang),
-                modifier = Modifier
-                    .padding(top = if (m.landscape) 4.dp else 6.dp)
-                    .fillMaxWidth(0.86f),
-                size = 10f,
-                weight = FontWeight.Medium,
-                color = Color.White.copy(alpha = 0.72f),
-                letterSpacing = tracking(0.02f),
-                lineHeightRatio = 1.28f,
-                maxLines = if (m.landscape) 2 else 3,
-                overflow = TextOverflow.Ellipsis,
-            )
+            HeroSynopsis(heroDescription(description, vm.settings.lang), m.landscape)
         } else if (sel != null && !vm.input.gamepadPresent) {
             // Con mando, las pistas de sus botones ya van al pie del estante.
             ElyText(
@@ -652,13 +657,144 @@ private fun HeroInfo(vm: ElyndraViewModel, sel: LibraryItem?, m: Metrics, floatC
                     .alpha(pulseHintAlpha()),
                 size = 9f,
                 weight = FontWeight.Medium,
-                color = Color.White.copy(alpha = 0.8f),
+                color = LocalHeroText.current.secondary(0.8f),
                 letterSpacing = tracking(0.14f),
+                shadow = LocalHeroText.current.shadow(null),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 uppercase = true,
             )
         }
+    }
+}
+
+/** La ficha ("APP ANDROID") y su línea al lado ("Sin jugar todavía", "2h 10m jugado"). */
+@Composable
+internal fun HeroChipRow(chip: String, subline: String, landscape: Boolean) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(bottom = if (landscape) 3.dp else 6.dp),
+    ) {
+        HeroChip(chip)
+        Spacer(Modifier.width(8.dp))
+        ElyText(
+            subline,
+            size = 9.5f,
+            weight = FontWeight.Medium,
+            color = LocalHeroText.current.secondary(0.85f),
+            letterSpacing = tracking(0.1f),
+            shadow = LocalHeroText.current.shadow(null),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** La sinopsis bajo el titular: dos líneas en horizontal, tres en vertical. */
+@Composable
+internal fun HeroSynopsis(text: String, landscape: Boolean) {
+    ElyText(
+        text,
+        modifier = Modifier
+            .padding(top = if (landscape) 4.dp else 6.dp)
+            .fillMaxWidth(0.86f),
+        size = 10f,
+        weight = FontWeight.Medium,
+        color = LocalHeroText.current.secondary(0.72f),
+        letterSpacing = tracking(0.02f),
+        lineHeightRatio = 1.28f,
+        shadow = LocalHeroText.current.shadow(null),
+        maxLines = if (landscape) 2 else 3,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+/**
+ * El logo del juego en el hero del carrusel, dibujado igual que en Meridian
+ * ([MeridianLogo]): pedido al tamaño de su caja, con filtrado de calidad y con
+ * su sombra fina y su filo claro, que lo despegan del arte (antes era una
+ * imagen sin más y se veía apagada). Hasta [widthFraction] del ancho y
+ * [maxHeight] de alto; un logo pequeño se amplía lo que deja [LogoFit].
+ */
+@Composable
+internal fun HeroLogo(path: String, maxHeight: Dp, modifier: Modifier = Modifier, widthFraction: Float = HERO_LOGO_WIDTH) {
+    val density = LocalDensity.current.density
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val box = LogoFit.Box(
+            maxWidth = maxWidth.value * widthFraction,
+            maxHeight = maxHeight.value,
+            minHeight = maxHeight.value * HERO_LOGO_MIN_HEIGHT,
+            maxUpscale = LogoFit.maxUpscale(density),
+        )
+        MeridianLogo(path, box)
+    }
+}
+
+/**
+ * Ancho máximo del logo en el hero del carrusel (fracción del bloque), alto
+ * mínimo (fracción del máximo) y alto en horizontal (fracción del de siempre):
+ * un logo apaisado ampliado hasta el 72 % del ancho salía gigantesco.
+ */
+private const val HERO_LOGO_WIDTH = 0.55f
+private const val HERO_LOGO_MIN_HEIGHT = 0.6f
+internal const val HERO_LOGO_HEIGHT = 0.8f
+
+/**
+ * Los logos de las carpetas: su hero es más bajo que el de la biblioteca (las
+ * carátulas ocupan más), así que con la caja de la biblioteca quedaban
+ * diminutos. En horizontal, 1,25 veces el alto de siempre (cabe bajo la barra);
+ * en vertical, el de siempre; y hasta el 70 % del ancho.
+ */
+internal const val FOLDER_LOGO_HEIGHT_LANDSCAPE = 1.25f
+internal const val FOLDER_LOGO_WIDTH = 0.7f
+
+/**
+ * El titular sin logo en vertical: más pequeño que en horizontal y ajustado
+ * al ancho que hay, el mayor cuerpo entre [PortraitHero.TITLE_MIN_SP] y el
+ * tope (que sale del ancho, nunca más que [base]) que quepa en dos líneas;
+ * si ni el mínimo cabe, dos líneas y puntos suspensivos ("Minecraft: Dream
+ * it, Build it!" entra entero en un móvil).
+ */
+@Composable
+internal fun PortraitTitle(name: String, base: Float) {
+    val fontScale = LocalDensity.current.fontScale
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val maxSp = PortraitHero.titleMaxSp(maxWidth.value, base)
+        val lineHeight = TitleFit.lineHeight(name)
+        val box = LogoFit.Box(maxWidth = maxWidth.value, maxHeight = maxSp * fontScale * lineHeight * PortraitHero.TITLE_LINES + 2f, minHeight = 0f)
+        MeridianTitle(
+            name,
+            box,
+            minSp = PortraitHero.TITLE_MIN_SP,
+            maxSp = maxSp,
+            color = LocalHeroText.current.title,
+            shadow = LocalHeroText.current.titleShadow,
+            ellipsize = true,
+        )
+    }
+}
+
+/**
+ * El titular sin logo en horizontal: en el alto de una línea de [base] (lo de
+ * siempre), pero sin cortarse: si el nombre no cabe en una línea, baja de
+ * cuerpo y se reparte en dos ("FREE FIRE X NARUTO SHIPPUDEN" entero en vez de
+ * "FREE FIRE X NARUT…"). Solo con puntos suspensivos si ni el mínimo cabe.
+ */
+@Composable
+internal fun LandscapeTitle(name: String, base: Float) {
+    val fontScale = LocalDensity.current.fontScale
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val lineHeight = TitleFit.lineHeight(name)
+        val box = LogoFit.Box(maxWidth = maxWidth.value, maxHeight = base * fontScale * lineHeight * 1.1f, minHeight = 0f)
+        MeridianTitle(
+            name,
+            box,
+            minSp = PortraitHero.TITLE_MIN_SP,
+            maxSp = base,
+            color = LocalHeroText.current.title,
+            shadow = LocalHeroText.current.titleShadow,
+            ellipsize = true,
+        )
     }
 }
 
