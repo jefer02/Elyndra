@@ -83,9 +83,12 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -136,8 +139,11 @@ import kotlinx.coroutines.launch
        emulador.
      · Las imágenes, como tarjetas con la imagen de verdad a sangre, que
        se inclinan al recibir el foco.
-     · Lo que borra, aparte y en rojo. Lo que se hace al momento (quitar
-       una imagen) pide mantener pulsado o una segunda pulsación.
+     · Lo que borra, en rojo: el "Quitar" de cada imagen, justo debajo de
+       ella; quitar el juego, aparte tras un filo. Lo que se hace al
+       momento (quitar una imagen) pide mantener pulsado o una segunda
+       pulsación.
+     · Una X a la vista en la banda: tocar fuera o B no se adivinan.
 
    SALE DE LA CARD. La superficie se transforma desde el rectángulo de
    la card (escala y posición) y el contenido entra escalonado; al
@@ -203,7 +209,7 @@ fun GameActionOverlayContainer(
                     .padding(PANEL_MARGIN),
                 contentAlignment = Alignment.Center,
             ) {
-                ActionPanel(shown, held.origin, open, input, maxHeight)
+                ActionPanel(shown, held.origin, open, input, maxHeight, onOverlayDismissed)
             }
         }
     }
@@ -214,7 +220,7 @@ private class HeldSheet {
     var origin: Rect? = null
 }
 
-/** El panel: superficie que se transforma desde la card y contenido encima. */
+/** El panel: superficie que se transforma desde la card y contenido encima. [onDismiss] lo cierra (la X del menú de un juego). */
 @Composable
 private fun ActionPanel(
     spec: ActionSheetSpec,
@@ -222,6 +228,7 @@ private fun ActionPanel(
     open: State<Float>,
     input: InputController,
     maxHeight: Dp,
+    onDismiss: () -> Unit,
 ) {
     val landscape = LocalLandscape.current
     val layout = remember(spec, landscape) { SheetLayout.of(spec, landscape) }
@@ -238,7 +245,7 @@ private fun ActionPanel(
 
     OverlayPanelShell(origin, open, accent, tone, maxWidth, maxHeight) {
         if (hero != null) {
-            HeroContent(spec, hero, layout, input, accent, tone, open, reduced)
+            HeroContent(spec, hero, layout, input, accent, tone, open, reduced, maxHeight, onDismiss)
         } else {
             ListContent(spec, layout, input, accent, tone, open, reduced)
         }
@@ -323,6 +330,8 @@ private fun HeroContent(
     tone: Color,
     open: State<Float>,
     reduced: Boolean,
+    maxHeight: Dp,
+    onDismiss: () -> Unit,
 ) {
     val scroll = rememberScrollState()
     // El aro del mando solo mientras se usa el mando: con el dedo sobra.
@@ -330,6 +339,9 @@ private fun HeroContent(
     val armed = input.sheetArmed
     val run: (SheetAction) -> Unit = { a -> input.runSheetAction(layout.indexOf(a), a) }
     val artHeader = spec.groups.firstOrNull { it.style == GroupStyle.Thumbnails }?.header
+    // Ventana baja (un móvil apaisado): la banda encoge para que el panel apenas
+    // tenga que desplazarse. El ancho no se toca: las piezas de dos líneas lo necesitan.
+    val shortBanner = layout.twoColumns && maxHeight < SHORT_PANEL
 
     Column {
         Box(Modifier.weight(1f, fill = false)) {
@@ -337,10 +349,16 @@ private fun HeroContent(
                 HeroBanner(
                     spec = spec,
                     hero = hero,
-                    height = if (layout.twoColumns) BANNER_WIDE else BANNER_TALL,
+                    height = when {
+                        shortBanner -> BANNER_SHORT
+                        layout.twoColumns -> BANNER_WIDE
+                        else -> BANNER_TALL
+                    },
                     tone = tone,
                     open = open,
                     reduced = reduced,
+                    onClose = onDismiss,
+                    logoHeight = if (shortBanner) LOGO_SHORT else LOGO,
                     modifier = Modifier.staggered(open, 0, reduced),
                 )
                 val play: @Composable () -> Unit = {
@@ -378,15 +396,30 @@ private fun HeroContent(
                                     ArtTile(a, hero, focused = focus == layout.indexOf(a), accent = accent, reduced = reduced, modifier = Modifier.weight(1f)) { run(a) }
                                 }
                             }
+                            // Cada "Quitar" justo bajo la imagen que borra (mismos huecos que
+                            // las tarjetas): se ve qué se va sin leer el rótulo entero.
+                            if (layout.artClears.isNotEmpty()) {
+                                Spacer(Modifier.height(GAP))
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(GAP)) {
+                                    layout.artClears.forEach { a ->
+                                        if (a == null) {
+                                            Spacer(Modifier.weight(1f))
+                                        } else {
+                                            val i = layout.indexOf(a)
+                                            DangerRow(a, i, focused = focus == i, armed = armed == i, input = input, modifier = Modifier.weight(1f), compact = true)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-                // La zona de borrado es un pie aparte, a lo ancho del panel y tras un
-                // filo rojo: no se llega a ella por inercia desde ninguna columna.
+                // Lo demás que borra (quitar el juego), tras un filo rojo y lo último de
+                // su columna: no se llega a ello por inercia desde la de al lado.
                 val danger: @Composable () -> Unit = {
                     if (layout.danger.isNotEmpty()) {
                         Column(
-                            Modifier.fillMaxWidth().staggered(open, 4, reduced).padding(start = PAD, end = PAD, bottom = PAD),
+                            Modifier.fillMaxWidth().staggered(open, 4, reduced),
                             verticalArrangement = Arrangement.spacedBy(GAP),
                         ) {
                             Box(Modifier.fillMaxWidth().padding(bottom = 4.dp).height(1.dp).background(P.red.copy(alpha = 0.22f)))
@@ -399,6 +432,8 @@ private fun HeroContent(
                 }
 
                 if (layout.twoColumns) {
+                    // La zona de borrado, en la columna de las imágenes: antes era un pie a
+                    // lo ancho y la columna derecha se quedaba medio vacía.
                     Row(
                         Modifier.fillMaxWidth().padding(start = PAD, end = PAD, bottom = PAD),
                         horizontalArrangement = Arrangement.spacedBy(PAD),
@@ -409,6 +444,7 @@ private fun HeroContent(
                         }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(SECTION_GAP)) {
                             images()
+                            danger()
                         }
                     }
                 } else {
@@ -419,9 +455,9 @@ private fun HeroContent(
                         play()
                         tiles()
                         images()
+                        danger()
                     }
                 }
-                danger()
             }
             ScrollHints(scroll, tone, accent)
         }
@@ -445,6 +481,10 @@ private val MENU_HINTS = listOf(PadHint("A", R.string.hint_select), PadHint("B",
  * La banda del arte: el fondo del juego a sangre por arriba (se acerca un
  * poco al abrir), un velo que deja leer el logo y, en el último tramo, el
  * fundido al color del cristal. Sin arte, el arte de reserva del juego.
+ *
+ * Arriba a la derecha, la X ([onClose]): en un móvil apaisado el panel ocupa
+ * casi toda la pantalla y cerrar tocando fuera (o con B) no se adivina. El
+ * logo mide [logoHeight] (menos en la banda corta de una ventana baja).
  */
 @Composable
 private fun HeroBanner(
@@ -454,7 +494,9 @@ private fun HeroBanner(
     tone: Color,
     open: State<Float>,
     reduced: Boolean,
+    onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    logoHeight: Dp = LOGO,
 ) {
     Box(modifier.fillMaxWidth().height(height)) {
         val art = hero.backgroundPath ?: hero.coverPath
@@ -497,7 +539,8 @@ private fun HeroBanner(
             Modifier
                 .align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .padding(start = 18.dp, end = 18.dp, bottom = FADE_INTO_GLASS + 2.dp),
+                // A la derecha, el sitio de la X: un título largo no pasa por debajo.
+                .padding(start = 18.dp, end = 18.dp + CLOSE_RESERVE, bottom = FADE_INTO_GLASS + 2.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
             val logo = hero.logoPath
@@ -518,7 +561,7 @@ private fun HeroBanner(
                 if (logo != null) {
                     LogoImage(
                         logo,
-                        Modifier.fillMaxWidth(0.72f).height(56.dp),
+                        Modifier.fillMaxWidth(0.72f).height(logoHeight),
                         alignment = Alignment.BottomStart,
                     )
                 } else {
@@ -547,6 +590,17 @@ private fun HeroBanner(
                 }
             }
         }
+        val closeLabel = stringResource(R.string.close)
+        ConsoleIconButton(
+            onClick = onClose,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = CLOSE_MARGIN, end = CLOSE_MARGIN)
+                .semantics {
+                    contentDescription = closeLabel
+                    role = Role.Button
+                },
+        ) { glyph -> ConsoleGlyphIcon(ConsoleGlyph.Close, Color.White, glyph) }
     }
 }
 
@@ -811,14 +865,28 @@ private fun ArtStateChip(@StringRes label: Int, set: Boolean, accent: Color) {
  * ([SheetAction.holdToConfirm]), pide mantener pulsado (la barra roja se
  * llena) o una segunda pulsación; con mando, A dos veces. Las demás (quitar el
  * juego) abren su diálogo de confirmación.
+ *
+ * [compact]: el "Quitar" bajo la tarjeta de una imagen. Un tercio de columna
+ * no da para "Quitar el fondo" en alemán, así que dice solo "Quitar" (armado,
+ * "¿Confirmar?") y la imagen de encima dice qué; el lector de pantalla sigue
+ * leyendo el rótulo entero.
  */
 @Composable
-private fun DangerRow(action: SheetAction, index: Int, focused: Boolean, armed: Boolean, input: InputController) {
+private fun DangerRow(
+    action: SheetAction,
+    index: Int,
+    focused: Boolean,
+    armed: Boolean,
+    input: InputController,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+) {
     val shape = RoundedCornerShape(TILE_RADIUS)
     val hold = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     val fired = remember { BooleanArray(1) }
     val label = action.label.resolve()
+    val confirmHint = stringResource(R.string.confirm_again)
     val armedGlow = animateFloatAsState(if (armed) 1f else 0f, Springs.fade(), label = "armed")
     LaunchedEffect(armed) {
         if (!armed) return@LaunchedEffect
@@ -827,9 +895,9 @@ private fun DangerRow(action: SheetAction, index: Int, focused: Boolean, armed: 
     }
 
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
-            .heightIn(min = 46.dp)
+            .heightIn(min = if (compact) 40.dp else 46.dp)
             .revealWhen(focused)
             .clip(shape)
             .background(P.red.copy(alpha = if (P.isDark) 0.14f else 0.07f))
@@ -843,6 +911,11 @@ private fun DangerRow(action: SheetAction, index: Int, focused: Boolean, armed: 
             .consoleFocus(focused, shape, P.red)
             .semantics(mergeDescendants = true) {
                 role = Role.Button
+                // En compacto lo visible es solo "Quitar": se lee el rótulo entero (y, armado, cómo confirmar).
+                if (compact) {
+                    contentDescription = label
+                    if (armed && action.holdToConfirm) stateDescription = confirmHint
+                }
                 onClick(label) {
                     input.runSheetAction(index, action)
                     true
@@ -872,24 +945,45 @@ private fun DangerRow(action: SheetAction, index: Int, focused: Boolean, armed: 
                     onTap = { if (!fired[0]) input.runSheetAction(index, action) },
                 )
             }
-            .padding(horizontal = 14.dp, vertical = 9.dp),
+            .padding(horizontal = if (compact) 8.dp else 14.dp, vertical = if (compact) 6.dp else 9.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = if (compact) Arrangement.Center else Arrangement.Start,
     ) {
-        action.icon?.let { SheetGlyph(it, P.red, size = 17.dp) }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            ElyText(label, size = 12f, weight = FontWeight.SemiBold, color = P.red, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (action.holdToConfirm && armed) {
-                ElyText(
-                    stringResource(R.string.confirm_again),
-                    size = 8.5f,
-                    color = P.red.copy(alpha = 0.9f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+        if (compact) {
+            // Armado con mando, la pista de A ocupa el sitio del glifo: en un tercio
+            // de columna no caben los dos junto a "¿Confirmar?".
+            if (armed && input.active) {
+                PadBadge("A", P.red)
+            } else {
+                action.icon?.let { SheetGlyph(it, P.red, size = 14.dp) }
             }
+            Spacer(Modifier.width(6.dp))
+            ElyText(
+                stringResource(if (armed) R.string.confirm_short else R.string.remove_short),
+                modifier = Modifier.weight(1f, fill = false).clearAndSetSemantics {},
+                size = 11f,
+                weight = FontWeight.SemiBold,
+                color = P.red,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        } else {
+            action.icon?.let { SheetGlyph(it, P.red, size = 17.dp) }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                ElyText(label, size = 12f, weight = FontWeight.SemiBold, color = P.red, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (action.holdToConfirm && armed) {
+                    ElyText(
+                        confirmHint,
+                        size = 8.5f,
+                        color = P.red.copy(alpha = 0.9f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            if (armed && input.active) PadBadge("A", P.red)
         }
-        if (armed && input.active) PadBadge("A", P.red)
     }
 }
 
@@ -1160,5 +1254,17 @@ internal val TILE_H = 76.dp
 private val ART_TILE_H = 76.dp
 private val BANNER_TALL = 152.dp
 private val BANNER_WIDE = 112.dp
+
+/** Banda de una ventana baja (por debajo de [SHORT_PANEL] de alto, en dos columnas): un móvil apaisado. */
+private val BANNER_SHORT = 84.dp
+private val SHORT_PANEL = 460.dp
+
+/** Alto del logo en la banda (en la corta, menos: si no, se come la banda entera). */
+private val LOGO = 56.dp
+private val LOGO_SHORT = 44.dp
+
+/** La X de la banda: su margen con las esquinas y lo que el título le deja a la derecha. */
+private val CLOSE_MARGIN = 10.dp
+private val CLOSE_RESERVE = 40.dp
 internal val FADE_INTO_GLASS = 22.dp
 private val ART_TILE_BACK get() = P.mediaBack
