@@ -2,17 +2,12 @@ package com.elyndra.launcher.ui.meridian
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -21,33 +16,19 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.data.SignaturePalettes
 import com.elyndra.launcher.data.argb
-import com.elyndra.launcher.ui.theme.LocalPoppins
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.Swift
-import com.elyndra.launcher.ui.theme.Frost
-import com.elyndra.launcher.ui.theme.LightGlass
 import com.elyndra.launcher.ui.theme.WheelGlass
-import com.elyndra.launcher.ui.theme.darkGlass
-import com.elyndra.launcher.ui.theme.lightGlass
 import kotlin.math.abs
 import kotlin.math.asin
-import kotlin.math.max
 
 /**
  * Los colores de Meridian para el tema activo, sacados del acento: el par de
@@ -171,7 +152,7 @@ internal fun MeridianDial(
                     val reach = if (reduced) 1f else ignite
                     val p = w.position
                     val fy = w.focusPx + w.lift()
-                    val top = w.reserve().coerceAtLeast(0f) + edgePad
+                    val top = edgePad
                     val up = (fy - top).coerceAtLeast(0f) * reach
                     val down = (size.height - edgePad - fy).coerceAtLeast(0f) * reach
                     dial.span(p, spacing, pad, up, down, span)
@@ -264,143 +245,3 @@ private val SPAN_PAD = 22.dp
 
 /** Margen del arco con los cantos de la rueda. */
 private val EDGE_PAD = 8.dp
-
-/**
- * El contador del dial: una cápsula de cristal pegada al nodo por el lado
- * del hero, con cifras tabulares —la posición grande, el total apagado— que
- * ruedan en vertical como un cuentakilómetros al cambiar (con "reducir
- * movimiento", un fundido). Siempre las mismas cifras ([DialCounter]): no
- * cambia de ancho. En la fila de "Añadir" ([onAdd]) enseña un "+". Lleva un
- * matiz del color del fondo ([tint], ≤ 12 %). Quien la pone la coloca leyendo
- * el nodo en la fase de colocación. En claro, cristal claro y cifras en tinta oscura.
- */
-@Composable
-internal fun DialCounterChip(index: Int, total: Int, onAdd: Boolean, tint: () -> Color, enterMs: () -> Float, reduced: Boolean, modifier: Modifier = Modifier) {
-    if (total <= 0) return
-    val measurer = rememberTextMeasurer()
-    val family = LocalPoppins.current
-    val density = LocalDensity.current
-    val light = !P.isDark
-    val inkColor = if (light) Color(LightGlass.INK) else Color.White
-    val digits = DialCounter.digits(total)
-    val glyphs = remember(measurer, family, density, inkColor) {
-        val big = TextStyle(fontFamily = family, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = inkColor)
-        val small = TextStyle(fontFamily = family, fontWeight = FontWeight.Medium, fontSize = 9.5.sp, color = inkColor)
-        CounterGlyphs(
-            big = Array(10) { measurer.measure(it.toString(), big, density = density) },
-            small = Array(10) { measurer.measure(it.toString(), small, density = density) },
-            plus = measurer.measure("+", big, density = density),
-            slash = measurer.measure("/", small, density = density),
-        )
-    }
-    val value = if (onAdd) -1 else index + 1
-    val shown = remember { mutableIntStateOf(value) }
-    val previous = remember { mutableIntStateOf(value) }
-    val roll = remember { Animatable(1f) }
-    LaunchedEffect(value) {
-        if (value == shown.intValue) return@LaunchedEffect
-        previous.intValue = shown.intValue
-        shown.intValue = value
-        roll.snapTo(0f)
-        roll.animateTo(1f, tween(ROLL_MS, easing = Swift))
-    }
-    val padH = with(density) { 10.dp.toPx() }
-    val gap = with(density) { 4.dp.toPx() }
-    val width = padH * 2f + digits * glyphs.bigAdvance + gap + glyphs.slash.size.width + gap + digits * glyphs.smallAdvance
-    val height = max(glyphs.bigHeight + with(density) { 8.dp.toPx() }, with(density) { COUNTER_HEIGHT.toPx() })
-    val shape = RoundedCornerShape(50)
-    // El total, apagado: sobre el cristal claro algo menos (la tinta oscura a 9,5 sp necesita más).
-    val totalAlpha = if (light) Frost.SECONDARY_ALPHA else 0.55f
-    Box(
-        modifier
-            .clearAndSetSemantics { }
-            .graphicsLayer { alpha = MeridianMotion.ignite(enterMs()) }
-            .size(with(density) { width.toDp() }, with(density) { height.toDp() })
-            .then(if (light) Modifier.lightGlass(shape) else Modifier.darkGlass(shape, minAlpha = MeridianGlass.FLOOR))
-            .drawBehind {
-                drawRect(tint(), alpha = COUNTER_TINT)
-                val t = roll.value
-                val cy = size.height / 2f
-                clipRect {
-                    var x = padH
-                    for (c in 0 until digits) {
-                        drawRolling(glyphs, previous.intValue, shown.intValue, digits, c, x, cy, t, reduced)
-                        x += glyphs.bigAdvance
-                    }
-                    x += gap
-                    drawText(glyphs.slash, topLeft = Offset(x, cy - glyphs.slash.size.height / 2f + glyphs.bigBaselineShift), alpha = totalAlpha)
-                    x += glyphs.slash.size.width + gap
-                    for (c in 0 until digits) {
-                        val g = glyphs.small[DialCounter.digitAt(total, digits, c)]
-                        drawText(g, topLeft = Offset(x + (glyphs.smallAdvance - g.size.width) / 2f, cy - g.size.height / 2f + glyphs.bigBaselineShift), alpha = totalAlpha)
-                        x += glyphs.smallAdvance
-                    }
-                }
-            },
-    )
-}
-
-/** Una cifra del número grande: la vieja sale por arriba (o por abajo) mientras la nueva entra. */
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRolling(
-    glyphs: CounterGlyphs,
-    from: Int,
-    to: Int,
-    digits: Int,
-    column: Int,
-    x: Float,
-    cy: Float,
-    t: Float,
-    reduced: Boolean,
-) {
-    if (to < 0 || from < 0) {
-        // "+" en la fila de "Añadir": fundido, y el "+" va en la última columna.
-        val last = column == digits - 1
-        val newGlyph = if (to < 0) glyphs.plus.takeIf { last } else glyphs.big[DialCounter.digitAt(to, digits, column)]
-        val oldGlyph = if (from < 0) glyphs.plus.takeIf { last } else glyphs.big[DialCounter.digitAt(from, digits, column)]
-        if (oldGlyph != null && t < 1f) drawText(oldGlyph, topLeft = Offset(x + (glyphs.bigAdvance - oldGlyph.size.width) / 2f, cy - oldGlyph.size.height / 2f), alpha = 1f - t)
-        if (newGlyph != null) drawText(newGlyph, topLeft = Offset(x + (glyphs.bigAdvance - newGlyph.size.width) / 2f, cy - newGlyph.size.height / 2f), alpha = t)
-        return
-    }
-    val dir = DialCounter.direction(from, to, digits, column)
-    val newG = glyphs.big[DialCounter.digitAt(to, digits, column)]
-    val nx = x + (glyphs.bigAdvance - newG.size.width) / 2f
-    val ny = cy - newG.size.height / 2f
-    if (dir == 0 || t >= 1f) {
-        drawText(newG, topLeft = Offset(nx, ny))
-        return
-    }
-    val oldG = glyphs.big[DialCounter.digitAt(from, digits, column)]
-    val ox = x + (glyphs.bigAdvance - oldG.size.width) / 2f
-    val oy = cy - oldG.size.height / 2f
-    if (reduced) {
-        drawText(oldG, topLeft = Offset(ox, oy), alpha = 1f - t)
-        drawText(newG, topLeft = Offset(nx, ny), alpha = t)
-        return
-    }
-    val h = glyphs.bigHeight
-    drawText(oldG, topLeft = Offset(ox, oy - dir * t * h), alpha = 1f - t)
-    drawText(newG, topLeft = Offset(nx, ny + dir * (1f - t) * h), alpha = t)
-}
-
-/** Las cifras medidas una vez (y su avance tabular: el de la más ancha). */
-private class CounterGlyphs(
-    val big: Array<androidx.compose.ui.text.TextLayoutResult>,
-    val small: Array<androidx.compose.ui.text.TextLayoutResult>,
-    val plus: androidx.compose.ui.text.TextLayoutResult,
-    val slash: androidx.compose.ui.text.TextLayoutResult,
-) {
-    val bigAdvance: Float = big.maxOf { it.size.width }.toFloat()
-    val smallAdvance: Float = small.maxOf { it.size.width }.toFloat()
-    val bigHeight: Float = big[0].size.height.toFloat()
-
-    /** Lo que baja el total para compartir la línea de base con el número grande. */
-    val bigBaselineShift: Float = (big[0].firstBaseline - big[0].size.height / 2f) - (small[0].firstBaseline - small[0].size.height / 2f)
-}
-
-internal val COUNTER_HEIGHT = 24.dp
-
-/** Lo que tarda una cifra en rodar. */
-private const val ROLL_MS = 300
-
-/** El matiz del fondo en la cápsula (como mucho un 12 %). */
-private const val COUNTER_TINT = 0.10f
