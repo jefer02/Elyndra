@@ -249,7 +249,7 @@ fun Modifier.darkGlass(
 
 /**
  * `lightGlass()` — el cristal claro del tema claro, para lo que va sobre el
- * velo esmerilado (secciones, orden, contador, fichas): blanco translúcido,
+ * velo esmerilado (secciones, orden, fichas): blanco translúcido,
  * luz arriba, un filo oscuro muy suave abajo y tinta oscura encima
  * ([LightGlass.INK]). [fill] es la opacidad del blanco.
  */
