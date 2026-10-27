@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -34,6 +33,9 @@ import com.elyndra.launcher.data.P
 import com.elyndra.launcher.data.SettingsStore
 import com.elyndra.launcher.ui.components.COVER_RATIO
 import com.elyndra.launcher.ui.components.DotTabs
+import com.elyndra.launcher.ui.components.rememberDotTabPills
+import com.elyndra.launcher.ui.screens.PreviewHeroBar
+import com.elyndra.launcher.ui.DockPalettes
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.LocalScreenSize
 import com.elyndra.launcher.ui.selection.rememberSelectionLook
@@ -163,13 +165,20 @@ private fun MeridianSample(count: Int, art: SampleArt, covers: Boolean = false, 
             val brush = art.brush
             Box(Modifier.fillMaxSize().then(if (brush != null) Modifier.background(brush) else Modifier.liquidGlass(RectangleShape, Color.Transparent)))
         },
+        // La cabecera de verdad (ver RailHeaderRow): solo el dock, en la fila de la barra, sin pasar
+        // del canto curvo de la niebla; Masha y el orden van en la barra de la derecha.
         railHeader = {
-            Box(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp, end = 16.dp), contentAlignment = Alignment.CenterEnd) {
-                DotTabs(labels = listOf("Todo", "Android", "Consolas"), selected = 0, onSelect = {}, light = !P.isDark)
-            }
+            val labels = listOf("Todo", "Android", "Consolas")
+            RailHeaderRow(
+                compact = LocalMeridianFrame.current.compact,
+                pills = rememberDotTabPills(labels),
+                dock = { DotTabs(labels = labels, selected = 2, onSelect = {}, glassMinAlpha = DockPalettes.SEAM_GLASS_MIN, light = !P.isDark) },
+            )
         },
         topEnd = {
-            if (covers) {
+            if (!covers) {
+                PreviewHeroBar(Modifier, landscape = true, masha = true, sort = true, grouped = true)
+            } else {
                 FolderHeader("Nintendo Switch", "/storage/emulated/0/Android/media/Roms/Nintendo/Switch/Juegos completos") {
                     Box(Modifier.height(34.dp).darkGlass(RoundedCornerShape(12.dp)).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
                         ElyText("21:47 · 84 %", size = 11f, weight = FontWeight.SemiBold, color = Color.White)
