@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -570,13 +572,21 @@ data class PadHint(val button: String, @StringRes val label: Int)
 /**
  * Pistas del mando ("A Abrir · B Atrás"). Solo se pintan con un mando
  * conectado ([visible]); aparecen y se van con un fundido.
+ *
+ * Con [wrap], si no caben en una fila, la pista que no cabe baja a otra
+ * (cada botón con su rótulo va siempre junto). En la columna de la rueda de
+ * un móvil apaisado (~190 dp) "↑↓ Verschieben · LB / RB Bereich" no cabía y
+ * la fila cortaba el último rótulo; a la derecha está el canto de la niebla,
+ * así que no hay más ancho que darle.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PadHints(
     hints: List<PadHint>,
     visible: Boolean,
     modifier: Modifier = Modifier,
     onDark: Boolean = false,
+    wrap: Boolean = false,
 ) {
     val reduced = LocalReducedMotion.current
     AnimatedVisibility(
@@ -585,13 +595,10 @@ fun PadHints(
         enter = fadeIn(if (reduced) snap() else Springs.fade()),
         exit = fadeOut(if (reduced) snap() else Springs.exit()),
     ) {
-        Row(
-            Modifier
-                .then(if (onDark) Modifier.darkGlass(RoundedCornerShape(Radii.s)) else Modifier)
-                .padding(horizontal = 10.dp, vertical = 5.dp),
-            horizontalArrangement = Arrangement.spacedBy(Space.m),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        val box = Modifier
+            .then(if (onDark) Modifier.darkGlass(RoundedCornerShape(Radii.s)) else Modifier)
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+        val items: @Composable () -> Unit = {
             hints.forEach { hint ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     PadButtonGlyph(hint.button, onDark)
@@ -605,6 +612,11 @@ fun PadHints(
                     )
                 }
             }
+        }
+        if (wrap) {
+            FlowRow(box, horizontalArrangement = Arrangement.spacedBy(Space.m), verticalArrangement = Arrangement.spacedBy(4.dp)) { items() }
+        } else {
+            Row(box, horizontalArrangement = Arrangement.spacedBy(Space.m), verticalAlignment = Alignment.CenterVertically) { items() }
         }
     }
 }
