@@ -139,4 +139,152 @@ class DotTabsLayoutTest {
         assertEquals(2f, DockPlacement.seamRise(8f), eps)
         assertEquals(0f, DockPlacement.seamRise(4f), eps)
     }
+
+    @Test
+    fun `con la seccion vacia el dock va entero dentro del hero y con juegos a caballo de la costura`() {
+        assertTrue(DockPlacement.insideHero(empty = true, inBar = false))
+        assertTrue(!DockPlacement.insideHero(empty = false, inBar = false))
+        // En la barra no hay costura: ni vacía se mueve.
+        assertTrue(!DockPlacement.insideHero(empty = true, inBar = true))
+
+        val dock = DotTabsLayout.HEIGHT
+        for (hero in listOf(240f, 420f, 560f)) for (pad in listOf(8f, 18f)) {
+            val rise = DockPlacement.seamRise(pad)
+            val inside = DockPlacement.top(hero, dock, inHero = true, seamRise = rise)
+            assertTrue("hero $hero: dentro", inside >= 0f && inside + dock <= hero + eps)
+            assertEquals("hero $hero: a HERO_GAP del canto", hero - DockPlacement.HERO_GAP, inside + dock, eps)
+            // El bloque de título sube lo que ocupa el dock más su aire: no se pisan.
+            assertTrue(hero - DockPlacement.heroLift(dock) <= inside + eps)
+
+            val seam = DockPlacement.top(hero, dock, inHero = false, seamRise = rise)
+            assertTrue("hero $hero pad $pad: a caballo", seam < hero && seam + dock > hero)
+            assertEquals(hero - rise, seam, eps)
+        }
+    }
+
+    /* ── Encajar en un ancho dado (fit) ── */
+
+    /** El dock con [fit] ya aplicado: píldoras recortadas a su tope, puntos a su hueco. */
+    private fun fittedWidth(natural: FloatArray, maxWidth: Float): Float {
+        val fit = DotTabsLayout.fit(natural, maxWidth)
+        val capped = FloatArray(natural.size) { minOf(natural[it], fit.pillCap) }
+        // Se mide con la píldora más ancha elegida: el dock no cambia de tamaño al cambiar de sección.
+        return capped.indices.maxOf { DotTabsLayout.totalWidth(capped, it, fit.dot) }
+    }
+
+    @Test
+    fun `con sitio de sobra el dock no cambia`() {
+        val natural = pills(labels.getValue("es"))
+        val fit = DotTabsLayout.fit(natural, 1_000f)
+        assertEquals(DOT_SLOT, fit.dot, eps)
+        assertEquals(DotTabsLayout.PILL_MAX, fit.pillCap, eps)
+        assertEquals(DotTabsLayout.PILL_MAX, DotTabsLayout.fit(natural, Float.POSITIVE_INFINITY).pillCap, eps)
+    }
+
+    @Test
+    fun `con poco sitio primero se recorta el rotulo y despues se juntan los puntos`() {
+        val natural = floatArrayOf(60f, 140f, 140f)
+        val loose = DotTabsLayout.fit(natural, 2 * INSET + 2 * (DOT_SLOT + GAP) + 100f)
+        assertEquals("los puntos no se tocan mientras el rótulo pueda bajar hasta PILL_FIT", DOT_SLOT, loose.dot, eps)
+        assertEquals(100f, loose.pillCap, eps)
+        // Los puntos ceden (hasta 38 dp) para que la píldora conserve PILL_FIT.
+        val tight = DotTabsLayout.fit(natural, 2 * INSET + 2 * (38f + GAP) + DotTabsLayout.PILL_FIT)
+        assertEquals(38f, tight.dot, eps)
+        assertEquals(DotTabsLayout.PILL_FIT, tight.pillCap, eps)
+        // Con los puntos ya en su mínimo, lo que falte sale de la píldora.
+        val tighter = DotTabsLayout.fit(natural, 2 * INSET + 2 * (DotTabsLayout.DOT_SLOT_MIN + GAP) + 60f)
+        assertEquals(DotTabsLayout.DOT_SLOT_MIN, tighter.dot, eps)
+        assertEquals(60f, tighter.pillCap, eps)
+    }
+
+    @Test
+    fun `desde su minimo el dock nunca mide mas de lo que le dan`() {
+        for ((lang, widths) in labels) {
+            for (n in 2..widths.size) {
+                val natural = pills(widths.copyOf(n))
+                var w = DotTabsLayout.minWidth(n)
+                while (w <= 400f) {
+                    assertTrue("$lang n=$n en $w dp", fittedWidth(natural, w) <= w + eps)
+                    val fit = DotTabsLayout.fit(natural, w)
+                    assertTrue(fit.dot in DotTabsLayout.DOT_SLOT_MIN..DOT_SLOT)
+                    assertTrue(fit.pillCap >= DotTabsLayout.PILL_MIN)
+                    w += 1f
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `el sitio del rotulo descuenta margenes e icono`() {
+        assertEquals(DotTabsLayout.LABEL_MAX, DotTabsLayout.labelRoom(DotTabsLayout.PILL_MAX), eps)
+        assertEquals(88f - 24f - 16f, DotTabsLayout.labelRoom(88f, 16f), eps)
+        assertEquals(0f, DotTabsLayout.labelRoom(10f, 16f), eps)
+    }
+
+    /* ── Dock + botón de orden ── */
+
+    @Test
+    fun `el boton de orden va siempre tras el dock con su aire`() {
+        val tabs = 150f
+        assertEquals(tabs + SectionDockLayout.SORT_GAP, SectionDockLayout.sortX(tabs), eps)
+        assertEquals(tabs + SectionDockLayout.SORT_GAP + SectionDockLayout.SORT_WIDTH, SectionDockLayout.width(tabs), eps)
+        assertEquals(200f - SectionDockLayout.SORT_GAP - SectionDockLayout.SORT_WIDTH, SectionDockLayout.tabsMaxWidth(200f), eps)
+        assertEquals(0f, SectionDockLayout.tabsMaxWidth(20f), eps)
+    }
+
+    /**
+     * Móvil apaisado (~800 × 360 dp, Meridian): la columna de la rueda mide
+     * 200 dp. Antes el dock solo tenía 162 dp y, sin respetarlos, el botón de
+     * orden acababa encima de la píldora. El orden ya va en la barra de la
+     * derecha: el dock, solo, cabe en los seis idiomas sin llegar al bloque
+     * del hero ni pasar del velo.
+     */
+    @Test
+    fun `movil apaisado el dock cabe solo en la cabecera de la rueda`() {
+        val rail = com.elyndra.launcher.ui.meridian.MeridianGeometry.slimRailWidth(800f, 360f, 1f, compact = true)
+        val header = com.elyndra.launcher.ui.meridian.RailHeaderLayout
+        val old = rail - header.START - header.END
+        assertTrue("el caso del fallo: antes no cabía", SectionDockLayout.width(DotTabsLayout.totalWidth(pills(labels.getValue("es").copyOf(3)), 2)) > old)
+        val heroLeft = rail + com.elyndra.launcher.ui.meridian.MeridianGeometry.HERO_GAP
+        val veilEnd = com.elyndra.launcher.ui.meridian.MeridianScrims.clearAt(rail, 800f)
+        for ((lang, widths) in labels) {
+            for (n in 2..widths.size) {
+                val maxDock = header.dockMaxWidth(rail)
+                val dock = fittedWidth(pills(widths.copyOf(n)), maxDock)
+                assertTrue("$lang n=$n", dock <= maxDock + eps)
+                val right = header.dockX(rail, dock) + dock
+                assertTrue("$lang n=$n no llega al bloque del hero", right < heroLeft)
+                assertTrue("$lang n=$n tiene velo detrás", right + 16f <= veilEnd)
+            }
+        }
+    }
+
+    /** Móvil en vertical (~393 dp, Clásico): el dock va en la costura con todo el ancho; entero. */
+    @Test
+    fun `movil vertical el dock va entero en la costura`() {
+        val seam = 393f - 2 * 18f
+        for ((lang, widths) in labels) {
+            val natural = pills(widths)
+            val fit = DotTabsLayout.fit(natural, SectionDockLayout.tabsMaxWidth(seam))
+            assertEquals(lang, DOT_SLOT, fit.dot, eps)
+            assertEquals(lang, DotTabsLayout.PILL_MAX, fit.pillCap, eps)
+        }
+    }
+
+    /** Tableta apaisada (Legion Y700, ~1280 × 800 dp): la columna es ancha y el dock no se toca. */
+    @Test
+    fun `tableta apaisada el dock no cambia`() {
+        val rail = com.elyndra.launcher.ui.meridian.MeridianGeometry.slimRailWidth(1280f, 800f, 1f, compact = false)
+        val header = com.elyndra.launcher.ui.meridian.RailHeaderLayout
+        for ((lang, widths) in labels) {
+            val natural = pills(widths.copyOf(3))
+            // Solo el dock: el orden va en la barra de la derecha.
+            val fit = DotTabsLayout.fit(natural, header.dockMaxWidth(rail))
+            assertEquals(lang, DOT_SLOT, fit.dot, eps)
+            assertEquals(lang, DotTabsLayout.PILL_MAX, fit.pillCap, eps)
+            // Pegado al canto de la columna, como antes (no asoma sobre el hueco del hero).
+            val dock = fittedWidth(natural, Float.POSITIVE_INFINITY)
+            assertTrue(lang, header.dockX(rail, dock) + dock <= rail - header.END + eps)
+        }
+    }
 }
