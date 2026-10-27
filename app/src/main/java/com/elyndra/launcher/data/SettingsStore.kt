@@ -5,9 +5,9 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 
 /** Ajustes no sensibles (aspecto, opciones de metadatos, sesión de juego en curso). */
-class SettingsStore(context: Context) {
+class SettingsStore internal constructor(private val prefs: SharedPreferences) {
 
-    private val prefs: SharedPreferences = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    constructor(context: Context) : this(context.getSharedPreferences("settings", Context.MODE_PRIVATE))
 
     /** Acento guardado; sin guardar (instalación nueva), el de partida (ver Palettes). */
     var accentId: String
@@ -161,9 +161,9 @@ class SettingsStore(context: Context) {
         if (prefs.contains("translate.auto")) prefs.edit { remove("translate.auto") }
     }
 
-    /** Píldora de hora y batería en Biblioteca y Carpeta. */
+    /** Píldora de hora y batería en Biblioteca y Carpeta; sin guardar (instalación nueva), apagada. Lo guardado manda. */
     var statusVisible: Boolean
-        get() = prefs.getBoolean("status.visible", true)
+        get() = prefs.getBoolean("status.visible", DEFAULT_STATUS_VISIBLE)
         set(v) = prefs.edit { putBoolean("status.visible", v) }
 
     /** Qué enseña la píldora: "both", "time" o "battery" (ver StatusMode). */
@@ -415,6 +415,9 @@ class SettingsStore(context: Context) {
         const val DEFAULT_SELECTION_PARTICLE_COLOR = 0xFF7C5CFF.toInt()
 
         const val DEFAULT_SELECTION_GLOW = true
+
+        /** La píldora de hora y batería, apagada de serie: se enciende en Ajustes. */
+        const val DEFAULT_STATUS_VISIBLE = false
 
         /** Un toque en lo seleccionado lo abre; apagado, se abre con doble toque como antes. */
         const val DEFAULT_TAP_OPENS_SELECTED = true
