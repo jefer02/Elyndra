@@ -313,6 +313,8 @@
     <string name="sheet_group_manage">管理</string>
     <string name="sheet_play">プレイ</string>
     <string name="confirm_again">長押しするか、もう一度押して確定</string>
+    <string name="remove_short">削除</string>
+    <string name="confirm_short">確定?</string>
     <string name="toast_pick_game_in_app">%1$sが開きます。そこでゲームを選んでください</string>
     <string name="open_bachata">Bachata S4を開く</string>
     <plurals name="ps4_pkgs_not_installed">
