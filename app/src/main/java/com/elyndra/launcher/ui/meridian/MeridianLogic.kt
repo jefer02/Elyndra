@@ -2,13 +2,14 @@ package com.elyndra.launcher.ui.meridian
 
 import com.elyndra.launcher.data.BrandTokens
 import com.elyndra.launcher.data.ColorMath
+import com.elyndra.launcher.ui.DotTabsLayout
+import com.elyndra.launcher.ui.TopBarLayout
 import com.elyndra.launcher.ui.theme.WheelGlass
 import java.text.Normalizer
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.exp
 import kotlin.math.floor
-import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -19,7 +20,7 @@ import kotlin.math.sqrt
    Meridian, sin Compose: qué modo toca, cómo se deforma la rueda
    según la distancia a la línea de foco, el círculo que siguen las
    filas y el dial, dónde se para al soltarla, el muelle que la lleva,
-   el dial y su contador y el reparto de la pantalla.
+   el dial y el reparto de la pantalla.
    Todo son números para probarlo en la JVM; el dibujo vive en los
    demás archivos del paquete.
    ───────────────────────────────────────────────────────────── */
@@ -309,7 +310,7 @@ object ShortList {
 
 /**
  * Los cantos de la rueda: una fila que se mete bajo lo que tapa la parte de
- * arriba (el bocadillo de Masha mientras se ve, o la cabecera) se apaga antes
+ * arriba (la cabecera) se apaga antes
  * de tocarlo; lo mismo abajo. [visualHeight] es el alto de la fila ya escalada.
  */
 object RailEdge {
@@ -492,40 +493,6 @@ data class DialScale(val count: Int, val spacing: Float, val stride: Int, val ma
 }
 
 /**
- * El contador del dial: la posición grande y el total apagado, con las mismas
- * cifras siempre (de 1 a 4, como poco 2), para que la cápsula no cambie de
- * ancho al moverse. Cada cifra rueda en vertical como un cuentakilómetros.
- */
-object DialCounter {
-
-    const val MAX_DIGITS = 4
-
-    /** Cifras del contador para [total] juegos: al menos 2 y como mucho [MAX_DIGITS] (más allá, el número entero). */
-    fun digits(total: Int): Int = max(2, total.coerceAtLeast(0).toString().length)
-
-    /** El número de la fila [index] (desde 0) entre [total], con ceros delante hasta [digits] cifras. */
-    fun current(index: Int, total: Int): String {
-        if (total <= 0) return "0".repeat(digits(total))
-        return (index + 1).coerceIn(1, total).toString().padStart(digits(total), '0')
-    }
-
-    fun total(total: Int): String = total.coerceAtLeast(0).toString().padStart(digits(total), '0')
-
-    /** La cifra de la columna [column] (0 = la de la izquierda) de [value] escrito con [digits] cifras. */
-    fun digitAt(value: Int, digits: Int, column: Int): Int {
-        var v = value.coerceAtLeast(0)
-        repeat(digits - 1 - column) { v /= 10 }
-        return v % 10
-    }
-
-    /** Hacia dónde rueda una cifra: +1 (sube, el número crece), −1 (baja) o 0 (no cambia esa cifra). */
-    fun direction(from: Int, to: Int, digits: Int, column: Int): Int {
-        if (digitAt(from, digits, column) == digitAt(to, digits, column)) return 0
-        return if (to > from) 1 else -1
-    }
-}
-
-/**
  * La entrada de Meridian, medida en milisegundos desde que arranca (un solo
  * reloj para todo, leído en las capas): el dial se enciende desde la muesca
  * hacia fuera, las filas entran en cascada desde la izquierda (solo las
@@ -622,8 +589,17 @@ data class MeridianGeometry(
             return (inset + tile * aspect + TILE_TO_DIAL).coerceAtLeast(SLIM_MIN).coerceAtMost(classic)
         }
 
-        /** Hueco entre el dial y el arranque del bloque del hero: ahí va el contador del nodo (hasta 4 cifras), que no lo pisa nunca. */
-        const val HERO_GAP = 96f
+        /**
+         * Hueco entre el dial y el arranque del bloque del hero. Antes medía 96
+         * para el contador del nodo; sin él solo separa el dial del bloque, y
+         * esos dp son arte. No baja de 48 por dos cosas medidas: el velo (que
+         * necesita [MeridianScrims.FADE_DP] para no hacer canto) ya está por
+         * debajo del 0,25 al llegar aquí, así que no apaga el texto blanco del
+         * hero en el tema claro; y lo que asoma el dock de la cabecera
+         * ([RailHeaderLayout.OVERHANG]) le deja en un móvil al menos el sitio
+         * que tenía con el orden al lado.
+         */
+        const val HERO_GAP = 48f
 
         /** Margen de abajo del bloque del hero, en fracción del alto de la pantalla. */
         const val HERO_BOTTOM = 0.08f
@@ -656,9 +632,11 @@ data class MeridianGeometry(
  * El velo neutro del tema (con "Color de fondo adaptable" apagado, o cuando
  * el color del arte no daría el contraste): tinta honda en oscuro, perla
  * cálida en claro, más fuerte en el canto izquierdo, que se mantiene hasta el
- * eje y se desvanece del todo hacia el 62 % del ancho. El adaptable usa el
- * mismo perfil de opacidad como máscara (ver [ArtWash]). El peor caso es arte
- * negro o blanco puro (o muy saturado).
+ * eje y se desvanece del todo [FADE_DP] más allá, justo pasada la columna de
+ * la rueda. El adaptable usa el mismo perfil de opacidad como máscara (ver
+ * [ArtWash]). El peor caso es arte negro o blanco puro (o muy saturado).
+ *
+ * Todo en dp (quien pinta en px convierte antes: ver la máscara de [MeridianFog]).
  */
 object MeridianScrims {
 
@@ -674,11 +652,14 @@ object MeridianScrims {
     const val AXIS_ALPHA = 0.86f
 
     /**
-     * Donde el velo ya es transparente: esta fracción del ancho más allá del
-     * eje (con la columna ancha de antes, el 58 % del ancho; con la rueda de
-     * solo iconos, el velo se queda junto a ella y deja el arte limpio).
+     * Lo que tarda el velo en apagarse pasado el eje (dp). Antes era el 16 %
+     * del ancho (hasta ~200 dp en una tableta), en parte para que el contador
+     * del nodo tuviera fondo; sin contador basta con una banda fija junto a la
+     * rueda y el resto es arte. Es lo más corto sin canto: con la caída de
+     * [FALLOFF], por debajo de ~80 dp el velo baja más de 0,02 por dp y se ve
+     * el borde.
      */
-    const val FADE_PAST_AXIS = 0.16f
+    const val FADE_DP = 88f
 
     /**
      * La caída más allá del eje: `(1 − smoothstep)^FALLOFF`. Con más de 1 el
@@ -710,7 +691,8 @@ object MeridianScrims {
 
     fun plateAlpha(dark: Boolean): Float = if (dark) PLATE_ALPHA_DARK else PLATE_ALPHA_LIGHT
 
-    fun clearAt(axisX: Float, width: Float): Float = (axisX + width * FADE_PAST_AXIS).coerceAtMost(width)
+    /** Donde el velo ya es transparente (dp), en una ventana de [width]. */
+    fun clearAt(axisX: Float, width: Float): Float = (axisX + FADE_DP).coerceAtMost(width)
 
     /** Opacidad del velo a [x] (mismas unidades que [axisX] y [width]). */
     fun alphaAt(x: Float, axisX: Float, width: Float): Float {
@@ -728,13 +710,15 @@ object MeridianScrims {
      * El canto del cristal curvo del tema claro (dp) a la altura [y]: en la
      * línea de foco ([focusY]) pasa [WheelGlass.PAST_AXIS_DP] del eje, y se
      * corre a la izquierda lo mismo que las filas al seguir el círculo de la
-     * rueda ([radius]); nunca más allá de [WheelGlass.MIN_EDGE_DP].
+     * rueda ([radius]); nunca más allá de [WheelGlass.MIN_EDGE_DP]. En la
+     * banda de arriba ([band]) no se recoge más de lo que pide el dock.
      */
-    fun glassEdgeAt(y: Float, axisX: Float, focusY: Float, radius: Float): Float =
-        (axisX + WheelGlass.PAST_AXIS_DP - MeridianFog.shift(y, focusY, radius)).coerceAtLeast(WheelGlass.MIN_EDGE_DP)
+    fun glassEdgeAt(y: Float, axisX: Float, focusY: Float, radius: Float, band: MeridianFog.Band = MeridianFog.Band.NONE): Float =
+        (axisX + WheelGlass.PAST_AXIS_DP - MeridianFog.shift(y, focusY, radius, band)).coerceAtLeast(WheelGlass.MIN_EDGE_DP)
 
-    /** Lo más ancho que llega el cristal (en la línea de foco), en dp. */
-    fun glassRight(axisX: Float, width: Float): Float = (axisX + WheelGlass.PAST_AXIS_DP).coerceAtMost(width)
+    /** Lo más ancho que llega el cristal (en la línea de foco, o hasta [reachX] si la banda de arriba pasa de ahí), en dp. */
+    fun glassRight(axisX: Float, width: Float, reachX: Float = 0f): Float =
+        maxOf(axisX + WheelGlass.PAST_AXIS_DP, reachX + WheelGlass.RIM_DP).coerceAtMost(width)
 
     /** Las paradas del degradado horizontal: (posición 0…1 del ancho, opacidad). */
     fun stops(axisX: Float, width: Float): List<Pair<Float, Float>> {
@@ -778,8 +762,9 @@ object MeridianScrims {
  * para todas), y arriba y abajo, lejos del centro de la lista, el arte queda
  * más limpio: la niebla dibuja la media luna de la rueda en vez de una banda recta.
  *
- * Todo en las mismas unidades (dp o px): [focusY] es la línea de foco y
- * [radius] el radio del círculo (≤ 0 = sin curva, el perfil recto de antes).
+ * Todo en dp (el velo se apaga en [MeridianScrims.FADE_DP], que son dp): [focusY]
+ * es la línea de foco y [radius] el radio del círculo (≤ 0 = sin curva, el
+ * perfil recto de antes).
  */
 object MeridianFog {
 
@@ -789,22 +774,91 @@ object MeridianFog {
     /** Lo que se corre el perfil a la altura [y]: lo mismo que la fila que pasa por ahí (≥ 0). */
     fun shift(y: Float, focusY: Float, radius: Float): Float = -WheelArc.offset(y - focusY, radius)
 
-    fun alphaAt(x: Float, y: Float, axisX: Float, width: Float, focusY: Float, radius: Float): Float =
-        MeridianScrims.alphaAt(x + shift(y, focusY, radius), axisX, width)
+    /**
+     * La banda de arriba (la cabecera de la rueda, hasta [bottom]) en la que
+     * la niebla no se recoge más de [maxShift]: ahí el canto llega al menos
+     * hasta donde acaba el dock más su aire. Hace falta cuando el dock, ni en
+     * su ancho mínimo, cabe bajo la curva (la curva se recoge mucho lejos de
+     * la línea de foco): mejor ensanchar la niebla arriba que dejarlo medio
+     * sobre el arte. Por debajo de [bottom] vuelve a la curva en [BAND_BLEND]
+     * dp, sin escalón. [maxShift] puede ser negativo (el cristal claro pasa de
+     * su canto de la línea de foco).
+     */
+    data class Band(val bottom: Float, val maxShift: Float) {
+        companion object {
+            val NONE = Band(0f, Float.POSITIVE_INFINITY)
+        }
+    }
+
+    /** Lo que tarda la banda en volver a la curva por debajo de la cabecera (dp). */
+    const val BAND_BLEND = 32f
+
+    /** [shift] con la banda de arriba ([band]): nunca más de su tope dentro de ella, y de vuelta a la curva justo debajo. */
+    fun shift(y: Float, focusY: Float, radius: Float, band: Band): Float {
+        val s = shift(y, focusY, radius)
+        if (s <= band.maxShift) return s
+        return band.maxShift + (s - band.maxShift) * WheelTransform.smoothstep(band.bottom, band.bottom + BAND_BLEND, y)
+    }
+
+    fun alphaAt(x: Float, y: Float, axisX: Float, width: Float, focusY: Float, radius: Float, band: Band = Band.NONE): Float =
+        MeridianScrims.alphaAt(x + shift(y, focusY, radius, band), axisX, width)
+
+    /**
+     * Hasta dónde se ve la niebla, por fuera del eje, en la línea de foco
+     * (dp): donde el velo ya se ha quedado en la mitad ([VISIBLE]) de lo que
+     * tiene en el eje. No es [MeridianScrims.FADE_DP] (ahí ya es transparente):
+     * con la caída de [MeridianScrims.FALLOFF] el velo queda en un cuarto a
+     * mitad de la banda y, a la vista, lo que hay más allá ya es arte. Medir
+     * contra los 88 dp decía "cabe" a un dock que se veía medio sobre el arte.
+     */
+    const val VISIBLE = 0.5f
+
+    val WASH_REACH: Float by lazy {
+        // Inversa de la caída: (1 − smoothstep(t))^FALLOFF = VISIBLE.
+        val target = 1f - VISIBLE.toDouble().pow(1.0 / MeridianScrims.FALLOFF).toFloat()
+        var lo = 0f
+        var hi = 1f
+        repeat(40) {
+            val mid = (lo + hi) / 2f
+            if (WheelTransform.smoothstep(0f, 1f, mid) < target) lo = mid else hi = mid
+        }
+        (lo + hi) / 2f * MeridianScrims.FADE_DP
+    }
+
+    /** Lo que llega la niebla por fuera del eje en la línea de foco: el canto del cristal claro ([glass]) o [WASH_REACH]. */
+    fun reach(glass: Boolean): Float = if (glass) WheelGlass.PAST_AXIS_DP else WASH_REACH
+
+    /**
+     * El canto que se ve de la niebla a la altura [y] (dp): el del cristal
+     * claro ([glass], ver [MeridianScrims.glassEdgeAt]) o el del velo oscuro,
+     * los dos curvados por el círculo de la rueda y con la banda de arriba.
+     * Lo que va sobre la niebla (el dock de la cabecera, el bocadillo de
+     * Masha) se queda a este lado, con su aire.
+     */
+    fun visibleEdge(y: Float, axisX: Float, focusY: Float, radius: Float, glass: Boolean, band: Band = Band.NONE): Float =
+        if (glass) MeridianScrims.glassEdgeAt(y, axisX, focusY, radius, band) else axisX + WASH_REACH - shift(y, focusY, radius, band)
+
+    /**
+     * La banda de arriba hasta [bottom] para que el canto llegue a [reachX]
+     * (dp; ≤ 0 = sin banda), con el velo o el cristal ([glass]) de eje [axisX].
+     */
+    fun band(bottom: Float, reachX: Float, axisX: Float, glass: Boolean): Band =
+        if (reachX <= 0f) Band.NONE else Band(bottom, axisX + reach(glass) - reachX)
 
     /**
      * La máscara en una rejilla de [cols]×[rows] muestras que cubre una capa
      * de [layerWidth]×[layerHeight] (cada muestra en el centro de su celda),
      * como ARGB negro con la opacidad del velo. [width] es el ancho de la
-     * ventana y [axisX] el eje; mismas unidades que las alturas.
+     * ventana y [axisX] el eje; todo en dp, como las alturas. [band], la
+     * banda de arriba (ver [Band]).
      */
-    fun mask(cols: Int, rows: Int, layerWidth: Float, layerHeight: Float, axisX: Float, width: Float, focusY: Float, radius: Float): IntArray {
+    fun mask(cols: Int, rows: Int, layerWidth: Float, layerHeight: Float, axisX: Float, width: Float, focusY: Float, radius: Float, band: Band = Band.NONE): IntArray {
         val out = IntArray(cols * rows)
         if (cols <= 0 || rows <= 0) return out
         val sx = layerWidth / cols
         val sy = layerHeight / rows
         for (j in 0 until rows) {
-            val shift = shift((j + 0.5f) * sy, focusY, radius)
+            val shift = shift((j + 0.5f) * sy, focusY, radius, band)
             for (i in 0 until cols) {
                 val a = MeridianScrims.alphaAt((i + 0.5f) * sx + shift, axisX, width)
                 out[j * cols + i] = ColorMath.withAlpha(0xFF000000.toInt(), a)
@@ -819,7 +873,7 @@ object MeridianFog {
 
 /**
  * El cristal oscuro de las píldoras y cápsulas de Meridian (volver, "Abrir",
- * emulador, hora y batería, buscar, Ajustes, contador): con este suelo de
+ * emulador, hora y batería, buscar, Ajustes): con este suelo de
  * tinta el texto blanco llega al 4,5:1 y los iconos al 3:1 sobre cualquier
  * fondo, también sobre arte blanco o un velo pastel.
  */
@@ -896,46 +950,116 @@ object LogoFit {
 }
 
 /**
- * Dónde va el bocadillo de Masha sin tapar nada: debajo de su botón,
- * alineado a su izquierda; si ahí pisa algo (el dock que baja a una segunda
- * línea, el orden…), a su derecha; si tampoco, por debajo de lo que pisa.
- * Siempre dentro de [bounds] (en Meridian, la columna de la rueda: nunca
- * llega al bloque del hero ni a las píldoras de arriba a la derecha).
+ * Dónde va el bocadillo de Masha sin tapar nada, y nunca encima de quien
+ * habla: su propio botón cuenta siempre como obstáculo, igual que lo que se
+ * le pase (el dock, el grupo de arriba a la derecha, el bloque del hero).
+ *
+ * En Meridian, Masha es la primera pieza del grupo de arriba a la derecha y
+ * el bocadillo va justo debajo del grupo, sobre el arte ([underGroup]): ahí
+ * hay ancho para la línea entera en una fila. Antes iba en la cabecera de la
+ * rueda, a la derecha del emblema o, si no cabía, en la columna, partido en
+ * tres líneas y empujando la rueda hacia abajo.
+ *
+ * En el Clásico, debajo del botón, alineado a su izquierda y bajando por
+ * debajo de lo que pise —el dock— ([below]). Sin cola: el bocadillo se lee
+ * de quién es por estar pegado al botón (y por su filo de acento).
  */
 object BubbleSlot {
 
     data class Area(val left: Float, val top: Float, val right: Float, val bottom: Float) {
         val width: Float get() = right - left
+        val height: Float get() = bottom - top
         fun overlaps(o: Area): Boolean = left < o.right && o.left < right && top < o.bottom && o.top < bottom
         fun at(x: Float, y: Float, w: Float, h: Float) = Area(x, y, x + w, y + h)
     }
 
-    /** Arriba a la izquierda del bocadillo de [w]×[h] junto a [anchor], dentro de [bounds] y fuera de [obstacles]. */
-    fun place(anchor: Area, w: Float, h: Float, bounds: Area, obstacles: List<Area>, gap: Float, margin: Float): Pair<Float, Float> {
-        fun clampX(x: Float) = x.coerceIn(bounds.left + margin, (bounds.right - w - margin).coerceAtLeast(bounds.left + margin))
-        fun clampY(y: Float) = y.coerceIn(bounds.top + margin, (bounds.bottom - h - margin).coerceAtLeast(bounds.top + margin))
-        val candidates = listOf(
-            clampX(anchor.left) to clampY(anchor.bottom + gap),
-            clampX(anchor.right + gap) to clampY(anchor.top + (anchor.bottom - anchor.top) / 2f - h / 2f),
-        )
-        for ((x, y) in candidates) {
-            val box = Area(x, y, x + w, y + h)
-            if (obstacles.none { it.overlaps(box) }) return x to y
+    /**
+     * Dónde queda el bocadillo: arriba a la izquierda y su ancho. Sin [clear]
+     * no hay sitio que no tape algo (letra muy grande con un hero muy alto):
+     * mejor no enseñarlo que tapar los botones del hero.
+     */
+    data class Slot(val x: Float, val y: Float, val width: Float, val clear: Boolean = true)
+
+    /**
+     * Debajo del grupo de arriba a la derecha ([group]), en el que va el botón
+     * de Masha ([anchor]), para un bocadillo de ancho natural [natural] (la
+     * línea en una fila) y alto [heightFor] según el ancho.
+     *
+     * Pegado al canto derecho del grupo si es más ancho que lo que va de
+     * Masha a ese canto; si es más estrecho, alineado a la izquierda de Masha:
+     * así siempre queda debajo de ella. No pasa de [maxWidth] ni sale por la
+     * izquierda de [bounds] (lo que queda del arte, sin la columna de la
+     * rueda), con [margin] de aire: si la línea no cabe, se estrecha y el
+     * texto se parte (en dos líneas, lo normal). Si pisa algún obstáculo por
+     * la izquierda (el dock que asoma), se estrecha hasta dejarlo libre; si
+     * aun así pisa algo (el bloque del hero, que no se puede esquivar a lo
+     * ancho), [Slot.clear] es false. Nunca baja de [minWidth].
+     */
+    fun underGroup(
+        anchor: Area,
+        group: Area,
+        natural: Float,
+        maxWidth: Float,
+        heightFor: (Float) -> Float,
+        bounds: Area,
+        obstacles: List<Area>,
+        gap: Float,
+        margin: Float,
+        minWidth: Float = 0f,
+    ): Slot {
+        val right = minOf(group.right, bounds.right - margin)
+        var left = bounds.left + margin
+        val y = maxOf(group.bottom, anchor.bottom) + gap
+        repeat(obstacles.size + 1) {
+            val w = minOf(natural, maxWidth, right - left).coerceAtLeast(minWidth)
+            val x = minOf(right - w, anchor.left).coerceAtLeast(left)
+            val box = Area(x, y, x + w, y + heightFor(w))
+            val hits = (obstacles + anchor).filter { it.overlaps(box) }
+            if (hits.isEmpty()) return Slot(x, y, w)
+            // Lo que asoma por la izquierda (el dock) se deja a un lado; lo que lo cruza entero, no.
+            val side = hits.filter { it.right < right - minWidth }.maxOfOrNull { it.right } ?: return Slot(x, y, w, clear = false)
+            if (side + gap <= left) return Slot(x, y, w, clear = false)
+            left = side + gap
         }
-        var (x, y) = candidates[0]
+        val w = minOf(natural, maxWidth, right - left).coerceAtLeast(minWidth)
+        return Slot(minOf(right - w, anchor.left).coerceAtLeast(left), y, w, clear = false)
+    }
+
+    /**
+     * Debajo de [anchor], alineado a su izquierda, dentro de [bounds] a lo
+     * ancho y por debajo de lo que pise de [obstacles]. Nunca sube por encima
+     * del botón (antes, al recolocarlo dentro de [bounds], podía quedar encima).
+     */
+    fun below(anchor: Area, w: Float, h: Float, bounds: Area, obstacles: List<Area>, gap: Float, margin: Float): Pair<Float, Float> {
+        val x = anchor.left.coerceIn(bounds.left + margin, (bounds.right - w - margin).coerceAtLeast(bounds.left + margin))
+        var y = maxOf(anchor.bottom + gap, bounds.top + margin)
         repeat(obstacles.size) {
             val box = Area(x, y, x + w, y + h)
             val hit = obstacles.filter { it.overlaps(box) }.maxOfOrNull { it.bottom } ?: return x to y
-            y = clampY(hit + gap)
+            y = hit + gap
         }
         return x to y
     }
 
-    /** Lo que la rueda deja libre arriba (px desde su canto) mientras el bocadillo baja hasta [bubbleBottom]. */
-    fun reserve(bubbleBottom: Float, railTop: Float, gap: Float): Float = (bubbleBottom - railTop + gap).coerceAtLeast(0f)
-
-    /** La rueda baja la mitad de lo que ocupa el bocadillo (lo demás lo apaga el canto de arriba). */
-    const val SHIFT = 0.5f
+    /**
+     * El sitio del bocadillo en el Clásico: debajo del botón ([below]) con su
+     * ancho natural [natural], hasta [maxWidth]. [heightFor] da su alto para
+     * un ancho (el texto se parte en líneas).
+     */
+    fun choose(
+        anchor: Area,
+        natural: Float,
+        maxWidth: Float,
+        heightFor: (Float) -> Float,
+        bounds: Area,
+        obstacles: List<Area>,
+        gap: Float,
+        margin: Float,
+    ): Slot {
+        val w = minOf(natural, maxWidth)
+        val (x, y) = below(anchor, w, heightFor(w), bounds, obstacles, gap, margin)
+        return Slot(x, y, w)
+    }
 
     /** Ancho máximo del bocadillo: el de siempre, sin salirse de la columna de la rueda. */
     fun maxWidth(columnWidth: Float, margin: Float, preferred: Float): Float = min(preferred, (columnWidth - margin * 2f).coerceAtLeast(0f))
@@ -959,4 +1083,122 @@ object PadGlyphs {
 
     /** Progreso (0…1) hacia el que se anima el hueco del glifo. */
     fun target(gamepadPresent: Boolean): Float = if (visible(gamepadPresent)) 1f else 0f
+}
+
+/**
+ * La fila de arriba de Meridian (dp): la cabecera de la rueda (el dock) a la
+ * izquierda y el grupo de la derecha (Masha, hora y batería, "Abrir", orden,
+ * buscar, Ajustes). Las dos cuelgan del mismo tope y miden lo mismo de alto
+ * ([TopBarLayout.BAR_HEIGHT] = [DotTabsLayout.HEIGHT]), así comparten la
+ * línea central. Antes la cabecera empezaba 2 dp más arriba que la barra en
+ * una ventana baja y el dock, debajo de Masha, no se alineaba con nada.
+ */
+object MeridianTopRow {
+    const val TOP = 8f
+    const val TOP_COMPACT = 6f
+
+    /** Debajo de la cabecera, antes de la rueda. */
+    const val BOTTOM = 6f
+    const val BOTTOM_COMPACT = 2f
+
+    /** Margen derecho del grupo de la derecha (el mismo que el bloque del hero). */
+    const val END = 22f
+
+    fun top(compact: Boolean): Float = if (compact) TOP_COMPACT else TOP
+
+    fun bottom(compact: Boolean): Float = if (compact) BOTTOM_COMPACT else BOTTOM
+
+    /** La línea central de la fila, desde arriba de la ventana. */
+    fun centerY(compact: Boolean): Float = top(compact) + TopBarLayout.BAR_HEIGHT / 2f
+
+    /**
+     * Lo más ancho que puede medir el grupo de la derecha en una ventana de
+     * [width] con la columna de [railWidth]: hasta donde puede llegar el dock
+     * de la cabecera (que asoma sobre el hueco del hero,
+     * [RailHeaderLayout.OVERHANG]) más el aire de la barra. Antes el tope
+     * dejaba solo 2 dp entre los dos en el peor caso. Nunca menos que lo que
+     * la barra no compacta (Masha, orden, buscar, Ajustes): eso no se corta.
+     */
+    fun barMaxWidth(width: Float, railWidth: Float): Float {
+        val dockEnd = RailHeaderLayout.START + RailHeaderLayout.dockMaxWidth(railWidth)
+        val fixed = TopBarLayout.fixedWidth(TopBarLayout.searchWidth(open = false, landscape = true), masha = true, sort = true)
+        return maxOf(width - END - dockEnd - TopBarLayout.GAP, fixed)
+    }
+}
+
+/**
+ * La cabecera de la rueda (dp): solo el dock de secciones, en una fila con el
+ * grupo de la derecha ([MeridianTopRow]). Masha ya no va aquí: es la primera
+ * pieza de la barra de la derecha. Encima del dock, solo, se veía apretado y
+ * sin alinear con nada, y su fila le quitaba a la rueda ~48 dp de alto.
+ *
+ * En un móvil apaisado la columna es estrecha ([MeridianGeometry.SLIM_MIN]):
+ * ahí el dock no cabe entero (con cuatro secciones pide ~255 dp y la columna
+ * da 162). Por eso puede asomar sobre el hueco entre el dial y el bloque del
+ * hero ([OVERHANG]), que a esa altura está vacío, sin pasar del canto que se
+ * ve de la niebla a la altura de la cabecera, que es curvo (ver [plan]).
+ */
+object RailHeaderLayout {
+    const val START = 22f
+    const val END = 16f
+
+    /** Lo que puede pasar el dock del canto de la columna: el hueco del hero menos un margen hasta su bloque. */
+    const val OVERHANG = MeridianGeometry.HERO_GAP - MeridianGeometry.RAIL_START
+
+    /** Lo más ancho que puede medir el dock en una columna de [railWidth]. */
+    fun dockMaxWidth(railWidth: Float): Float = (railWidth - START - END + OVERHANG).coerceAtLeast(0f)
+
+    /** Borde izquierdo del dock: pegado al canto derecho de la columna si cabe; si no, desde [START] hacia el hueco. */
+    fun dockX(railWidth: Float, dockWidth: Float): Float = maxOf(START, railWidth - END - dockWidth)
+
+    /** Aire entre el final del dock y el canto que se ve de la niebla ([MeridianFog.visibleEdge]). */
+    const val FOG_MARGIN = 16f
+
+    /**
+     * Lo que el dock puede pasar del canto curvo (y la niebla ensancharse en
+     * la banda de arriba para seguirlo) para que sus rótulos se lean enteros:
+     * con tres secciones en un móvil faltaban 2–7 dp y "Consolas" se cortaba.
+     * Más allá, el rótulo se recorta: la niebla no se hincha sobre el arte.
+     */
+    const val LABEL_STRETCH = 12f
+
+    /**
+     * La cabecera colocada (dp, desde arriba de la fila sin su relleno): dónde
+     * y cuánto mide el dock y hasta dónde tiene que llegar la niebla en la
+     * banda de arriba ([reach], el final del dock más [FOG_MARGIN]; 0 = sin
+     * curva medida).
+     */
+    data class Plan(val dockX: Float, val dockTop: Float, val dockWidth: Float, val height: Float, val reach: Float)
+
+    /**
+     * Cómo va el dock de [dockHeight] cuyas píldoras naturales son [pills] en
+     * una columna de [railWidth]. El alto de la cabecera es el del dock: no
+     * depende de la curva, que a su vez depende de ese alto.
+     *
+     * El ancho sale de la curva: el canto de la niebla ([edge], a una altura
+     * de la fila) se recoge hacia la izquierda lejos de la línea de foco, así
+     * que a la altura de la cabecera queda bastante más a la izquierda que en
+     * el foco (y ahora, con la cabecera más arriba, todavía más). El dock no
+     * pasa del canto a la altura de su borde de arriba ni del de abajo (el
+     * más justo), menos [FOG_MARGIN]; y como mide lo mismo con cualquier
+     * sección ([DotTabsLayout.uniformWidth]), cambiar de sección no lo saca
+     * de ahí. Si ahí los rótulos no caben enteros, el dock crece hasta
+     * [LABEL_STRETCH] más (lo justo para que quepan, nunca más allá de la
+     * columna) y [Plan.reach] pide a la niebla que llegue hasta él; si ni en
+     * su mínimo cabe, se queda en el mínimo, también con la niebla hasta él.
+     */
+    fun plan(railWidth: Float, dockHeight: Float, pills: FloatArray, edge: ((Float) -> Float)?): Plan {
+        val top = 0f
+        val column = START + dockMaxWidth(railWidth)
+        val curve = edge?.let { minOf(it(top), it(top + dockHeight)) - FOG_MARGIN } ?: Float.POSITIVE_INFINITY
+        val limit = minOf(column, curve)
+        // Un poco más allá de la curva si así los rótulos se leen enteros (la niebla lo sigue).
+        val stretch = minOf(column, curve + LABEL_STRETCH) - START
+        val room = maxOf(limit - START, minOf(DotTabsLayout.fullWidth(pills), stretch), DotTabsLayout.minWidth(pills.size))
+        val width = DotTabsLayout.uniformWidth(pills, room)
+        // Pegado al canto de la columna si cabe; si la curva no llega, pegado a la curva; si ni así, desde [START].
+        val right = minOf(railWidth - END, maxOf(limit, START + width))
+        val x = maxOf(START, right - width)
+        return Plan(x, top, width, dockHeight, reach = if (edge == null) 0f else x + width + FOG_MARGIN)
+    }
 }
