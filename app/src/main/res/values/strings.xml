@@ -333,6 +333,8 @@
     <string name="sheet_group_manage">Manage</string>
     <string name="sheet_play">Play</string>
     <string name="confirm_again">Hold or press again to confirm</string>
+    <string name="remove_short">Remove</string>
+    <string name="confirm_short">Confirm?</string>
     <string name="toast_pick_game_in_app">%1$s will open; pick the game there</string>
     <string name="open_bachata">Open Bachata S4</string>
     <plurals name="ps4_pkgs_not_installed">
