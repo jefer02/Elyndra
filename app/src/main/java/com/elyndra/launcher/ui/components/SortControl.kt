@@ -64,6 +64,7 @@ import com.elyndra.launcher.data.P
 import com.elyndra.launcher.data.argb
 import com.elyndra.launcher.ui.DockPalettes
 import com.elyndra.launcher.ui.DotTabsLayout
+import com.elyndra.launcher.ui.SectionDockLayout
 import com.elyndra.launcher.ui.theme.LocalReducedMotion
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.Radii
@@ -152,7 +153,8 @@ fun SortButton(
     }
 }
 
-private const val SORT_BUTTON_W = 44f
+/** El mismo ancho con el que lo reserva el dock (ver [SectionDockLayout]). */
+private const val SORT_BUTTON_W = SectionDockLayout.SORT_WIDTH
 
 /**
  * El menú de orden: una lámina pequeña anclada bajo el botón ([anchor], en
