@@ -30,6 +30,12 @@ import com.elyndra.launcher.ui.meridian.WheelMath
 import com.elyndra.launcher.ui.DockPalettes
 import com.elyndra.launcher.ui.theme.DARK_GLASS_MIN
 import com.elyndra.launcher.ui.DotTabsLayout
+import com.elyndra.launcher.ui.SectionDockLayout
+import com.elyndra.launcher.core.device.StatusMode
+import com.elyndra.launcher.ui.components.rememberStatusLabelWidths
+import com.elyndra.launcher.ui.components.rememberOpenLabelWidth
+import com.elyndra.launcher.ui.TopBarLayout
+import com.elyndra.launcher.ui.selection.AuraHalo
 import com.elyndra.launcher.ui.ShelfLayout
 import com.elyndra.launcher.ui.SortMode
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -123,6 +129,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -257,13 +264,30 @@ fun LibraryScreen(vm: ElyndraViewModel) {
     val dockInBar = DockPlacement.inBar(screen.width.value)
     SideEffect { vm.input.dockInBar = dockInBar }
     val seamRise = DockPlacement.seamRise(heroInfoBottomPad(m).value).dp
-    val dockInset = if (dockInBar) 0.dp else DotTabsLayout.HEIGHT.dp - seamRise + 6.dp
+    // Sección vacía: la costura es un corte duro y el dock va entero dentro del
+    // hero (ver DockPlacement.insideHero); el estante no le guarda sitio.
+    val dockInHero = DockPlacement.insideHero(showEmpty, dockInBar)
+    val dockInset = if (dockInBar || dockInHero) 0.dp else DotTabsLayout.HEIGHT.dp - seamRise + 6.dp
+    // Lo que sube el bloque de título para dejarle sitio; con muelle, como el dock.
+    val heroLift by animateDpAsState(
+        if (dockInHero) DockPlacement.heroLift(DotTabsLayout.HEIGHT).dp else 0.dp,
+        motion(Springs.enter()),
+        label = "heroLift",
+    )
     val sortAnchor = remember { mutableStateOf(Rect.Zero) }
     val mashaAnchor = remember { mutableStateOf(Rect.Zero) }
     val mashaHost = remember { mutableStateOf(Offset.Zero) }
+    val hostBounds = remember { mutableStateOf(Rect.Zero) }
+    // El dock (en la barra, en la costura o dentro del hero): el bocadillo de Masha no lo tapa.
+    val dockBounds = remember { mutableStateOf(Rect.Zero) }
     val labelBlock = labelBlock(LIBRARY_LABEL_SP)
 
-    BoxWithConstraints(Modifier.fillMaxSize().onGloballyPositioned { mashaHost.value = it.positionInWindow() }) {
+    BoxWithConstraints(
+        Modifier.fillMaxSize().onGloballyPositioned {
+            mashaHost.value = it.positionInWindow()
+            hostBounds.value = it.boundsInWindow()
+        },
+    ) {
         val shelfH = (maxHeight - m.iconHeroH).value
         val shelf = ShelfLayout.compute(
             available = shelfH,
@@ -285,6 +309,8 @@ fun LibraryScreen(vm: ElyndraViewModel) {
         // tableta y en pantalla partida. Ahí el titular sin logo se ajusta y el logo tiene tope.
         val portrait = maxHeight > maxWidth
         val windowHeight = maxHeight.value
+        // La barra de arriba se mide con el ancho de la ventana (dentro del hero no hay `maxWidth`).
+        val windowWidth = maxWidth
         val heroArt = when (sel) {
             is LibraryItem.App -> sel.app.meta.hero ?: sel.app.meta.screenshot
             is LibraryItem.Folder -> sel.heroPath
@@ -318,6 +344,13 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                 // El arte limpio, sin franjas oscuras.
                 clean = clean,
                 topBar = {
+                    // En un móvil en vertical no cabe todo: se compacta antes de que la fila recorte Ajustes (ver TopBarLayout).
+                    val barFit = rememberTopBarFit(
+                        vm = vm,
+                        available = (windowWidth - m.pad * 2).value,
+                        landscape = m.landscape,
+                        dockWidth = if (dockInBar) SectionDockLayout.minWidth(vm.availableFilters().size) else 0f,
+                    )
                     Row(
                         Modifier
                             .align(Alignment.TopStart)
@@ -330,20 +363,20 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         // Ventana ancha: el dock y el orden abren el grupo de la
                         // derecha, a mano junto a la hora y "Abrir", con el mismo cristal.
                         if (dockInBar) {
-                            SectionDock(vm) { sortAnchor.value = it }
+                            SectionDock(vm, Modifier.onGloballyPositioned { dockBounds.value = it.boundsInWindow() }) { sortAnchor.value = it }
                             Spacer(Modifier.width(8.dp))
                         }
                         // Hora y batería, arriba a la derecha junto a la barra. Con el
                         // buscador abierto se aparta: el campo necesita el ancho.
-                        if (vm.settings.statusVisible && !vm.searchOpen) {
-                            StatusStrip(vm.settings.statusMode)
+                        if (vm.settings.statusVisible && !vm.searchOpen && barFit.status) {
+                            StatusStrip(vm.settings.statusMode, showPercent = barFit.statusPercent)
                             Spacer(Modifier.width(8.dp))
                         }
                         // "Abrir" vive aquí, sobre el fondo del juego. Mientras
                         // se busca desaparece: el campo abierto necesita ese
                         // ancho y ahí nadie está lanzando nada.
                         if (!vm.searchOpen) {
-                            OpenButton(enabled = sel != null, focused = vm.input.isBarFocused(BarItem.Open)) {
+                            OpenButton(enabled = sel != null, focused = vm.input.isBarFocused(BarItem.Open), showLabel = barFit.openLabel) {
                                 sel?.let {
                                     vm.requestOpen(it)
                                 }
@@ -370,7 +403,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         label = "heroInfo",
                     ) { item ->
                         CompositionLocalProvider(LocalHeroText provides heroText) {
-                            HeroInfo(vm, item, m, floatClock, searching = vm.query.isNotBlank(), portrait = portrait, windowHeight = windowHeight) { if (vm.tryOpen()) vm.go(Screen.Add) }
+                            HeroInfo(vm, item, m, floatClock, searching = vm.query.isNotBlank(), portrait = portrait, windowHeight = windowHeight, lift = heroLift) { if (vm.tryOpen()) vm.go(Screen.Add) }
                         }
                     }
                 },
@@ -459,22 +492,40 @@ fun LibraryScreen(vm: ElyndraViewModel) {
             }
         }
 
-        // Ventana estrecha: el dock flota en la costura, sin tapar el titular.
+        // Ventana estrecha: el dock flota en la costura, sin tapar el titular. Con la
+        // sección vacía va dentro del hero y, al entrar el primer juego, baja a la
+        // costura con un muelle (se lee en la fase de colocación: no recompone).
         if (!dockInBar) {
+            val dockTop by animateFloatAsState(
+                DockPlacement.top(m.iconHeroH.value, DotTabsLayout.HEIGHT, dockInHero, seamRise.value),
+                motion(Springs.enter()),
+                label = "dockTop",
+            )
             SectionDock(
                 vm,
                 Modifier
                     .align(Alignment.TopCenter)
-                    .offset(y = m.iconHeroH - seamRise),
-                // Media cápsula cae sobre el estante, que en claro es perla: cristal más denso
-                // y, en claro, el cristal claro (como el resto de lo que va sobre el velo claro).
-                glassMinAlpha = DockPalettes.SEAM_GLASS_MIN,
-                light = !P.isDark,
+                    .offset { IntOffset(0, dockTop.dp.roundToPx()) }
+                    .onGloballyPositioned { dockBounds.value = it.boundsInWindow() },
+                // En la costura media cápsula cae sobre el estante, que en claro es perla: cristal
+                // más denso y, en claro, el cristal claro (como el resto de lo que va sobre el velo
+                // claro). Dentro del hero va sobre el escenario, como el dock de la barra.
+                glassMinAlpha = if (dockInHero) DARK_GLASS_MIN else DockPalettes.SEAM_GLASS_MIN,
+                light = !dockInHero && !P.isDark,
             ) { sortAnchor.value = it }
         }
 
         // Ventana baja (teléfono): bocadillo de una línea, que no tape el titular del hero.
-        MashaInsight(vm, mashaAnchor.value, mashaHost.value, oneLine = MeridianMode.compact(LocalScreenSize.current.height.value))
+        // Debajo de Masha, en toda la pantalla, sin tapar el dock (con la sección vacía va
+        // dentro del hero, más arriba que en la costura).
+        MashaInsight(
+            vm,
+            mashaAnchor.value,
+            mashaHost.value,
+            region = hostBounds.value.takeIf { it != Rect.Zero },
+            obstacles = listOf(dockBounds.value),
+            oneLine = MeridianMode.compact(LocalScreenSize.current.height.value),
+        )
 
         SortPopover(
             visible = vm.sortMenuOpen,
@@ -503,7 +554,7 @@ internal fun labelBlock(sp: Float): Float = ShelfLayout.LABEL_GAP + sp * 1.45f *
 /** Margen bajo el bloque de título del hero (el dock de la costura no puede pasar de ahí). */
 private fun heroInfoBottomPad(m: Metrics): Dp = if (m.landscape) 8.dp else 18.dp
 
-/** El dock de secciones con el botón de orden al lado; con [light], en cristal claro (sobre el velo claro, no sobre el arte). */
+/** El dock de secciones con el botón de orden al lado (ver [DockWithSort]); con [light], en cristal claro (sobre el velo claro, no sobre el arte). */
 @Composable
 internal fun SectionDock(
     vm: ElyndraViewModel,
@@ -512,28 +563,82 @@ internal fun SectionDock(
     light: Boolean = false,
     onSortBounds: (Rect) -> Unit,
 ) {
+    DockWithSort(
+        modifier = modifier,
+        tabs = { SectionTabs(vm, glassMinAlpha = glassMinAlpha, light = light) },
+        sort = { SectionSortButton(vm, glassMinAlpha = glassMinAlpha, light = light, onBounds = onSortBounds) },
+    )
+}
+
+/** Las pestañas del dock de secciones, solas: en la cabecera de la rueda el orden va en la barra de la derecha. */
+@Composable
+internal fun SectionTabs(vm: ElyndraViewModel, modifier: Modifier = Modifier, glassMinAlpha: Float = DARK_GLASS_MIN, light: Boolean = false) {
     val filters = vm.availableFilters()
     val dockFocused = vm.input.isBarFocused(BarItem.Sections)
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        DotTabs(
-            labels = filters.map { stringResource(it.label) },
-            selected = filters.indexOf(vm.filter).coerceAtLeast(0),
-            onSelect = { i -> filters.getOrNull(i)?.let(vm::updateFilter) },
-            focused = dockFocused,
-            focusIndex = if (dockFocused) vm.input.dockFocus else -1,
-            glassMinAlpha = glassMinAlpha,
-            light = light,
-        )
-        Spacer(Modifier.width(8.dp))
-        SortButton(
-            description = stringResource(R.string.sort_button_a11y, stringResource(vm.settings.sortMode.label)),
-            open = vm.sortMenuOpen,
-            onClick = { if (vm.sortMenuOpen) vm.closeSortMenu() else vm.openSortMenu() },
-            focused = vm.input.isBarFocused(BarItem.Sort),
-            glassMinAlpha = glassMinAlpha,
-            light = light,
-            modifier = Modifier.onGloballyPositioned { onSortBounds(it.boundsInWindow()) },
-        )
+    DotTabs(
+        labels = filters.map { stringResource(it.label) },
+        selected = filters.indexOf(vm.filter).coerceAtLeast(0),
+        onSelect = { i -> filters.getOrNull(i)?.let(vm::updateFilter) },
+        modifier = modifier,
+        focused = dockFocused,
+        focusIndex = if (dockFocused) vm.input.dockFocus else -1,
+        glassMinAlpha = glassMinAlpha,
+        light = light,
+    )
+}
+
+/** El botón de orden; [onBounds] da dónde anclar su menú ([SortPopover]), esté donde esté. */
+@Composable
+internal fun SectionSortButton(
+    vm: ElyndraViewModel,
+    modifier: Modifier = Modifier,
+    glassMinAlpha: Float = DARK_GLASS_MIN,
+    light: Boolean = false,
+    onBounds: (Rect) -> Unit,
+) {
+    SortButton(
+        description = stringResource(R.string.sort_button_a11y, stringResource(vm.settings.sortMode.label)),
+        open = vm.sortMenuOpen,
+        onClick = { if (vm.sortMenuOpen) vm.closeSortMenu() else vm.openSortMenu() },
+        focused = vm.input.isBarFocused(BarItem.Sort),
+        glassMinAlpha = glassMinAlpha,
+        light = light,
+        modifier = modifier.onGloballyPositioned { onBounds(it.boundsInWindow()) },
+    )
+}
+
+/**
+ * El dock ([tabs]) y el botón de orden ([sort]) uno tras otro, sin ViewModel
+ * (también para las vistas previas).
+ *
+ * No es una `Row`: el botón se reserva primero y el dock se encoge en lo que
+ * queda ([SectionDockLayout]); el botón va tras lo que el dock mide de verdad.
+ * Así, con poco sitio (la cabecera de la rueda en un móvil apaisado), el botón
+ * nunca acaba encima de la píldora.
+ */
+@Composable
+internal fun DockWithSort(modifier: Modifier = Modifier, tabs: @Composable () -> Unit, sort: @Composable () -> Unit) {
+    Layout(
+        modifier = modifier,
+        content = {
+            tabs()
+            sort()
+        },
+    ) { measurables, constraints ->
+        val sortP = measurables[1].measure(Constraints())
+        val room = if (constraints.hasBoundedWidth) {
+            SectionDockLayout.tabsMaxWidth(constraints.maxWidth.toDp().value).dp.roundToPx()
+        } else {
+            Constraints.Infinity
+        }
+        val tabsP = measurables[0].measure(Constraints(maxWidth = room))
+        // measuredWidth, no width: si el dock no pudiera encogerse más, el botón sigue detrás de él.
+        val sortX = SectionDockLayout.sortX(tabsP.measuredWidth.toDp().value).dp.roundToPx()
+        val height = maxOf(tabsP.height, sortP.height)
+        layout(sortX + sortP.width, height) {
+            tabsP.place(0, (height - tabsP.height) / 2)
+            sortP.place(sortX, (height - sortP.height) / 2)
+        }
     }
 }
 
@@ -586,6 +691,9 @@ internal val SORT_MENU_HINTS = listOf(
  * En vertical ([portrait]) el titular sin logo baja de cuerpo y se ajusta a
  * dos líneas del ancho que hay (ver [PortraitHero]) y el logo tiene tope de
  * alto; [windowHeight] es el alto disponible (dp).
+ *
+ * [lift] es lo que sube el bloque para dejar sitio al dock cuando va dentro
+ * del hero (sección vacía, ver [DockPlacement.insideHero]).
  */
 @Composable
 private fun HeroInfo(
@@ -596,12 +704,13 @@ private fun HeroInfo(
     searching: Boolean,
     portrait: Boolean,
     windowHeight: Float,
+    lift: Dp = 0.dp,
     onAdd: () -> Unit,
 ) {
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(start = m.pad, end = m.pad, bottom = if (m.landscape) 8.dp else 18.dp),
+            .padding(start = m.pad, end = m.pad, bottom = heroInfoBottomPad(m) + lift),
     ) {
         if (sel != null) {
             HeroChipRow(
@@ -637,7 +746,7 @@ private fun HeroInfo(
                 }
             }
         } else if (sel == null) {
-            if (vm.loaded) EmptyHeroBlock(vm, m, searching, onAdd)
+            if (vm.loaded) EmptyHeroBlock(vm, m, searching, lift, onAdd)
         } else if (portrait) {
             PortraitTitle(sel.name, m.titleSize)
         } else {
@@ -803,15 +912,16 @@ internal fun LandscapeTitle(name: String, base: Float) {
  * compartido con Meridian ([EmptyLibraryHero]) sobre el escenario de la
  * paleta. El titular toma el mayor cuerpo que cabe en dos líneas dentro de
  * lo que deja el hero (barra, línea y botón aparte), sin pasar de [Metrics.titleSize].
- * Buscando sin resultados, solo el aviso.
+ * Buscando sin resultados, solo el aviso. Con el dock dentro del hero, el
+ * bloque sube [lift] y el titular pierde ese alto (el botón no choca con el dock).
  */
 @Composable
-private fun EmptyHeroBlock(vm: ElyndraViewModel, m: Metrics, searching: Boolean, onAdd: () -> Unit) {
+private fun EmptyHeroBlock(vm: ElyndraViewModel, m: Metrics, searching: Boolean, lift: Dp, onAdd: () -> Unit) {
     val libraryEmpty = vm.library.apps.isEmpty() && vm.library.folders.isEmpty()
     val compact = m.iconHeroH < EMPTY_COMPACT_HERO
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val reserve = if (searching) EMPTY_RESERVE_SEARCH else if (compact) EMPTY_RESERVE_COMPACT else EMPTY_RESERVE
-        val room = (m.iconHeroH.value - reserve).coerceAtLeast(EMPTY_TITLE_MIN_ROOM)
+        val room = (m.iconHeroH.value - reserve - lift.value).coerceAtLeast(EMPTY_TITLE_MIN_ROOM)
         // En horizontal, más estrecho y más bajo: dos líneas equilibradas que no suben hasta la barra.
         val box = LogoFit.Box(
             maxWidth = minOf(maxWidth.value * if (m.landscape) EMPTY_TITLE_WIDE_FRACTION else 1f, EMPTY_TITLE_MAX_WIDTH),
@@ -912,7 +1022,7 @@ internal fun SearchField(vm: ElyndraViewModel, m: Metrics) {
         }
     }
     val fieldWidth by animateDpAsState(
-        targetValue = if (open) (if (m.landscape) 190.dp else 96.dp) else 0.dp,
+        targetValue = if (open) (if (m.landscape) TopBarLayout.SEARCH_FIELD_WIDE else TopBarLayout.SEARCH_FIELD).dp else 0.dp,
         animationSpec = motion(Springs.enter()),
         label = "searchW",
     )
@@ -926,7 +1036,7 @@ internal fun SearchField(vm: ElyndraViewModel, m: Metrics) {
         Modifier
             .height(34.dp)
             .then(if (open) Modifier.darkGlass(RoundedCornerShape(12.dp)) else Modifier)
-            .padding(start = if (open) 11.dp else 0.dp),
+            .padding(start = if (open) TopBarLayout.SEARCH_PAD.dp else 0.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.width(fieldWidth).alpha(fieldAlpha).clipToBounds()) {
@@ -957,8 +1067,43 @@ internal fun SearchField(vm: ElyndraViewModel, m: Metrics) {
     }
 }
 
+/**
+ * Cuánto se compacta la barra de arriba en [available] dp (ver [TopBarLayout.fit]):
+ * con los rótulos medidos de verdad, el buscador como esté y, si va en la
+ * barra, lo menos que mide el dock ([dockWidth]). [masha] = el emblema va en
+ * esta fila (en Meridian va en la cabecera de la rueda); [sort] = el botón de
+ * orden va suelto en esta fila (en Meridian, delante del buscador).
+ */
+@Composable
+internal fun rememberTopBarFit(vm: ElyndraViewModel, available: Float, landscape: Boolean, dockWidth: Float = 0f, masha: Boolean = true, sort: Boolean = false): TopBarLayout.Fit =
+    rememberTopBarFit(available, landscape, vm.settings.statusMode, vm.settings.statusVisible, vm.searchOpen, dockWidth, masha, sort)
+
+/** Lo mismo sin ViewModel (también para las vistas previas). */
+@Composable
+internal fun rememberTopBarFit(
+    available: Float,
+    landscape: Boolean,
+    statusMode: StatusMode,
+    statusVisible: Boolean,
+    searchOpen: Boolean,
+    dockWidth: Float = 0f,
+    masha: Boolean = true,
+    sort: Boolean = false,
+): TopBarLayout.Fit {
+    val openLabel = rememberOpenLabelWidth()
+    val (time, percent) = rememberStatusLabelWidths(statusMode)
+    val status = statusVisible && !searchOpen
+    return TopBarLayout.fit(
+        available = available,
+        fixed = TopBarLayout.fixedWidth(TopBarLayout.searchWidth(searchOpen, landscape), extra = dockWidth, masha = masha, sort = sort),
+        openLabel = openLabel.takeIf { !searchOpen },
+        time = time.takeIf { status },
+        percent = percent.takeIf { status },
+    )
+}
+
 /** Lado del emblema de Masha: algo mayor que las píldoras de la barra (34 dp), como un avatar. */
-private val MASHA_BUTTON = 40.dp
+private val MASHA_BUTTON = TopBarLayout.MASHA.dp
 
 /**
  * El botón de Masha: su emblema, fijo en la barra del hero, arriba a la
@@ -969,9 +1114,13 @@ private val MASHA_BUTTON = 40.dp
  * y se toca en 48 × 48. Alrededor flotan sus partículas, del color de Masha
  * (Ajustes → Masha; ver [mashaAura]). [onBounds] recibe su rectángulo en la
  * ventana: de ahí sale el bocadillo.
+ *
+ * Con [grouped] va entre otras piezas (en Meridian, la primera del grupo de
+ * arriba a la derecha, con la píldora de hora a 8 dp): sus partículas no
+ * pasan a los lados del aire que la separa de ellas ([AuraHalo]).
  */
 @Composable
-internal fun MashaButton(vm: ElyndraViewModel, onBounds: (Rect) -> Unit) {
+internal fun MashaButton(vm: ElyndraViewModel, grouped: Boolean = false, onBounds: (Rect) -> Unit) {
     val shape = CircleShape
     val interaction = remember { MutableInteractionSource() }
     Box(
@@ -992,7 +1141,7 @@ internal fun MashaButton(vm: ElyndraViewModel, onBounds: (Rect) -> Unit) {
                 .size(MASHA_BUTTON)
                 .onGloballyPositioned { onBounds(it.boundsInWindow()) }
                 .pressFeedback(interaction)
-                .mashaAura(vm.settings.mashaParticleColor)
+                .mashaAura(vm.settings.mashaParticleColor, halo = if (grouped) AuraHalo.forGap(TopBarLayout.GAP).dp else null)
                 .outerShadow(10.dp, shape, ambientColor = P.shade.copy(alpha = 0.45f), spotColor = P.shade.copy(alpha = 0.45f))
                 .consoleFocus(vm.input.isBarFocused(BarItem.Masha), shape)
                 .indication(interaction, focusRing(shape)),
@@ -1009,17 +1158,20 @@ internal fun MashaButton(vm: ElyndraViewModel, onBounds: (Rect) -> Unit) {
 }
 
 /**
- * La línea ambiental de Masha, bajo su emblema. Se recoge sola al rato: está
- * para enterarse de un vistazo, no para quedarse tapando el hero.
+ * La línea ambiental de Masha, junto a su emblema (ver [MashaInsightBubble]).
+ * Se recoge sola al rato: está para enterarse de un vistazo, no para quedarse
+ * tapando el hero.
  */
 @Composable
 internal fun MashaInsight(
     vm: ElyndraViewModel,
     anchor: Rect,
     host: Offset,
-    /** Meridian: la zona en la que puede ir (la columna de la rueda) y lo que no puede tapar, en la ventana. */
+    /** La zona en la que puede ir (en Meridian, el arte, sin la columna de la rueda) y lo que no puede tapar, en la ventana. */
     region: Rect? = null,
     obstacles: List<Rect> = emptyList(),
+    /** Meridian: el grupo de arriba a la derecha en el que va el botón (en la ventana): el bocadillo va debajo. */
+    group: Rect? = null,
     oneLine: Boolean = false,
     onPlaced: ((Rect?) -> Unit)? = null,
 ) {
@@ -1048,6 +1200,7 @@ internal fun MashaInsight(
             below = true,
             region = region?.let { DpRect((it.left - host.x).toDp(), (it.top - host.y).toDp(), (it.right - host.x).toDp(), (it.bottom - host.y).toDp()) },
             obstacles = obstacles.filter { it != Rect.Zero }.map { DpRect((it.left - host.x).toDp(), (it.top - host.y).toDp(), (it.right - host.x).toDp(), (it.bottom - host.y).toDp()) },
+            group = group?.takeIf { it != Rect.Zero }?.let { DpRect((it.left - host.x).toDp(), (it.top - host.y).toDp(), (it.right - host.x).toDp(), (it.bottom - host.y).toDp()) },
             oneLine = oneLine,
             onPlaced = onPlaced,
         )
