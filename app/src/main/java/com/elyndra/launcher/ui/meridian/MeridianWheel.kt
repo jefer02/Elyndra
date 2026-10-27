@@ -1,32 +1,20 @@
 package com.elyndra.launcher.ui.meridian
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.ui.selection.SelectionLook
@@ -35,14 +23,12 @@ import kotlin.math.roundToInt
 /**
  * La rueda con todo lo suyo, en el hueco de la columna izquierda: una rueda
  * por sección (al cambiar de sección la nueva entra deslizando en vertical y
- * la vieja se va con su lista de antes), el dial orbital en el canto derecho
- * con su nodo y su contador.
+ * la vieja se va con su lista de antes) y el dial orbital en el canto derecho
+ * con su nodo.
  *
  * [focused] es la fila enfocada de la sección actual ([section]); la rueda de
  * esa sección se publica en [current] (el paralaje del arte y el dial la leen).
  * [onSettle] recibe la fila en la que se para la rueda tras moverla con el dedo.
- * [bubbleBottom] es el canto de abajo (px en la ventana) del bocadillo de
- * Masha mientras se ve, o null: la rueda le deja sitio con un muelle.
  */
 @Composable
 internal fun BoxScope.MeridianWheelArea(
@@ -71,7 +57,6 @@ internal fun BoxScope.MeridianWheelArea(
     onLongPress: (WheelEntry, Rect) -> Unit,
     onBounds: (Rect) -> Unit,
     empty: @Composable BoxScope.(focusY: Float) -> Unit,
-    bubbleBottom: Float? = null,
 ) {
     val density = LocalDensity.current
     val rowPx = with(density) { geo.rowHeight.dp.roundToPx() }
@@ -79,16 +64,6 @@ internal fun BoxScope.MeridianWheelArea(
     val railPx = with(density) { geo.railHeight.dp.toPx() }
     val count = entries.size + if (add != null) 1 else 0
     val focusedRow = focused.coerceIn(0, (count - 1).coerceAtLeast(0))
-
-    // El sitio que se deja al bocadillo de Masha: llega y se va con un muelle (al instante con "reducir movimiento").
-    var railTop by remember { mutableFloatStateOf(0f) }
-    val gap = with(density) { BUBBLE_GAP.toPx() }
-    val target = bubbleBottom?.let { BubbleSlot.reserve(it, railTop, gap) } ?: 0f
-    val reserve = remember { Animatable(target) }
-    LaunchedEffect(target, reduced) {
-        if (reduced) reserve.snapTo(target) else reserve.animateTo(target, spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow))
-    }
-    Spacer(Modifier.matchParentSize().onGloballyPositioned { railTop = it.positionInWindow().y })
 
     // Lo que tenía cada sección la última vez que se vio: la que se va sale con su lista.
     val sections = remember { HashMap<Any, Pair<List<WheelEntry>, WheelAdd?>>() }
@@ -110,7 +85,6 @@ internal fun BoxScope.MeridianWheelArea(
             wheel.railPx = railPx
             wheel.focusPx = focusPx
             wheel.count = rows
-            wheel.reserve = { reserve.value }
             if (live) {
                 wheel.target = focusedRow
                 current.value = wheel
@@ -161,30 +135,4 @@ internal fun BoxScope.MeridianWheelArea(
         lite = lite,
         modifier = Modifier.matchParentSize(),
     )
-    val counterX = with(density) { (geo.axisX.dp - DIAL_INSET + COUNTER_GAP).roundToPx() }
-    DialCounterChip(
-        index = focusedRow,
-        total = entries.size,
-        onAdd = add != null && focusedRow >= entries.size,
-        tint = { wash.tone() },
-        enterMs = enterMs,
-        reduced = reduced,
-        modifier = Modifier
-            .align(Alignment.TopStart)
-            // Se coloca en la fase de colocación leyendo el nodo: lo sigue sin recomponer, centrado en él.
-            .layout { measurable, constraints ->
-                val p = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
-                layout(p.width, p.height) {
-                    val w = current.value
-                    val y = (w?.focusPx ?: focusPx) + (w?.lift() ?: 0f) - p.height / 2f
-                    p.place(counterX, y.roundToInt())
-                }
-            },
-    )
 }
-
-/** Entre el bocadillo de Masha y la primera fila que se ve. */
-private val BUBBLE_GAP = 8.dp
-
-/** Del nodo al contador. */
-private val COUNTER_GAP = 16.dp
