@@ -7,9 +7,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.unit.Dp
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.components.FallbackArtCache
 import com.elyndra.launcher.ui.theme.LocalReducedMotion
@@ -31,9 +33,12 @@ private const val AURA_COUNT_LITE = 8
  *
  * Solo esta pieza tiene reloj y lo que se repinta es ella. Con "reducir
  * movimiento" quedan quietas, ya repartidas alrededor.
+ *
+ * Con [halo] (el emblema va entre vecinos, ver [AuraHalo]) no se alejan a los
+ * lados más de eso: se apagan antes y lo que asome se recorta.
  */
 @Composable
-fun Modifier.mashaAura(color: Int): Modifier {
+fun Modifier.mashaAura(color: Int, halo: Dp? = null): Modifier {
     val reduced = LocalReducedMotion.current
     val preview = LocalInspectionMode.current
     val context = LocalContext.current
@@ -84,10 +89,16 @@ fun Modifier.mashaAura(color: Int): Modifier {
             dust.step(dt, sampler, density, Random)
             sim[0] = now
         }
-        for (i in 0 until dust.count) {
-            val a = dust.alpha(i)
-            if (a <= 0f) continue
-            drawStar(ink.atlas, dust.variant(i), dust.isGlint(i), dust.x(i), dust.y(i), dust.sizeDp(i) * density, a, ink.blend)
+        val haloPx = halo?.toPx()
+        val draw = {
+            for (i in 0 until dust.count) {
+                var a = dust.alpha(i)
+                if (haloPx != null) a *= AuraHalo.fade(dust.x(i) - cx, r, haloPx)
+                if (a <= 0f) continue
+                drawStar(ink.atlas, dust.variant(i), dust.isGlint(i), dust.x(i), dust.y(i), dust.sizeDp(i) * density, a, ink.blend)
+            }
         }
+        // Solo a lo ancho: hacia arriba y abajo no hay vecinos en la barra.
+        if (haloPx == null) draw() else clipRect(left = -haloPx, top = -size.height * 2f, right = size.width + haloPx, bottom = size.height * 3f) { draw() }
     }
 }
