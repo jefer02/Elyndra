@@ -95,9 +95,9 @@ class MeridianFogTest {
             val g = geo(w)
             val focus = 40f + g.focusY
             val atFocus = MeridianScrims.glassEdgeAt(focus, g.axisX, focus, g.arcRadius)
-            // En la línea de foco: el dial y la cápsula "03 / 13" (~10 dp pasado el eje, ~74 con 3 cifras) dentro; el hero, fuera.
-            assertTrue(atFocus >= g.axisX + 82f)
-            assertTrue(atFocus <= g.heroLeft - 8f)
+            // En la línea de foco: el dial con su nodo y su resplandor (~6 dp pasado el eje) dentro, con aire; el hero, fuera.
+            assertTrue(atFocus >= g.axisX + 18f)
+            assertTrue(atFocus <= g.heroLeft - 16f)
             assertEquals(MeridianScrims.glassRight(g.axisX, w), atFocus, 1e-3f)
             // Lejos de la línea, se recoge como las filas (simétrico y sin pasar del mínimo).
             val up = MeridianScrims.glassEdgeAt(focus - 200f, g.axisX, focus, g.arcRadius)
