@@ -305,7 +305,9 @@ internal fun MeridianWashLayer(
                 val h = size.height
                 val ax = axisX.dp.toPx()
                 val fog = arc()
-                val mask = fogMask(size, ax, w, fog.top, fog.focusY.dp.toPx(), fog.radius.dp.toPx(), MeridianFog.CELL_DP.dp.toPx())
+                // La banda de arriba: si el dock de la cabecera no cabe bajo la curva, la niebla llega hasta él.
+                val band = MeridianFog.band(fog.top / density, fog.reach, axisX, glass = false)
+                val mask = fogMask(size, ax, w, fog.top, fog.focusY.dp.toPx(), fog.radius.dp.toPx(), MeridianFog.CELL_DP.dp.toPx(), density, band)
                 val maskSize = IntSize(mask.width, mask.height)
                 val layerSize = IntSize(size.width.roundToInt(), size.height.roundToInt())
                 val from = state.from
@@ -342,7 +344,7 @@ internal fun MeridianWashLayer(
 /**
  * El tema claro detrás de la rueda: un cristal curvo como la lista (ver
  * [WheelGlass]). Su canto derecho sigue el círculo de la rueda ([arc]): en la
- * línea de foco pasa el dial y su contador, y arriba y abajo se recoge igual
+ * línea de foco pasa el dial con su nodo, y arriba y abajo se recoge igual
  * que las filas. Dentro, [frosted] (el arte de verdad desenfocado y avivado,
  * API 31+; sin él, la copia diminuta del arte, que ya va desenfocada) y un
  * tinte pastel del color del juego ([WashState.tone], que se funde al
@@ -368,6 +370,7 @@ internal fun WheelGlassLayer(
                 val h = size.height
                 val fog = arc()
                 val focus = fog.top / density + fog.focusY
+                val band = MeridianFog.band(fog.top / density, fog.reach, axisX, glass = true)
                 val step = WheelGlass.STEP_DP.dp.toPx()
                 val edge = Path()
                 val area = Path()
@@ -375,7 +378,7 @@ internal fun WheelGlassLayer(
                 var y = 0f
                 var first = true
                 while (true) {
-                    val x = MeridianScrims.glassEdgeAt(y / density, axisX, focus, fog.radius).dp.toPx().coerceAtMost(size.width)
+                    val x = MeridianScrims.glassEdgeAt(y / density, axisX, focus, fog.radius, band).dp.toPx().coerceAtMost(size.width)
                     if (first) edge.moveTo(x, y) else edge.lineTo(x, y)
                     area.lineTo(x, y)
                     first = false
@@ -411,11 +414,15 @@ internal fun WheelGlassLayer(
     }
 }
 
-/** La máscara de la niebla para una capa de [layer] px (ver [MeridianFog.mask]); [top] es donde empieza la rueda. */
-private fun fogMask(layer: Size, axisX: Float, width: Float, top: Float, focusY: Float, radius: Float, cell: Float): ImageBitmap {
+/**
+ * La máscara de la niebla para una capa de [layer] px (ver [MeridianFog.mask]); [top] es donde empieza la rueda
+ * y [band] (en dp) la banda de arriba.
+ * Todo llega en px y la máscara se calcula en dp ([density]): el velo se apaga en una banda fija de dp.
+ */
+private fun fogMask(layer: Size, axisX: Float, width: Float, top: Float, focusY: Float, radius: Float, cell: Float, density: Float, band: MeridianFog.Band): ImageBitmap {
     val cols = MeridianFog.samples(layer.width, cell)
     val rows = MeridianFog.samples(layer.height, cell)
-    val px = MeridianFog.mask(cols, rows, layer.width, layer.height, axisX, width, top + focusY, radius)
+    val px = MeridianFog.mask(cols, rows, layer.width / density, layer.height / density, axisX / density, width / density, (top + focusY) / density, radius / density, band)
     return Bitmap.createBitmap(px, cols, rows, Bitmap.Config.ARGB_8888).asImageBitmap()
 }
 
