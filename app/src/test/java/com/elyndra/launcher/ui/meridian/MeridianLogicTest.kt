@@ -2,6 +2,8 @@ package com.elyndra.launcher.ui.meridian
 
 import com.elyndra.launcher.data.BrandTokens
 import com.elyndra.launcher.data.ColorMath
+import com.elyndra.launcher.ui.DotTabsLayout
+import com.elyndra.launcher.ui.SectionDockLayout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -326,25 +328,80 @@ class MeridianLogicTest {
     fun `the masha bubble goes below its button, never over the dock, and inside the rail column`() {
         val column = BubbleSlot.Area(0f, 0f, 340f, 520f)
         val masha = BubbleSlot.Area(22f, 8f, 62f, 48f)
-        val (x, y) = BubbleSlot.place(masha, 250f, 90f, column, emptyList(), gap = 8f, margin = 8f)
+        val (x, y) = BubbleSlot.below(masha, 250f, 90f, column, emptyList(), gap = 8f, margin = 8f)
         assertEquals(22f, x, 0f)
         assertEquals(56f, y, 0f)
         // El dock bajó a una segunda línea bajo Masha: el bocadillo no lo pisa.
         val dock = BubbleSlot.Area(60f, 52f, 330f, 86f)
-        val (dx, dy) = BubbleSlot.place(masha, 250f, 90f, column, listOf(dock), gap = 8f, margin = 8f)
+        val (dx, dy) = BubbleSlot.below(masha, 250f, 90f, column, listOf(dock), gap = 8f, margin = 8f)
         val box = BubbleSlot.Area(dx, dy, dx + 250f, dy + 90f)
         assertFalse(box.overlaps(dock))
+        assertFalse(box.overlaps(masha))
         assertTrue(box.left >= column.left && box.right <= column.right)
         // Nunca más ancho que la columna.
         assertEquals(324f, BubbleSlot.maxWidth(340f, 8f, 400f), 0f)
         assertEquals(250f, BubbleSlot.maxWidth(600f, 8f, 250f), 0f)
-        // Un botón arrastrado al canto: el bocadillo se queda dentro.
-        val dragged = BubbleSlot.Area(320f, 480f, 360f, 520f)
-        val (cx, cy) = BubbleSlot.place(dragged, 250f, 90f, column, emptyList(), gap = 8f, margin = 8f)
-        assertTrue(cx + 250f <= column.right - 8f + 1e-3f && cy + 90f <= column.bottom - 8f + 1e-3f)
-        // La rueda le deja sitio: hasta su canto de abajo y un poco más; sin bocadillo, nada.
-        assertEquals(158f, BubbleSlot.reserve(bubbleBottom = 300f, railTop = 150f, gap = 8f), 0f)
-        assertEquals(0f, BubbleSlot.reserve(bubbleBottom = 100f, railTop = 150f, gap = 8f), 0f)
+        // Un botón al canto derecho: el bocadillo se queda dentro a lo ancho y nunca sube encima del botón.
+        val edge = BubbleSlot.Area(300f, 40f, 340f, 80f)
+        val (cx, cy) = BubbleSlot.below(edge, 250f, 90f, column, emptyList(), gap = 8f, margin = 8f)
+        assertTrue(cx + 250f <= column.right - 8f + 1e-3f)
+        assertFalse(BubbleSlot.Area(cx, cy, cx + 250f, cy + 90f).overlaps(edge))
+    }
+
+    /**
+     * Meridian: Masha es la primera pieza del grupo de arriba a la derecha y
+     * el bocadillo va debajo del grupo. Más ancho que lo que va de Masha al
+     * canto del grupo, pegado a ese canto; más estrecho, alineado a Masha.
+     * Nunca encima de ella ni de la barra.
+     */
+    @Test
+    fun `the masha bubble goes under the top right group, below masha`() {
+        val art = BubbleSlot.Area(200f, 0f, 892f, 411f)
+        val bar = BubbleSlot.Area(480f, 6f, 870f, 40f)
+        val masha = BubbleSlot.Area(480f, 3f, 520f, 43f)
+        val wide = BubbleSlot.underGroup(masha, bar, natural = 430f, maxWidth = 560f, heightFor = { 30f }, bounds = art, obstacles = listOf(bar), gap = 8f, margin = 8f)
+        assertTrue(wide.clear)
+        assertEquals(430f, wide.width, 0f)
+        assertEquals(870f - 430f, wide.x, 1e-3f)
+        assertEquals(51f, wide.y, 0f)
+        val narrow = BubbleSlot.underGroup(masha, bar, natural = 250f, maxWidth = 560f, heightFor = { 30f }, bounds = art, obstacles = listOf(bar), gap = 8f, margin = 8f)
+        assertEquals(masha.left, narrow.x, 0f)
+        for (sl in listOf(wide, narrow)) {
+            val box = BubbleSlot.Area(sl.x, sl.y, sl.x + sl.width, sl.y + 30f)
+            assertFalse(box.overlaps(masha) || box.overlaps(bar))
+        }
+        // Sin sitio a lo ancho: se estrecha (el texto se parte), sin salir del arte.
+        val tight = BubbleSlot.underGroup(masha, bar, natural = 900f, maxWidth = 560f, heightFor = { if (it >= 900f) 30f else 47f }, bounds = BubbleSlot.Area(400f, 0f, 892f, 411f), obstacles = emptyList(), gap = 8f, margin = 8f)
+        assertEquals(870f - 408f, tight.width, 1e-3f)
+        assertEquals(408f, tight.x, 1e-3f)
+    }
+
+    @Test
+    fun `the masha bubble steps aside from the dock and hides rather than cover the hero`() {
+        val art = BubbleSlot.Area(200f, 0f, 640f, 360f)
+        val bar = BubbleSlot.Area(300f, 6f, 618f, 40f)
+        val masha = BubbleSlot.Area(300f, 3f, 340f, 43f)
+        // Un dock que asomara hasta debajo del grupo: el bocadillo empieza pasado él.
+        val dock = BubbleSlot.Area(22f, 45f, 260f, 79f)
+        val s = BubbleSlot.underGroup(masha, bar, natural = 500f, maxWidth = 560f, heightFor = { 47f }, bounds = art, obstacles = listOf(dock), gap = 8f, margin = 8f, minWidth = 150f)
+        assertTrue(s.clear)
+        assertTrue(s.x >= dock.right + 8f - 1e-3f)
+        assertEquals(618f, s.x + s.width, 1e-3f)
+        // El bloque del hero lo cruza entero a lo ancho: no hay sitio, no se enseña.
+        val hero = BubbleSlot.Area(248f, 70f, 618f, 330f)
+        assertFalse(BubbleSlot.underGroup(masha, bar, natural = 500f, maxWidth = 560f, heightFor = { 47f }, bounds = art, obstacles = listOf(hero), gap = 8f, margin = 8f, minWidth = 150f).clear)
+    }
+
+    /** Clásico: debajo del botón, con su ancho natural hasta el tope, sin pisar el dock. */
+    @Test
+    fun `classic chooses the slot below masha`() {
+        val screen = BubbleSlot.Area(0f, 0f, 393f, 851f)
+        val masha = BubbleSlot.Area(18f, 13f, 58f, 53f)
+        val dock = BubbleSlot.Area(100f, 60f, 290f, 94f)
+        val s = BubbleSlot.choose(masha, natural = 320f, maxWidth = 377f, heightFor = { 30f }, bounds = screen, obstacles = listOf(dock), gap = 8f, margin = 8f)
+        assertEquals(320f, s.width, 0f)
+        assertFalse(BubbleSlot.Area(s.x, s.y, s.x + s.width, s.y + 30f).overlaps(dock))
+        assertFalse(BubbleSlot.Area(s.x, s.y, s.x + s.width, s.y + 30f).overlaps(masha))
     }
 
     /* ── Posición, snap y muelle ── */
@@ -530,7 +587,7 @@ class MeridianLogicTest {
     private val widths = listOf(640f, 900f, 1280f, 1600f)
 
     @Test
-    fun `the feathered scrim has no edge and is clear by about 62 percent of the width`() {
+    fun `the feathered scrim has no edge and is clear well before 62 percent of the width`() {
         for (w in widths) {
             val ax = MeridianGeometry.railWidthFor(w)
             assertEquals(MeridianScrims.EDGE_ALPHA, MeridianScrims.alphaAt(0f, ax, w), 1e-6f)
@@ -604,6 +661,125 @@ class MeridianLogicTest {
             val hazed = ColorMath.over(ColorMath.withAlpha(white, 0.05f), pill)
             assertTrue("%08X".format(bg), ColorMath.contrast(white, hazed) >= 4.5)
             assertTrue(ColorMath.contrast(ColorMath.over(ColorMath.withAlpha(white, 0.8f), hazed), hazed) >= 3.0)
+        }
+    }
+
+    /* ── Cabecera de la rueda ── */
+
+    @Test
+    fun `rail header gives the dock room over the hero gap on a phone`() {
+        val rail = MeridianGeometry.slimRailWidth(800f, 360f, 1f, compact = true)
+        assertEquals(MeridianGeometry.SLIM_MIN, rail, 0.01f)
+        // Antes: solo la columna (162 dp). Ahora asoma sobre el hueco del hero, sin llegar a su bloque.
+        val max = RailHeaderLayout.dockMaxWidth(rail)
+        assertTrue(max > rail - RailHeaderLayout.START - RailHeaderLayout.END)
+        assertTrue(RailHeaderLayout.START + max < rail + MeridianGeometry.HERO_GAP)
+    }
+
+    @Test
+    fun `rail header keeps the dock flush with the column when it fits`() {
+        assertEquals(300f - RailHeaderLayout.END - 200f, RailHeaderLayout.dockX(300f, 200f), 0.01f)
+        // Más ancho que la columna: arranca en START y crece hacia el hueco.
+        assertEquals(RailHeaderLayout.START, RailHeaderLayout.dockX(200f, 230f), 0.01f)
+    }
+
+    /**
+     * La barra de la derecha nunca llega a donde puede asomar el dock: entre
+     * los dos queda al menos el aire de la barra (antes, en el peor caso, 2 dp).
+     */
+    @Test
+    fun `the top bar keeps clear of the rail header dock`() {
+        for ((w, h) in listOf(892f to 411f, 730f to 360f, 640f to 360f, 1280f to 800f)) {
+            val rail = MeridianGeometry.slimRailWidth(w, h, 1f, MeridianMode.compact(h))
+            val barLeft = w - MeridianTopRow.END - MeridianTopRow.barMaxWidth(w, rail)
+            val dockEnd = RailHeaderLayout.START + RailHeaderLayout.dockMaxWidth(rail)
+            assertTrue("%.0f×%.0f".format(w, h), barLeft - dockEnd >= com.elyndra.launcher.ui.TopBarLayout.GAP - 1e-3f)
+        }
+    }
+
+    /* ── La zona de la izquierda sin el contador del dial ── */
+
+    /** Rótulos del dock (dp) medidos en Poppins SemiBold 11 sp con 0,04 em: cuatro secciones, inglés y alemán (los más largos). */
+    private val dockLabels = mapOf(
+        "en" to floatArrayOf(15.3f, 47.7f, 55.1f, 85.3f),
+        "de" to floatArrayOf(22.6f, 47.7f, 55.2f, 78.1f),
+    )
+
+    /** Móvil apaisado, móvil pequeño, la ventana mínima de Meridian y tableta (dp). */
+    private val zoneWindows = listOf(892f to 411f, 730f to 360f, 640f to 360f, 1280f to 800f)
+
+    private fun zoneRail(w: Float, h: Float) = MeridianGeometry.slimRailWidth(w, h, 1f, MeridianMode.compact(h))
+
+    /** El dock de la cabecera (solo, sin el orden) encajado en lo que le da la cabecera: (ancho, tope de la píldora). */
+    private fun headerDock(rail: Float, labels: FloatArray): Pair<Float, Float> {
+        val pills = FloatArray(labels.size) { DotTabsLayout.pillWidth(labels[it]) }
+        val fit = DotTabsLayout.fit(pills, RailHeaderLayout.dockMaxWidth(rail))
+        val capped = FloatArray(pills.size) { minOf(pills[it], fit.pillCap) }
+        return capped.indices.maxOf { DotTabsLayout.totalWidth(capped, it, fit.dot) } to fit.pillCap
+    }
+
+    @Test
+    fun `without the sort button the dock alone fits the rail header with more room than before`() {
+        for ((w, h) in zoneWindows) for ((lang, labels) in dockLabels) {
+            val rail = zoneRail(w, h)
+            val max = RailHeaderLayout.dockMaxWidth(rail)
+            val name = "%.0f×%.0f %s".format(w, h, lang)
+            // Nunca por debajo de su mínimo: no se corta ni se sale.
+            assertTrue(name, max >= DotTabsLayout.minWidth(labels.size))
+            // Al menos lo que tenían las pestañas con el orden al lado y el hueco de 96 del contador.
+            val before = SectionDockLayout.tabsMaxWidth(rail - RailHeaderLayout.START - RailHeaderLayout.END + 96f - MeridianGeometry.RAIL_START)
+            assertTrue("$name: $max < $before", max >= before)
+            val (dock, cap) = headerDock(rail, labels)
+            assertTrue(name, dock <= max + 1e-3f)
+            // Con cuatro secciones, "Todo / Android / Consolas" se leen enteros; solo el último rótulo, el más largo, se recorta.
+            assertTrue("$name: tope $cap", DotTabsLayout.labelRoom(cap) >= labels[2])
+            // El dock no llega al bloque del hero.
+            val right = RailHeaderLayout.dockX(rail, dock) + dock
+            assertTrue(name, right + MeridianGeometry.RAIL_START <= rail + MeridianGeometry.HERO_GAP + 1e-3f)
+        }
+    }
+
+    @Test
+    fun `the veil clears a fixed band past the rail and never before the rail header ends`() {
+        for ((w, h) in zoneWindows) for ((lang, labels) in dockLabels) {
+            val rail = zoneRail(w, h)
+            val end = MeridianScrims.clearAt(rail, w)
+            assertEquals(rail + MeridianScrims.FADE_DP, end, 1e-3f)
+            assertEquals(0f, MeridianScrims.alphaAt(end, rail, w), 1e-6f)
+            // Mucho antes que con el 16 % del ancho de antes (en tableta, ~120 dp menos).
+            assertTrue(end <= rail + w * 0.16f + 1e-3f)
+            // El dock de la cabecera tiene velo detrás, con 16 dp de aire.
+            val (dock, _) = headerDock(rail, labels)
+            val right = RailHeaderLayout.dockX(rail, dock) + dock
+            assertTrue("%.0f×%.0f %s: %.1f".format(w, h, lang, right), right + 16f <= end)
+        }
+    }
+
+    @Test
+    fun `with the shorter veil the dial keeps 3 to 1 and white hero text still reads where it did`() {
+        val white = 0xFFFFFFFF.toInt()
+        // El arte sobre el que el texto blanco del hero ya se leía holgado (≥ 7:1): ahí el velo no puede estropearlo.
+        val darkArts = arts.filter { ColorMath.contrast(white, it) >= 7.0 }
+        assertTrue(darkArts.size >= 2)
+        for ((w, h) in zoneWindows) for (dark in listOf(false, true)) {
+            val rail = zoneRail(w, h)
+            // El dial: marcas hacia dentro desde el eje; la muesca y el resplandor del nodo, hasta ~6 dp pasado él.
+            var x = rail - 24f
+            while (x <= rail + 6f) {
+                for (art in arts) {
+                    val bg = MeridianScrims.background(art, x, rail, w, dark)
+                    assertTrue("%08X dark=%s w=%.0f x=%.0f".format(art, dark, w, x), ArtWash.tickContrast(bg, dark) >= MeridianScrims.MIN_UI)
+                }
+                x += 2f
+            }
+            // El arranque del bloque del hero: en claro el velo es perla y resta contraste al blanco; con el
+            // hueco de 48 queda por debajo del 0,25 y el texto sigue en 4,5:1 (con 32 bajaba de 3,5:1).
+            val heroLeft = rail + MeridianGeometry.HERO_GAP
+            assertTrue(MeridianScrims.alphaAt(heroLeft, rail, w) < 0.25f)
+            for (art in darkArts) {
+                val bg = MeridianScrims.background(art, heroLeft, rail, w, dark)
+                assertTrue("%08X dark=%s w=%.0f".format(art, dark, w), ColorMath.contrast(white, bg) >= MeridianScrims.MIN_TEXT)
+            }
         }
     }
 }
