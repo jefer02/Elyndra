@@ -47,6 +47,7 @@ import com.elyndra.launcher.library.NameCheck
 import com.elyndra.launcher.metadata.ArtKind
 import com.elyndra.launcher.ui.BarItem
 import com.elyndra.launcher.ui.DockPalettes
+import com.elyndra.launcher.ui.DotTabsLayout
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.TapAction
 import com.elyndra.launcher.ui.TapGate
@@ -60,6 +61,7 @@ import com.elyndra.launcher.ui.components.ArtVariant
 import com.elyndra.launcher.ui.components.ConsoleIconButton
 import com.elyndra.launcher.ui.components.DisintegratingContainer
 import com.elyndra.launcher.ui.components.ElyText
+import com.elyndra.launcher.ui.components.rememberDotTabPills
 import com.elyndra.launcher.ui.components.EmptyLibraryHero
 import com.elyndra.launcher.ui.components.LocalScreenSize
 import com.elyndra.launcher.ui.components.FallbackArt
@@ -83,20 +85,24 @@ import com.elyndra.launcher.ui.screens.MashaInsight
 import com.elyndra.launcher.ui.screens.SORT_HINTS
 import com.elyndra.launcher.ui.screens.SORT_MENU_HINTS
 import com.elyndra.launcher.ui.screens.SearchField
-import com.elyndra.launcher.ui.screens.SectionDock
+import com.elyndra.launcher.ui.screens.SectionSortButton
+import com.elyndra.launcher.ui.screens.SectionTabs
 import com.elyndra.launcher.ui.selection.rememberSelectionLook
 import com.elyndra.launcher.ui.theme.LocalReducedMotion
+import com.elyndra.launcher.ui.screens.rememberTopBarFit
 import com.elyndra.launcher.ui.theme.consoleFaceBrush
 import com.elyndra.launcher.ui.theme.liquidGlass
 import androidx.compose.foundation.shape.RoundedCornerShape
+import kotlin.math.ceil
 import com.elyndra.launcher.ui.theme.LightGlass
 import com.elyndra.launcher.ui.theme.lightGlass
 
 /**
  * La biblioteca en Meridian (ventana apaisada y ancha): la rueda vertical a
- * la izquierda con el dock de secciones y el orden encima, alineados con el
- * eje; el arte del juego enfocado a pantalla completa y su bloque a la
- * derecha. Filtros, orden, selección y búsqueda son los mismos del
+ * la izquierda con el dock de secciones encima, alineado con el eje; el arte
+ * del juego enfocado a pantalla completa y su bloque a la derecha, y la barra
+ * arriba a la derecha (Masha la primera, el orden junto al buscador), en la
+ * misma fila que el dock. Filtros, orden, selección y búsqueda son los mismos del
  * ViewModel que usa el carrusel: girar el aparato no pierde nada.
  */
 @Composable
@@ -122,11 +128,14 @@ internal fun MeridianLibrary(vm: ElyndraViewModel) {
     val wheel = remember { mutableStateOf<WheelState?>(null) }
     val sortAnchor = remember { mutableStateOf(Rect.Zero) }
     val dockAnchor = remember { mutableStateOf(Rect.Zero) }
+    // La barra de arriba a la derecha (Masha, hora, Abrir, orden, buscar, Ajustes): el bocadillo va debajo, sin tocarla.
+    val topAnchor = remember { mutableStateOf(Rect.Zero) }
+    // El bloque del hero (fichas, título, Jugar/Detalles/Opciones): el bocadillo nunca lo tapa.
+    val heroAnchor = remember { mutableStateOf(Rect.Zero) }
+    val fogArc = remember { mutableStateOf(FogArc.NONE) }
     val mashaAnchor = remember { mutableStateOf(Rect.Zero) }
     val mashaHost = remember { mutableStateOf(Offset.Zero) }
     val hostBounds = remember { mutableStateOf(Rect.Zero) }
-    // El bocadillo de Masha mientras se ve (en la ventana): la rueda le deja sitio.
-    val bubble = remember { mutableStateOf<Rect?>(null) }
     val filters = vm.availableFilters()
     val previous = remember { arrayOf(vm.filter) }
     val forward = remember(vm.filter) {
@@ -178,18 +187,29 @@ internal fun MeridianLibrary(vm: ElyndraViewModel) {
             ),
             wheel = { wheel.value },
             artIndex = { key -> if (key == WHEEL_ADD_KEY) items.size else keyIndex[key] },
-            railHeader = { RailHeader(vm, onMasha = { mashaAnchor.value = it }, onSort = { sortAnchor.value = it }, onDock = { dockAnchor.value = it }) },
-            topEnd = { TopEnd(vm, m, enabled = onAdd || hero != null) { openKey(if (onAdd) WHEEL_ADD_KEY else hero?.key) } },
+            railHeader = { RailHeader(vm, onDock = { dockAnchor.value = it }) },
+            topEnd = {
+                TopEnd(vm, m, enabled = onAdd || hero != null, onMasha = { mashaAnchor.value = it }, onSort = { sortAnchor.value = it }, onBounds = { topAnchor.value = it }) {
+                    openKey(if (onAdd) WHEEL_ADD_KEY else hero?.key)
+                }
+            },
             hints = {
                 PadHints(
                     hints = meridianHints(vm),
                     visible = vm.input.gamepadPresent,
                     modifier = Modifier.padding(start = 12.dp, bottom = 4.dp),
+                    // En la columna estrecha de un móvil, en dos filas antes que cortar el rótulo.
+                    wrap = true,
                 )
             },
-            hero = { LibraryHero(vm, hero, onAdd, searchEmpty, items.isEmpty(), ink, openKey) },
+            hero = {
+                Box(Modifier.fillMaxWidth().onGloballyPositioned { heroAnchor.value = it.boundsInWindow() }) {
+                    LibraryHero(vm, hero, onAdd, searchEmpty, items.isEmpty(), ink, openKey)
+                }
+            },
             adaptive = vm.settings.meridianAdaptiveColor,
-        wheelGlass = vm.settings.wheelGlassFor(P.isDark),
+            wheelGlass = vm.settings.wheelGlassFor(P.isDark),
+            fogArc = fogArc,
         ) { geo, wash ->
             MeridianWheelArea(
                 geo = geo,
@@ -208,7 +228,6 @@ internal fun MeridianLibrary(vm: ElyndraViewModel) {
                 reduced = reduced,
                 lite = LocalMeridianFrame.current.lite,
                 current = wheel,
-                bubbleBottom = bubble.value?.bottom,
                 onSettle = { row ->
                     restOnAdd = row >= items.size
                     items.getOrNull(row)?.let { vm.select(it.key) }
@@ -245,18 +264,22 @@ internal fun MeridianLibrary(vm: ElyndraViewModel) {
             )
         }
 
-        // El bocadillo va en la columna de la rueda, bajo el botón de Masha, sin pisar el dock ni el orden.
+        // El bocadillo, debajo del grupo de arriba a la derecha (Masha es su primera pieza), sobre
+        // el arte: la línea entera en una fila. Nunca sobre la barra, el dock ni el bloque del hero.
         val host = hostBounds.value
-        val compact = with(LocalDensity.current) { MeridianMode.compact(host.height.toDp().value) }
-        val railRight = with(LocalDensity.current) { host.left + MeridianGeometry.slimRailWidth(host.width.toDp().value, host.height.toDp().value, 1f, compact).dp.toPx() }
+        val density = LocalDensity.current
+        val hostW = with(density) { host.width.toDp().value }
+        val hostH = with(density) { host.height.toDp().value }
+        val railW = MeridianGeometry.slimRailWidth(hostW, hostH, 1f, MeridianMode.compact(hostH))
+        val railRight = with(density) { host.left + railW.dp.toPx() }
         MashaInsight(
             vm,
             mashaAnchor.value,
             mashaHost.value,
-            region = if (host == Rect.Zero) null else Rect(host.left, host.top, railRight, host.bottom),
-            obstacles = listOf(dockAnchor.value, sortAnchor.value),
-            oneLine = compact,
-            onPlaced = { bubble.value = it },
+            region = if (host == Rect.Zero) null else Rect(railRight, host.top, host.right, host.bottom),
+            obstacles = listOf(dockAnchor.value, topAnchor.value, heroAnchor.value),
+            group = topAnchor.value,
+            oneLine = true,
         )
 
         SortPopover(
@@ -337,52 +360,104 @@ private fun LibraryWheelTile(item: LibraryItem, fallback: ArtFallback) {
 }
 
 /**
- * La cabecera de la rueda: el emblema de Masha a la izquierda y, alineados
- * con el eje, el dock de secciones y el orden. Si no caben juntos (ventana
- * justa o rótulos largos), el dock baja a una segunda línea, pegado al eje.
+ * La cabecera de la rueda: el dock de secciones, alineado con el eje (ver
+ * [RailHeaderRow]). Masha y el orden van en la barra de la derecha ([TopEnd]).
  */
 @Composable
-private fun RailHeader(vm: ElyndraViewModel, onMasha: (Rect) -> Unit, onSort: (Rect) -> Unit, onDock: (Rect) -> Unit) {
-    val compact = LocalMeridianFrame.current.compact
-    Layout(
-        content = {
-            MashaButton(vm, onMasha)
+private fun RailHeader(vm: ElyndraViewModel, onDock: (Rect) -> Unit) {
+    val labels = vm.availableFilters().map { stringResource(it.label) }
+    RailHeaderRow(
+        compact = LocalMeridianFrame.current.compact,
+        pills = rememberDotTabPills(labels),
+        dock = {
             // Sobre el fondo de la rueda: el cristal del dock más denso, como en la costura
             // (en claro, el cristal claro, como todo lo que va sobre el arte en la rueda).
-            Box(Modifier.onGloballyPositioned { onDock(it.boundsInWindow()) }) {
-                SectionDock(vm, glassMinAlpha = DockPalettes.SEAM_GLASS_MIN, light = !P.isDark, onSortBounds = onSort)
-            }
+            SectionTabs(
+                vm,
+                modifier = Modifier.onGloballyPositioned { onDock(it.boundsInWindow()) },
+                glassMinAlpha = DockPalettes.SEAM_GLASS_MIN,
+                light = !P.isDark,
+            )
         },
-        modifier = Modifier.fillMaxWidth().padding(top = if (compact) 4.dp else 8.dp, bottom = if (compact) 2.dp else 6.dp),
+    )
+}
+
+/**
+ * La cabecera de la rueda sin ViewModel (también para las vistas previas):
+ * [dock] alineado con el eje, en una sola fila con el mismo tope y la misma
+ * línea central que la barra de la derecha ([MeridianTopRow]); si la columna
+ * es estrecha asoma sobre el hueco del hero (ver [RailHeaderLayout]).
+ *
+ * [pills] son las píldoras naturales del dock ([rememberDotTabPills]): con
+ * ellas se sabe cuánto medirá antes de medirlo. Su ancho sale del canto
+ * curvo de la niebla a la altura de la cabecera ([RailHeaderLayout.plan]),
+ * que da la escena ([LocalRailFog]); y la cabecera le devuelve hasta dónde
+ * tiene que llegar la niebla en su banda ([FogArc.reach]). Antes de que la
+ * rueda se mida, la curva la calcula aquí con lo mismo que usará la rueda
+ * ([FogArc.forRail]): el dock tiene su ancho final desde el primer fotograma.
+ */
+@Composable
+internal fun RailHeaderRow(compact: Boolean, pills: FloatArray, dock: @Composable () -> Unit) {
+    val fog = LocalRailFog.current
+    val padTop = MeridianTopRow.top(compact).dp
+    val padBottom = MeridianTopRow.bottom(compact).dp
+    Layout(
+        content = dock,
+        modifier = Modifier.fillMaxWidth().padding(top = padTop, bottom = padBottom),
     ) { measurables, constraints ->
-        val start = 22.dp.roundToPx()
-        val end = 16.dp.roundToPx()
-        val gap = 10.dp.roundToPx()
-        val masha = measurables[0].measure(Constraints())
-        val dock = measurables[1].measure(Constraints(maxWidth = (constraints.maxWidth - start - end).coerceAtLeast(0)))
-        val inline = start + masha.width + gap + dock.width <= constraints.maxWidth - end
-        val height = if (inline) maxOf(masha.height, dock.height) else masha.height + 6.dp.roundToPx() + dock.height
+        val rail = constraints.maxWidth.toDp().value
+        val dens = density
+        val arc = fog?.let { f ->
+            val measured = f.arc.value
+            if (measured.radius > 0f && measured.top > 0f) {
+                measured
+            } else {
+                // Aún sin rueda medida: su curva, con el alto que le dejarán la cabecera y las pistas.
+                // El alto de la cabecera no depende de la curva, así que ya se sabe.
+                val headerPx = padTop.roundToPx() + DotTabsLayout.HEIGHT.dp.roundToPx() + padBottom.roundToPx()
+                val totalPx = constraints.maxHeight + padTop.roundToPx() + padBottom.roundToPx()
+                FogArc.forRail(f.windowWidth, (totalPx - headerPx - f.hintsPx) / dens, headerPx.toFloat(), f.tileAspect, f.compact, f.axisX)
+            }
+        }?.copy(reach = 0f) // La curva sin la banda que pide la propia cabecera (si no, el dock se iría ensanchando con ella).
+        val edge: ((Float) -> Float)? = if (fog == null || arc == null) null else { y -> arc.edgeAt(padTop.value + y, fog.axisX, fog.glass, dens) }
+        val plan = RailHeaderLayout.plan(rail, DotTabsLayout.HEIGHT, pills, edge)
+        val dockP = measurables[0].measure(Constraints(maxWidth = ceil(plan.dockWidth * dens).toInt()))
+        val height = plan.height.dp.roundToPx()
         layout(constraints.maxWidth, height) {
-            masha.place(start, if (inline) (height - masha.height) / 2 else 0)
-            val x = (constraints.maxWidth - end - dock.width).coerceAtLeast(start)
-            dock.place(x, if (inline) (height - dock.height) / 2 else height - dock.height)
+            // Centrado en la fila (el dock mide lo que la barra: la misma línea central).
+            dockP.place(plan.dockX.dp.roundToPx(), plan.dockTop.dp.roundToPx() + (height - dockP.height) / 2)
+            fog?.arc?.let { state -> if (state.value.reach != plan.reach) state.value = state.value.copy(reach = plan.reach) }
         }
     }
 }
 
-/** La barra de la derecha, la de siempre: hora y batería, "Abrir", buscar y Ajustes. */
+/**
+ * La barra de la derecha: Masha, hora y batería, "Abrir", el orden, buscar y
+ * Ajustes; compacta si no cabe (ver TopBarLayout: primero "Abrir" se queda en
+ * su icono, luego la píldora; Masha y Ajustes nunca se van). Masha abre el
+ * grupo: en la cabecera de la rueda, sola sobre el dock, se veía apretada y
+ * le quitaba alto a la rueda. El orden va justo antes del buscador: los dos
+ * sirven para encontrar un juego. [onMasha] da el emblema (el bocadillo va
+ * debajo del grupo), [onSort] dónde anclar su menú y [onBounds] lo que ocupa
+ * la barra entera.
+ */
 @Composable
-private fun TopEnd(vm: ElyndraViewModel, m: Metrics, enabled: Boolean, onOpen: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        if (vm.settings.statusVisible && !vm.searchOpen) {
-            StatusStrip(vm.settings.statusMode)
+private fun TopEnd(vm: ElyndraViewModel, m: Metrics, enabled: Boolean, onMasha: (Rect) -> Unit, onSort: (Rect) -> Unit, onBounds: (Rect) -> Unit, onOpen: () -> Unit) = BoxWithConstraints {
+    val fit = rememberTopBarFit(vm, available = if (constraints.hasBoundedWidth) maxWidth.value else Float.POSITIVE_INFINITY, landscape = m.landscape, masha = true, sort = true)
+    Row(Modifier.onGloballyPositioned { onBounds(it.boundsInWindow()) }, verticalAlignment = Alignment.CenterVertically) {
+        MashaButton(vm, grouped = true, onBounds = onMasha)
+        Spacer(Modifier.width(8.dp))
+        if (vm.settings.statusVisible && !vm.searchOpen && fit.status) {
+            StatusStrip(vm.settings.statusMode, showPercent = fit.statusPercent)
             Spacer(Modifier.width(8.dp))
         }
         if (!vm.searchOpen) {
             // "Abrir" hace lo mismo que la acción principal del hero (también en la fila de "Añadir").
-            OpenButton(enabled = enabled, focused = vm.input.isBarFocused(BarItem.Open), onClick = onOpen)
+            OpenButton(enabled = enabled, focused = vm.input.isBarFocused(BarItem.Open), showLabel = fit.openLabel, onClick = onOpen)
             Spacer(Modifier.width(8.dp))
         }
+        SectionSortButton(vm, onBounds = onSort)
+        Spacer(Modifier.width(8.dp))
         SearchField(vm, m)
         Spacer(Modifier.width(8.dp))
         ConsoleIconButton(onClick = { vm.go(Screen.Settings) }, focused = vm.input.isBarFocused(BarItem.Settings)) { glyph -> SettingsGlyph(glyph) }
@@ -489,13 +564,26 @@ internal fun RailMessage(text: String, focusY: Float) {
     }
 }
 
-/** Las pistas del mando bajo la rueda: moverse y cambiar de sección (A, X e Y ya están en el hero). */
+/**
+ * Las pistas del mando bajo la rueda: moverse y cambiar de sección (A, X e Y
+ * ya están en el hero). En la fila de arriba (dock, Masha, Abrir, orden,
+ * buscar, Ajustes: una sola fila, en el orden en que se ve, ver
+ * LibraryFocus.meridianRows) ↑↓ no mueven la rueda: ←→ la recorren, A elige
+ * y B vuelve a ella.
+ */
 private fun meridianHints(vm: ElyndraViewModel): List<PadHint> = when {
     vm.sortMenuOpen -> SORT_MENU_HINTS
     vm.input.isBarFocused(BarItem.Sections) -> DOCK_HINTS
     vm.input.isBarFocused(BarItem.Sort) -> SORT_HINTS
+    vm.input.active && vm.input.barFocus != null -> MERIDIAN_BAR_HINTS
     else -> MERIDIAN_HINTS
 }
+
+private val MERIDIAN_BAR_HINTS = listOf(
+    PadHint("A", R.string.hint_select),
+    PadHint("←→", R.string.hint_move),
+    PadHint("B", R.string.hint_back),
+)
 
 private val MERIDIAN_HINTS = listOf(
     PadHint("↑↓", R.string.hint_move),
