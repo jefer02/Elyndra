@@ -356,7 +356,7 @@ private fun WheelRow(
                 val row = size.height
                 val lift = wheel.lift()
                 val dy = WheelTransform.center(d) * row
-                val edge = RailEdge.fade(wheel.focusPx + lift + dy, s * row, wheel.reserve(), wheel.railPx)
+                val edge = RailEdge.fade(wheel.focusPx + lift + dy, s * row, 0f, wheel.railPx)
                 scaleX = s
                 scaleY = s
                 alpha = WheelTransform.alpha(d, lite) * enter * edge
