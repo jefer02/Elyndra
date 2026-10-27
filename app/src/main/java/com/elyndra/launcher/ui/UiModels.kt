@@ -264,6 +264,11 @@ data class SheetAction(
      * imagen): el menú la protege con "mantén pulsado o pulsa otra vez".
      */
     val holdToConfirm: Boolean = false,
+    /**
+     * La imagen a la que se refiere (poner o quitar esa clase de imagen): el
+     * menú de un juego empareja así cada "Quitar" con su tarjeta (ver [SheetLayout]).
+     */
+    val artSlot: ArtKind? = null,
     val action: () -> Unit,
 )
 

@@ -63,6 +63,35 @@ class LibraryFocusTest {
     }
 
     @Test
+    fun `en Meridian es una fila en el orden que se ve, con Masha la primera de la barra`() {
+        // Cabecera de la rueda (el dock) y la barra de la derecha (Masha, Abrir, orden, buscar, Ajustes).
+        assertEquals(listOf(listOf(Sections, Masha, Open, Sort, Search, Settings)), LibraryFocus.meridianRows(searchOpen = false))
+        assertEquals(listOf(listOf(Sections, Masha, Sort, Search, Settings)), LibraryFocus.meridianRows(searchOpen = true))
+        val rows = LibraryFocus.meridianRows(searchOpen = false)
+        // Del dock a la derecha se llega a Masha, y de ella a "Abrir"; a la izquierda del dock, nada.
+        assertEquals(Masha, LibraryFocus.side(rows, Sections, 1))
+        assertEquals(Open, LibraryFocus.side(rows, Masha, 1))
+        assertEquals(Sections, LibraryFocus.side(rows, Masha, -1))
+        assertEquals(Sections, LibraryFocus.side(rows, Sections, -1))
+        // Buscando, de Masha al orden.
+        assertEquals(Sort, LibraryFocus.side(LibraryFocus.meridianRows(searchOpen = true), Masha, 1))
+        assertEquals(Search, LibraryFocus.side(rows, Sort, 1))
+        assertEquals(Open, LibraryFocus.side(rows, Sort, -1))
+        // Una sola fila: arriba se queda y abajo vuelve a la rueda.
+        assertEquals(Sort, LibraryFocus.up(rows, Sort))
+        assertNull(LibraryFocus.down(rows, Sort))
+        assertNull(LibraryFocus.down(rows, Sections))
+    }
+
+    @Test
+    fun `en Meridian la rueda lleva a la izquierda al dock y a la derecha a la barra`() {
+        assertEquals(Open, LibraryFocus.fromWheelRight(searchOpen = false))
+        // Buscando no hay "Abrir": al campo.
+        assertEquals(Search, LibraryFocus.fromWheelRight(searchOpen = true))
+        assertEquals(Sections, LibraryFocus.fromCarousel(searchOpen = false))
+    }
+
+    @Test
     fun `los puntos se recorren y por los extremos se sale`() {
         assertEquals(1, LibraryFocus.stepDot(0, 1, 3))
         assertEquals(2, LibraryFocus.stepDot(1, 1, 3))

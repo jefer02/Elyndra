@@ -8,6 +8,7 @@ package com.elyndra.launcher.ui
  * que se ve. Con el dock en la costura hero/estante son dos: la barra arriba
  * y el dock debajo, justo encima del carrusel. Desde el carrusel, arriba
  * lleva al dock; desde la barra, abajo baja al dock y luego al carrusel.
+ * Meridian tiene su propia fila ([meridianRows]).
  */
 object LibraryFocus {
 
@@ -22,6 +23,19 @@ object LibraryFocus {
             )
         }
     }
+
+    /**
+     * Meridian: una sola fila en el orden en que se ve de izquierda a derecha.
+     * El dock va solo en la cabecera de la rueda y la barra arriba a la
+     * derecha empieza por Masha: Masha, "Abrir", el orden, buscar y Ajustes
+     * (la píldora de hora no se enfoca). Antes Masha iba primero, encima del
+     * dock; ahora que está en la barra, ir del dock a Masha es ir a la derecha.
+     */
+    fun meridianRows(searchOpen: Boolean): List<List<BarItem>> =
+        listOf(listOfNotNull(BarItem.Sections, BarItem.Masha, BarItem.Open.takeIf { !searchOpen }, BarItem.Sort, BarItem.Search, BarItem.Settings))
+
+    /** Meridian, derecha desde la rueda: la barra, por "Abrir" (buscando, el campo: es donde se escribe). */
+    fun fromWheelRight(searchOpen: Boolean): BarItem = if (searchOpen) BarItem.Search else BarItem.Open
 
     /** Arriba desde el carrusel: el dock (o el buscador, si está abierto: es donde se escribe). */
     fun fromCarousel(searchOpen: Boolean): BarItem = if (searchOpen) BarItem.Search else BarItem.Sections

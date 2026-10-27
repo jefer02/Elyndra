@@ -53,6 +53,10 @@ import com.elyndra.launcher.ui.meridian.LayoutStyle
 import com.elyndra.launcher.ui.meridian.WheelArc
 import com.elyndra.launcher.ui.meridian.WheelTransform
 import com.elyndra.launcher.ui.components.SwitchRow
+import com.elyndra.launcher.ui.components.SegmentedControl
+import com.elyndra.launcher.ui.components.SettingRow
+import com.elyndra.launcher.ui.components.SettingsDivider
+import com.elyndra.launcher.ui.theme.Space
 import kotlin.math.asin
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.Radii
@@ -69,6 +73,15 @@ internal fun LayoutStyleGroup(vm: ElyndraViewModel) {
     val s = vm.settings
     LayoutStyleChooser(s.layoutStyle, s::updateLayoutStyle)
     SettingsGroup {
+        // Detrás de la rueda: cristal o difuminado, en los dos temas.
+        SettingRow(stringResource(R.string.meridian_wheel_backdrop_title), description = stringResource(R.string.meridian_wheel_backdrop_desc))
+        SegmentedControl(
+            options = listOf(stringResource(R.string.meridian_wheel_glass), stringResource(R.string.meridian_wheel_fog)),
+            selected = if (s.wheelGlassFor(P.isDark)) 0 else 1,
+            onSelect = { s.updateMeridianWheelGlass(it == 0) },
+        )
+        Spacer(Modifier.height(Space.s))
+        SettingsDivider()
         SwitchRow(
             stringResource(R.string.meridian_adaptive_color_title),
             stringResource(R.string.meridian_adaptive_color_desc),

@@ -119,6 +119,30 @@ object SelectionFx {
     }
 }
 
+/**
+ * Hasta dónde llegan a los lados las partículas de Masha cuando su emblema va
+ * entre otras piezas (la barra de arriba de Meridian, con la píldora de hora
+ * a 8 dp): sin tope se alejan hasta ~19 dp del orbe y se pintaban encima de
+ * la píldora de al lado. Se apagan antes de [halo] dp más allá del canto, a
+ * lo ancho (hacia arriba siguen subiendo: ahí no hay nada), y lo que aún
+ * asome se recorta en ese mismo canto.
+ */
+object AuraHalo {
+
+    /** Lo que puede pasar del orbe a los lados con vecinos a [gap] dp: un poco menos, para no tocarlos. */
+    fun forGap(gap: Float): Float = (gap - 2f).coerceAtLeast(0f)
+
+    /**
+     * La opacidad de una partícula a [dx] (px) a lo ancho del centro de un
+     * orbe de radio [radius] (px) con [halo] (px): entera hasta la mitad del
+     * halo, nada en su canto.
+     */
+    fun fade(dx: Float, radius: Float, halo: Float): Float {
+        val past = kotlin.math.abs(dx) - radius
+        return 1f - SelectionFx.smoothstep(halo * 0.5f, halo, past)
+    }
+}
+
 /* ── Paleta ─────────────────────────────────────────────────── */
 
 /**

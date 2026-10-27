@@ -78,13 +78,33 @@ class MeridianFogTest {
     @Test
     fun `past the axis the fog is graded, denser near the wheel and lighter than a plain fade`() {
         for (w in widths) {
-            val ax = MeridianGeometry.railWidthFor(w)
+            // La columna de la rueda de solo iconos (la que se usa).
+            val ax = MeridianGeometry.slimRailWidth(w, w * 0.5f)
             val end = MeridianScrims.clearAt(ax, w)
             val mid = MeridianScrims.alphaAt((ax + end) / 2f, ax, w)
             assertTrue("w=$w mid=$mid", mid < MeridianScrims.AXIS_ALPHA * 0.4f)
             val near = MeridianScrims.alphaAt(ax + (end - ax) * 0.1f, ax, w)
             assertTrue("w=$w near=$near", near > MeridianScrims.AXIS_ALPHA * 0.85f)
             assertTrue("w=$w end=$end", end <= w * 0.62f)
+        }
+    }
+
+    @Test
+    fun `the light glass edge passes the dial at the focus line and curves back like the rows`() {
+        for (w in widths) {
+            val g = geo(w)
+            val focus = 40f + g.focusY
+            val atFocus = MeridianScrims.glassEdgeAt(focus, g.axisX, focus, g.arcRadius)
+            // En la línea de foco: el dial con su nodo y su resplandor (~6 dp pasado el eje) dentro, con aire; el hero, fuera.
+            assertTrue(atFocus >= g.axisX + 18f)
+            assertTrue(atFocus <= g.heroLeft - 16f)
+            assertEquals(MeridianScrims.glassRight(g.axisX, w), atFocus, 1e-3f)
+            // Lejos de la línea, se recoge como las filas (simétrico y sin pasar del mínimo).
+            val up = MeridianScrims.glassEdgeAt(focus - 200f, g.axisX, focus, g.arcRadius)
+            val down = MeridianScrims.glassEdgeAt(focus + 200f, g.axisX, focus, g.arcRadius)
+            assertTrue(up < atFocus)
+            assertEquals(up, down, 1e-3f)
+            assertTrue(MeridianScrims.glassEdgeAt(focus + 5000f, g.axisX, focus, g.arcRadius) >= 120f)
         }
     }
 

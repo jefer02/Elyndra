@@ -142,6 +142,7 @@ internal class StageCamera(private val camera: Camera, focalLengthMm: Double) {
 
         MashaFraming.solve(
             width.toFloat(), height.toFloat(), areaL, areaT, areaR, areaB, tanHalf, shot, face[1], frameRaw,
+            landscape = width > height,
         )
         if (!frameSeen) {
             frameRaw.copyInto(frame)

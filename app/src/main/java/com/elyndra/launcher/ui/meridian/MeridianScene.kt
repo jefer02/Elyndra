@@ -1,6 +1,8 @@
 package com.elyndra.launcher.ui.meridian
 
+import android.os.Build
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
@@ -27,11 +29,14 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
 import com.elyndra.launcher.ui.EmptyStage
@@ -41,11 +46,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import com.elyndra.launcher.ui.theme.HeroText
+import com.elyndra.launcher.ui.theme.LocalHeroText
+import com.elyndra.launcher.ui.theme.WheelGlass
+import java.io.File
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.components.ArtFallback
@@ -74,6 +90,9 @@ internal data class MeridianArt(
 internal data class MeridianFrame(val compact: Boolean, val heroWidth: Float, val lite: Boolean)
 
 internal val LocalMeridianFrame = staticCompositionLocalOf { MeridianFrame(compact = false, heroWidth = 600f, lite = false) }
+
+/** Detrás de la rueda va el cristal (no el difuminado): las marcas del dial, sin velo, van blancas con sombra. */
+internal val LocalWheelGlass = staticCompositionLocalOf { false }
 
 /**
  * El reloj de la entrada de Meridian (ms, ver [MeridianMotion]). Espera mientras
@@ -127,14 +146,62 @@ private val MERIDIAN_STAGE = EmptyStage.MERIDIAN.let {
 /**
  * El círculo de la rueda visto desde la escena: [top] es donde empieza la
  * rueda (px, bajo su cabecera); [focusY] y [radius] van en dp, medidos desde
- * ese [top]. Sin medir aún, sin curva.
+ * ese [top]. Sin medir aún, sin curva. [reach] (dp) es hasta dónde tiene que
+ * llegar la niebla en la cabecera (el final del dock y su aire; ver
+ * [RailHeaderLayout.plan] y [MeridianFog.band]); 0 = sin banda.
  */
 @Immutable
-internal data class FogArc(val top: Float, val focusY: Float, val radius: Float) {
+internal data class FogArc(val top: Float, val focusY: Float, val radius: Float, val reach: Float = 0f) {
+
+    /** La línea de foco en la escena (dp). */
+    fun focusIn(density: Float): Float = top / density + focusY
+
+    /** El canto que se ve de la niebla a la altura [y] de la escena (dp), con la banda de arriba. */
+    fun edgeAt(y: Float, axisX: Float, glass: Boolean, density: Float): Float =
+        MeridianFog.visibleEdge(y, axisX, focusIn(density), radius, glass, MeridianFog.band(top / density, reach, axisX, glass))
+
     companion object {
         val NONE = FogArc(0f, 0f, 0f)
+
+        /**
+         * El círculo de una rueda de [railHeight] dp que empieza en [top] (px)
+         * bajo su cabecera, en una ventana de [windowWidth] dp: lo mismo que
+         * calcula la rueda al medirse ([MeridianGeometry.compute]). La cabecera
+         * lo usa antes de que la rueda se mida, así el dock tiene su ancho de
+         * verdad desde el primer fotograma.
+         */
+        fun forRail(windowWidth: Float, railHeight: Float, top: Float, aspect: Float, compact: Boolean, railWidth: Float): FogArc {
+            val geo = MeridianGeometry.compute(windowWidth, railHeight, aspect, compact, railWidth)
+            return FogArc(top, geo.focusY, geo.arcRadius)
+        }
     }
 }
+
+/**
+ * La niebla de la rueda para la cabecera: [arc] (lo mide la rueda; la
+ * cabecera escribe ahí su [FogArc.reach]), el eje [axisX] (dp) y si detrás
+ * va el cristal claro ([glass]). Sin escena (vistas previas sueltas), null.
+ *
+ * Antes de que la rueda se mida, [arc] aún no tiene curva: la cabecera la
+ * calcula ella misma ([FogArc.forRail]) con la ventana ([windowWidth] dp,
+ * [compact], [tileAspect]) y lo que mide la fila de pistas ([hintsPx], que la
+ * columna mide antes que la cabecera; ver [RailColumn]). Sin eso, el primer
+ * fotograma medía el dock contra un canto recto y al siguiente encogía.
+ */
+@Stable
+internal class RailFog(
+    val arc: MutableState<FogArc>,
+    val axisX: Float,
+    val glass: Boolean,
+    val windowWidth: Float,
+    val compact: Boolean,
+    val tileAspect: Float,
+) {
+    /** Alto de la fila de pistas (px) en esta medida: no es estado, se escribe justo antes de medir la cabecera. */
+    var hintsPx: Int = 0
+}
+
+internal val LocalRailFog = staticCompositionLocalOf<RailFog?> { null }
 
 /** Lo que se desplaza el arte en el paralaje (dp) por fila de distancia. */
 private val PARALLAX = 18.dp
@@ -178,27 +245,40 @@ internal fun MeridianScene(
     washPreset: ArtColors? = null,
     /** Sustituye al arte del juego (las vistas previas pintan un degradado). */
     backdrop: (@Composable () -> Unit)? = null,
+    /** Detrás de la rueda: cristal curvo o el difuminado de siempre (ver [WheelBackdrop]). */
+    wheelGlass: Boolean = WheelBackdrop.glass(null, P.isDark),
+    /** Dónde está el círculo de la rueda (para curvar la niebla): lo fija la rueda al medirse; fuera, para el bocadillo de Masha. */
+    fogArc: MutableState<FogArc> = remember { mutableStateOf(FogArc.NONE) },
     rail: @Composable BoxScope.(MeridianGeometry, WashState) -> Unit,
 ) {
     val reduced = LocalReducedMotion.current
     val skin = LocalSkin.current
     val ink = rememberMeridianInk()
     val lite = rememberMeridianLite()
+    // El desenfoque de verdad (RenderEffect) solo desde Android 12 y fuera de la calidad ligera.
+    val blurred = wheelGlass && !lite && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     BoxWithConstraints(modifier.fillMaxSize()) {
         val width = maxWidth.value
         val screenHeight = maxHeight.value
         val compact = MeridianMode.compact(screenHeight)
-        val railWidth = MeridianGeometry.railWidthFor(width, compact)
+        // Solo iconos en la rueda (el nombre está en el hero): la columna se estrecha y el arte gana sitio.
+        val railWidth = MeridianGeometry.slimRailWidth(width, screenHeight, tileAspect, compact)
         val heroLeft = railWidth + MeridianGeometry.HERO_GAP
         val wash = rememberWash(art.imagePath, P.isDark, ink.primary, adaptive, washPreset)
+        // El arte más alto y más ancho que la ventana, con el paralaje contrario a la rueda.
+        val artLayer: (Any) -> Modifier = { key -> Modifier.meridianArtFrame(maxWidth).meridianParallax(reduced, wheel, artIndex, key) }
         val frame = remember(compact, width, railWidth, lite) { MeridianFrame(compact, width - railWidth, lite) }
         // Sin arte ni reserva (fila "Añadir", biblioteca vacía) el fondo es el escenario, que ya
         // lleva su luz: el óvalo y la franja de arriba, pensados para leer sobre arte, se apagan.
         val artShown by animateFloatAsState(if (backdrop != null || art.imagePath != null || art.fallback != null) 1f else 0f, motion(Springs.fade()), label = "artShown")
-        // Dónde está el círculo de la rueda (para curvar la niebla): lo fija la rueda al medirse.
-        val fogArc = remember { mutableStateOf(FogArc.NONE) }
+        val railFog = remember(fogArc, railWidth, wheelGlass, width, compact, tileAspect) { RailFog(fogArc, railWidth, wheelGlass, width, compact, tileAspect) }
 
-        CompositionLocalProvider(LocalMeridianFrame provides frame, LocalGlassFloor provides MeridianGlass.FLOOR) {
+        CompositionLocalProvider(
+            LocalMeridianFrame provides frame,
+            LocalGlassFloor provides MeridianGlass.FLOOR,
+            LocalWheelGlass provides wheelGlass,
+            LocalRailFog provides railFog,
+        ) {
             if (backdrop != null) backdrop() else HeroArtLayer(
                 fallback = art.fallback,
                 heroKey = art.key,
@@ -210,58 +290,63 @@ internal fun MeridianScene(
                     .fillMaxSize()
                     .clipToBounds()
                     .graphicsLayer { alpha = MeridianMotion.heroFade(enterMs()) },
-                layer = { key ->
-                    Modifier
-                        // El arte es algo más alto que la pantalla (al desplazarse no asoma el canto) y
-                        // más ancho, anclado a la izquierda: su motivo cae a la derecha, fuera del velo.
-                        .layout { measurable, constraints ->
-                            val extra = ART_EXTRA.roundToPx()
-                            val h = constraints.maxHeight + extra * 2
-                            val w = MeridianArtFrame.width(constraints.maxWidth.toFloat()).toInt()
-                            val placeable = measurable.measure(constraints.copy(minHeight = h, maxHeight = h, minWidth = w, maxWidth = w))
-                            layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, -extra) }
-                        }
-                        .graphicsLayer {
-                            if (reduced) return@graphicsLayer
-                            val w = wheel() ?: return@graphicsLayer
-                            val index = artIndex(key) ?: return@graphicsLayer
-                            val d = (w.position - index).coerceIn(-1.2f, 1.2f)
-                            translationY = -d * PARALLAX.toPx()
-                        }
-                },
+                layer = artLayer,
             )
-            Box(Modifier.fillMaxSize().meridianScrims(heroLeft, skin.scrim, wash, if (compact) TOP_BAR_COMPACT else TOP_BAR) { artShown })
-            MeridianWashLayer(
-                state = wash,
-                windowWidth = width,
-                axisX = railWidth,
-                artExtra = ART_EXTRA.value,
-                lite = lite,
-                arc = { fogArc.value },
-                modifier = Modifier.fillMaxHeight().width(MeridianScrims.clearAt(railWidth, width).dp),
-            )
+            Box(Modifier.fillMaxSize().meridianScrims(heroLeft, skin.scrim, wash, if (compact) TOP_BAR_COMPACT else TOP_BAR, clean = true) { artShown })
+            // Detrás de la rueda, lo elegido en Ajustes: el cristal curvo como la lista
+            // (ver WheelGlass) o el difuminado de siempre.
+            if (wheelGlass) {
+                WheelGlassLayer(
+                    state = wash,
+                    windowWidth = width,
+                    axisX = railWidth,
+                    artExtra = ART_EXTRA.value,
+                    arc = { fogArc.value },
+                    frosted = if (!blurred) null else {
+                        { FrostedArt(art, backdrop, artLayer, Modifier.graphicsLayer { alpha = MeridianMotion.heroFade(enterMs()) }) }
+                    },
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        // Más ancho si la banda de arriba pasa del canto de la línea de foco.
+                        .width(MeridianScrims.glassRight(railWidth, width, fogArc.value.reach).dp)
+                        .graphicsLayer { alpha = MeridianMotion.heroFade(enterMs()) },
+                )
+            } else {
+                MeridianWashLayer(
+                    state = wash,
+                    windowWidth = width,
+                    axisX = railWidth,
+                    artExtra = ART_EXTRA.value,
+                    lite = lite,
+                    arc = { fogArc.value },
+                    modifier = Modifier.fillMaxHeight().width(MeridianScrims.clearAt(railWidth, width).dp),
+                )
+            }
 
             Row(Modifier.fillMaxSize()) {
-                Column(Modifier.width(railWidth.dp).fillMaxHeight()) {
-                    railHeader()
-                    BoxWithConstraints(
-                        Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .onPlaced { c ->
-                                val top = c.positionInParent().y
-                                if (fogArc.value.top != top) fogArc.value = fogArc.value.copy(top = top)
-                            },
-                    ) {
-                        val geo = MeridianGeometry.compute(width, maxHeight.value, tileAspect, compact)
-                        SideEffect {
-                            val a = fogArc.value
-                            if (a.focusY != geo.focusY || a.radius != geo.arcRadius) fogArc.value = a.copy(focusY = geo.focusY, radius = geo.arcRadius)
+                RailColumn(
+                    fog = railFog,
+                    modifier = Modifier.width(railWidth.dp).fillMaxHeight(),
+                    header = railHeader,
+                    rail = {
+                        BoxWithConstraints(
+                            Modifier
+                                .fillMaxSize()
+                                .onPlaced { c ->
+                                    val top = c.positionInParent().y
+                                    if (fogArc.value.top != top) fogArc.value = fogArc.value.copy(top = top)
+                                },
+                        ) {
+                            val geo = MeridianGeometry.compute(width, maxHeight.value, tileAspect, compact, railWidth)
+                            SideEffect {
+                                val a = fogArc.value
+                                if (a.focusY != geo.focusY || a.radius != geo.arcRadius) fogArc.value = a.copy(focusY = geo.focusY, radius = geo.arcRadius)
+                            }
+                            rail(geo, wash)
                         }
-                        rail(geo, wash)
-                    }
-                    hints()
-                }
+                    },
+                    hints = hints,
+                )
                 Box(
                     Modifier
                         .weight(1f)
@@ -274,15 +359,113 @@ internal fun MeridianScene(
                         ),
                     contentAlignment = Alignment.BottomStart,
                 ) {
-                    Box(Modifier.fillMaxWidth().graphicsLayer { alpha = MeridianMotion.heroFade(enterMs()) }) { hero() }
+                    // El texto del hero, blanco, sin el óvalo oscuro detrás, con su sombra sutil.
+                    CompositionLocalProvider(LocalHeroText provides HeroText.CLEAN) {
+                        Box(Modifier.fillMaxWidth().graphicsLayer { alpha = MeridianMotion.heroFade(enterMs()) }) { hero() }
+                    }
                 }
             }
+            // En la misma fila que la cabecera de la rueda (mismo tope, misma línea central) y sin
+            // llegar a donde puede asomar el dock (ver MeridianTopRow.barMaxWidth).
             Box(
                 Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = if (compact) 6.dp else 8.dp, end = 22.dp)
-                    .widthIn(max = (width - railWidth - 40f).coerceAtLeast(120f).dp),
+                    .padding(top = MeridianTopRow.top(compact).dp, end = MeridianTopRow.END.dp)
+                    .widthIn(max = MeridianTopRow.barMaxWidth(width, railWidth).dp),
             ) { topEnd() }
+        }
+    }
+}
+
+/**
+ * La columna de la rueda: [header] arriba, [rail] con lo que queda y [hints]
+ * abajo, como una `Column` con la rueda en `weight(1f)`, pero midiendo las
+ * pistas antes que la cabecera: así la cabecera sabe cuánto alto le quedará a
+ * la rueda y calcula la curva de la niebla ya en la primera medida (ver
+ * [RailFog.hintsPx]). [rail] tiene que emitir un solo nodo.
+ */
+@Composable
+private fun RailColumn(
+    fog: RailFog,
+    modifier: Modifier,
+    header: @Composable () -> Unit,
+    rail: @Composable () -> Unit,
+    hints: @Composable () -> Unit,
+) {
+    Layout(
+        content = {
+            Box { header() }
+            // Sin envoltorio: la rueda lee su `positionInParent` (el alto de la cabecera) para la niebla.
+            rail()
+            // Las pistas, ocultas, no emiten nada: la caja mantiene el sitio en la lista.
+            Box { hints() }
+        },
+        modifier = modifier,
+    ) { measurables, constraints ->
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val hintsP = measurables[2].measure(loose)
+        fog.hintsPx = hintsP.height
+        val headerP = measurables[0].measure(loose)
+        val railH = (constraints.maxHeight - headerP.height - hintsP.height).coerceAtLeast(0)
+        val railP = measurables[1].measure(Constraints.fixed(constraints.maxWidth, railH))
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            headerP.place(0, 0)
+            railP.place(0, headerP.height)
+            hintsP.place(0, constraints.maxHeight - hintsP.height)
+        }
+    }
+}
+
+/**
+ * El marco del arte de Meridian: algo más alto que la ventana (al desplazarse
+ * no asoma el canto) y más ancho ([MeridianArtFrame]), anclado a la izquierda:
+ * su motivo cae a la derecha, fuera del velo. [window] es el ancho de la
+ * ventana (la copia desenfocada va en una capa más estrecha y tiene que caer
+ * igual que el arte de verdad).
+ */
+private fun Modifier.meridianArtFrame(window: Dp): Modifier = layout { measurable, constraints ->
+    val extra = ART_EXTRA.roundToPx()
+    val h = constraints.maxHeight + extra * 2
+    val w = MeridianArtFrame.width(window.toPx()).toInt()
+    val placeable = measurable.measure(constraints.copy(minHeight = h, maxHeight = h, minWidth = w, maxWidth = w))
+    layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, -extra) }
+}
+
+/** El paralaje del arte [key]: contrario al recorrido de la rueda, leído en la capa. */
+private fun Modifier.meridianParallax(reduced: Boolean, wheel: () -> WheelState?, artIndex: (Any) -> Int?, key: Any): Modifier = graphicsLayer {
+    if (reduced) return@graphicsLayer
+    val w = wheel() ?: return@graphicsLayer
+    val index = artIndex(key) ?: return@graphicsLayer
+    val d = (w.position - index).coerceIn(-1.2f, 1.2f)
+    translationY = -d * PARALLAX.toPx()
+}
+
+/** Más color: el cristal deja pasar el arte avivado, no un gris lechoso. */
+private val GlassSaturation = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(WheelGlass.SATURATION) })
+
+/**
+ * El arte desenfocado dentro del cristal curvo del tema claro (API 31+): el
+ * mismo arte, con el mismo marco y el mismo paralaje ([layer]), avivado
+ * ([WheelGlass.SATURATION]) y pasado por un desenfoque de [WheelGlass.BLUR_DP] con
+ * los cantos estirados. Se funde al cambiar de juego como el de verdad. Las
+ * vistas previas desenfocan su [backdrop].
+ */
+@Composable
+private fun FrostedArt(art: MeridianArt, backdrop: (@Composable () -> Unit)?, layer: (Any) -> Modifier, modifier: Modifier) {
+    val context = LocalContext.current
+    Crossfade(targetState = art.key to art.imagePath, modifier = modifier.fillMaxSize(), animationSpec = motion(Springs.fade()), label = "frostedArt") { (key, path) ->
+        Box(Modifier.fillMaxSize().then(layer(key)).blur(WheelGlass.BLUR_DP.dp)) {
+            when {
+                backdrop != null -> backdrop()
+                path != null -> AsyncImage(
+                    model = remember(path) { File(context.filesDir, path) },
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.TopCenter,
+                    colorFilter = GlassSaturation,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
     }
 }

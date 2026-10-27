@@ -7,27 +7,10 @@ import android.content.IntentFilter
 import android.os.Build
 import android.util.Log
 import com.elyndra.launcher.ui.masha.lipsync.Vis
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -48,8 +31,9 @@ import kotlinx.coroutines.launch
  *   adb shell am broadcast -a com.elyndra.launcher.DEBUG_MOOD --es mood auto       (vuelve al de la conversación)
  *
  * `cps` > 0 simula el streaming del modelo (caracteres por segundo), como en una respuesta real;
- * 0 entrega el texto entero de golpe. La vista previa de ánimo también está en la pantalla
- * ([MashaDebugMoodChip]).
+ * 0 entrega el texto entero de golpe. La vista previa de ánimo va solo por adb: el chip
+ * "FX · …" que la recorría en pantalla se quitó (en las builds debug tapaba el bocadillo
+ * de la conversación en horizontal).
  */
 @Composable
 fun MashaDebugSay(voice: MashaVoice) {
@@ -147,29 +131,6 @@ fun MashaDebugSay(voice: MashaVoice) {
     }
 }
 
-/**
- * Solo debug: chip que recorre los ánimos para verlos en la cara (Auto → Neutral → … →
- * Listening → Auto). Lo mismo que `DEBUG_MOOD` por adb.
- */
-@Composable
-fun MashaDebugMoodChip(modifier: Modifier = Modifier) {
-    var index by remember { mutableIntStateOf(0) }
-    val label = MashaDebugPose.PREVIEWS[index]
-    Box(
-        modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xCC0A1A33))
-            .border(1.dp, Color(0x8086D6FF), RoundedCornerShape(12.dp))
-            .clickable {
-                index = (index + 1) % MashaDebugPose.PREVIEWS.size
-                MashaDebugPose.preview(MashaDebugPose.PREVIEWS[index])
-            }
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-    ) {
-        BasicText("FX · $label", style = TextStyle(color = Color(0xFFBFEAFF), fontSize = 11.sp))
-    }
-}
-
 private const val ACTION_SAY = "com.elyndra.launcher.DEBUG_SAY"
 private const val ACTION_STOP = "com.elyndra.launcher.DEBUG_STOP"
 private const val ACTION_POSE = "com.elyndra.launcher.DEBUG_POSE"
@@ -201,9 +162,6 @@ internal object MashaDebugPose {
     /** Vista previa de un ánimo (null = el de la conversación) y de la atención al escuchar. */
     @Volatile var mood: MashaMood? = null
     @Volatile var listen = false
-
-    /** Lo que recorre el chip: "Auto", cada ánimo y "Listening". */
-    val PREVIEWS: List<String> = listOf("Auto") + MashaMood.entries.map { it.name } + "Listening"
 
     /** Pone la vista previa por nombre ("Playful", "Listening"…); null, "auto" o un nombre desconocido la quitan. */
     fun preview(name: String?) {

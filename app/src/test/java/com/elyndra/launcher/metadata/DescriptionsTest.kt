@@ -133,6 +133,26 @@ class DescriptionsTest {
         assertEquals("First sentence here.", TextTrim.shorten(long))
         assertTrue(TextTrim.shorten("word ".repeat(80)).endsWith("…"))
     }
+
+    @Test
+    fun heroSummarySkipsTheLeadingSectionHeadingOfAPlayListing() {
+        // Lo que da Google Play para Minecraft (es) tras cleanDescription: el rótulo "CREA" en su línea.
+        val play = PlayParser.cleanDescription(
+            "CREA <br>Crea lo que sea que puedas imaginar en tu propio mundo infinito que es único cada vez que lo juegues. <br>EXPLORA   <br>Descubre biomas.",
+        )
+        assertTrue(play.startsWith("CREA\n"))
+        assertEquals("Crea lo que sea que puedas imaginar en tu propio mundo infinito que es único cada vez que lo juegues. Descubre biomas.", TextTrim.shorten(play))
+        // Con la ficha entera, la primera frase (sin rótulo delante).
+        assertEquals("Crea lo que sea que puedas imaginar en tu propio mundo infinito que es único cada vez que lo juegues.", TextTrim.shorten(play + "\n" + "Más texto. ".repeat(20)))
+        // Varios rótulos seguidos, y uno con tildes y signos.
+        assertEquals("Diviértete con amigos.", TextTrim.shorten("¡JUEGA EN COMPAÑÍA!\n\nNOVEDADES:\nDiviértete con amigos."))
+        // Un rótulo solo, sin texto detrás, se queda; y una primera línea normal no se toca.
+        assertEquals("CREA", TextTrim.shorten("CREA"))
+        assertEquals("Build. Explore.", TextTrim.shorten("Build.\nExplore."))
+        // Los idiomas sin mayúsculas no tienen rótulos así.
+        assertEquals("マインクラフト 無限の世界を作ろう。", TextTrim.shorten("マインクラフト\n無限の世界を作ろう。"))
+        assertFalse(TextTrim.isHeading("GTA: Vice City es un clásico"))
+    }
 }
 
 class TranslationCacheTest {

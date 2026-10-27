@@ -125,6 +125,38 @@ class MashaFramingTest {
         assertTrue(headTop >= 0f && floor <= 2400f)
     }
 
+    /**
+     * Horizontal (892×411, 730×360, 1280×800 dp; ella en la mitad izquierda bajo
+     * la barra de 54 dp): la cabeza con aire bajo la barra, los aros de la base a
+     * la vista, centrada en su columna y llenando casi todo el alto.
+     */
+    @Test
+    fun landscapeFullBodyKeepsHeadroomUnderTheBarAndShowsTheRings() {
+        for ((w, h) in listOf(892f to 411f, 730f to 360f, 1280f to 800f)) {
+            val s = Screen(w, h, 0f, 54f, w / 2f, h)
+            val out = FloatArray(3).also { MashaFraming.solve(s.w, s.h, s.l, s.t, s.r, s.b, tan, MashaShot.FullBody, eyes, it, landscape = true) }
+            val headTop = y(s, out, MashaFraming.spanTop(eyes))
+            val rings = y(s, out, MashaFraming.RINGS_BOTTOM)
+            assertTrue("${w}x$h: cabeza $headTop pegada a la barra", headTop >= s.t + 0.03f * s.bandH)
+            assertTrue("${w}x$h: aros $rings fuera", rings <= s.b - 0.01f * s.bandH)
+            assertEquals(s.centerX, x(s, out), 0.5f)
+            assertTrue("${w}x$h: ocupa ${(rings - headTop) / s.bandH}", rings - headTop >= 0.9f * s.bandH)
+        }
+    }
+
+    @Test
+    fun portraitFramingIsUnchangedByTheLandscapeVariant() {
+        for (s in listOf(phonePortrait, tabletPortrait)) for (shot in MashaShot.entries) {
+            val default = solve(s, shot)
+            val portrait = FloatArray(3).also { MashaFraming.solve(s.w, s.h, s.l, s.t, s.r, s.b, tan, shot, eyes, it, landscape = false) }
+            for (i in 0..2) assertEquals(default[i], portrait[i], 0f)
+        }
+        // Solo el cuerpo entero cambia en horizontal; los primeros planos, igual.
+        for (shot in listOf(MashaShot.CloseUp, MashaShot.UpperBody)) {
+            assertEquals(MashaFraming.spanBottom(shot, eyes), MashaFraming.spanBottom(shot, eyes, landscape = true), 0f)
+        }
+    }
+
     @Test
     fun lensFovIsVerticalOn24mmSensor() {
         assertEquals(12f / 38f, tan, 1e-6f)

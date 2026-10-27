@@ -114,7 +114,25 @@ class MeridianHeroLogicTest {
     @Test
     fun `the hero art is widened so its subject sits in the clear right side`() {
         assertEquals(1350f, MeridianArtFrame.width(1000f), 1e-3f)
-        // El centro del arte cae a la derecha del velo (que se apaga hacia el 58 %).
         assertTrue(MeridianArtFrame.subjectAt() > 0.6f)
+        // El centro del arte cae a la derecha del velo, que se apaga a FADE_DP de la rueda.
+        for ((w, h) in listOf(892f to 411f, 730f to 360f, 640f to 360f, 1280f to 800f)) {
+            val rail = MeridianGeometry.slimRailWidth(w, h, 1f, MeridianMode.compact(h))
+            assertTrue("$w", MeridianScrims.clearAt(rail, w) < w * MeridianArtFrame.subjectAt())
+        }
+    }
+
+    @Test
+    fun `without the dial counter the hero block starts closer to the dial`() {
+        for ((w, h) in listOf(892f to 411f, 730f to 360f, 640f to 360f, 1280f to 800f)) {
+            val compact = MeridianMode.compact(h)
+            val rail = MeridianGeometry.slimRailWidth(w, h, 1f, compact)
+            val g = MeridianGeometry.compute(w, h - MeridianGeometry.HEADER_ESTIMATE, 1f, compact, rail)
+            assertEquals(rail + MeridianGeometry.HERO_GAP, g.heroLeft, 1e-3f)
+            // El hueco de 96 era para el contador: sin él, 48 dp más de arte.
+            assertEquals(48f, rail + 96f - g.heroLeft, 1e-3f)
+            // El nodo del dial y su resplandor (~6 dp pasado el eje) siguen lejos del bloque.
+            assertTrue(g.heroLeft - (g.axisX + 6f) >= 32f)
+        }
     }
 }

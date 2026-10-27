@@ -107,7 +107,23 @@ internal class HoloShader private constructor(
         val eyeScanCalm: Float = 0f,
     ) {
         companion object {
-            val BODY = HoloShaderParams()
+            /**
+             * Cuerpo: algo más de brillo propio y un borde de Fresnel más ancho y
+             * más opaco que los de partida del material. Sobre el azul oscuro de
+             * la sala el holograma azul se perdía (en horizontal sobre todo, con
+             * ella en la parte más oscura): el borde recorta la silueta y el
+             * brillo propio aclara el lado en sombra. Scanlines, circuitos y
+             * barrido quedan igual, para no lavar el aspecto de holograma; el
+             * brillo propio sigue muy por debajo del umbral del bloom.
+             */
+            val BODY = HoloShaderParams(
+                albedo = 0.34f,
+                rimPower = 2.6f,
+                rimIntensity = 1.15f,
+                rimAlpha = 0.55f,
+                alpha = 0.9f,
+                selfIllum = 0.08f,
+            )
 
             /**
              * Cara: opaca (si no, a través de los párpados y los labios se ven
@@ -121,7 +137,7 @@ internal class HoloShader private constructor(
                 desaturate = 0.55f,
                 roughness = 0.48f,
                 specular = 0.40f,
-                rimIntensity = 0.7f,
+                rimIntensity = 0.85f,
                 rimPower = 3.5f,
                 rimAlpha = 0.3f,
                 circuitIntensity = 1.2f,
@@ -130,7 +146,8 @@ internal class HoloShader private constructor(
                 sweepIntensity = 0.15f,
                 alpha = 1f,
                 emissiveDamp = 0.3f,
-                selfIllum = 0.06f,
+                // Un poco más que el cuerpo: la cara es lo primero que se busca.
+                selfIllum = 0.09f,
                 contourPower = 2f,
                 contourIntensity = 0.22f,
                 eyeScanCalm = 0.85f,
@@ -222,7 +239,8 @@ internal class HoloShader private constructor(
         val glitchAmount: Float = 1f,
     ) {
         companion object {
-            val HAIR = HoloCardParams()
+            /** Pelo: el borde algo más fuerte, porque es el contorno de arriba de su silueta. */
+            val HAIR = HoloCardParams(rimIntensity = 0.75f, glowIntensity = 0.2f)
             // Cejas y pestañas: su textura es negra y en el holograma desaparecían
             // (la cara parecía sin cejas). Brillo propio para que se lean. Las pestañas
             // casi no parpadean con el glitch: enmarcan los ojos, que tienen que leerse.

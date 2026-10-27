@@ -247,6 +247,21 @@ fun Modifier.darkGlass(
         .border(1.dp, rimBrush(Color.White.copy(alpha = 0.28f)), shape)
 }
 
+/**
+ * `lightGlass()` — el cristal claro del tema claro, para lo que va sobre el
+ * velo esmerilado (secciones, orden, fichas): blanco translúcido,
+ * luz arriba, un filo oscuro muy suave abajo y tinta oscura encima
+ * ([LightGlass.INK]). [fill] es la opacidad del blanco.
+ */
+fun Modifier.lightGlass(
+    shape: Shape = RoundedCornerShape(12.dp),
+    fill: Float = LightGlass.FILL_ALPHA,
+): Modifier = this
+    .clip(shape)
+    .background(Color.White.copy(alpha = fill))
+    .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = LightGlass.HAZE_ALPHA), Color.Transparent)))
+    .border(1.dp, Brush.verticalGradient(listOf(Color(LightGlass.RIM_TOP), Color(LightGlass.RIM_BOTTOM))), shape)
+
 /** Suelo de la tinta de [darkGlass] (con la transparencia del cristal al mínimo). */
 const val DARK_GLASS_MIN = 0.25f
 

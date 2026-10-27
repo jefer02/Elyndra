@@ -1,5 +1,12 @@
 package com.elyndra.launcher.ui.components
 
+import com.elyndra.launcher.ui.theme.LocalPoppins
+import com.elyndra.launcher.ui.theme.TypeScale
+import com.elyndra.launcher.ui.theme.Radii
+import com.elyndra.launcher.ui.TopBarLayout
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.elyndra.launcher.ui.theme.Springs
@@ -281,7 +288,7 @@ fun GhostButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifie
 }
 
 /** Alto de la barra del hero, que "Abrir" comparte con los botones de al lado. */
-val HeroBarHeight = 34.dp
+val HeroBarHeight = TopBarLayout.BAR_HEIGHT.dp
 
 /**
  * "Abrir", en la barra de arriba del hero y sobre el fondo del juego.
@@ -290,36 +297,62 @@ val HeroBarHeight = 34.dp
  * cristal oscuro de sus vecinos, sin degradado de acento): ahí arriba lo que
  * se tiene que ver es el fondo del juego. [focused] es el foco del mando
  * (ver `InputController.barFocus`).
+ *
+ * Sin [showLabel] (barra justa, ver [TopBarLayout.fit]) se queda en su icono,
+ * un botón cuadrado como buscar y Ajustes; el lector de pantalla sigue
+ * diciendo "Abrir".
  */
 @Composable
 fun OpenButton(
     enabled: Boolean,
     modifier: Modifier = Modifier,
     focused: Boolean = false,
+    showLabel: Boolean = true,
     onClick: () -> Unit,
 ) {
     val glyph by animateFloatAsState(if (focused) 1.14f else 1f, motion(Springs.snappy()), label = "openGlyph")
     val interaction = remember { MutableInteractionSource() }
+    val label = stringResource(R.string.open)
     Row(
         modifier
             .touchTarget(Modifier.clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick))
             .height(HeroBarHeight)
+            .then(if (showLabel) Modifier else Modifier.width(HeroBarHeight).semantics { contentDescription = label })
             .alpha(if (enabled) 1f else 0.45f)
-            .darkGlass(RoundedCornerShape(12.dp))
+            .darkGlass(RoundedCornerShape(Radii.s))
             .consoleFocus(focused)
             .indication(interaction, LocalIndication.current)
-            .padding(start = 8.dp, end = 12.dp),
+            .then(if (showLabel) Modifier.padding(start = TopBarLayout.OPEN_PAD_START.dp, end = TopBarLayout.OPEN_PAD_END.dp) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
         OpenGlyph(Modifier.graphicsLayer { scaleX = glyph; scaleY = glyph })
-        Spacer(Modifier.width(6.dp))
-        ElyText(
-            stringResource(R.string.open),
-            size = 11f,
-            weight = FontWeight.SemiBold,
-            color = Color.White,
-            maxLines = 1,
-        )
+        if (showLabel) {
+            Spacer(Modifier.width(TopBarLayout.OPEN_GLYPH_GAP.dp))
+            ElyText(
+                label,
+                size = OPEN_LABEL_SP,
+                weight = FontWeight.SemiBold,
+                color = Color.White,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/** Cuerpo del rótulo de "Abrir" (el de las píldoras de la barra). */
+private const val OPEN_LABEL_SP = TypeScale.Label
+
+/** Lo que mide el rótulo de "Abrir" (dp), con la fuente, el idioma y la escala de letra de ahora. */
+@Composable
+fun rememberOpenLabelWidth(): Float {
+    val label = stringResource(R.string.open)
+    val family = LocalPoppins.current
+    val measurer = rememberTextMeasurer()
+    val dens = LocalDensity.current
+    return remember(label, family, dens) {
+        val style = TextStyle(fontFamily = family, fontSize = OPEN_LABEL_SP.sp, fontWeight = FontWeight.SemiBold)
+        measurer.measure(label, style, maxLines = 1, density = dens).size.width / dens.density
     }
 }
 

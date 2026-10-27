@@ -300,4 +300,21 @@ class SelectionFxTest {
             assertTrue(p.bloomAlphas.toList().zipWithNext().all { (a, b) -> a > b })
         }
     }
+
+    /** En la barra de Meridian la píldora de hora está a 8 dp de Masha: las partículas se apagan antes. */
+    @Test
+    fun `masha aura fades out before reaching the bar neighbours`() {
+        val halo = AuraHalo.forGap(8f)
+        assertEquals(6f, halo, 0f)
+        val r = 20f
+        // Sobre el orbe y cerca de él, enteras; en el canto del halo y más allá, nada.
+        assertEquals(1f, AuraHalo.fade(0f, r, halo), 0f)
+        assertEquals(1f, AuraHalo.fade(r + halo * 0.5f, r, halo), 1e-6f)
+        assertEquals(0f, AuraHalo.fade(r + halo, r, halo), 1e-6f)
+        assertEquals(0f, AuraHalo.fade(-(r + 19f), r, halo), 1e-6f)
+        // Nunca llegan al vecino (a 8 dp del orbe).
+        assertTrue(r + halo < r + 8f)
+        // Sin hueco, sin halo.
+        assertEquals(0f, AuraHalo.forGap(1f), 0f)
+    }
 }

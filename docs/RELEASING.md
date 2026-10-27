@@ -32,7 +32,7 @@ The ABI tokens it recognises are `arm64-v8a` (also `arm64`, `aarch64`),
 In `app/build.gradle.kts`:
 
 ```kotlin
-versionCode = 5              // previous + 1
+versionCode = 6              // previous + 1
 versionName = "1.1.0"        // = tag without the "v" (a beta would be "1.1.0-beta")
 ```
 
@@ -48,26 +48,27 @@ The keystore and its passwords stay **outside the repository**. Never commit
 them, never put them in `local.properties`, and avoid typing passwords where
 they end up in shell history (read them into environment variables first).
 
-arm64 build (what most handhelds and phones use):
+One build makes both APKs (arm64 + universal). The `elyndra.releaseApks`
+property turns on the ABI split in `app/build.gradle.kts`:
 
 ```bash
-./gradlew :app:assembleRelease \
-  -Pandroid.injected.signing.store.file="<path outside the repo>/elyndra-release.jks" \
+./gradlew :app:assembleRelease -Pelyndra.releaseApks \
+  -Pandroid.injected.signing.store.file="<path outside the repo>/elyndra-release-key.jks" \
   -Pandroid.injected.signing.store.password="$ELYNDRA_STORE_PASSWORD" \
-  -Pandroid.injected.signing.key.alias=elyndra \
-  -Pandroid.injected.signing.key.password="$ELYNDRA_KEY_PASSWORD" \
-  -Pandroid.injected.invoked.from.ide=true \
-  -Pandroid.injected.build.abi=arm64-v8a
+  -Pandroid.injected.signing.key.alias=elyndra-key \
+  -Pandroid.injected.signing.key.password="$ELYNDRA_KEY_PASSWORD"
 ```
 
-Output: `app/build/intermediates/apk/release/app-release.apk`. Copy and rename
-it to `Elyndra-v1.1.0-arm64-v8a.apk` before building the next one (the
-next build overwrites it).
-
-Universal build (every ABI, larger): run the same command **without** the last
-two `-Pandroid.injected.invoked.from.ide` / `-Pandroid.injected.build.abi`
-lines. Output: `app/build/outputs/apk/release/app-release.apk`. Rename it to
+Output in `app/build/outputs/apk/release/`: `app-arm64-v8a-release.apk` and
+`app-universal-release.apk`. Rename them to `Elyndra-v1.1.0-arm64-v8a.apk` and
 `Elyndra-v1.1.0-universal.apk`.
+
+**Don't** publish an APK built with `-Pandroid.injected.invoked.from.ide=true`
+(with or without `-Pandroid.injected.build.abi`). It is marked `testOnly`:
+Android refuses to install it outside `adb install -t`, from a file manager or
+from the in-app updater. To check, run
+`aapt2 dump xmltree --file AndroidManifest.xml <apk> | grep testOnly`; it must
+print nothing.
 
 Check that both are signed with the release key (the certificate digest must
 be the same as in previous releases):

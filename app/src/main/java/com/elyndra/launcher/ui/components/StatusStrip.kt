@@ -47,6 +47,14 @@ import com.elyndra.launcher.core.device.StatusFormat
 import com.elyndra.launcher.core.device.StatusMode
 import com.elyndra.launcher.data.BrandTokens
 import com.elyndra.launcher.ui.theme.darkGlass
+import com.elyndra.launcher.ui.theme.LocalPoppins
+import com.elyndra.launcher.ui.theme.TypeScale
+import com.elyndra.launcher.ui.theme.Radii
+import com.elyndra.launcher.ui.TopBarLayout
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.TextStyle
 import java.util.Calendar
 
 /* ─────────────────────────────────────────────────────────────
@@ -68,8 +76,12 @@ private val TEXT = Color.White
 private val LOW = Color(BrandTokens.DARK.error)
 private val CHARGING = Color(BrandTokens.DARK.success)
 
+/**
+ * Sin [showPercent] (barra justa, ver [TopBarLayout.fit]) la pila va sin el
+ * número: la píldora encoge y el lector de pantalla sigue diciendo el tanto por ciento.
+ */
 @Composable
-fun StatusStrip(mode: StatusMode, modifier: Modifier = Modifier) {
+fun StatusStrip(mode: StatusMode, modifier: Modifier = Modifier, showPercent: Boolean = true) {
     val time = if (mode.showsTime) rememberClockText() else null
     val battery = if (mode.showsBattery) rememberBattery() else null
 
@@ -89,32 +101,63 @@ fun StatusStrip(mode: StatusMode, modifier: Modifier = Modifier) {
     Row(
         modifier
             .height(HeroBarHeight)
-            .darkGlass(RoundedCornerShape(12.dp))
+            .darkGlass(RoundedCornerShape(Radii.s))
             .clearAndSetSemantics { contentDescription = a11y }
-            .padding(horizontal = 11.dp),
+            .padding(horizontal = TopBarLayout.STATUS_PAD.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(TopBarLayout.STATUS_ITEM_GAP.dp),
     ) {
         if (timeText != null) {
-            ElyText(timeText, size = 11f, weight = FontWeight.SemiBold, color = TEXT, maxLines = 1)
+            ElyText(timeText, size = STATUS_SP, weight = FontWeight.SemiBold, color = TEXT, maxLines = 1)
         }
         if (info != null) {
-            if (timeText != null) Box(Modifier.size(3.dp).drawBehind { drawCircle(Color.White.copy(alpha = 0.5f)) })
+            if (timeText != null) Box(Modifier.size(TopBarLayout.STATUS_DOT.dp).drawBehind { drawCircle(Color.White.copy(alpha = 0.5f)) })
             val tone = when {
                 info.low -> LOW
                 info.charging -> CHARGING
                 else -> TEXT
             }
             BatteryGlyph(info, tone)
-            ElyText("${info.percent}%", size = 11f, weight = FontWeight.SemiBold, color = tone, maxLines = 1)
+            if (showPercent) ElyText(percentText(info.percent), size = STATUS_SP, weight = FontWeight.SemiBold, color = tone, maxLines = 1)
         }
     }
 }
 
+/** Cuerpo de los textos de la píldora (el de las píldoras de la barra). */
+private const val STATUS_SP = TypeScale.Label
+
+private fun percentText(percent: Int) = "$percent%"
+
+/**
+ * Lo que miden la hora y el tanto por ciento (dp; null = no se enseña con
+ * [mode]) para decidir si la barra cabe. Con una hora y un nivel de muestra
+ * de los más anchos ("12:58", "100%") en el formato del aparato: así no hace
+ * falta escuchar el reloj y la decisión no cambia cada minuto.
+ */
+@Composable
+fun rememberStatusLabelWidths(mode: StatusMode): Pair<Float?, Float?> {
+    val context = LocalContext.current
+    val locale = LocalConfiguration.current.locales[0]
+    val family = LocalPoppins.current
+    val measurer = rememberTextMeasurer()
+    val dens = LocalDensity.current
+    return remember(mode, locale, family, dens) {
+        val style = TextStyle(fontFamily = family, fontSize = STATUS_SP.sp, fontWeight = FontWeight.SemiBold)
+        fun width(text: String) = measurer.measure(text, style, maxLines = 1, density = dens).size.width / dens.density
+        val time = if (mode.showsTime) width(StatusFormat.time(SAMPLE_HOUR, SAMPLE_MINUTE, systemUses24h(context), locale)) else null
+        val percent = if (mode.showsBattery) width(percentText(SAMPLE_PERCENT)) else null
+        time to percent
+    }
+}
+
+private const val SAMPLE_HOUR = 12
+private const val SAMPLE_MINUTE = 58
+private const val SAMPLE_PERCENT = 100
+
 /** La pila: contorno, borne y el nivel dentro; con el rayo encima si carga. */
 @Composable
 private fun BatteryGlyph(info: BatteryInfo, tone: Color) {
-    Canvas(Modifier.size(width = 20.dp, height = 11.dp)) {
+    Canvas(Modifier.size(width = TopBarLayout.BATTERY_GLYPH.dp, height = 11.dp)) {
         val stroke = 1.3.dp.toPx()
         val nub = 2.dp.toPx()
         val body = Size(size.width - nub - stroke, size.height - stroke)

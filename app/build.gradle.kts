@@ -44,8 +44,8 @@ android {
         // el actualizador compara las dos como semver. versionCode sube siempre en 1 por
         // release y nunca baja (Android no instala por encima una versión menor).
         // Pasos para publicar: docs/RELEASING.md.
-        versionCode = 4
-        versionName = "1.0.0"
+        versionCode = 6
+        versionName = "1.1.0"
         buildConfigField("String", "MASHA_API_KEY", quoted(localProp("masha.apiKey")))
         buildConfigField("String", "MASHA_MODEL", quoted(localProp("masha.model").ifEmpty { "deepseek-chat" }))
         buildConfigField("String", "MASHA_BASE_URL", quoted(localProp("masha.baseUrl").ifEmpty { "https://api.deepseek.com" }))
@@ -83,6 +83,19 @@ android {
     // en el APK se cargan sin descomprimir (y el Ogg ya viene comprimido).
     // La voz natural solo se usa en procesos de 64 bits (NeuralRuntime.hardwareOk): el ONNX
     // Runtime de 32 bits serían ~55 MB muertos en el APK universal.
+    // Con -Pelyndra.releaseApks una sola compilación de release saca los dos APK que se publican:
+    // el de arm64-v8a y el universal (docs/RELEASING.md). Sin la propiedad, nada cambia.
+    // No usar android.injected.build.abi para publicar: va con invoked.from.ide, que marca
+    // el APK como testOnly y Android lo rechaza fuera de adb (también el actualizador).
+    splits {
+        abi {
+            isEnable = project.hasProperty("elyndra.releaseApks")
+            reset()
+            include("arm64-v8a")
+            isUniversalApk = true
+        }
+    }
+
     packaging {
         jniLibs {
             excludes += listOf("lib/armeabi-v7a/libonnxruntime*.so", "lib/x86/libonnxruntime*.so")

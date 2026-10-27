@@ -92,8 +92,8 @@ enum class StageStatus { Loading, Ready, Failed }
 private val TARGET = Position(0f, 1.40f, 0f)
 private val HOME = Position(0f, 1.40f, 1.6f)
 
-/** Distancia focal de la cámara (mm, sensor de 24 mm de Filament). */
-private const val FOCAL_LENGTH = 38.0
+/** Distancia focal de la cámara (la comparten el encuadre y la luz de fondo, ver [MashaFraming]). */
+private const val FOCAL_LENGTH = MashaFraming.FOCAL_LENGTH_MM
 
 /** Zoom de la órbita a mano: ni meterse en el holograma ni perderla de vista. */
 private const val MIN_DISTANCE = 0.4f
@@ -111,7 +111,10 @@ private const val SKY_INTENSITY = 0.32f
  * [shot] es el plano ([MashaFraming]); cambiarlo, o cambiar [recenter] (el
  * botón de encuadre), vuelve a encuadrar con una transición. [faceArea] es el
  * hueco que la interfaz deja libre (px, en coordenadas de este escenario):
- * el plano se coloca dentro, centrado en horizontal.
+ * el plano se coloca dentro, centrado en horizontal. [onFramed] dice si la
+ * cámara la lleva el plano (true) o el usuario la ha tomado al tocar la escena
+ * (false): lo que se dibuja encima contando con el encuadre (la luz de fondo,
+ * [MashaBacklight]) se aparta mientras ella puede estar en cualquier sitio.
  */
 @Composable
 fun MashaStage(
@@ -121,10 +124,12 @@ fun MashaStage(
     modifier: Modifier = Modifier,
     recenter: Int = 0,
     faceArea: androidx.compose.ui.geometry.Rect? = null,
+    onFramed: (Boolean) -> Unit = {},
     onStatus: (StageStatus) -> Unit,
 ) {
     val context = LocalContext.current
     val status by rememberUpdatedState(onStatus)
+    val framed by rememberUpdatedState(onFramed)
 
     // Todo lo nativo (Filament) es de este escenario y se libera en UN sitio y
     // en su orden (ver `Gpu.destroy`). Con los `remember*` de SceneView cada
@@ -214,6 +219,7 @@ fun MashaStage(
         // móvil) cada cambio se anima desde donde esté la cámara.
         stageCamera.show(shot, animate = framedOnce)
         framedOnce = true
+        framed(true)
     }
     SideEffect {
         val a = faceArea
@@ -247,7 +253,7 @@ fun MashaStage(
                         if (i.hasExtra("springs")) MashaDebugPose.noSprings = !i.getBooleanExtra("springs", true)
                         return
                     }
-                    stageCamera.takeOver()
+                    if (stageCamera.takeOver()) framed(false)
                     val y = i.getFloatExtra("y", 1.50f)
                     cameraNode.position = Position(i.getFloatExtra("x", 0f), y + 0.02f, i.getFloatExtra("z", 0.45f))
                     cameraNode.lookAt(Position(0f, y, 0f))
@@ -327,6 +333,7 @@ fun MashaStage(
             // Primer toque en la escena: la cámara pasa a ser del usuario, en
             // la posición actual (sin salto) y orbitando alrededor de lo que mira.
             if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN && stageCamera.takeOver()) {
+                framed(false)
                 stageCamera.eyeOut(takeoverEye)
                 stageCamera.targetOut(takeoverTarget)
                 val orbit = BoundedOrbit(

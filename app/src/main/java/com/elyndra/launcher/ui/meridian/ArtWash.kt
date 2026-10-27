@@ -99,6 +99,7 @@ object ArtWash {
     const val TOP_MAX_ALPHA = 0.82f
 
     private const val WHITE = 0xFFFFFFFF.toInt()
+    private const val BLACK = 0xFF000000.toInt()
 
     /**
      * Analiza [pixels] (ARGB, [width] × [height], ya reducido a ~[SAMPLE] px).
@@ -225,19 +226,27 @@ object ArtWash {
         return ColorMath.fromHsl(hsl[0], (hsl[1] * 0.7f).coerceIn(0.12f, 0.5f), TOP_L)
     }
 
-    /** Contraste del texto del tema (con opacidad [textAlpha]) sobre [bg]. */
-    fun textContrast(bg: Int, dark: Boolean, textAlpha: Float = 1f): Double = MeridianScrims.textContrast(bg, dark, textAlpha)
+    /** Contraste del texto del tema (o de [ink]), con opacidad [textAlpha], sobre [bg]. */
+    fun textContrast(bg: Int, dark: Boolean, textAlpha: Float = 1f, ink: Int = MeridianScrims.ink(dark)): Double =
+        MeridianScrims.textContrast(bg, dark, textAlpha, ink)
 
     /**
      * Lo menos que tiene que cubrir [tint] sobre [worst] (0…1) para que el
-     * texto del tema, con opacidad [textAlpha], llegue a [min]. 2 si no llega
-     * ni cubriendo del todo.
+     * texto del tema (o [ink]), con opacidad [textAlpha], llegue a [min]. 2 si
+     * no llega ni cubriendo del todo.
      */
-    fun coverageFor(tint: Int, worst: Int, dark: Boolean, textAlpha: Float = NEIGHBOR_TEXT_ALPHA, min: Double = MeridianScrims.MIN_TEXT): Float {
+    fun coverageFor(
+        tint: Int,
+        worst: Int,
+        dark: Boolean,
+        textAlpha: Float = NEIGHBOR_TEXT_ALPHA,
+        min: Double = MeridianScrims.MIN_TEXT,
+        ink: Int = MeridianScrims.ink(dark),
+    ): Float {
         var c = 0f
         while (c <= 1f + 1e-4f) {
             val bg = ColorMath.over(ColorMath.withAlpha(tint, c), ColorMath.opaque(worst))
-            if (textContrast(bg, dark, textAlpha) >= min) return c
+            if (textContrast(bg, dark, textAlpha, ink) >= min) return c
             c += 0.01f
         }
         return 2f
@@ -265,7 +274,7 @@ object ArtWash {
      * esa máscara por [WashPlan.coverage].
      */
     fun plan(colors: ArtColors?, dark: Boolean, fallback: Int, enabled: Boolean = true): WashPlan {
-        val worstText = if (colors == null) (if (dark) WHITE else 0xFF000000.toInt()) else if (dark) colors.leftLight else colors.leftDark
+        val worstText = if (colors == null) (if (dark) WHITE else BLACK) else if (dark) colors.leftLight else colors.leftDark
         val topSource = colors?.dominant ?: fallback
         val top = deep(topSource)
         val topAlpha = topAlphaFor(top, colors?.topLight ?: WHITE)

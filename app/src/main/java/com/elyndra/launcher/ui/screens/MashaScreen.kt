@@ -5,7 +5,6 @@ import com.elyndra.launcher.ui.components.PadHint
 import android.Manifest
 import android.content.pm.PackageManager
 import com.elyndra.launcher.BuildConfig
-import com.elyndra.launcher.ui.masha.MashaDebugMoodChip
 import com.elyndra.launcher.ui.masha.MashaDebugSay
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,9 +12,12 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,9 +62,12 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -91,15 +96,19 @@ import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.GlowingSwitch
 import com.elyndra.launcher.ui.components.inputStyle
 import com.elyndra.launcher.ui.components.metrics
+import com.elyndra.launcher.ui.components.touchTarget
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.masha.Holo
 import com.elyndra.launcher.ui.masha.HoloAtmosphere
+import com.elyndra.launcher.ui.masha.HoloBacklight
+import com.elyndra.launcher.ui.masha.MashaBacklight
 import com.elyndra.launcher.ui.masha.HoloFallback
 import com.elyndra.launcher.ui.masha.HoloMessage
 import com.elyndra.launcher.ui.masha.HoloWorking
 import com.elyndra.launcher.ui.masha.MashaEars
 import com.elyndra.launcher.ui.masha.MashaPresence
 import com.elyndra.launcher.ui.masha.MashaQuality
+import com.elyndra.launcher.ui.masha.MashaShot
 import com.elyndra.launcher.ui.masha.MashaStage
 import com.elyndra.launcher.ui.masha.StageStatus
 import com.elyndra.launcher.ui.masha.holoPanel
@@ -142,6 +151,8 @@ fun MashaScreen(vm: ElyndraViewModel) {
     // mismo plano para la nueva orientación.
     var alternate by remember { mutableStateOf(false) }
     var recenter by remember { mutableIntStateOf(0) }
+    // La cámara la lleva el plano (true) o el usuario la orbita (false): la luz de fondo solo cuadra con el plano.
+    var framed by remember { mutableStateOf(true) }
     val shot = MashaFraming.shotFor(m.landscape, alternate)
     // El hueco que deja libre la interfaz para su cara (coordenadas de la raíz).
     val area = remember { FaceAreaProbe() }
@@ -223,7 +234,14 @@ fun MashaScreen(vm: ElyndraViewModel) {
 
     Box(Modifier.fillMaxSize().background(Holo.bg)) {
         if (stage == StageStatus.Failed) {
-            HoloFallback(presence, Modifier.fillMaxSize().padding(bottom = 180.dp))
+            // En horizontal, en su columna (la de la izquierda): a pantalla
+            // completa con 180 dp abajo, en 360 dp de alto el núcleo de 230 dp
+            // subía hasta la barra de arriba y quedaba detrás de la conversación.
+            HoloFallback(
+                presence,
+                if (m.landscape) Modifier.fillMaxHeight().fillMaxWidth(0.5f).padding(top = LANDSCAPE_BAR)
+                else Modifier.fillMaxSize().padding(bottom = 180.dp),
+            )
         } else {
             MashaStage(
                 presence,
@@ -232,14 +250,36 @@ fun MashaScreen(vm: ElyndraViewModel) {
                 Modifier.fillMaxSize().onGloballyPositioned { area.stage = it.boundsInRoot() },
                 recenter = recenter,
                 faceArea = area.faceArea(m.landscape),
+                onFramed = { framed = it },
             ) { stage = it }
+            // La luz de fondo que la separa del azul oscuro de la sala (ver MashaBacklight).
+            HoloBacklight(
+                halo = { area.halo(shot, m.landscape) },
+                presence = presence,
+                visible = stage == StageStatus.Ready && framed,
+                lite = quality == MashaQuality.Lite,
+            )
         }
         HoloAtmosphere(presence)
-        // Oscurece abajo para que el panel se lea sobre el holograma.
+        // Oscurece abajo para que el panel se lea sobre el holograma. En
+        // horizontal, solo detrás de la conversación (con un fundido de 32 dp a
+        // su izquierda): a todo el ancho apagaba sus piernas y la base, y ella
+        // quedaba en la zona más oscura de la pantalla.
         Spacer(
-            Modifier.fillMaxSize().drawBehind {
-                drawRect(Brush.verticalGradient(0.45f to Color.Transparent, 1f to Holo.bg.copy(alpha = 0.88f)))
-            },
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawBehind {
+                    drawRect(Brush.verticalGradient(0.45f to Color.Transparent, 1f to Holo.bg.copy(alpha = 0.88f)))
+                    val chatLeft = area.chatLeft()
+                    if (m.landscape && chatLeft != null) {
+                        val fade = 32.dp.toPx()
+                        drawRect(
+                            Brush.horizontalGradient(0f to Color.Transparent, 1f to Color.Black, startX = chatLeft - fade, endX = chatLeft),
+                            blendMode = BlendMode.DstIn,
+                        )
+                    }
+                },
         )
         AnimatedVisibility(stage == StageStatus.Loading, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.Center)) {
             ElyText(
@@ -301,10 +341,6 @@ fun MashaScreen(vm: ElyndraViewModel) {
             modifier = Modifier.align(Alignment.TopEnd).padding(top = 64.dp, end = m.pad),
         ) {
             SoundPanel(vm, glow)
-        }
-        // Solo en debug: vista previa de cada ánimo en la cara (también `adb … DEBUG_MOOD`).
-        if (BuildConfig.DEBUG && stage == StageStatus.Ready) {
-            MashaDebugMoodChip(Modifier.align(Alignment.CenterEnd).padding(end = m.pad))
         }
     }
 }
@@ -441,8 +477,9 @@ private fun StatsRow(vm: ElyndraViewModel, glow: Color) {
                     .holoPanel(RoundedCornerShape(12.dp), glow, alpha = 0.55f)
                     .padding(horizontal = 10.dp, vertical = 8.dp),
             ) {
-                ElyText(label, size = 7.5f, weight = FontWeight.SemiBold, color = Holo.dim, letterSpacing = tracking(0.18f), maxLines = 1, uppercase = true)
-                ElyText(value, size = 14f, weight = FontWeight.Bold, color = Holo.text, maxLines = 1)
+                // Con la letra a 1,3 y media pantalla de ancho (horizontal) no caben enteros: "…", no un corte a media letra.
+                ElyText(label, size = 7.5f, weight = FontWeight.SemiBold, color = Holo.dim, letterSpacing = tracking(0.18f), maxLines = 1, overflow = TextOverflow.Ellipsis, uppercase = true)
+                ElyText(value, size = 14f, weight = FontWeight.Bold, color = Holo.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 ElyText(sub, size = 8.5f, color = Holo.dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
@@ -461,7 +498,28 @@ private fun Suggestions(vm: ElyndraViewModel, glow: Color, onPick: (String) -> U
         stringResource(R.string.masha_chip_art),
         stringResource(R.string.masha_suggest_fact),
     )
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+    // La fila se desliza: el canto que tiene más detrás se apaga en 28 dp, para
+    // que la sugerencia cortada se lea como "hay más" y no como un recorte (la
+    // tercera, "Quiero seguir con algo", parecía rota en el canto de la columna).
+    val scroll = rememberScrollState()
+    val fade = 28.dp
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                val f = fade.toPx()
+                if (scroll.canScrollForward) {
+                    drawRect(Brush.horizontalGradient(0f to Color.Black, 1f to Color.Transparent, startX = size.width - f, endX = size.width), blendMode = BlendMode.DstIn)
+                }
+                if (scroll.canScrollBackward) {
+                    drawRect(Brush.horizontalGradient(0f to Color.Transparent, 1f to Color.Black, startX = 0f, endX = f), blendMode = BlendMode.DstIn)
+                }
+            }
+            .horizontalScroll(scroll),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
         suggestions.forEach { q ->
             Box(
                 Modifier
@@ -474,6 +532,8 @@ private fun Suggestions(vm: ElyndraViewModel, glow: Color, onPick: (String) -> U
                 ElyText(q, size = 10.5f, weight = FontWeight.SemiBold, color = Holo.text, maxLines = 1)
             }
         }
+        // La última, al final del todo, sale entera de la zona que se apaga.
+        Spacer(Modifier.width(fade - 7.dp))
     }
 }
 
@@ -595,14 +655,16 @@ private fun SwitchLine(label: String, checked: Boolean, onToggle: () -> Unit) {
 
 @Composable
 private fun HoloIcon(description: String, glow: Color, onClick: () -> Unit, glyph: @Composable () -> Unit) {
+    // Se ve de 38 dp pero se toca en 48 (como las píldoras de las barras): con 38 y 8 entre medias se fallaba el vecino.
+    val interaction = remember { MutableInteractionSource() }
     Box(
         Modifier
+            .touchTarget(Modifier.semantics { contentDescription = description }.clickable(interaction, indication = null, onClick = onClick))
             .size(38.dp)
-            .semantics { contentDescription = description }
             .clip(RoundedCornerShape(12.dp))
             .background(Holo.panel.copy(alpha = 0.6f))
             .border(1.dp, glow.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
+            .indication(interaction, LocalIndication.current),
         contentAlignment = Alignment.Center,
     ) { glyph() }
 }
@@ -733,6 +795,18 @@ private class FaceAreaProbe {
         } ?: return null
         return Rect(r.left - s.left, r.top - s.top, r.right - s.left, r.bottom - s.top)
     }
+
+    /** La luz de fondo para [shot] en su hueco (coordenadas del escenario); null mientras no se ha medido. */
+    fun halo(shot: MashaShot, landscape: Boolean): MashaBacklight.Halo? {
+        val a = faceArea(landscape) ?: return null
+        return MashaBacklight.place(stage.width, stage.height, a.left, a.top, a.right, a.bottom, shot, landscape)
+    }
+
+    /** En horizontal, dónde empieza la conversación (el canto derecho de su columna), en coordenadas del escenario. */
+    fun chatLeft(): Float? = side.takeIf { it.width > 0f }?.let { it.right - stage.left }
 }
+
+/** Lo que mide la barra de arriba en horizontal (8 + 38 + 8 dp). */
+private val LANDSCAPE_BAR = 54.dp
 
 private val MASHA_HINTS = listOf(PadHint("A", R.string.hint_select), PadHint("B", R.string.hint_back))

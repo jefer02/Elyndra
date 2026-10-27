@@ -165,9 +165,17 @@ lazo, ruido sintetizado en frecuencia, eventos escritos módulo N y reverb circu
 
 ## Ajustes finos
 
-- Encuadre y órbita: `TARGET`, `HOME`, `LANDSCAPE_SHIFT`, `MIN_DISTANCE`/`MAX_DISTANCE` en `MashaStage.kt`.
-- Brillo del holograma: `Kind` (alfa y emisión por material) en `HoloRig.kt`; exposición 1
-  en la cámara (los valores se leen tal cual).
+- Encuadre: `MashaFraming.spec` (aire, tramo y ancho de cada plano; en horizontal el cuerpo
+  entero deja un 4 % de aire bajo la barra y llega hasta los aros de la base, `RINGS_BOTTOM`).
+  Órbita: `TARGET`, `HOME`, `MIN_DISTANCE`/`MAX_DISTANCE` en `MashaStage.kt`.
+- Brillo del holograma: `HoloShader.HoloShaderParams.BODY`/`FACE` y `HoloCardParams.HAIR`
+  (brillo propio `selfIllum`, borde de Fresnel `rimIntensity`/`rimPower`/`rimAlpha`, alfa);
+  exposición 1 en la cámara (los valores se leen tal cual).
+- Luz de fondo: `MashaBacklight` (un anillo suave del color del ánimo, desaturado, centrado en
+  su torso y nunca más ancho que su columna). Va encima de la vista de Filament y debajo de la
+  atmósfera: la vista es una SurfaceView opaca (el cielo de la sala), nada 2D puede ir detrás.
+  Se aparta mientras el usuario orbita la cámara; en calidad ligera y con "reducir movimiento"
+  es fija.
 - Colores por ánimo: `MashaMood`.
 - Volumen: `AmbientSoundscape.MAX_GAIN` (techo del deslizador) y `DUCK` (lo que queda mientras
   habla). Voz: `MashaVoice.PITCH`/`RATE`.
@@ -198,7 +206,7 @@ usan el mismo material con todo lo de ojo apagado (sus PNG son opacos y entran p
 
 ### Cara: contornos (`masha_holo.mat`, instancia `FACE`)
 
-Fresnel algo más fuerte (`rimIntensity` 0,6 → 0,7) y un segundo lóbulo ancho (`contourPower` 2,
+Fresnel algo más fuerte (`rimIntensity` 0,6 → 0,7 → 0,85, para que se lea sobre la sala oscura) y un segundo lóbulo ancho (`contourPower` 2,
 `contourIntensity` 0,22): donde la superficie se aparta de la cámara —nariz, borde de los labios,
 pómulos, mandíbula— la cara se ilumina desde dentro y los rasgos se leen a través del holograma.
 
@@ -279,8 +287,9 @@ CPU de `HoloRig.frame` ≈ 1,0–1,1 ms en los dos (+0–40 µs).
 
 ### Probar la expresión
 
-- Debug: chip "FX" a la derecha de la pantalla de Masha (Auto → cada ánimo → Listening), o
-  `adb shell am broadcast -a com.elyndra.launcher.DEBUG_MOOD --es mood Curious` (`auto` vuelve).
+- Debug: `adb shell am broadcast -a com.elyndra.launcher.DEBUG_MOOD --es mood Curious` (`auto`
+  vuelve; `Listening` = la atención del micrófono). El chip "FX" que hacía lo mismo en pantalla se
+  quitó: tapaba el bocadillo de la conversación en horizontal.
 - Primer plano: `adb shell am broadcast -a com.elyndra.launcher.DEBUG_CAM --ef y 1.56 --ef z 0.9`.
 - Coste de cada morph: `DEBUG_POSE --ei load N` enciende N morphs más a 0,02 (invisibles).
 - Pruebas: `MashaExpressionTest` (ánimo → morphs, atención, pupila, ápice, ruido, microexpresiones,

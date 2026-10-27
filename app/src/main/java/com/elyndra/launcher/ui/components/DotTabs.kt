@@ -9,6 +9,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -64,6 +65,8 @@ import com.elyndra.launcher.ui.theme.Swift
 import com.elyndra.launcher.ui.theme.consoleFocus
 import com.elyndra.launcher.ui.theme.DARK_GLASS_MIN
 import com.elyndra.launcher.ui.theme.darkGlass
+import com.elyndra.launcher.ui.theme.LightGlass
+import com.elyndra.launcher.ui.theme.lightGlass
 import com.elyndra.launcher.ui.theme.outerShadow
 import com.elyndra.launcher.ui.theme.topGlint
 import kotlinx.coroutines.coroutineScope
@@ -131,10 +134,17 @@ fun Modifier.dockSurface(
  * cualquier idioma; por encima de [DotTabsLayout.PILL_MAX] se cortan con
  * puntos suspensivos.
  *
+ * Respeta el ancho que le dan: si no cabe entero (la cabecera estrecha de la
+ * rueda en un móvil apaisado), recorta el rótulo y junta los puntos
+ * ([DotTabsLayout.fit]) en vez de medir de más. Medir de más era lo que
+ * dejaba al botón de orden de al lado encima de la píldora.
+ *
  * @param focused el mando está en el dock (aro de foco).
  * @param focusIndex punto señalado por el mando: lleva un aro y enseña un
  *   momento su rótulo.
  * @param feedback sonido de navegación y un toque háptico al cambiar.
+ * @param light cristal claro (tema claro sobre el velo esmerilado): puntos y
+ *   aro en tinta oscura; la píldora del acento no cambia.
  */
 @Composable
 fun DotTabs(
@@ -148,34 +158,92 @@ fun DotTabs(
     feedback: Boolean = true,
     /** Suelo de la tinta del cristal (ver [darkGlass]); más alto en la costura. */
     glassMinAlpha: Float = DARK_GLASS_MIN,
+    light: Boolean = false,
+) {
+    if (labels.isEmpty()) return
+    BoxWithConstraints(modifier) {
+        // Sin tope (una fila con scroll, una vista previa suelta), el dock entero.
+        val room = if (constraints.hasBoundedWidth) maxWidth.value else Float.POSITIVE_INFINITY
+        DotTabsBody(labels, selected, onSelect, icons, focused, focusIndex, feedback, glassMinAlpha, light, room)
+    }
+}
+
+/** El rótulo de las pestañas: Poppins SemiBold 11 sp con 0,04 em (con la escala de letra del sistema). */
+@Composable
+private fun rememberDotTabStyle(): TextStyle {
+    val family = LocalPoppins.current
+    return remember(family) {
+        TextStyle(fontFamily = family, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.04.em, color = Color.White)
+    }
+}
+
+/**
+ * Las píldoras naturales (dp) de [labels], medidas como las mide el dock:
+ * para quien tiene que saber cuánto ocupará antes de colocarlo (la cabecera
+ * de la rueda decide con esto si va en la línea de Masha y cuánto le cabe
+ * bajo la curva de la niebla; ver [DotTabsLayout.uniformWidth]).
+ */
+@Composable
+fun rememberDotTabPills(labels: List<String>, icons: List<DotTabIcon?> = emptyList()): FloatArray {
+    val dens = LocalDensity.current
+    val measurer = rememberTextMeasurer()
+    val style = rememberDotTabStyle()
+    return remember(labels, icons, style, dens) {
+        FloatArray(labels.size) { i ->
+            val icon = if (icons.getOrNull(i) != null) DOT_TAB_ICON + DOT_TAB_ICON_GAP else 0f
+            val maxPx = with(dens) { DotTabsLayout.labelRoom(DotTabsLayout.PILL_MAX, icon).dp.roundToPx() }
+            val text = measurer.measure(labels[i], style, TextOverflow.Ellipsis, maxLines = 1, constraints = Constraints(maxWidth = maxPx), density = dens)
+            DotTabsLayout.pillWidth(text.size.width / dens.density, icon)
+        }
+    }
+}
+
+@Composable
+private fun DotTabsBody(
+    labels: List<String>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    icons: List<DotTabIcon?>,
+    focused: Boolean,
+    focusIndex: Int,
+    feedback: Boolean,
+    glassMinAlpha: Float,
+    light: Boolean,
+    /** Ancho disponible (dp). */
+    room: Float,
 ) {
     val n = labels.size
-    if (n == 0) return
     val sel = selected.coerceIn(0, n - 1)
     val dens = LocalDensity.current
     val reduced = LocalReducedMotion.current
     val skin = LocalSkin.current
     val dark = P.isDark
-    val family = LocalPoppins.current
     val measurer = rememberTextMeasurer()
-    val style = remember(family) {
-        TextStyle(fontFamily = family, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.04.em, color = Color.White)
-    }
-    val maxLabelPx = with(dens) { DotTabsLayout.LABEL_MAX.dp.roundToPx() }
-    val texts = remember(labels, style, dens, maxLabelPx) {
-        labels.map {
-            measurer.measure(it, style, TextOverflow.Ellipsis, maxLines = 1, constraints = Constraints(maxWidth = maxLabelPx), density = dens)
-        }
-    }
+    val style = rememberDotTabStyle()
     val hasIcon = remember(icons, n) { BooleanArray(n) { icons.getOrNull(it) != null } }
-    val pills = remember(texts, hasIcon) {
-        FloatArray(n) { i ->
-            DotTabsLayout.pillWidth(texts[i].size.width / dens.density, if (hasIcon[i]) DOT_TAB_ICON + DOT_TAB_ICON_GAP else 0f)
-        }
+    fun iconWidth(i: Int) = if (hasIcon[i]) DOT_TAB_ICON + DOT_TAB_ICON_GAP else 0f
+    fun measureAll(labelRoom: (Int) -> Float) = labels.mapIndexed { i, label ->
+        val maxPx = with(dens) { labelRoom(i).dp.roundToPx() }
+        measurer.measure(label, style, TextOverflow.Ellipsis, maxLines = 1, constraints = Constraints(maxWidth = maxPx), density = dens)
+    }
+    // Primero a lo natural; si el dock no cabe en [room], otra vez con el rótulo recortado.
+    val natural = remember(labels, style, dens, hasIcon) { measureAll { DotTabsLayout.labelRoom(DotTabsLayout.PILL_MAX, iconWidth(it)) } }
+    val naturalPills = remember(natural, hasIcon) {
+        FloatArray(n) { i -> DotTabsLayout.pillWidth(natural[i].size.width / dens.density, iconWidth(i)) }
+    }
+    val fit = remember(naturalPills, room) { DotTabsLayout.fit(naturalPills, room) }
+    val dotSlot = fit.dot
+    val texts = remember(natural, fit.pillCap) {
+        if (fit.pillCap >= DotTabsLayout.PILL_MAX) natural else measureAll { DotTabsLayout.labelRoom(fit.pillCap, iconWidth(it)) }
+    }
+    // Una sola píldora para todas (la del rótulo más ancho): el dock mide lo mismo con cualquier sección.
+    val pills = remember(naturalPills, fit) {
+        val pill = DotTabsLayout.uniformPill(naturalPills, fit)
+        FloatArray(n) { pill }
     }
 
     val expansion = remember(n) { List(n) { Animatable(if (it == sel) 1f else 0f) } }
-    val start = remember(n) { DotTabsLayout.pillTarget(pills, sel) }
+    val start = remember(n) { DotTabsLayout.pillTarget(pills, sel, dotSlot) }
     val left = remember(n) { Animatable(start.first) }
     val right = remember(n) { Animatable(start.second) }
     val reveal = remember(n) { Animatable(1f) }
@@ -187,12 +255,12 @@ fun DotTabs(
     val previous = remember(n) { IntArray(1) { sel } }
     val announced = remember { IntArray(1) { sel } }
 
-    LaunchedEffect(sel, pills.contentHashCode()) {
-        val (l, r) = DotTabsLayout.pillTarget(pills, sel)
+    LaunchedEffect(sel, pills.contentHashCode(), dotSlot) {
+        val (l, r) = DotTabsLayout.pillTarget(pills, sel, dotSlot)
         val from = previous[0]
         previous[0] = sel
         if (reduced || from == sel) {
-            // Mismo hueco (cambió un rótulo, p. ej. el idioma): se recoloca sin ceremonia.
+            // Mismo hueco (cambió un rótulo, el idioma o el sitio): se recoloca sin ceremonia.
             expansion.forEachIndexed { i, a -> a.snapTo(if (i == sel) 1f else 0f) }
             left.snapTo(l)
             right.snapTo(r)
@@ -265,12 +333,13 @@ fun DotTabs(
     val pillStart = remember(accent) { Color(DockPalettes.pillStart(accent.argb())) }
     val pillEnd = remember(skin.fillEnd) { Color(DockPalettes.pillEnd(skin.fillEnd.argb())) }
     val pillRim = remember(accent) { Color(DockPalettes.pillRim(accent.argb(), true)) }
-    // El dock lleva el cristal oscuro de la barra del hero en los dos temas:
-    // puntos claros y el acento en su tono para fondo oscuro.
-    val dot = Color(DockPalettes.GLASS_DOT)
-    val ring = remember(skin.accent) { Color(DockPalettes.glassAccent(skin.accent.content(true).argb())) }
-    val peekInk = Color.White
-    val peekSurface = P.shade.copy(alpha = DockPalettes.GLASS_PEEK_ALPHA)
+    // Sobre el arte, el cristal oscuro de la barra del hero: puntos claros y el
+    // acento en su tono para fondo oscuro. Sobre el esmerilado claro, al revés.
+    val dot = Color(if (light) LightGlass.DOT else DockPalettes.GLASS_DOT)
+    val ring = remember(skin.accent, light) { if (light) skin.accent.content(false) else Color(DockPalettes.glassAccent(skin.accent.content(true).argb())) }
+    val peekInk = if (light) Color(LightGlass.INK) else Color.White
+    val peekSurface = if (light) Color.White.copy(alpha = DockPalettes.GLASS_PEEK_ALPHA) else P.shade.copy(alpha = DockPalettes.GLASS_PEEK_ALPHA)
+    val shadow = P.shade.copy(alpha = if (light) LightGlass.SHADOW_ALPHA else 0.35f)
     val path = remember { Path() }
     val scratch = remember(n) { FloatArray(n + 1) }
     val e = remember(n) { FloatArray(n) }
@@ -279,7 +348,7 @@ fun DotTabs(
         content = {
             // El cristal va en un hijo aparte: su recorte no puede comerse la
             // zona táctil de las pestañas, que sobresale de la cápsula.
-            Box(Modifier.darkGlass(CapsuleShape, minAlpha = glassMinAlpha))
+            Box(if (light) Modifier.lightGlass(CapsuleShape) else Modifier.darkGlass(CapsuleShape, minAlpha = glassMinAlpha))
             for (i in 0 until n) {
                 Box(
                     Modifier
@@ -294,24 +363,24 @@ fun DotTabs(
                 )
             }
         },
-        modifier = modifier
+        modifier = Modifier
             // El rótulo que asoma va por fuera de la cápsula: se dibuja antes del recorte.
             .drawWithContent {
                 drawContent()
                 val p = peek.value
                 if (p > 0f && focusIndex in 0 until n && focusIndex != sel) {
                     for (i in 0 until n) e[i] = expansion[i].value
-                    val cx = DotTabsLayout.slotCenter(pills, e, focusIndex).dp.toPx()
+                    val cx = DotTabsLayout.slotCenter(pills, e, focusIndex, dotSlot).dp.toPx()
                     drawPeek(texts[focusIndex], cx, p, peekSurface, peekInk)
                 }
             }
-            .outerShadow(8.dp, CapsuleShape, ambientColor = P.shade.copy(alpha = 0.35f), spotColor = P.shade.copy(alpha = 0.35f))
+            .outerShadow(8.dp, CapsuleShape, ambientColor = shadow, spotColor = shadow)
             .consoleFocus(focused, CapsuleShape, color = ring)
             .selectableGroup()
             .drawWithContent {
                 drawContent()
                 for (i in 0 until n) e[i] = expansion[i].value
-                val o = DotTabsLayout.offsets(pills, e, scratch)
+                val o = DotTabsLayout.offsets(pills, e, scratch, dotSlot)
                 val h = size.height
                 val cy = h / 2f
                 val pxPerDp = dens.density
@@ -320,7 +389,7 @@ fun DotTabs(
                 for (i in 0 until n) {
                     val s = DotTabsLayout.dotScale(e[i]) * if (pressed.intValue == i) press.value else 1f
                     if (s <= 0f) continue
-                    val cx = (o[i] + DotTabsLayout.slotWidth(pills[i], e[i]) / 2f) * pxPerDp
+                    val cx = (o[i] + DotTabsLayout.slotWidth(pills[i], e[i], dotSlot) / 2f) * pxPerDp
                     drawCircle(dot, radius = DotTabsLayout.DOT / 2f * pxPerDp * s, center = Offset(cx, cy))
                     if (focused && i == focusIndex && i != sel) {
                         drawCircle(ring, radius = 7.dp.toPx(), center = Offset(cx, cy), style = Stroke(1.5.dp.toPx()))
@@ -383,7 +452,7 @@ fun DotTabs(
                         val slotWidth: Float
                         if (i == sel) {
                             // El rótulo nuevo ya está en su sitio final: la píldora lo destapa.
-                            val (tl, _) = DotTabsLayout.pillTarget(pills, sel)
+                            val (tl, _) = DotTabsLayout.pillTarget(pills, sel, dotSlot)
                             slotLeft = tl
                             slotWidth = pills[i]
                             alpha = (reveal.value * 1.6f).coerceAtMost(1f)
@@ -391,7 +460,7 @@ fun DotTabs(
                             alpha = DotTabsLayout.fadingLabelAlpha(e[i])
                             if (alpha <= 0f) continue
                             slotLeft = o[i]
-                            slotWidth = DotTabsLayout.slotWidth(pills[i], e[i])
+                            slotWidth = DotTabsLayout.slotWidth(pills[i], e[i], dotSlot)
                         }
                         val text = texts[i]
                         val icon = icons.getOrNull(i)
@@ -429,7 +498,7 @@ fun DotTabs(
             },
     ) { measurables, _ ->
         for (i in 0 until n) e[i] = expansion[i].value
-        val o = DotTabsLayout.offsets(pills, e, scratch)
+        val o = DotTabsLayout.offsets(pills, e, scratch, dotSlot)
         val h = DotTabsLayout.HEIGHT.dp.roundToPx()
         val touch = DotTabsLayout.TOUCH.dp.roundToPx()
         val width = (o[n] * dens.density).roundToInt()
@@ -438,7 +507,7 @@ fun DotTabs(
         // Cada pestaña mide 48 dp de alto y sobresale de la cápsula: la zona
         // táctil es de 48 × 48 dp aunque la cápsula mida 34 de alto.
         val tabs = List(n) { i ->
-            val (l, r) = DotTabsLayout.touchSpan(o, pills, e, i)
+            val (l, r) = DotTabsLayout.touchSpan(o, pills, e, i, dotSlot)
             val x0 = (l * dens.density).roundToInt()
             xs[i] = x0
             measurables[i + 1].measure(Constraints.fixed(((r * dens.density).roundToInt() - x0).coerceAtLeast(1), touch))

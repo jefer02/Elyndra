@@ -44,9 +44,6 @@ internal class WheelState(val list: LazyListState, initialTarget: Int) {
     var focusPx by mutableFloatStateOf(0f)
     var count by mutableIntStateOf(0)
 
-    /** Lo que ocupa arriba el bocadillo de Masha mientras se ve (px desde el canto de la rueda); se lee al dibujar. */
-    var reserve: () -> Float = { 0f }
-
     /** La fila que tiene que quedar en la línea de foco. */
     var target by mutableIntStateOf(initialTarget)
 
@@ -67,13 +64,13 @@ internal class WheelState(val list: LazyListState, initialTarget: Int) {
 
     /**
      * Lo que se mueve la línea de foco (px, + = abajo): el centrado de las
-     * listas cortas ([ShortList]) y media reserva del bocadillo de Masha. Lo
-     * leen al dibujar las filas, el nodo, el dial y el contador: van juntos.
+     * listas cortas ([ShortList]). Lo leen al dibujar las filas, el nodo y el
+     * dial: van juntos.
      */
     fun lift(): Float {
         val row = rowPx
         if (row <= 0f) return 0f
-        return ShortList.lift(position, count, railPx / row, focusPx / row) * row + reserve() * BubbleSlot.SHIFT
+        return ShortList.lift(position, count, railPx / row, focusPx / row) * row
     }
 
     /**

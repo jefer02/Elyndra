@@ -327,6 +327,8 @@
     <string name="sheet_group_manage">Verwalten</string>
     <string name="sheet_play">Spielen</string>
     <string name="confirm_again">Gedrückt halten oder erneut drücken zum Bestätigen</string>
+    <string name="remove_short">Entfernen</string>
+    <string name="confirm_short">Bestätigen?</string>
     <string name="toast_pick_game_in_app">%1$s wird geöffnet; wähle das Spiel dort aus</string>
     <string name="open_bachata">Bachata S4 öffnen</string>
     <plurals name="ps4_pkgs_not_installed">
@@ -816,6 +818,10 @@
     <string name="tap_open_desc">Ein Tipp auf das ausgewählte Spiel, den Ordner oder die ROM öffnet es. Aus: zum Öffnen doppelt tippen.</string>
     <string name="hint_gestures_tap">Tippen wählt · Erneut tippen öffnet · Gedrückt halten für Optionen</string>
     <!-- Meridian: fondo adaptable, fila de Añadir y fichas -->
+    <string name="meridian_wheel_backdrop_title">Listenhintergrund</string>
+    <string name="meridian_wheel_backdrop_desc">In Meridian, was hinter der Spieleliste liegt: ein gebogenes Glas, das das Artwork fast unverändert lässt, oder der Weichzeichner, der es mit der Designfarbe verschmilzt.</string>
+    <string name="meridian_wheel_glass">Glas</string>
+    <string name="meridian_wheel_fog">Weichzeichner</string>
     <string name="meridian_adaptive_color_title">Adaptive Hintergrundfarbe</string>
     <string name="meridian_adaptive_color_desc">In Meridian übernimmt der Hintergrund hinter der Liste die Farbe des Artworks des ausgewählten Spiels. Aus: der neutrale Hintergrund des Designs.</string>
     <string name="meridian_add_short">Hinzufügen</string>

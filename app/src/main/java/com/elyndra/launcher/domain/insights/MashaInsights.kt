@@ -108,7 +108,8 @@ object MashaInsights {
     fun compute(input: InsightInput): List<Insight> {
         val out = ArrayList<Insight>()
         val games = input.games
-        if (games.isEmpty()) return listOf(Insight.EmptyLibrary)
+        // "Ahora no" también vale aquí: sin juegos no hay nada más que decir, pero tampoco se insiste.
+        if (games.isEmpty()) return listOf(Insight.EmptyLibrary).filterNot { it.id in input.dismissed }
 
         input.device?.takeIf { it.isHot }?.let { out += Insight.DeviceHot(it.batteryTempC) }
 
