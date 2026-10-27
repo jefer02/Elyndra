@@ -119,7 +119,8 @@ internal fun MeridianFolder(vm: ElyndraViewModel, item: LibraryItem.Folder) {
         artIndex = { key -> keyIndex[key] },
         railHeader = {
             val compact = LocalMeridianFrame.current.compact
-            Column(Modifier.fillMaxWidth().padding(top = if (compact) 4.dp else 8.dp, bottom = if (compact) 2.dp else 6.dp)) {
+            // El mismo tope que la barra de la derecha: las dos filas comparten la línea central.
+            Column(Modifier.fillMaxWidth().padding(top = MeridianTopRow.top(compact).dp, bottom = MeridianTopRow.bottom(compact).dp)) {
                 Row(Modifier.padding(start = 22.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     ConsoleIconButton(onClick = { vm.go(Screen.Library) }, focused = vm.input.isBarFocused(BarItem.Back)) { glyph ->
                         Box(glyph) { BackChevron(color = Color.White) }
