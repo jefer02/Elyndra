@@ -26,8 +26,13 @@ object Frost {
  * curva. La rueda solo lleva los iconos.
  */
 object WheelGlass {
-    /** El canto en la línea de foco, pasado el eje: el dial y la cápsula "03 / 13" quedan dentro. */
-    const val PAST_AXIS_DP = 84f
+    /**
+     * El canto en la línea de foco, pasado el eje: el dial, su nodo y el
+     * resplandor (~6 dp pasado el eje) quedan dentro, con aire. Antes eran 84
+     * para la cápsula del contador; sin ella, el cristal no llega al bloque
+     * del hero (a [com.elyndra.launcher.ui.meridian.MeridianGeometry.HERO_GAP]).
+     */
+    const val PAST_AXIS_DP = 24f
 
     /** Saturación del arte desenfocado (1 = la de siempre). */
     const val SATURATION = 1.1f
@@ -60,8 +65,8 @@ object WheelGlass {
 }
 
 /**
- * Cristal claro: las píldoras del tema claro (el contador del dial, el dock y
- * el orden, también en la costura del hero en vertical). Blanco translúcido,
+ * Cristal claro: las píldoras del tema claro (el dock y el orden, también en
+ * la costura del hero en vertical). Blanco translúcido,
  * filo sutil y tinta oscura.
  */
 object LightGlass {
