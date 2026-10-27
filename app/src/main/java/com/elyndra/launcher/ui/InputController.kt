@@ -334,7 +334,7 @@ class InputController(private val vm: ElyndraViewModel) {
      */
     private fun libraryTop(pad: Pad, fallback: (Pad) -> Boolean): Boolean {
         var current = barFocus ?: return fallback(pad)
-        val rows = LibraryFocus.rows(dockInBar, vm.searchOpen)
+        val rows = if (meridian) LibraryFocus.meridianRows(vm.searchOpen) else LibraryFocus.rows(dockInBar, vm.searchOpen)
         dockFocus = dockFocus.coerceIn(0, (vm.availableFilters().size - 1).coerceAtLeast(0))
         // Lo señalado ya no está (al abrir el buscador se va "Abrir"): el buscador.
         if (rows.none { current in it }) {
@@ -410,7 +410,8 @@ class InputController(private val vm: ElyndraViewModel) {
      * La rueda de Meridian: arriba y abajo recorren la lista (mantener acelera,
      * ver [MeridianInput]) y pasado el último juego está la fila de "Añadir".
      * Izquierda lleva al dock de secciones (arriba de la rueda) y derecha a la
-     * barra (Abrir, buscar, Ajustes); abajo o B vuelven. Arriba desde el primer
+     * barra, por "Abrir" (Masha queda justo a su izquierda): todo es una fila,
+     * la de [LibraryFocus.meridianRows]; abajo o B vuelven. Arriba desde el primer
      * juego también sube al dock, pero solo con una pulsación nueva: mantener
      * la cruceta para llegar al principio no se sale de la lista.
      */
@@ -447,7 +448,7 @@ class InputController(private val vm: ElyndraViewModel) {
             }
             Pad.Down -> if (items.isNotEmpty() && index >= items.lastIndex && vm.loaded) { addFocus = true; true } else moveLibrary(items, index, step)
             Pad.Left -> { focusTop(BarItem.Sections); true }
-            Pad.Right -> { focusTop(LibraryFocus.up(LibraryFocus.rows(dockInBar = false, searchOpen = vm.searchOpen), BarItem.Sections)); true }
+            Pad.Right -> { focusTop(LibraryFocus.fromWheelRight(vm.searchOpen)); true }
             else -> libraryCommon(p)
         }
     }
