@@ -15,7 +15,7 @@ Todo vive en `ui/theme/Console.kt` (tokens, superficies, movimiento) y en
 | Pestañas de filtro y orden | Una fila entera bajo el hero (pestañas, "N elementos" y el orden en texto) | Dock de puntos en la barra del hero (o en la costura) y botón de orden con su menú; la fila se va y su alto es del carrusel. |
 | Card seleccionada | Escala 1,14 y marco de 6 dp: tapa a las vecinas | Muelle a 1,05, marco fino y halo. |
 | Biblioteca vacía | Titular gigante y una card "+" suelta | Estado vacío con icono, texto y botón principal. |
-| Menú de pulsación larga | Rótulos a una línea (se cortan), imágenes sin estado y la zona de borrado mezclada con las imágenes | Rejilla de 2 líneas, imágenes con "Añadir/Cambiar" y borrado en un pie aparte. |
+| Menú de pulsación larga | Rótulos a una línea (se cortan), imágenes sin estado y la zona de borrado mezclada con las imágenes | Rejilla de 2 líneas, imágenes con "Añadir/Cambiar" y un "Quitar" corto bajo cada una (el mando baja de cada imagen a su "Quitar"); quitar el juego aparte tras un filo rojo, en ancho en la columna de las imágenes. X de cerrar en la banda, y banda más baja en un móvil apaisado. |
 | Ajustes | Dos columnas largas y desequilibradas | Raíl de categorías + panel (ancho) o lista → página (estrecho). |
 | Sonidos propios | 9 bloques de dos botones de texto | Sección plegable con filas compactas de iconos. |
 | Prioridad de fuentes | 12 filas con flechas sueltas | Panel compacto plegable, con arrastre, estado y resumen. |
@@ -133,6 +133,10 @@ Plasma; nada guardado se pisa. El acento Plasma arranca su relleno en
   al dock (al buscador si está abierto). Con el dock en la barra todo es una
   fila en el orden en que se ve (Masha, secciones, orden, Abrir, buscar,
   Ajustes); en la costura son dos (la barra y, debajo, secciones y orden).
+  En Meridian también es una fila en el orden en que se ve (secciones, Masha,
+  Abrir, orden, buscar, Ajustes: `LibraryFocus.meridianRows`); desde la rueda,
+  izquierda va al dock y derecha a "Abrir". En esa fila las pistas dicen
+  A Seleccionar · ←→ Mover · B Atrás.
   En el dock, izquierda/derecha recorren los puntos —el señalado enseña su
   rótulo un momento— y por los extremos se sale a la pieza de al lado; A elige.
   LB/RB cambian de sección desde cualquier sitio. El menú de orden se maneja
@@ -169,7 +173,11 @@ todo pasa a fundido corto o salto.
   `PaletteTest`).
 - Textos de los seis idiomas sin cortes: los rótulos de acción admiten dos
   líneas y las filas crecen en vez de truncar. El dock mide sus rótulos con
-  `TextMeasurer`; solo por encima de 152 dp de píldora se cortan.
+  `TextMeasurer`; solo por encima de 152 dp de píldora se cortan (o si no hay
+  más sitio: en la cabecera de la rueda, bajo la curva de la niebla). Todas las
+  secciones abren la misma píldora, la del rótulo más ancho
+  (`DotTabsLayout.uniformPill`): cambiar de sección mueve la píldora, nunca
+  cambia el ancho del dock ni empuja al botón de orden o a la barra.
 - Dock: cada punto es una pestaña (`Role.Tab`, seleccionada o no, con su
   rótulo como descripción); zona táctil de 48 × 48 dp: cada pestaña cubre su
   hueco (44 dp) y la mitad de los de al lado, y sobresale de la cápsula por
@@ -202,7 +210,7 @@ Vistas previas en claro y oscuro: `ConsolePreviews.kt` (anotación `@ConsolePrev
 
 | Categoría | Contenido |
 |---|---|
-| Pantalla y tema | Modo oscuro, intro, fotogramas por segundo, alta fluidez de Masha, hora y batería, idioma |
+| Pantalla y tema | Modo oscuro, intro, fotogramas por segundo, alta fluidez de Masha, hora y batería (apagada de serie), idioma |
 | Sonido | Sonidos de la interfaz, volumen, sonido al navegar, paquete, sonidos propios (plegados) |
 | Música y fondo | Música del menú, fondo de la interfaz |
 | Apariencia | Estilo de la lista (Meridian o Clásico, con miniaturas), color de fondo adaptable (Meridian), paleta de firma, color de acento, liquid glass, selección (halo y partículas, con su color) |
@@ -279,6 +287,10 @@ Masha (Ajustes → Masha), 14 (8 en calidad ligera) que nacen en el canto del
 orbe y suben con un rizo. Solo esa pieza tiene reloj; con "reducir
 movimiento" quedan quietas. Su línea ambiental sale debajo,
 alineada a su izquierda, sobre el arte del hero, y se recoge a los 14 s.
+En Meridian el botón es la primera pieza del grupo de arriba a la derecha
+(ver §11); ahí, con la píldora de hora a 8 dp, sus partículas no pasan de 6 dp
+a los lados del orbe (`AuraHalo`: se apagan antes y lo que asome se recorta;
+hacia arriba siguen subiendo).
 
 ## 11. Meridian: la rueda vertical
 
@@ -292,12 +304,26 @@ nada: la rueda (y el carrusel) nacen ya en la selección (`WheelMath.restoreInde
 
 **Reparto** (`MeridianGeometry`): la rueda ocupa ~42 % del ancho (300–600 dp);
 en una ventana baja (< 480 dp de alto, `MeridianMode.compact`) el 40 %
-(280–520 dp). La línea de foco va en el centro. Arriba de la rueda, el
-emblema de Masha y el dock de secciones y el orden. A la derecha, el arte del
+(280–520 dp). La línea de foco va en el centro. Arriba de la rueda, solo el
+dock de secciones, en la misma fila que la barra de la derecha
+(`MeridianTopRow`: el mismo tope, 8 dp o 6 en ventana baja, el mismo alto de
+34 y la misma línea central). La barra es `[Masha] [hora · batería] [Abrir]
+[orden] [buscar] [Ajustes]` (la píldora de hora y batería viene apagada de
+serie y se enciende en Ajustes; sin ella la barra es más corta): Masha va ahí y no encima del dock (sola en la
+cabecera se veía apretada y sin alinear con nada, y su fila le quitaba 48 dp de
+alto a la rueda, que ahora los recupera). La barra compacta como en el Clásico
+(`TopBarLayout`: "Abrir" a su icono, la píldora sin el tanto por ciento, sin
+píldora); Masha y Ajustes nunca se van. Su ancho máximo
+(`MeridianTopRow.barMaxWidth`) deja al menos 8 dp hasta donde puede asomar el
+dock. A la derecha, el arte del
 juego a sangre (`HeroArtLayer`), ensanchado un 35 % y anclado a la izquierda
 (`MeridianArtFrame`), el bloque del hero abajo (margen inferior del 8 % del
 alto; 6 % en ventana baja) y la barra arriba a la derecha. Entre el dial y el
-bloque, 96 dp: ahí va el contador. Los insets (barras del sistema y recortes)
+bloque, 48 dp (`HERO_GAP`): eran 96 para el contador del nodo; sin él, el
+hueco solo separa el dial del bloque, y no baja de 48 para que el velo ya esté
+por debajo de 0,25 bajo el texto blanco del hero (en claro el velo es perla) y
+para que el dock de la cabecera, que puede asomar sobre ese hueco, tenga en un
+móvil al menos el sitio que tenía con el orden al lado. Los insets (barras del sistema y recortes)
 ya los respeta la raíz de la app (`systemBars ∪ displayCutout`).
 
 **Tarjetas y profundidad** (`WheelTransform`, tablas por fila de distancia
@@ -348,11 +374,9 @@ juegos, un arco corto; sin juegos, nada. El nodo va en "línea de foco +
 desplazamiento", el mismo valor que coloca la tarjeta: con la rueda parada,
 en su centro exacto. En claro, marcas de grafito; en oscuro, claras y el
 resplandor suma (≥ 3:1 sobre el fondo). Un solo lienzo que lee la rueda al
-dibujar, sin objetos por fotograma. Al lado, el **contador** (`DialCounterChip`):
-cápsula de cristal con cifras tabulares, la posición grande y el total
-apagado, siempre con las mismas cifras (2 a 4, `DialCounter`), que ruedan como
-un cuentakilómetros al cambiar (fundido con "reducir movimiento"); en
-"Añadir", un "+".
+dibujar, sin objetos por fotograma. Sin contador de posición ("11 / 13"): el
+dial y su muesca ya dicen dónde se está, y la cápsula al lado del nodo solo
+añadía ruido entre la rueda y el hero.
 
 **Fondo adaptable** (`ArtWash`, `MeridianWash`; Ajustes → Apariencia →
 "Color de fondo adaptable", encendido de serie). Del arte enfocado se pide a
@@ -368,8 +392,24 @@ sin desenfocar por fotograma), el tono del velo encima (oscuro: luminosidad
 modulación vertical con los colores del canto del arte, grano fijo al 3,5 %
 y la máscara de la niebla (`MeridianFog`): 0,86 desde el canto hasta el eje
 (detrás de las tarjetas no hace falta más) y, pasado el eje, una caída
-graduada `(1 − smoothstep)^1,7` hasta el 58 % del ancho (densa junto a la
-rueda, un tercio a mitad del tramo). El perfil se curva con el círculo de la
+graduada `(1 − smoothstep)^1,7` en una banda fija de 88 dp (`FADE_DP`; antes
+el 16 % del ancho, hasta ~200 dp en tableta): densa junto a la rueda, un tercio
+a mitad del tramo, y sin canto (por debajo de ~80 dp bajaría más de 0,02 por
+dp). La máscara se calcula en dp. En claro, el cristal curvo pasa 24 dp del eje
+(el dial con su nodo dentro; antes 84, para la cápsula del contador). Lo que va
+encima de la niebla (el dock de la cabecera, el bocadillo de Masha) se mide
+contra su canto *visible* y curvo a su altura (`MeridianFog.visibleEdge`): el
+filo del cristal en claro y, en oscuro, donde el velo ya ha bajado a la mitad
+(~34 dp pasado el eje, `WASH_REACH`), no los 88 dp donde ya es transparente.
+El dock de la cabecera no pasa de ese canto, menos 16 dp, ni a la altura de
+su borde de arriba ni del de abajo (`RailHeaderLayout.plan`). Si así sus
+rótulos no caben enteros, puede pasar hasta 12 dp más (`LABEL_STRETCH`), lo
+justo; más allá se recortan. En ese caso, o si ni en su ancho mínimo cabe, la
+niebla se ensancha solo en la banda de la cabecera (`MeridianFog.Band`) hasta
+el dock y vuelve a la curva en 32 dp. La curva la calcula la propia cabecera
+antes de que la rueda se mida (`FogArc.forRail`, con el alto que dejan la
+cabecera y las pistas, que la columna mide primero): el dock tiene su ancho
+final desde el primer fotograma. El perfil se curva con el círculo de la
 rueda (`WheelArc`): a cada altura se corre lo mismo que la fila que pasa por
 ahí, así que el texto de cada fila tiene detrás el mismo velo que la fila
 enfocada y, arriba y abajo, el arte queda más limpio (una media luna, no una
@@ -386,17 +426,23 @@ el ajuste, el velo neutro de siempre (perla cálida en claro, tinta en oscuro).
 opacidad justa para el texto blanco (≥ 4,5:1 sobre el píxel más claro de esa
 zona). La cabecera de Carpeta: nombre en una línea, ruta en otra recortada
 por el centro, a 12 dp de la píldora de la batería. Todas las píldoras de
-cristal oscuro (volver, Abrir, emulador, hora, buscar, Ajustes, contador)
+cristal oscuro (volver, Abrir, emulador, hora, buscar, Ajustes)
 llevan en Meridian un suelo de tinta de 0,66 (`MeridianGlass`, `LocalGlassFloor`):
 texto ≥ 4,5:1 e iconos ≥ 3:1 sobre cualquier fondo. Se tocan en 48 dp
 aunque se vean de 34 (`touchTarget`).
 
-**Bocadillo de Masha** (`BubbleSlot`): va en la columna de la rueda, bajo el
-botón de Masha, sin pisar el dock ni el orden (si el dock baja a otra línea,
-el bocadillo se coloca a su lado o debajo). Mientras se ve, la rueda le deja
-sitio con un muelle: baja la mitad de lo que ocupa y las filas que quedarían
-debajo se apagan antes de tocarlo (`RailEdge`). En ventana baja, una sola
-línea con "Ahora no" al lado.
+**Bocadillo de Masha** (`BubbleSlot.underGroup`): debajo del grupo de arriba a
+la derecha, 8 dp bajo Masha, sobre el arte. Si es más ancho que lo que va de
+Masha al canto del grupo, pegado a ese canto; si no, alineado a Masha: siempre
+queda debajo de ella. Una línea con una X al lado (22 dp, tocable en 48 × 48,
+descrita como "Ahora no"), hasta 560 dp: en un móvil apaisado (892 × 411) la
+línea entera cabe con ~200 dp de sobra en español. Si no cabe (640 dp con la
+letra a 1,3), el texto se parte en dos líneas y "Ahora no" baja debajo, en vez
+de cortarse. Nunca tapa la barra, el dock (si asomara debajo, empieza pasado
+él) ni el bloque del hero (fichas, título, Jugar/Detalles/Opciones); si no hay
+sitio que no lo tape, no se enseña. La rueda ya no le deja sitio: no va sobre
+ella. En el Clásico, debajo de Masha y, si el dock queda justo debajo (sección
+vacía), por debajo del dock.
 
 **Bloque del hero**: fichas (saltan de línea), logo (o titular), sinopsis (dos
 líneas) y las acciones, con ritmo de 8 dp. El logo se encaja (`LogoFit`) en una
