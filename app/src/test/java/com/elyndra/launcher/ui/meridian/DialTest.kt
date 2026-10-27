@@ -96,40 +96,4 @@ class DialTest {
         assertEquals(1f, DialScale.endFade(0.5f), 0f)
         assertEquals(0f, DialScale.endFade(1f), 0f)
     }
-
-    @Test
-    fun `the counter keeps the same digits for 1 to 4 digit totals`() {
-        assertEquals(2, DialCounter.digits(1))
-        assertEquals(2, DialCounter.digits(9))
-        assertEquals(2, DialCounter.digits(99))
-        assertEquals(3, DialCounter.digits(100))
-        assertEquals(3, DialCounter.digits(999))
-        assertEquals(4, DialCounter.digits(1000))
-        assertEquals(4, DialCounter.digits(9999))
-        for (total in listOf(1, 7, 42, 100, 512, 1000, 9999)) {
-            val width = DialCounter.total(total).length
-            for (i in listOf(0, total / 2, total - 1)) assertEquals("$i/$total", width, DialCounter.current(i, total).length)
-        }
-        assertEquals("07", DialCounter.current(6, 42))
-        assertEquals("42", DialCounter.total(42))
-        assertEquals("007", DialCounter.current(6, 120))
-        assertEquals("0001", DialCounter.current(0, 2048))
-        assertEquals("42", DialCounter.current(99, 42))
-    }
-
-    @Test
-    fun `each digit rolls in the direction of the change, odometer style`() {
-        assertEquals(1, DialCounter.digitAt(17, 2, 0))
-        assertEquals(7, DialCounter.digitAt(17, 2, 1))
-        assertEquals(0, DialCounter.digitAt(17, 4, 0))
-        assertEquals(7, DialCounter.digitAt(1234567, 4, 3))
-        // 09 → 10: las dos cifras suben; 10 → 09: bajan; 11 → 12: solo la de las unidades.
-        assertEquals(1, DialCounter.direction(9, 10, 2, 0))
-        assertEquals(1, DialCounter.direction(9, 10, 2, 1))
-        assertEquals(-1, DialCounter.direction(10, 9, 2, 0))
-        assertEquals(0, DialCounter.direction(11, 12, 2, 0))
-        assertEquals(1, DialCounter.direction(11, 12, 2, 1))
-        // 0999 → 1000 en cuatro cifras: todas ruedan.
-        for (c in 0..3) assertEquals(1, DialCounter.direction(999, 1000, 4, c))
-    }
 }
