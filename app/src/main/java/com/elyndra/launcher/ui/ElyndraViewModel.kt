@@ -1585,6 +1585,7 @@ class ElyndraViewModel @Inject constructor(
                     icon = kind.sheetIcon(),
                     preview = art.path(key, kind),
                     opensSheet = true,
+                    artSlot = kind,
                 ) { chooseArtSource(key, title, kind) }
             }
             if (has) {
@@ -1594,6 +1595,8 @@ class ElyndraViewModel @Inject constructor(
                     icon = SheetIcon.Remove,
                     // Quitar una imagen no pasa por un diálogo: el menú lo protege.
                     holdToConfirm = true,
+                    // El menú lo pone bajo la tarjeta de su imagen.
+                    artSlot = kind,
                 ) { clearArt(key, kind) }
             }
         }
