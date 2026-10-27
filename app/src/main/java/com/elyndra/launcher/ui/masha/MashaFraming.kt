@@ -50,6 +50,16 @@ internal object MashaFraming {
      */
     const val FLOOR = 0f
 
+    /**
+     * Abajo del cuerpo entero en horizontal: los aros de la base del holotanque
+     * (−0,07 m). En horizontal el hueco es ancho y bajo y el alto manda: sin los
+     * aros ella parecía flotar recortada sobre el canto de abajo.
+     */
+    const val RINGS_BOTTOM = -0.07f
+
+    /** Distancia focal de la cámara del escenario (mm, sensor de 24 mm de Filament). */
+    const val FOCAL_LENGTH_MM = 38.0
+
     /** Ojos en reposo, hasta que llega la primera pose animada. */
     val REST_EYES = floatArrayOf(0f, 1.659f, 0.117f)
 
@@ -78,11 +88,18 @@ internal object MashaFraming {
      * - Cuerpo entero: lo más cerca posible sin cortarla: la coronilla y la
      *   planta de los pies tocan los bordes del hueco (1 % de aire); a lo
      *   ancho, el holotanque (±0,55 m) en todo el ancho del hueco.
+     * - Cuerpo entero en horizontal ([landscape]): el hueco es la columna de la
+     *   izquierda bajo la barra; con la coronilla pegada a la barra parecía
+     *   aplastada contra ella, así que deja un 4 % de aire arriba y llega hasta
+     *   los aros de la base ([RINGS_BOTTOM]) con un 2 % abajo; anclado arriba,
+     *   para que ese aire no se reparta a medias con el de abajo.
      */
-    fun spec(shot: MashaShot): Spec = when (shot) {
+    fun spec(shot: MashaShot, landscape: Boolean = false): Spec = when (shot) {
         MashaShot.CloseUp -> Spec(topMargin = 0.07f, bottomMargin = 0f, halfWidth = 0.18f, widthFill = 1f, anchorTop = true)
         MashaShot.UpperBody -> Spec(topMargin = 0.06f, bottomMargin = 0f, halfWidth = 0.30f, widthFill = 0.95f, anchorTop = true)
-        MashaShot.FullBody -> Spec(topMargin = 0.01f, bottomMargin = 0.01f, halfWidth = 0.55f, widthFill = 1f, anchorTop = false)
+        MashaShot.FullBody ->
+            if (landscape) Spec(topMargin = 0.04f, bottomMargin = 0.02f, halfWidth = 0.55f, widthFill = 1f, anchorTop = true)
+            else Spec(topMargin = 0.01f, bottomMargin = 0.01f, halfWidth = 0.55f, widthFill = 1f, anchorTop = false)
     }
 
     /**
@@ -96,10 +113,10 @@ internal object MashaFraming {
     /** Arriba y abajo del tramo del plano, en metros del mundo. */
     fun spanTop(eyeY: Float): Float = eyeY + HEAD_TOP_ABOVE_EYES
 
-    fun spanBottom(shot: MashaShot, eyeY: Float): Float = when (shot) {
+    fun spanBottom(shot: MashaShot, eyeY: Float, landscape: Boolean = false): Float = when (shot) {
         MashaShot.CloseUp -> eyeY - CHEST_BELOW_EYES
         MashaShot.UpperBody -> eyeY - HIPS_BELOW_EYES
-        MashaShot.FullBody -> FLOOR
+        MashaShot.FullBody -> if (landscape) RINGS_BOTTOM else FLOOR
     }
 
     /**
@@ -111,7 +128,8 @@ internal object MashaFraming {
     /**
      * Resuelve [shot] para una vista de [viewW]×[viewH] px con el hueco libre
      * [left], [top], [right], [bottom] (px, mismas coordenadas; sin área = toda
-     * la vista) y los ojos a [eyeY] m.
+     * la vista) y los ojos a [eyeY] m. [landscape]: la variante apaisada del
+     * plano (ver [spec]); el escenario la decide por la forma de la vista.
      *
      * Escribe en [out]: 0 distancia (m) · 1 altura de la cámara (m, mira en
      * horizontal) · 2 desplazamiento lateral de la cámara respecto a sus ojos (m).
@@ -127,9 +145,10 @@ internal object MashaFraming {
         shot: MashaShot,
         eyeY: Float,
         out: FloatArray,
+        landscape: Boolean = false,
     ) {
         val spanTop = spanTop(eyeY)
-        val spanBottom = spanBottom(shot, eyeY)
+        val spanBottom = spanBottom(shot, eyeY, landscape)
         if (viewW <= 0f || viewH <= 0f || tanHalf <= 0f) {
             out[0] = 2f; out[1] = (spanTop + spanBottom) / 2f; out[2] = 0f
             return
@@ -146,7 +165,7 @@ internal object MashaFraming {
         val bandW = br - bl
         val bandH = bb - bt
 
-        val s = spec(shot)
+        val s = spec(shot, landscape)
         val span = spanTop - spanBottom
         // Píxeles por metro: lo que permite el alto (con su aire) y lo que permite el ancho.
         val byHeight = bandH * (1f - s.topMargin - s.bottomMargin) / span
