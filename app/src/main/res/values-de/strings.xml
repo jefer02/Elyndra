@@ -327,6 +327,8 @@
     <string name="sheet_group_manage">Verwalten</string>
     <string name="sheet_play">Spielen</string>
     <string name="confirm_again">Gedrückt halten oder erneut drücken zum Bestätigen</string>
+    <string name="remove_short">Entfernen</string>
+    <string name="confirm_short">Bestätigen?</string>
     <string name="toast_pick_game_in_app">%1$s wird geöffnet; wähle das Spiel dort aus</string>
     <string name="open_bachata">Bachata S4 öffnen</string>
     <plurals name="ps4_pkgs_not_installed">
