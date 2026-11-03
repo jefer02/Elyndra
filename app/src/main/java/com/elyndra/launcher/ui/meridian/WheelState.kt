@@ -19,6 +19,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -155,9 +157,16 @@ internal class WheelSnap(private val wheel: WheelState, private val count: () ->
 
 /**
  * Lo que la rueda hace sola: ir con el muelle a la fila seleccionada, avisar
- * de la fila en la que se para tras moverla con el dedo ([onSettle]) y un
- * toque háptico por fila que pasa bajo el dedo (como mucho uno cada
- * [HAPTIC_GAP_MS]; los toques respetan el ajuste del sistema).
+ * de la fila que queda en la línea de foco mientras se mueve con el dedo y de
+ * la fila en la que se para ([onSettle]), y un toque háptico por fila que
+ * pasa bajo el dedo (como mucho uno cada [HAPTIC_GAP_MS]; los toques respetan
+ * el ajuste del sistema).
+ *
+ * Antes solo se seleccionaba al pararse del todo (tras el ajuste a la fila):
+ * el hero cambiaba tarde. Ahora la fila que se queda [PASS_DWELL_MS] en la
+ * línea ya se selecciona; a toda velocidad no se queda ninguna y el hero no
+ * parpadea. Mientras el dedo la mueve, el muelle no la persigue: la selección
+ * nueva no le quita la lista al dedo ni frena el lanzamiento.
  */
 @Composable
 internal fun WheelEffects(wheel: WheelState, reduced: Boolean, count: Int, active: Boolean, onSettle: (Int) -> Unit) {
@@ -165,7 +174,7 @@ internal fun WheelEffects(wheel: WheelState, reduced: Boolean, count: Int, activ
     val settle by rememberUpdatedState(onSettle)
     val total by rememberUpdatedState(count)
     LaunchedEffect(wheel, reduced) {
-        snapshotFlow { wheel.target to wheel.rowPx }.collect { wheel.follow(reduced) }
+        snapshotFlow { wheel.target to wheel.rowPx }.collect { if (!wheel.touched) wheel.follow(reduced) }
     }
     LaunchedEffect(wheel, active) {
         if (!active) return@LaunchedEffect
@@ -183,6 +192,13 @@ internal fun WheelEffects(wheel: WheelState, reduced: Boolean, count: Int, activ
                 }
             }
         }
+        launch {
+            snapshotFlow { if (wheel.rowPx > 0f) wheel.position.roundToInt() else -1 }.collectLatest { row ->
+                if (row < 0 || !wheel.touched || wheel.programmatic) return@collectLatest
+                delay(PASS_DWELL_MS)
+                if (wheel.touched && total > 0) settle(row.coerceIn(0, total - 1))
+            }
+        }
         snapshotFlow { wheel.list.isScrollInProgress }.collect { scrolling ->
             if (!scrolling && wheel.touched) {
                 wheel.touched = false
@@ -194,3 +210,6 @@ internal fun WheelEffects(wheel: WheelState, reduced: Boolean, count: Int, activ
 
 /** Entre dos toques hápticos de la rueda: a toda velocidad no se convierten en un zumbido. */
 private const val HAPTIC_GAP_MS = 45L
+
+/** Lo que tiene que quedarse una fila en la línea de foco, con la rueda en marcha, para seleccionarse. */
+private const val PASS_DWELL_MS = 70L
