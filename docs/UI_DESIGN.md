@@ -324,24 +324,37 @@ hueco solo separa el dial del bloque, y no baja de 48 para que el velo ya esté
 por debajo de 0,25 bajo el texto blanco del hero (en claro el velo es perla) y
 para que el dock de la cabecera, que puede asomar sobre ese hueco, tenga en un
 móvil al menos el sitio que tenía con el orden al lado. Los insets (barras del sistema y recortes)
-ya los respeta la raíz de la app (`systemBars ∪ displayCutout`).
+ya los respeta la raíz de la app (`SafeAreaInsets` = `systemBars ∪ displayCutout`). Los fondos sí
+pasan bajo la muesca hasta el filo de la ventana (`EdgeBleed.kt`): el arte del hero (también arriba,
+bajo la cámara de un móvil en vertical; sus velos cuentan con esa franja), el fondo vivo y
+el arte de Meridian crecen (`edgeBleed`); el cristal y el velo de la rueda reflejan su canto
+(`edgeMirror`); el estante estira su degradado. Barra, rueda, cards y texto se quedan en el área segura.
 
 **Tarjetas y profundidad** (`WheelTransform`, tablas por fila de distancia
 0, ±1, ±2, ±3, ±4, interpoladas en línea):
 
 | | 0 | ±1 | ±2 | ±3 | ±4 |
 |---|---|---|---|---|---|
-| Escala | 1 | 0,64 | 0,46 | 0,32 | 0,24 |
+| Escala | 1 | 0,72 | 0,52 | 0,37 | 0,28 |
 | Opacidad | 1 | 0,85 | 0,5 | 0,25 | 0 |
 | Giro Y | 0° | 6° | 12° | 18° | 18° |
 | Niebla | 0 | 0,12 | 0,26 | 0,42 | 0,55 |
 | Texto | sí | sí (2 líneas) | no | no | no |
 
-La tarjeta enfocada mide el 48 % del alto de la rueda (carátulas, como mucho
+La tarjeta enfocada mide el 39 % del alto de la rueda (carátulas, como mucho
 el 24 % del ancho de la ventana) o el 38 % (iconos y apaisadas), y nunca más
 ancha que el 42 % de la rueda (al nombre le queda sitio); entre 88 y 380 dp.
-Se leen tres filas (la enfocada y sus vecinas, que pueden asomar recortadas
-en los cantos) y, con iconos, dos tenues más. Cada fila sigue el **círculo**
+Nunca tan alta que una vecina (±1) se salga de la rueda (`NEIGHBOR_REACH`):
+con el 48 % de antes, en tableta las carátulas vecinas se cortaban en seco
+contra la cabecera y el pie. Se leen tres filas (la enfocada y sus vecinas,
+enteras) y, con iconos, dos tenues más. El margen izquierdo (`insetFor`)
+cuenta con que la fila encoge desde su canto: la vecina, encogida y corrida
+por la curva, queda al menos a 8 dp del filo (`NEIGHBOR_START`).
+
+Al moverla con el dedo, la fila que se queda 70 ms en la línea de foco ya se
+selecciona (`WheelEffects`): el hero cambia mientras se recorre, no al
+pararse del todo; a toda velocidad no se queda ninguna y el hero no parpadea.
+Mientras el dedo la mueve, el muelle no persigue la selección nueva. Cada fila sigue el **círculo**
 de `WheelArc`: su centro queda fuera de la pantalla, a la izquierda, a la
 altura de la línea de foco (radio 1,6 altos de la rueda); el dial usa la misma
 función, así que filas y arco nunca se separan. La niebla es el color del
@@ -401,8 +414,11 @@ encima de la niebla (el dock de la cabecera, el bocadillo de Masha) se mide
 contra su canto *visible* y curvo a su altura (`MeridianFog.visibleEdge`): el
 filo del cristal en claro y, en oscuro, donde el velo ya ha bajado a la mitad
 (~34 dp pasado el eje, `WASH_REACH`), no los 88 dp donde ya es transparente.
-El dock de la cabecera no pasa de ese canto, menos 16 dp, ni a la altura de
-su borde de arriba ni del de abajo (`RailHeaderLayout.plan`). Si así sus
+El dock de la cabecera va a la izquierda (`START`, 22 dp), no pegado al canto
+de la columna, y no pasa de ese canto, menos 16 dp, ni a la altura de
+su borde de arriba ni del de abajo (`RailHeaderLayout.plan`). Si a 22 dp
+pasaría de la curva, antes de nada se corre hacia el filo, hasta 8 dp
+(`MIN_START`): así, en un móvil, el cristal no se abomba arriba. Si así sus
 rótulos no caben enteros, puede pasar hasta 12 dp más (`LABEL_STRETCH`), lo
 justo; más allá se recortan. En ese caso, o si ni en su ancho mínimo cabe, la
 niebla se ensancha solo en la banda de la cabecera (`MeridianFog.Band`) hasta
