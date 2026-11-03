@@ -7,8 +7,10 @@ A tidier top bar and a brighter Masha: more room for your games on every screen 
 - **Masha's bubble** fits on one line, has a close button and moves out of the way of other pieces.
 - **Game actions:** the action sheet has a close button, each art removal sits under its card, and destructive actions come last.
 - **Gamepad hints** wrap onto a second row when they don't fit.
+- **Wheel:** unselected games are bigger, and swiping through the list selects games as you pass them instead of waiting for it to stop.
+- **Camera cutout:** backgrounds and art now reach the screen edge under the notch, in portrait too.
 - The time and battery pill is now **off by default** (turn it on in Settings → Display → Time and battery).
-- **Fixed:** the folder header lines up with the top bar; landscape scrim, quick replies and touch targets in Masha's chat.
+- **Fixed:** the folder header lines up with the top bar; the section dock no longer bulges the frosted glass; covers in tablet folders are no longer cut off; landscape scrim, quick replies and touch targets in Masha's chat.
 
 ## Download
 - **Elyndra-v1.2.0-arm64-v8a.apk**: most phones, tablets and handhelds (smaller).
