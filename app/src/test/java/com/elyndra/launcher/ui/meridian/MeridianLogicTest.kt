@@ -65,7 +65,7 @@ class MeridianLogicTest {
 
     @Test
     fun `scale alpha and rotation follow the tuned tables by distance`() {
-        val scale = floatArrayOf(1f, 0.64f, 0.46f, 0.32f, 0.24f)
+        val scale = floatArrayOf(1f, 0.72f, 0.52f, 0.37f, 0.28f)
         val alpha = floatArrayOf(1f, 0.85f, 0.5f, 0.25f, 0f)
         val rot = floatArrayOf(0f, 6f, 12f, 18f)
         for (d in 0..4) {
@@ -75,8 +75,8 @@ class MeridianLogicTest {
         }
         for (d in 0..3) assertEquals(-rot[d], WheelTransform.rotationY(d.toFloat(), flat = false), 1e-6f)
         assertEquals(0f, WheelTransform.alpha(7f), 0f)
-        assertEquals(0.24f, WheelTransform.scale(9f), 1e-6f)
-        assertEquals((0.64f + 0.46f) / 2f, WheelTransform.scale(1.5f), 1e-6f)
+        assertEquals(0.28f, WheelTransform.scale(9f), 1e-6f)
+        assertEquals((0.72f + 0.52f) / 2f, WheelTransform.scale(1.5f), 1e-6f)
         // El nombre: en la enfocada y sus vecinas; desde ±2, solo el arte.
         assertEquals(1f, WheelTransform.detail(1f), 0f)
         assertEquals(0f, WheelTransform.detail(2f), 0f)
@@ -158,18 +158,24 @@ class MeridianLogicTest {
     @Test
     fun `about three rows read clearly plus two faint ones with icons, and covers keep three`() {
         assertEquals(3 to 2, rows(WheelTransform.ICON_TILE))
-        // Carátulas al 48 %: la enfocada y sus vecinas (que pueden asomar recortadas en los cantos).
+        // Carátulas: la enfocada y sus vecinas, enteras.
         val (clear, _) = rows(WheelTransform.COVER_TILE)
         assertEquals(3, clear)
     }
 
     @Test
     fun `focused tiles are big, sized from the rail height and capped by the window and the rail`() {
-        // Iconos: 38 % del alto; carátulas: 48 % (entre el 46 y el 52 % pedido).
+        // Iconos: 38 % del alto; carátulas: lo que deja ver enteras a sus vecinas (~39 %).
         assertEquals(600f * 0.38f, WheelTransform.tileHeight(600f, 1600f, 1f), 1e-3f)
-        assertEquals(600f * 0.48f, WheelTransform.tileHeight(600f, 1600f, 2f / 3f), 1e-3f)
-        assertTrue(WheelTransform.COVER_TILE in 0.46f..0.52f)
+        assertEquals(600f * WheelTransform.COVER_TILE, WheelTransform.tileHeight(600f, 1600f, 2f / 3f), 1e-3f)
+        assertTrue(WheelTransform.COVER_TILE in 0.36f..0.42f)
         assertTrue(WheelTransform.ICON_TILE in 0.36f..0.40f)
+        // Ni iconos ni carátulas dejan a una vecina (±1) fuera de la rueda: el corte en seco de la tableta.
+        for (rail in listOf(300f, 457f, 656f, 740f)) for (aspect in listOf(1f, 2f / 3f)) {
+            val t = WheelTransform.tileHeight(rail, 1280f, aspect)
+            val reach = (WheelTransform.center(1f) + WheelTransform.scale(1f) / 2f) * t
+            assertTrue("$rail $aspect: $reach", reach <= rail * WheelTransform.FOCUS_FRACTION + 1e-3f)
+        }
         // Ventana estrecha: el ancho de la carátula no pasa del 24 % de la ventana.
         val tall = WheelTransform.tileHeight(900f, 600f, 2f / 3f)
         assertEquals(600f * 0.24f, tall * 2f / 3f, 1e-3f)
@@ -178,9 +184,9 @@ class MeridianLogicTest {
         // Topes absolutos.
         assertEquals(WheelTransform.TILE_MIN, WheelTransform.tileHeight(120f, 1600f, 1f), 0f)
         assertEquals(WheelTransform.TILE_MAX, WheelTransform.tileHeight(3000f, 4000f, 1f), 0f)
-        // La tableta de las capturas (853 × 533 dp, rueda de 457 dp): la carátula enfocada ~48 % de la rueda.
+        // La tableta de las capturas (853 × 533 dp, rueda de 457 dp): la carátula enfocada ~39 % de la rueda.
         val g = MeridianGeometry.compute(853f, 457f, 2f / 3f)
-        assertTrue("${g.rowHeight / 457f}", g.rowHeight / 457f in 0.46f..0.52f)
+        assertTrue("${g.rowHeight / 457f}", g.rowHeight / 457f in 0.36f..0.42f)
         assertTrue(g.rowHeight * 2f / 3f <= 853f * 0.24f + 1e-3f)
     }
 
@@ -281,7 +287,8 @@ class MeridianLogicTest {
             val f = focus + lift
             assertTrue("$count@$at: la enfocada dentro", f - 0.5f >= -1e-4f && f + 0.5f <= railTiles + 1e-4f)
             if (f > 0.5f + 1e-4f && f < railTiles - 0.5f - 1e-4f) assertEquals("$count@$at", railTiles / 2f, (top + bottom) / 2f, 1e-3f)
-            assertTrue("$count@$at hueco ${top}", top <= railTiles * 0.3f)
+            // (Una sola carátula, centrada, deja algo más: la carátula mide ~39 % de la rueda.)
+            assertTrue("$count@$at hueco ${top}", top <= railTiles * 0.32f)
         }
         // Desde 6 filas, nada se mueve.
         assertEquals(0f, ShortList.lift(0f, 40, railTiles, focus), 0f)
@@ -569,8 +576,13 @@ class MeridianLogicTest {
         assertEquals(g.focusY, g.padTop + g.rowHeight / 2f, 1e-3f)
         assertEquals(g.railHeight, g.padTop + g.rowHeight + g.padBottom, 1e-3f)
         assertTrue(g.heroLeft > g.axisX)
-        // Las vecinas (±1) no se salen por la izquierda con la curva.
+        // Las vecinas (±1) no se salen por la izquierda con la curva, ya encogidas (la fila encoge desde su canto izquierdo).
         assertTrue(g.inset + WheelArc.offset(WheelTransform.center(1f) * g.rowHeight, g.arcRadius) >= MeridianGeometry.RAIL_START - 1e-3f)
+        for ((w, h) in listOf(1280f to 656f, 853f to 457f, 915f to 355f)) for (aspect in listOf(1f, 2f / 3f)) {
+            val m = MeridianGeometry.compute(w, h, aspect)
+            val left = m.inset * WheelTransform.scale(1f) + WheelArc.offset(WheelTransform.center(1f) * m.rowHeight, m.arcRadius)
+            assertTrue("$w×$h $aspect: $left", left >= MeridianGeometry.NEIGHBOR_START - 1e-3f)
+        }
         // Al nombre de la enfocada le queda sitio (más de un tercio de la rueda) en tableta, móvil y el umbral.
         for ((w, h, compact) in listOf(Triple(853f, 457f, false), Triple(1280f, 720f, false), Triple(915f, 340f, true), Triple(800f, 300f, true), Triple(640f, 300f, true))) {
             for (aspect in listOf(1f, 2f / 3f)) {
@@ -677,10 +689,21 @@ class MeridianLogicTest {
     }
 
     @Test
-    fun `rail header keeps the dock flush with the column when it fits`() {
-        assertEquals(300f - RailHeaderLayout.END - 200f, RailHeaderLayout.dockX(300f, 200f), 0.01f)
-        // Más ancho que la columna: arranca en START y crece hacia el hueco.
-        assertEquals(RailHeaderLayout.START, RailHeaderLayout.dockX(200f, 230f), 0.01f)
+    fun `rail header keeps the dock on the left and slides it toward the edge before the fog has to bulge`() {
+        val pills = floatArrayOf(90f, 60f, 70f)
+        val h = DotTabsLayout.HEIGHT
+        // Sin curva o con sitio de sobra: a la izquierda, en START (no pegado al canto de la columna).
+        assertEquals(RailHeaderLayout.START, RailHeaderLayout.plan(300f, h, pills, null).dockX, 0.01f)
+        assertEquals(RailHeaderLayout.START, RailHeaderLayout.plan(300f, h, pills) { 400f }.dockX, 0.01f)
+        // La curva no llega al final del dock en START: se corre hacia el filo y la niebla no se ensancha.
+        val wide = RailHeaderLayout.plan(300f, h, pills, null).dockWidth
+        val edge = RailHeaderLayout.START + wide + RailHeaderLayout.FOG_MARGIN - 6f
+        val slid = RailHeaderLayout.plan(300f, h, pills) { edge }
+        assertTrue(slid.dockX < RailHeaderLayout.START)
+        assertTrue(slid.reach <= edge + 0.01f)
+        // Nunca más allá de MIN_START.
+        val tight = RailHeaderLayout.plan(300f, h, pills) { 0f }
+        assertEquals(RailHeaderLayout.MIN_START, tight.dockX, 0.01f)
     }
 
     /**
@@ -734,7 +757,7 @@ class MeridianLogicTest {
             // Con cuatro secciones, "Todo / Android / Consolas" se leen enteros; solo el último rótulo, el más largo, se recorta.
             assertTrue("$name: tope $cap", DotTabsLayout.labelRoom(cap) >= labels[2])
             // El dock no llega al bloque del hero.
-            val right = RailHeaderLayout.dockX(rail, dock) + dock
+            val right = RailHeaderLayout.START + dock
             assertTrue(name, right + MeridianGeometry.RAIL_START <= rail + MeridianGeometry.HERO_GAP + 1e-3f)
         }
     }
@@ -750,7 +773,7 @@ class MeridianLogicTest {
             assertTrue(end <= rail + w * 0.16f + 1e-3f)
             // El dock de la cabecera tiene velo detrás, con 16 dp de aire.
             val (dock, _) = headerDock(rail, labels)
-            val right = RailHeaderLayout.dockX(rail, dock) + dock
+            val right = RailHeaderLayout.START + dock
             assertTrue("%.0f×%.0f %s: %.1f".format(w, h, lang, right), right + 16f <= end)
         }
     }
