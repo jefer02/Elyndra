@@ -44,8 +44,8 @@ android {
         // el actualizador compara las dos como semver. versionCode sube siempre en 1 por
         // release y nunca baja (Android no instala por encima una versión menor).
         // Pasos para publicar: docs/RELEASING.md.
-        versionCode = 6
-        versionName = "1.1.0"
+        versionCode = 7
+        versionName = "1.2.0"
         buildConfigField("String", "MASHA_API_KEY", quoted(localProp("masha.apiKey")))
         buildConfigField("String", "MASHA_MODEL", quoted(localProp("masha.model").ifEmpty { "deepseek-chat" }))
         buildConfigField("String", "MASHA_BASE_URL", quoted(localProp("masha.baseUrl").ifEmpty { "https://api.deepseek.com" }))

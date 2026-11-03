@@ -43,6 +43,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalDensity
 import com.elyndra.launcher.ui.theme.heroInfoTransition
 import com.elyndra.launcher.ui.theme.shelfSurface
+import com.elyndra.launcher.ui.components.edgeBleed
 import com.elyndra.launcher.library.NameCheck
 import com.elyndra.launcher.ui.heroDescription
 import com.elyndra.launcher.ui.rememberDescription
@@ -321,12 +322,14 @@ fun LibraryScreen(vm: ElyndraViewModel) {
         val heroText = HeroText.CLEAN
 
         // Fondo vivo: el arte de la selección, desenfocado y teñido con su color.
+        // Hasta el filo de la ventana, también bajo la muesca.
         DynamicBackdrop(
             when (sel) {
                 is LibraryItem.App -> sel.app.meta.hero ?: sel.app.meta.screenshot ?: sel.app.meta.icon
                 is LibraryItem.Folder -> sel.heroPath ?: sel.iconPath
                 null -> null
             },
+            Modifier.edgeBleed(),
         )
         Column(Modifier.fillMaxSize().animAppEntrance(key = Screen.Library)) {
 

@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -271,13 +272,20 @@ fun Hero(
 ) {
     val skin = LocalSkin.current
     val shelf = shelfColor()
+    // Lo que el fondo sube por encima del área segura: la franja de la cámara
+    // de un móvil en vertical (con las barras ocultas). Los velos y la subida
+    // del estante se miden desde el tope del fondo, así que cuentan con ella.
+    val density = LocalDensity.current
+    val bleedTop = with(density) { SafeAreaInsets.getTop(density).toDp() }
+    val artHeight = height + bleedTop
     Box(
         modifier
             .fillMaxWidth()
             .height(height),
     ) {
         // El fondo mide hero + extensión, pero en la columna solo cuenta el hero:
-        // el resto asoma por debajo, detrás del estante.
+        // el resto asoma por debajo, detrás del estante. A los lados y arriba
+        // llega al filo de la ventana, bajo la muesca; la barra y el título no.
         Box(
             Modifier
                 .fillMaxWidth()
@@ -286,6 +294,7 @@ fun Hero(
                     val placeable = measurable.measure(constraints.copy(minHeight = h, maxHeight = h))
                     layout(placeable.width, constraints.maxHeight) { placeable.place(0, 0) }
                 }
+                .edgeBleed(bottom = false)
                 .clipToBounds(),
         ) {
             HeroArtLayer(
@@ -299,9 +308,9 @@ fun Hero(
             ) { art ->
                 // Con fondo, solo los cantos; sin él, el velo entero del diseño.
                 // Debajo del hero, la franja del titular se apaga.
-                if (!clean) Box(Modifier.fillMaxSize().heroScrims(height, art = art, skin.scrim))
+                if (!clean) Box(Modifier.fillMaxSize().heroScrims(artHeight, art = art, skin.scrim))
             }
-            if (extension > 0.dp) Box(Modifier.fillMaxSize().shelfRise(height, shelf))
+            if (extension > 0.dp) Box(Modifier.fillMaxSize().shelfRise(artHeight, shelf))
         }
         topBar()
         info()

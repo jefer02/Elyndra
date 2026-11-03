@@ -129,9 +129,14 @@ object WheelTransform {
     /** La línea de foco: el centro exacto de la columna. */
     const val FOCUS_FRACTION = 0.5f
 
-    /** Alto de la tarjeta enfocada respecto al alto de la rueda: iconos cuadrados (y apaisadas) y carátulas verticales. */
+    /**
+     * Alto de la tarjeta enfocada respecto al alto de la rueda: iconos
+     * cuadrados (y apaisadas) y carátulas verticales. Las carátulas iban al
+     * 48 %: en una tableta sus vecinas no cabían y se cortaban en seco contra
+     * la cabecera y el pie. Ahora miden lo que deja [NEIGHBOR_REACH].
+     */
     const val ICON_TILE = 0.38f
-    const val COVER_TILE = 0.48f
+    const val COVER_TILE = 0.39f
 
     /** Ancho máximo de la tarjeta enfocada: respecto a la ventana y respecto a la rueda (al nombre le queda sitio). */
     const val MAX_TILE_WIDTH = 0.24f
@@ -141,8 +146,8 @@ object WheelTransform {
     const val TILE_MIN = 88f
     const val TILE_MAX = 380f
 
-    /** Escala por distancia (la enfocada mide 1). */
-    val SCALE = floatArrayOf(1f, 0.64f, 0.46f, 0.32f, 0.24f)
+    /** Escala por distancia (la enfocada mide 1). Las vecinas, al 72 % (antes 64 %): se reconocen sin tener que enfocarlas. */
+    val SCALE = floatArrayOf(1f, 0.72f, 0.52f, 0.37f, 0.28f)
 
     /** Opacidad por distancia: desde ±4, invisible. */
     val ALPHA = floatArrayOf(1f, 0.85f, 0.5f, 0.25f, 0f)
@@ -171,6 +176,16 @@ object WheelTransform {
         for (n in 1 until c.size) c[n] = c[n - 1] + (SCALE[n - 1] + SCALE[n]) / 2f + GAP[n - 1]
     }
 
+    /** Aire (en altos de tarjeta) entre las vecinas y el canto de la rueda: su sombra no se corta. */
+    const val NEIGHBOR_AIR = 0.03f
+
+    /**
+     * Lo que ocupa la rueda desde la línea de foco hasta el canto de fuera de
+     * una vecina (±1), más [NEIGHBOR_AIR], en altos de tarjeta: la enfocada no
+     * crece más de lo que deja ver enteras a sus dos vecinas.
+     */
+    val NEIGHBOR_REACH: Float get() = CENTER[1] + SCALE[1] / 2f + NEIGHBOR_AIR
+
     /** El radio del círculo en altos de tarjeta para una rueda de iconos (la miniatura de Ajustes y las pruebas). */
     const val DEFAULT_RADIUS_TILES = WheelArc.RADIUS / ICON_TILE
 
@@ -181,11 +196,13 @@ object WheelTransform {
     /**
      * Alto de la tarjeta enfocada (dp) para una rueda de [railHeight] × [railWidth] dp,
      * una ventana de [windowWidth] dp y una proporción ancho/alto [aspect].
+     * Nunca tanto que una vecina se salga de la rueda ([NEIGHBOR_REACH]).
      */
     fun tileHeight(railHeight: Float, windowWidth: Float, aspect: Float, railWidth: Float = Float.MAX_VALUE): Float {
         val byHeight = railHeight * if (aspect < 1f) COVER_TILE else ICON_TILE
         val byWidth = min(windowWidth * MAX_TILE_WIDTH, railWidth * MAX_TILE_RAIL) / aspect.coerceAtLeast(0.1f)
-        return min(byHeight, byWidth).coerceIn(TILE_MIN, TILE_MAX).coerceAtMost(railHeight.coerceAtLeast(TILE_MIN))
+        val byNeighbors = railHeight * FOCUS_FRACTION / NEIGHBOR_REACH
+        return minOf(byHeight, byWidth, byNeighbors).coerceIn(TILE_MIN, TILE_MAX).coerceAtMost(railHeight.coerceAtLeast(TILE_MIN))
     }
 
     /** Interpolación lineal de una tabla por la distancia (sin signo); más allá de la última entrada, la última. */
@@ -552,7 +569,7 @@ data class MeridianGeometry(
     val padBottom: Float get() = (railHeight - focusY - rowHeight / 2f).coerceAtLeast(0f)
 
     /** Margen izquierdo de las tarjetas: la curva de las vecinas (±1) no las saca de la pantalla; las lejanas pueden asomar. */
-    val inset: Float get() = RAIL_START + abs(WheelArc.offset(WheelTransform.center(1f) * rowHeight, arcRadius))
+    val inset: Float get() = insetFor(rowHeight, arcRadius)
 
     companion object {
         const val RAIL_FRACTION = 0.42f
@@ -562,6 +579,22 @@ data class MeridianGeometry(
         const val COMPACT_RAIL_MIN = 280f
         const val COMPACT_RAIL_MAX = 520f
         const val RAIL_START = 16f
+
+        /** Lo menos que queda entre el filo y una vecina (±1), ya encogida y corrida por la curva. */
+        const val NEIGHBOR_START = 8f
+
+        /**
+         * El margen izquierdo de las tarjetas de [tile] dp en un círculo de
+         * [radius]: [RAIL_START] más lo que la curva corre a las vecinas. La
+         * fila encoge desde su canto izquierdo, así que el margen encoge con
+         * ella: con carátulas grandes (tableta) la vecina, al 72 % y corrida
+         * por la curva, quedaba fuera del filo. Se da lo que haga falta para
+         * dejarle [NEIGHBOR_START].
+         */
+        fun insetFor(tile: Float, radius: Float): Float {
+            val curve = abs(WheelArc.offset(WheelTransform.center(1f) * tile, radius))
+            return maxOf(RAIL_START + curve, (NEIGHBOR_START + curve) / WheelTransform.SCALE[1])
+        }
 
         /**
          * La rueda ya no lleva el nombre junto a cada icono (está en el hero): su
@@ -584,7 +617,7 @@ data class MeridianGeometry(
             val classic = railWidthFor(width, compact)
             val railH = (height - if (compact) HEADER_ESTIMATE_COMPACT else HEADER_ESTIMATE).coerceAtLeast(WheelTransform.TILE_MIN)
             val tile = WheelTransform.tileHeight(railH, width, aspect, classic)
-            val inset = RAIL_START + abs(WheelArc.offset(WheelTransform.center(1f) * tile, WheelArc.radius(railH)))
+            val inset = insetFor(tile, WheelArc.radius(railH))
             // Nunca más que la de siempre (que con una ventana sin medir aún vale 0).
             return (inset + tile * aspect + TILE_TO_DIAL).coerceAtLeast(SLIM_MIN).coerceAtMost(classic)
         }
@@ -1148,8 +1181,13 @@ object RailHeaderLayout {
     /** Lo más ancho que puede medir el dock en una columna de [railWidth]. */
     fun dockMaxWidth(railWidth: Float): Float = (railWidth - START - END + OVERHANG).coerceAtLeast(0f)
 
-    /** Borde izquierdo del dock: pegado al canto derecho de la columna si cabe; si no, desde [START] hacia el hueco. */
-    fun dockX(railWidth: Float, dockWidth: Float): Float = maxOf(START, railWidth - END - dockWidth)
+    /**
+     * Lo más a la izquierda que se corre el dock cuando a [START] pasaría del
+     * canto curvo: así la niebla (o el cristal) no tiene que ensancharse arriba
+     * para cubrirlo y conserva su curva. Con la muesca a la izquierda, la franja
+     * del recorte ya le deja aire hasta el filo.
+     */
+    const val MIN_START = 8f
 
     /** Aire entre el final del dock y el canto que se ve de la niebla ([MeridianFog.visibleEdge]). */
     const val FOG_MARGIN = 16f
@@ -1186,6 +1224,11 @@ object RailHeaderLayout {
      * [LABEL_STRETCH] más (lo justo para que quepan, nunca más allá de la
      * columna) y [Plan.reach] pide a la niebla que llegue hasta él; si ni en
      * su mínimo cabe, se queda en el mínimo, también con la niebla hasta él.
+     *
+     * Va a la izquierda ([START]), no pegado al canto: el canto que ensanchaba
+     * la niebla era su final. Si aun así pasa de la curva, antes de ensanchar
+     * la niebla se corre hacia el filo, hasta [MIN_START]: con el dock de un
+     * móvil (~180 dp) eso basta para que el cristal no se abombe arriba.
      */
     fun plan(railWidth: Float, dockHeight: Float, pills: FloatArray, edge: ((Float) -> Float)?): Plan {
         val top = 0f
@@ -1196,9 +1239,8 @@ object RailHeaderLayout {
         val stretch = minOf(column, curve + LABEL_STRETCH) - START
         val room = maxOf(limit - START, minOf(DotTabsLayout.fullWidth(pills), stretch), DotTabsLayout.minWidth(pills.size))
         val width = DotTabsLayout.uniformWidth(pills, room)
-        // Pegado al canto de la columna si cabe; si la curva no llega, pegado a la curva; si ni así, desde [START].
-        val right = minOf(railWidth - END, maxOf(limit, START + width))
-        val x = maxOf(START, right - width)
+        // En [START]; si así pasa de la curva, hacia el filo (hasta [MIN_START]) antes que hinchar la niebla.
+        val x = minOf(START, limit - width).coerceAtLeast(MIN_START)
         return Plan(x, top, width, dockHeight, reach = if (edge == null) 0f else x + width + FOG_MARGIN)
     }
 }

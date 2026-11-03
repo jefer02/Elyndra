@@ -18,13 +18,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.snap
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,6 +51,7 @@ import com.elyndra.launcher.ui.components.LocalScreenSize
 import com.elyndra.launcher.ui.components.LocalPadHints
 import com.elyndra.launcher.ui.components.LocalPadInput
 import com.elyndra.launcher.ui.components.ImeBridge
+import com.elyndra.launcher.ui.components.SafeAreaInsets
 import com.elyndra.launcher.ui.components.PadFocusGroup
 import com.elyndra.launcher.ui.components.ToastView
 import com.elyndra.launcher.ui.components.VideoBackdrop
@@ -143,12 +143,14 @@ fun ElyndraApp(vm: ElyndraViewModel) {
 
         // Masha y la calibración de voz son oscuras de borde a borde: el fondo de
         // la raíz también, o la franja de la muesca (fuera del padding de
-        // insets) quedaría clara junto a ellas.
+        // insets) quedaría clara junto a ellas. Las demás llevan su arte hasta
+        // el filo (ver EdgeBleed); lo que no, se queda sobre el papel.
         val holoScreen = vm.screen == Screen.Masha || vm.screen == Screen.VoiceSync
         Box(Modifier.fillMaxSize().background(if (holoScreen) Holo.bg else P.paper)) {
             // Las barras van ocultas (pantalla completa), así que sus insets son 0;
             // se mantiene el del recorte de pantalla para que en un móvil con muesca
-            // el contenido no quede debajo.
+            // el contenido no quede debajo. Los fondos de cada pantalla sí pasan
+            // por debajo de la muesca (edgeBleed / edgeMirror).
             // La pantalla entera va dentro del contenedor del menú de
             // acciones: es él quien la desenfoca y la oscurece cuando el menú
             // está abierto, y quien monta el overlay por encima.
@@ -181,7 +183,7 @@ fun ElyndraApp(vm: ElyndraViewModel) {
             BoxWithConstraints(
                 Modifier
                     .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)),
+                    .windowInsetsPadding(SafeAreaInsets),
             ) {
                 // Las métricas reparten este alto entre hero y cards (móvil y tableta).
                 CompositionLocalProvider(
@@ -208,7 +210,8 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                             // desde el lado al que se va con un leve zoom; volver
                             // invierte el sentido. Interrumpible a mitad.
                             val dir = if (targetState == Screen.Library || (targetState == Screen.Settings && initialState.isSettingsPage)) -1 else 1
-                            if (reduced) {
+                            // Sin recorte: los fondos a sangre salen de esta caja hacia la franja de la muesca.
+                            val transform = if (reduced) {
                                 fadeIn(snap()).togetherWith(fadeOut(snap()))
                             } else {
                                 (
@@ -221,6 +224,7 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                                         scaleOut(Springs.enter(), targetScale = 1.02f),
                                 )
                             }
+                            transform using SizeTransform(clip = false)
                         },
                         label = "screen",
                     ) { screen ->

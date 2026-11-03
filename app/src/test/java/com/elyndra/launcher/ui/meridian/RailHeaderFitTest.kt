@@ -99,7 +99,8 @@ class RailHeaderFitTest {
             assertTrue("$name: dock acaba en %.1f, niebla en %.1f".format(s.dockRight, edge), s.dockRight + RailHeaderLayout.FOG_MARGIN <= edge + eps)
             // Ni llega al bloque del hero ni sale por la izquierda.
             assertTrue(name, s.dockRight <= s.rail + MeridianGeometry.HERO_GAP - MeridianGeometry.RAIL_START + eps)
-            assertTrue(name, s.plan.dockX >= RailHeaderLayout.START - eps)
+            // Sin pasar del sitio de siempre: a la izquierda, en START, o más cerca del filo si la curva lo pide.
+            assertTrue(name, s.plan.dockX >= RailHeaderLayout.MIN_START - eps && s.plan.dockX <= RailHeaderLayout.START + eps)
         }
     }
 
