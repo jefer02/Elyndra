@@ -252,7 +252,7 @@ class DotTabsLayoutTest {
                 val maxDock = header.dockMaxWidth(rail)
                 val dock = fittedWidth(pills(widths.copyOf(n)), maxDock)
                 assertTrue("$lang n=$n", dock <= maxDock + eps)
-                val right = header.dockX(rail, dock) + dock
+                val right = header.START + dock
                 assertTrue("$lang n=$n no llega al bloque del hero", right < heroLeft)
                 assertTrue("$lang n=$n tiene velo detrás", right + 16f <= veilEnd)
             }
@@ -282,9 +282,9 @@ class DotTabsLayoutTest {
             val fit = DotTabsLayout.fit(natural, header.dockMaxWidth(rail))
             assertEquals(lang, DOT_SLOT, fit.dot, eps)
             assertEquals(lang, DotTabsLayout.PILL_MAX, fit.pillCap, eps)
-            // Pegado al canto de la columna, como antes (no asoma sobre el hueco del hero).
+            // A la izquierda de la columna, sin asomar sobre el hueco del hero.
             val dock = fittedWidth(natural, Float.POSITIVE_INFINITY)
-            assertTrue(lang, header.dockX(rail, dock) + dock <= rail - header.END + eps)
+            assertTrue(lang, header.START + dock <= rail - header.END + eps)
         }
     }
 }
