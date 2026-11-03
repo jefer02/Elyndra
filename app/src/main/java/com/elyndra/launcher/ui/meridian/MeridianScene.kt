@@ -48,6 +48,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
+import com.elyndra.launcher.ui.components.edgeBleed
+import com.elyndra.launcher.ui.components.edgeMirror
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
@@ -286,8 +288,11 @@ internal fun MeridianScene(
                 backgroundVanishing = art.vanishing,
                 onBackgroundVanished = art.onVanished,
                 stage = { EmptyStageBackdrop(MERIDIAN_STAGE, Modifier.fillMaxSize()) },
+                // Hasta el filo de la ventana, bajo la muesca. El arte esmerilado de
+                // la rueda (FrostedArt) crece igual, así que los dos siguen alineados.
                 modifier = Modifier
                     .fillMaxSize()
+                    .edgeBleed()
                     .clipToBounds()
                     .graphicsLayer { alpha = MeridianMotion.heroFade(enterMs()) },
                 layer = artLayer,
@@ -303,9 +308,12 @@ internal fun MeridianScene(
                     artExtra = ART_EXTRA.value,
                     arc = { fogArc.value },
                     frosted = if (!blurred) null else {
-                        { FrostedArt(art, backdrop, artLayer, Modifier.graphicsLayer { alpha = MeridianMotion.heroFade(enterMs()) }) }
+                        { FrostedArt(art, backdrop, artLayer, Modifier.edgeBleed().graphicsLayer { alpha = MeridianMotion.heroFade(enterMs()) }) }
                     },
+                    // Dibuja con sus propias coordenadas (eje, niebla): no se mueve, su canto
+                    // se refleja en la franja de la muesca si está a la izquierda.
                     modifier = Modifier
+                        .edgeMirror(right = false)
                         .fillMaxHeight()
                         // Más ancho si la banda de arriba pasa del canto de la línea de foco.
                         .width(MeridianScrims.glassRight(railWidth, width, fogArc.value.reach).dp)
@@ -319,7 +327,7 @@ internal fun MeridianScene(
                     artExtra = ART_EXTRA.value,
                     lite = lite,
                     arc = { fogArc.value },
-                    modifier = Modifier.fillMaxHeight().width(MeridianScrims.clearAt(railWidth, width).dp),
+                    modifier = Modifier.edgeMirror(right = false).fillMaxHeight().width(MeridianScrims.clearAt(railWidth, width).dp),
                 )
             }
 
