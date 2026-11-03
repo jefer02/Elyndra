@@ -25,11 +25,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.data.argb
 import com.elyndra.launcher.ui.ShelfLayout
+import com.elyndra.launcher.ui.components.SafeAreaInsets
 import kotlinx.coroutines.delay
 
 /* ─────────────────────────────────────────────────────────────
@@ -127,11 +131,16 @@ fun shelfColor(): Color {
  * arriba se queda sin fondo —lo pinta el velo del hero, que acaba en este
  * mismo color— y desde ahí el estante es liso y se aclara apenas hacia el pie.
  * Sin costura: ni sombra ni filo, es la misma escena.
+ *
+ * El fondo del estante sigue a los lados y abajo hasta el filo de la ventana,
+ * bajo la muesca (ver `edgeBleed`); las cards se quedan en el área segura.
+ * Sus degradados son verticales, así que estirarlos de lado no los cambia.
  */
 @Composable
 fun Modifier.shelfSurface(extension: Dp = 0.dp): Modifier {
     val skin = LocalSkin.current
     val dark = P.isDark
+    val safe = SafeAreaInsets
     if (extension > 0.dp) {
         val solid = shelfColor()
         val bottom = ShelfLayout.shelfBottomAlpha(dark)
@@ -139,7 +148,7 @@ fun Modifier.shelfSurface(extension: Dp = 0.dp): Modifier {
             val top = extension.roundToPx().toFloat().coerceAtMost(size.height)
             val brush = Brush.verticalGradient(listOf(solid, solid.copy(alpha = bottom)), startY = top, endY = size.height)
             onDrawBehind {
-                if (top < size.height) drawRect(brush, topLeft = Offset(0f, top), size = Size(size.width, size.height - top))
+                if (top < size.height) bleed(safe) { drawRect(brush, topLeft = Offset(0f, top), size = Size(size.width, size.height - top)) }
             }
         }
     }
@@ -157,18 +166,29 @@ fun Modifier.shelfSurface(extension: Dp = 0.dp): Modifier {
             listOf(P.shade.copy(alpha = if (dark) 0.32f else 0.10f), Color.Transparent),
             endY = 22.dp.toPx(),
         )
-        val castSize = Size(size.width, 22.dp.toPx())
+        val castHeight = 22.dp.toPx()
         val rim = Color.White.copy(alpha = if (dark) 0.10f else 0.75f)
         val y = 0.5.dp.toPx()
         val stroke = 1.dp.toPx()
         onDrawBehind {
-            drawRect(base)
-            drawRect(tint)
-            drawRect(cast, size = castSize)
-            drawLine(rim, Offset(0f, y), Offset(size.width, y), strokeWidth = stroke)
+            bleed(safe) {
+                drawRect(base)
+                drawRect(tint)
+                drawRect(cast, size = Size(size.width, castHeight))
+                drawLine(rim, Offset(0f, y), Offset(size.width, y), strokeWidth = stroke)
+            }
         }
     }.topGlint(0.8f)
 }
+
+/** Dibuja [block] con el lienzo agrandado a los lados y abajo hasta el filo de la ventana ([safe] en negativo). */
+private inline fun DrawScope.bleed(safe: WindowInsets, block: DrawScope.() -> Unit) = inset(
+    left = -safe.getLeft(this, layoutDirection).toFloat(),
+    top = 0f,
+    right = -safe.getRight(this, layoutDirection).toFloat(),
+    bottom = -safe.getBottom(this).toFloat(),
+    block = block,
+)
 
 /**
  * El bloque de título del hero al cambiar de selección: el nuevo entra con
