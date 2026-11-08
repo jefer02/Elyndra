@@ -72,16 +72,17 @@ object DotTabsLayout {
      * Por debajo de [minWidth] no hay forma de que quepa: lo tiene que
      * resolver quien lo coloca (la cabecera de la rueda le da más sitio).
      */
-    fun fit(pills: FloatArray, maxWidth: Float): Fit {
+    fun fit(pills: FloatArray, maxWidth: Float, dest: Boolean = false): Fit {
         val n = pills.size
         val widest = pills.maxOrNull() ?: return Fit(DOT_SLOT, PILL_MAX)
         if (!maxWidth.isFinite()) return Fit(DOT_SLOT, PILL_MAX)
-        if (n == 1) return Fit(DOT_SLOT, (maxWidth - 2 * INSET).coerceIn(PILL_MIN, PILL_MAX))
-        fun capFor(dot: Float) = maxWidth - 2 * INSET - (n - 1) * (dot + GAP)
+        val room = maxWidth - destReserve(dest)
+        if (n == 1) return Fit(DOT_SLOT, (room - 2 * INSET).coerceIn(PILL_MIN, PILL_MAX))
+        fun capFor(dot: Float) = room - 2 * INSET - (n - 1) * (dot + GAP)
         if (capFor(DOT_SLOT) >= widest) return Fit(DOT_SLOT, PILL_MAX)
         val wanted = minOf(widest, PILL_FIT).coerceAtLeast(PILL_MIN)
         if (capFor(DOT_SLOT) >= wanted) return Fit(DOT_SLOT, capFor(DOT_SLOT))
-        val dot = ((maxWidth - 2 * INSET - wanted) / (n - 1) - GAP).coerceIn(DOT_SLOT_MIN, DOT_SLOT)
+        val dot = ((room - 2 * INSET - wanted) / (n - 1) - GAP).coerceIn(DOT_SLOT_MIN, DOT_SLOT)
         return Fit(dot, capFor(dot).coerceIn(PILL_MIN, wanted))
     }
 
@@ -95,10 +96,10 @@ object DotTabsLayout {
     fun uniformPill(pills: FloatArray, fit: Fit): Float = minOf(pills.maxOrNull() ?: PILL_MIN, fit.pillCap)
 
     /** Lo que mide el dock (el mismo con cualquier sección elegida) con las píldoras naturales [pills] en [maxWidth]. */
-    fun uniformWidth(pills: FloatArray, maxWidth: Float): Float {
+    fun uniformWidth(pills: FloatArray, maxWidth: Float, dest: Boolean = false): Float {
         if (pills.isEmpty()) return 0f
-        val fit = fit(pills, maxWidth)
-        return 2 * INSET + (pills.size - 1) * (fit.dot + GAP) + uniformPill(pills, fit)
+        val fit = fit(pills, maxWidth, dest)
+        return 2 * INSET + (pills.size - 1) * (fit.dot + GAP) + uniformPill(pills, fit) + destReserve(dest)
     }
 
     /**
@@ -107,16 +108,41 @@ object DotTabsLayout {
      * píldora no pasa de [PILL_FIT] (así lo encaja [fit]); si pasa, [fit] solo
      * la deja crecer con los puntos enteros.
      */
-    fun fullWidth(pills: FloatArray): Float {
+    fun fullWidth(pills: FloatArray, dest: Boolean = false): Float {
         val widest = pills.maxOrNull() ?: return 0f
-        if (pills.size == 1) return widest + 2 * INSET
+        if (pills.size == 1) return widest + 2 * INSET + destReserve(dest)
         val dot = if (widest <= PILL_FIT) DOT_SLOT_MIN else DOT_SLOT
-        return 2 * INSET + (pills.size - 1) * (dot + GAP) + widest
+        return 2 * INSET + (pills.size - 1) * (dot + GAP) + widest + destReserve(dest)
     }
 
     /** Lo menos que puede medir un dock de [n] secciones (puntos y píldora en su mínimo). */
-    fun minWidth(n: Int): Float =
-        if (n <= 0) 0f else 2 * INSET + (n - 1) * (DOT_SLOT_MIN + GAP) + PILL_MIN
+    fun minWidth(n: Int, dest: Boolean = false): Float =
+        if (n <= 0) 0f else 2 * INSET + (n - 1) * (DOT_SLOT_MIN + GAP) + PILL_MIN + destReserve(dest)
+
+    /**
+     * Hueco del destino del final del dock (la tienda de ports): un icono
+     * suelto tras una raya, que nunca se abre en píldora. No es una sección
+     * más de la biblioteca sino otra pantalla, y por eso va aparte: se
+     * reserva primero (como el botón de orden en [SectionDockLayout]) y las
+     * secciones se encajan en lo que queda. Con [GAP] da los mismos 48 dp de
+     * zona táctil que un punto entero.
+     */
+    const val DEST_SLOT = 44f
+
+    /** Raya entre las secciones y el destino: el aire de un [GAP] a cada lado de una línea de 1 dp. */
+    const val DIVIDER = 2 * GAP + 1f
+
+    /** Lo que ocupa el destino (raya incluida), o nada si el dock no lo lleva. */
+    fun destReserve(dest: Boolean): Float = if (dest) DIVIDER + DEST_SLOT else 0f
+
+    /** Centro de la raya, con [end] = el final de las secciones (`offsets[n]`, que lleva el [INSET]). */
+    fun dividerX(end: Float): Float = end - INSET + DIVIDER / 2f
+
+    /** Borde izquierdo del hueco del destino. */
+    fun destLeft(end: Float): Float = end - INSET + DIVIDER
+
+    /** Zona táctil del destino: de la raya al canto de la cápsula. */
+    fun destTouch(end: Float): Pair<Float, Float> = dividerX(end) to end + destReserve(true)
 
     /** Sitio para el rótulo (más su icono de [iconWidth]) en una píldora con tope [pillCap]. */
     fun labelRoom(pillCap: Float, iconWidth: Float = 0f): Float =
@@ -145,10 +171,22 @@ object DotTabsLayout {
      * Zona táctil de cada hueco (izquierda, derecha): se reparten los huecos
      * entre pestañas y los márgenes de la cápsula, sin dejar nada muerto.
      */
-    fun touchSpan(offsets: FloatArray, pills: FloatArray, expansion: FloatArray, i: Int, dot: Float = DOT_SLOT): Pair<Float, Float> {
+    fun touchSpan(
+        offsets: FloatArray,
+        pills: FloatArray,
+        expansion: FloatArray,
+        i: Int,
+        dot: Float = DOT_SLOT,
+        dest: Boolean = false,
+    ): Pair<Float, Float> {
         val n = pills.size
         val left = if (i == 0) 0f else offsets[i] - GAP / 2f
-        val right = if (i == n - 1) offsets[n] else offsets[i] + slotWidth(pills[i], expansion[i], dot) + GAP / 2f
+        val right = when {
+            i < n - 1 -> offsets[i] + slotWidth(pills[i], expansion[i], dot) + GAP / 2f
+            // Con destino, la última sección llega hasta la raya y el resto es del destino.
+            dest -> dividerX(offsets[n])
+            else -> offsets[n]
+        }
         return left to right
     }
 
@@ -255,6 +293,6 @@ object SectionDockLayout {
 
     fun width(tabsWidth: Float): Float = sortX(tabsWidth) + SORT_WIDTH
 
-    /** Lo menos que mide el conjunto con [n] secciones. */
-    fun minWidth(n: Int): Float = width(DotTabsLayout.minWidth(n))
+    /** Lo menos que mide el conjunto con [n] secciones (y el destino, con [dest]). */
+    fun minWidth(n: Int, dest: Boolean = false): Float = width(DotTabsLayout.minWidth(n, dest))
 }
