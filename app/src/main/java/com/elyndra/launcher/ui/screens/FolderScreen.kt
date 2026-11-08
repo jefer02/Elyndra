@@ -1,10 +1,15 @@
 package com.elyndra.launcher.ui.screens
+import com.elyndra.launcher.ui.UiTags
+import androidx.compose.ui.platform.testTag
 import com.elyndra.launcher.ui.components.NeedsNameBadge
 import com.elyndra.launcher.ui.theme.focusRing
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.indication
 import com.elyndra.launcher.ui.components.touchTarget
 import com.elyndra.launcher.ui.ShelfLayout
+import com.elyndra.launcher.ui.ClassicLayout
+import androidx.compose.ui.platform.LocalDensity
+import com.elyndra.launcher.ui.theme.pulseHint
 import com.elyndra.launcher.ui.DockPalettes
 import com.elyndra.launcher.ui.components.COVER_RATIO
 import com.elyndra.launcher.ui.components.CapsuleShape
@@ -50,6 +55,11 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import com.elyndra.launcher.ui.components.SheetGlyph
+import com.elyndra.launcher.ui.SheetIcon
+import com.elyndra.launcher.ui.FolderBarLayout
+import com.elyndra.launcher.ui.meridian.FolderHeader
 import com.elyndra.launcher.ui.TapAction
 import com.elyndra.launcher.ui.TapAnchor
 import com.elyndra.launcher.ui.TapGate
@@ -164,13 +174,11 @@ fun FolderScreen(vm: ElyndraViewModel) {
     val emulatorLabel = item.emulatorName ?: stringResource(R.string.choose_emulator)
     // Con mando la selección se mueve sin arrastrar el carrusel: va detrás.
     // Nace ya en la selección (al girar desde la rueda no hay que recorrerlo otra vez).
+    // La fila se desplaza dejando una card delante de la seleccionada (ClassicLayout.anchorIndex):
+    // se ve de dónde se viene y la seleccionada no queda pegada al borde.
     val carousel = rememberLazyListState(
-        initialFirstVisibleItemIndex = remember { WheelMath.restoreIndex(roms.map { it.key }, rom?.key, addFocused = false, hasAdd = false) },
+        initialFirstVisibleItemIndex = remember { ClassicLayout.anchorIndex(WheelMath.restoreIndex(roms.map { it.key }, rom?.key, addFocused = false, hasAdd = false)) },
     )
-    LaunchedEffect(rom?.key, roms.size) {
-        val index = roms.indexOfFirst { it.key == rom?.key }
-        if (index >= 0) runCatching { carousel.animateScrollToItem(index) }
-    }
 
     // Tocar: lo no seleccionado se selecciona; lo seleccionado se abre (ver TapGate).
     val gate = remember { TapGate() }
@@ -195,27 +203,84 @@ fun FolderScreen(vm: ElyndraViewModel) {
     // El marco de la selección (Ajustes → Apariencia): halo, partículas y su color.
     val look = rememberSelectionLook(vm.settings.selectionParticleColor, vm.settings.selectionGlow, vm.settings.selectionParticles)
     val labelBlock = labelBlock(FOLDER_LABEL_SP)
+    val fontScale = LocalDensity.current.fontScale
+    // La pista táctil: nunca con mando (ni mientras se maneja con él).
+    val showHint = ClassicLayout.showTouchHint(vm.input.gamepadPresent, vm.input.active)
+    // La sinopsis se mide aquí para repartir el hero; el bloque la vuelve a pedir para lo que enseña.
+    val description = rememberDescription(vm, rom?.key, rom?.meta)
 
     BoxWithConstraints(Modifier.fillMaxSize().animFadeIn(key = Screen.Folder)) {
-        // Mismo reparto que la biblioteca (ver ShelfLayout): la carátula se centra
-        // bajo las fichas del estante y el arte del hero baja por detrás.
-        val shelfH = (maxHeight - m.heroH).value
-        val shelf = ShelfLayout.compute(
-            available = shelfH,
-            hintsVisible = vm.input.gamepadPresent,
+        // El reparto del Clásico (ClassicLayout): la carátula manda, el estante
+        // mide lo justo y el hero se queda el resto, con su bloque bajo la barra.
+        val landscape = m.landscape
+        val barBottom = ClassicLayout.barBottom(landscape)
+        val bottomPad = ClassicLayout.heroBottomPad(landscape)
+        val chips = ClassicLayout.chipsHeight(fontScale, landscape)
+        val merged = ClassicLayout.mergedChipsHeight(fontScale, landscape)
+        val frame = ClassicLayout.frame(
+            width = maxWidth.value,
+            height = maxHeight.value,
             aspect = COVER_RATIO,
-            base = m.romTileH.value,
-            topInset = FOLDER_CHIPS_INSET,
+            hintsVisible = vm.input.gamepadPresent,
             labelBlock = labelBlock,
-            minTile = if (m.landscape) 72f else 104f,
-            maxTile = m.romTileH.value * ShelfLayout.GROW,
+            topInset = 0f,
+            heroMin = ClassicLayout.heroMin(barBottom, bottomPad, ClassicLayout.Block(chips, merged, logoMax = ClassicLayout.LOGO_MIN)),
+        )
+        val secondary = when {
+            description != null -> ClassicLayout.synopsisHeight(fontScale, landscape)
+            showHint -> ClassicLayout.hintHeight(fontScale, landscape)
+            else -> 0f
+        }
+        // Los logos de las carpetas, algo mayores en apaisado (ver FOLDER_LOGO_HEIGHT_LANDSCAPE).
+        val logoMax = ClassicLayout.logoHeight(frame.heroHeight, landscape) * (if (landscape) FOLDER_LOGO_HEIGHT_LANDSCAPE else 1f)
+        val plan = ClassicLayout.heroPlan(
+            ClassicLayout.heroRoom(frame.heroHeight, barBottom, bottomPad),
+            ClassicLayout.Block(
+                chips, merged, logoMax,
+                secondary = secondary,
+                stats = ClassicLayout.STATS_BLOCK,
+                // La sinopsis pierde líneas antes de irse; la pista es una sola.
+                secondaryLines = if (description != null) ClassicLayout.synopsisLines(landscape) else 1,
+                secondaryLine = if (description != null) ClassicLayout.synopsisLineHeight(fontScale) else 0f,
+            ),
         )
         // Sin ROMs no hay escena que continuar: el estado vacío va sobre el estante liso.
-        val extension = if (roms.isEmpty()) 0.dp else ShelfLayout.artExtension(shelfH, maxHeight.value, shelf.labelTop).dp
-        val rowY = animateFloatAsState(m.heroH.value + shelf.tileTop, motion(Springs.enter()), label = "folderRow")
-        FolderContent(vm, item, roms, rom, m, shelf, extension, { rowY.value }, emulatorLabel, carousel, floatClock, look, reduced, userScrolling, onRomTap, openRom)
+        val extension = if (roms.isEmpty()) 0.dp else ShelfLayout.artExtension(frame.shelfHeight, maxHeight.value, frame.labelTop).dp
+        val rowY = animateFloatAsState(frame.heroHeight + frame.tileTop, motion(Springs.enter()), label = "folderRow")
+        val rowLandscape = maxWidth >= maxHeight
+        // Aire, escala de las vecinas, halo y nombres de la fila (en vertical, con el aire a la vista).
+        val rowStyle = ClassicLayout.rowStyle((maxWidth - m.pad * 2).value, frame.tileWidth, rowLandscape)
+        val gap = rowStyle.gap
+        // El desplazamiento de la fila hacia la selección (ver ClassicLayout.anchor): en
+        // apaisado, una card entera delante; en vertical, la seleccionada en el primer
+        // hueco con un poco de la anterior asomando. La primera vez se coloca sin
+        // animar (al nacer o al girar); después, con la animación de siempre.
+        val density = LocalDensity.current
+        val placed = remember { booleanArrayOf(false) }
+        LaunchedEffect(rom?.key, roms.size, frame.tileWidth, gap, rowLandscape) {
+            val index = roms.indexOfFirst { it.key == rom?.key }
+            if (index < 0) return@LaunchedEffect
+            val a = ClassicLayout.anchor(index, frame.tileWidth, gap, rowLandscape)
+            val offset = with(density) { a.offset.dp.roundToPx() }
+            runCatching {
+                if (placed[0]) carousel.animateScrollToItem(a.index, offset) else carousel.scrollToItem(a.index, offset)
+            }
+            placed[0] = true
+        }
+        val hero = FolderHero(frame, plan, barBottom, bottomPad, ClassicLayout.titleSp(frame.heroHeight, landscape), showHint)
+        FolderContent(vm, item, roms, rom, m, hero, rowStyle, extension, { rowY.value }, emulatorLabel, carousel, floatClock, look, reduced, userScrolling, onRomTap, openRom)
     }
 }
+
+/** El reparto del Clásico de la carpeta, ya decidido (ver [ClassicLayout]). */
+private class FolderHero(
+    val frame: ClassicLayout.Frame,
+    val plan: ClassicLayout.HeroPlan,
+    val barBottom: Float,
+    val bottomPad: Float,
+    val titleSp: Float,
+    val showHint: Boolean,
+)
 
 @Composable
 private fun FolderContent(
@@ -224,7 +289,9 @@ private fun FolderContent(
     roms: List<RomEntry>,
     rom: RomEntry?,
     m: Metrics,
-    shelf: ShelfLayout.Result,
+    hero: FolderHero,
+    /** Aire, escala de las vecinas, halo y nombres de la fila ([ClassicLayout.rowStyle]). */
+    rowStyle: ClassicLayout.RowStyle,
     extension: Dp,
     rowY: () -> Float,
     emulatorLabel: String,
@@ -247,7 +314,7 @@ private fun FolderContent(
             // Quitar el fondo lo deshace en polvo antes de borrarlo.
             backgroundVanishing = rom?.let { vm.isVanishingArt(it.key, ArtKind.Background) } == true,
             onBackgroundVanished = { vm.finishVanish() },
-            height = m.heroH,
+            height = hero.frame.heroHeight.dp,
             extension = extension,
             imagePath = rom?.let { it.meta.hero ?: it.meta.screenshot },
             topBar = {
@@ -257,8 +324,6 @@ private fun FolderContent(
                         .fillMaxWidth()
                         .padding(start = m.pad, end = m.pad, top = if (m.landscape) 8.dp else 16.dp),
                 ) {
-                    // Tope del selector de emulador: su nombre puede ser larguísimo.
-                    val emulatorMax = maxWidth * 0.32f
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -274,40 +339,22 @@ private fun FolderContent(
                         Spacer(Modifier.width(8.dp))
                         OpenButton(enabled = rom != null, focused = vm.input.isBarFocused(BarItem.Open)) { rom?.let { vm.openRom(it) } }
                         Spacer(Modifier.width(8.dp))
-                        // El selector lleva un tope fijo y no un peso: con
-                        // `weight(fill = false)` la parte que no usaba se quedaba sin
-                        // repartir y el bloque de la derecha no llegaba al borde.
-                        EmulatorSelector(vm, item, emulatorLabel, Modifier.widthIn(max = emulatorMax))
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                            ElyText(
-                                item.system.name,
-                                modifier = Modifier.fillMaxWidth(),
-                                size = 12.5f,
-                                weight = FontWeight.SemiBold,
-                                color = Color.White,
-                                shadow = heroText.shadow(null),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                align = TextAlign.End,
-                            )
-                            Spacer(Modifier.height(2.dp))
-                            ElyText(
-                                item.folder.displayPath,
-                                modifier = Modifier.fillMaxWidth(),
-                                size = 8.5f,
-                                color = heroText.secondary(0.72f),
-                                shadow = heroText.shadow(null),
-                                letterSpacing = tracking(0.1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                align = TextAlign.End,
-                            )
-                        }
-                        // Hora y batería, pegadas al borde derecho, tras el nombre de la carpeta.
-                        if (vm.settings.statusVisible) {
-                            Spacer(Modifier.width(10.dp))
-                            StatusStrip(vm.settings.statusMode)
+                        // La misma cabecera que en Meridian: el emulador al principio del hueco,
+                        // el sistema con su ruta (recortada por el centro) y la hora al final.
+                        // En vertical, si no cabe, el emulador se recorta y luego se queda en su
+                        // icono (FolderBarLayout); antes era un 32 % fijo del ancho.
+                        FolderHeader(
+                            title = item.system.name,
+                            path = item.folder.displayPath,
+                            modifier = Modifier.weight(1f),
+                            emulatorLabel = emulatorLabel,
+                            emulator = { iconOnly -> EmulatorSelector(vm, item, emulatorLabel, iconOnly = iconOnly) },
+                            spread = true,
+                            shadow = heroText.shadow(null),
+                            // Último paso de compactación: la ficha de la carpeta sube aquí, junto al sistema (como en Meridian).
+                            pill = if (hero.plan.statsInBar) ({ short -> FolderChips(vm, item, roms.size, short = short) }) else null,
+                        ) {
+                            if (vm.settings.statusVisible) StatusStrip(vm.settings.statusMode)
                         }
                     }
                 }
@@ -316,12 +363,16 @@ private fun FolderContent(
                 AnimatedContent(
                     targetState = rom,
                     contentKey = { it?.key ?: item.key },
-                    modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth(),
+                    // Nunca por encima de la barra: el bloque empieza, como muy arriba, bajo ella.
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(top = (hero.barBottom + ClassicLayout.BAR_GAP).dp),
                     contentAlignment = Alignment.BottomStart,
                     transitionSpec = { heroInfoTransition(reduced) },
                     label = "folderInfo",
                 ) { shown ->
-                    FolderHeroInfo(vm, item, shown, m, floatClock)
+                    FolderHeroInfo(vm, item, shown, roms.size, m, hero, floatClock)
                 }
             },
         )
@@ -334,22 +385,24 @@ private fun FolderContent(
                     message = stringResource(R.string.folder_empty),
                     actionLabel = stringResource(R.string.rescan_folder),
                     onAction = { vm.rescanFolder(item.folder) },
-                    modifier = Modifier.fillMaxSize().padding(top = FOLDER_CHIPS_INSET.dp, bottom = if (vm.input.gamepadPresent) PAD_HINTS_HEIGHT else 0.dp),
+                    modifier = Modifier.fillMaxSize().padding(bottom = if (vm.input.gamepadPresent) PAD_HINTS_HEIGHT else 0.dp),
                     glyph = ConsoleGlyph.Folder,
                 )
             } else {
                 LazyRow(
                     Modifier
                         .fillMaxSize()
-                        .offset { IntOffset(0, (rowY() - m.heroH.value - shelf.tileTop).dp.roundToPx()) },
+                        .testTag(UiTags.SHELF)
+                        .offset { IntOffset(0, (rowY() - hero.frame.heroHeight - hero.frame.tileTop).dp.roundToPx()) },
                     state = carousel,
                     contentPadding = PaddingValues(
                         start = m.pad,
                         end = m.pad,
-                        // Por encima queda el hueco para lo que la seleccionada sube, crece y alumbra.
-                        top = shelf.tileTop.dp,
+                        // Por encima queda el hueco para lo que la seleccionada sube y alumbra.
+                        top = hero.frame.tileTop.dp,
                     ),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    // El aire que hace que la fila llene el ancho (ClassicLayout.spacing).
+                    horizontalArrangement = Arrangement.spacedBy(rowStyle.gap.dp),
                     verticalAlignment = Alignment.Top,
                 ) {
                     itemsIndexed(roms, key = { _, r -> r.id }) { i, r ->
@@ -370,8 +423,9 @@ private fun FolderContent(
                                 selected = selected,
                                 look = look,
                                 fallback = vm.romFallback(r),
-                                width = shelf.tileWidth.dp,
-                                height = shelf.tileHeight.dp,
+                                width = hero.frame.tileWidth.dp,
+                                height = hero.frame.tileHeight.dp,
+                                rowStyle = rowStyle,
                                 coverVanishing = vm.isVanishingArt(r.key, ArtKind.Cover),
                                 onCoverVanished = { vm.finishVanish() },
                                 coverMaterializing = vm.isMaterializingArt(r.key, ArtKind.Cover),
@@ -390,7 +444,6 @@ private fun FolderContent(
                     }
                 }
             }
-            FolderChips(vm, item, roms.size, Modifier.align(Alignment.TopStart).padding(start = m.pad, end = m.pad, top = FOLDER_CHIPS_TOP.dp))
             PadHints(
                 hints = FOLDER_HINTS,
                 visible = vm.input.gamepadPresent,
@@ -401,48 +454,73 @@ private fun FolderContent(
     }
 }
 
-/** El selector de emulador de la carpeta (en la barra): su nombre en cristal oscuro; apagado si no está instalado. */
+/** Cuerpo (sp) del rótulo del emulador: [FolderHeader] lo mide con este mismo para compactar. */
+internal const val EMULATOR_LABEL_SP = 10f
+
+/**
+ * El selector de emulador de la carpeta (en la cabecera, con el sistema): su
+ * nombre en cristal oscuro; apagado si no está instalado. Con [iconOnly]
+ * (la cabecera no da para más, ver [com.elyndra.launcher.ui.FolderBarLayout])
+ * solo el icono, y el nombre en la descripción. Es el emulador de la
+ * carpeta; el de cada juego sigue en sus opciones.
+ */
 @Composable
-internal fun EmulatorSelector(vm: ElyndraViewModel, item: LibraryItem.Folder, label: String, modifier: Modifier = Modifier) {
+internal fun EmulatorSelector(vm: ElyndraViewModel, item: LibraryItem.Folder, label: String, modifier: Modifier = Modifier, iconOnly: Boolean = false) {
+    EmulatorChip(
+        label = label,
+        installed = item.emulatorInstalled,
+        focused = vm.input.isBarFocused(BarItem.Emulator),
+        iconOnly = iconOnly,
+        modifier = modifier,
+    ) { vm.pickFolderEmulator(item.folder) }
+}
+
+/** La píldora del emulador, sin el ViewModel (también para las vistas previas). */
+@Composable
+internal fun EmulatorChip(label: String, installed: Boolean, focused: Boolean, iconOnly: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
+    val description = stringResource(R.string.folder_emulator_a11y, label)
     Box(
         modifier
-            .touchTarget(Modifier.clickable(interactionSource = interaction, indication = null) { vm.pickFolderEmulator(item.folder) })
-            .height(HeroBarHeight)
-            .alpha(if (item.emulatorInstalled) 1f else 0.6f)
+            .touchTarget(Modifier.clickable(interactionSource = interaction, indication = null, onClick = onClick))
+            .then(if (iconOnly) Modifier.semantics { contentDescription = description }.size(HeroBarHeight) else Modifier.height(HeroBarHeight))
+            .alpha(if (installed) 1f else 0.6f)
             .darkGlass(RoundedCornerShape(11.dp))
-            .consoleFocus(vm.input.isBarFocused(BarItem.Emulator), cornerRadius = 11.dp)
+            .consoleFocus(focused, cornerRadius = 11.dp)
             .indication(interaction, focusRing(RoundedCornerShape(11.dp)))
-            .padding(horizontal = 11.dp),
-        contentAlignment = Alignment.CenterStart,
+            .then(if (iconOnly) Modifier else Modifier.padding(horizontal = FolderBarLayout.CHIP_PAD.dp)),
+        contentAlignment = if (iconOnly) Alignment.Center else Alignment.CenterStart,
     ) {
-        ElyText(
-            label,
-            size = 10f,
-            weight = FontWeight.SemiBold,
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        if (iconOnly) {
+            SheetGlyph(SheetIcon.Emulator, Color.White, 16.dp)
+        } else {
+            ElyText(
+                label,
+                size = EMULATOR_LABEL_SP,
+                weight = FontWeight.SemiBold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
 /** Cuerpo (sp) del nombre bajo la carátula. */
 private const val FOLDER_LABEL_SP = 8.5f
 
-/** Las fichas de arriba del estante: margen, alto y lo que ocupan en total (dp). */
-private const val FOLDER_CHIPS_TOP = 8f
-private const val FOLDER_CHIPS_H = 24f
-private const val FOLDER_CHIPS_INSET = FOLDER_CHIPS_TOP + FOLDER_CHIPS_H + 4f
+/** Alto de la ficha de la carpeta (el de [ClassicLayout.STATS_H]). */
+private const val FOLDER_CHIPS_H = ClassicLayout.STATS_H
 
 /**
  * El resumen de la carpeta (cuántas ROMs y cuánto se ha jugado) y, en PS4,
  * los .pkg sin instalar, que llevan a Bachata. Van en fichas de la misma
- * lámina que el dock: arriba del estante pasa el arte del juego y así se leen
- * sobre cualquier imagen.
+ * lámina que el dock: así se leen sobre cualquier arte. En el Clásico van al
+ * pie del bloque del hero (antes, arriba del estante, le quitaban 36 dp a las
+ * carátulas) o, si no caben, en la barra junto al sistema.
  */
 @Composable
-internal fun FolderChips(vm: ElyndraViewModel, item: LibraryItem.Folder, count: Int, modifier: Modifier = Modifier) {
+internal fun FolderChips(vm: ElyndraViewModel, item: LibraryItem.Folder, count: Int, modifier: Modifier = Modifier, short: Boolean = false) {
     val ink2 = Color(DockPalettes.ink2(P.isDark))
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(
@@ -453,7 +531,8 @@ internal fun FolderChips(vm: ElyndraViewModel, item: LibraryItem.Folder, count: 
             contentAlignment = Alignment.Center,
         ) {
             ElyText(
-                pluralStringResource(R.plurals.roms_summary, count, count, fmtMinutes(item.minutes)),
+                // Corta ("4 ROMs"), cuando en la cabecera de Meridian no cabe con el tiempo jugado (ver FolderBarLayout.Pill).
+                if (short) pluralStringResource(R.plurals.roms_count, count, count) else pluralStringResource(R.plurals.roms_summary, count, count, fmtMinutes(item.minutes)),
                 size = 8.5f,
                 weight = FontWeight.SemiBold,
                 color = ink2,
@@ -508,17 +587,34 @@ private val FOLDER_HINTS = listOf(
     PadHint("B", R.string.hint_back),
 )
 
-/** El bloque de título del hero de la carpeta: el de la ROM elegida o, sin ella, el del sistema. */
+/**
+ * El bloque de título del hero de la carpeta: el de la ROM elegida o, sin
+ * ella, el del sistema. Va bajo la barra y se compacta con el plan de
+ * [ClassicLayout.heroPlan]: sin pista, logo menor, fichas en una línea y la
+ * ficha de la carpeta en la barra.
+ */
 @Composable
-private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: RomEntry?, m: Metrics, floatClock: FloatClock) {
+private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: RomEntry?, count: Int, m: Metrics, hero: FolderHero, floatClock: FloatClock) {
     // Blanco, sin franjas oscuras detrás, con la sombra sutil (como en la biblioteca).
     val heroText = HeroText.CLEAN
+    val plan = hero.plan
+    val fontScale = LocalDensity.current.fontScale
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(start = m.pad, end = m.pad, bottom = if (m.landscape) 8.dp else 18.dp),
+            .padding(start = m.pad, end = m.pad, bottom = hero.bottomPad.dp),
     ) {
-        Row(
+        if (plan.mergedChips) {
+            MergedChipLine(
+                listOfNotNull(
+                    item.system.short,
+                    rom?.meta?.ra?.takeIf { it.achievements > 0 }?.let { "🏆 ${it.earned}/${it.achievements}" },
+                    rom?.let { playedLabel(it) },
+                    rom?.extension,
+                ),
+                m.landscape,
+            )
+        } else Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = if (m.landscape) 3.dp else 6.dp),
         ) {
@@ -546,7 +642,11 @@ private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: 
             )
         }
         val logo = rom?.meta?.logo
-        if (logo != null) {
+        // Por debajo de esto (solo en ventanas diminutas) no hay logo que se lea: fuera.
+        val logoBox = plan.logoHeight
+        if (logoBox < LOGO_HIDE) {
+            Unit
+        } else if (logo != null) {
             MaterializingContainer(
                 isMaterializing = vm.isMaterializingArt(rom.key, ArtKind.Logo),
                 onAnimationEnd = { vm.finishMaterializeArt() },
@@ -559,7 +659,7 @@ private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: 
                     // con la caja de las carpetas (su hero es más bajo y con la de la biblioteca quedaban diminutos).
                     HeroLogo(
                         logo,
-                        maxHeight = m.logoH * if (m.landscape) FOLDER_LOGO_HEIGHT_LANDSCAPE else 1f,
+                        maxHeight = logoBox.dp,
                         modifier = Modifier.floating(floatClock, floatPhaseOf(rom.key), amplitude = 3.dp, periodSeconds = 4.2f),
                         widthFraction = FOLDER_LOGO_WIDTH,
                     )
@@ -568,7 +668,7 @@ private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: 
         } else {
             ElyText(
                 rom?.displayTitle ?: item.system.name,
-                size = m.titleSize,
+                size = ClassicLayout.titleSpFor(logoBox, fontScale, hero.titleSp),
                 weight = FontWeight.ExtraBold,
                 color = heroText.title,
                 letterSpacing = tracking(-0.03f),
@@ -580,7 +680,9 @@ private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: 
             )
         }
         val description = rememberDescription(vm, rom?.key, rom?.meta)
-        if (description != null) {
+        if (!plan.showSecondary) {
+            Unit
+        } else if (description != null) {
             ElyText(
                 heroDescription(description, vm.settings.lang),
                 modifier = Modifier
@@ -592,16 +694,16 @@ private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: 
                 letterSpacing = tracking(0.02f),
                 lineHeightRatio = 1.28f,
                 shadow = heroText.shadow(null),
-                maxLines = if (m.landscape) 2 else 3,
+                maxLines = plan.secondaryLines.coerceAtLeast(1),
                 overflow = TextOverflow.Ellipsis,
             )
-        } else if (!vm.input.gamepadPresent) {
+        } else if (hero.showHint) {
             // Con mando, las pistas de sus botones ya van al pie del estante.
             ElyText(
                 stringResource(if (vm.settings.tapOpensSelected) R.string.hint_gestures_tap else R.string.hint_gestures),
                 modifier = Modifier
                     .padding(top = if (m.landscape) 4.dp else 7.dp)
-                    .alpha(pulseHintAlpha()),
+                    .pulseHint(),
                 size = 9f,
                 weight = FontWeight.Medium,
                 color = heroText.secondary(0.8f),
@@ -612,8 +714,16 @@ private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: 
                 uppercase = true,
             )
         }
+        // La ficha de la carpeta, al pie del bloque mientras quepa (si no, va en la barra).
+        if (!plan.statsInBar) {
+            Spacer(Modifier.height(ClassicLayout.STATS_GAP.dp))
+            FolderChips(vm, item, count)
+        }
     }
 }
+
+/** Alto (dp) por debajo del cual el logo (o el titular) no se pinta: no se leería. */
+private const val LOGO_HIDE = 12f
 
 @Composable
 internal fun playedLabel(rom: RomEntry): String =
@@ -633,6 +743,8 @@ private fun RomTile(
     fallback: ArtFallback,
     width: Dp,
     height: Dp,
+    /** Escala de las vecinas, halo y nombres de la fila ([ClassicLayout.rowStyle]). */
+    rowStyle: ClassicLayout.RowStyle,
     coverVanishing: Boolean,
     onCoverVanished: () -> Unit,
     coverMaterializing: Boolean,
@@ -649,8 +761,8 @@ private fun RomTile(
 ) {
     val shape = RoundedCornerShape(12.dp)
     val bounds = remember { arrayOf(Rect.Zero) }
-    val lift = selectionLift(selected)
-    val scale = selectionScale(selected)
+    // Subida y escala en la capa (ClassicCardMotion): el nombre no se mueve y la card no se recompone.
+    val cardMotion = rememberClassicCardMotion(selected, rowStyle.neighborScale)
     val press = rememberPress()
     val pressed = pressScale(press)
     val curtain = curtainAlpha(minOf(index, 12) * 40, key = rom.id)
@@ -670,7 +782,6 @@ private fun RomTile(
     Column(
         Modifier
             .width(width)
-            .offset(y = lift)
             .animPopIn(delayMs = minOf(index, 12) * 35, key = rom.id)
             .onGloballyPositioned {
                 bounds[0] = it.boundsInWindow()
@@ -703,10 +814,7 @@ private fun RomTile(
             Modifier
                 .fillMaxWidth()
                 .height(height)
-                .graphicsLayer {
-                    scaleX = scale * pressed.value
-                    scaleY = scale * pressed.value
-                }
+                .classicCard(cardMotion, pressed)
                 .shadow(
                     if (press.pressed) 4.dp else if (selected) 12.dp else 8.dp,
                     shape,
@@ -716,7 +824,7 @@ private fun RomTile(
                 )
                 // Tras la escala (la acompaña) y antes del recorte: halo, luz en
                 // el estante y partículas asoman por fuera de la carátula.
-                .selectionFrame(selected, look, shape)
+                .selectionFrame(selected, look, shape, rowStyle.haloSpreadDp())
                 .clip(shape)
                 .border(1.dp, P.hairline, shape),
         ) {
@@ -763,16 +871,17 @@ private fun RomTile(
             }
         }
 
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(ShelfLayout.LABEL_GAP.dp))
         ElyText(
             if (cover != null) rom.displayTitle else time,
-            size = 8.5f,
+            size = FOLDER_LABEL_SP,
             weight = FontWeight.Medium,
             color = if (selected) P.ink else P.ink2,
             align = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth(),
+            // Del ancho de lo que se ve de la carátula (en vertical, la vecina encogida).
+            modifier = Modifier.fillMaxWidth().padding(horizontal = rowStyle.labelInset.dp),
         )
     }
 }

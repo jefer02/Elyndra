@@ -20,10 +20,9 @@ object Frost {
 }
 
 /**
- * El cristal curvo de la rueda en el tema claro (horizontal): una lámina con
- * el canto derecho siguiendo la curva de la lista, casi transparente: el arte
- * apenas desenfocado, sin blanco encima, y un filo de luz muy sutil por la
- * curva. La rueda solo lleva los iconos.
+ * La forma del cristal curvo de la rueda (horizontal): una lámina con el canto
+ * derecho siguiendo la curva de la lista. Su aspecto (desenfoque, tinte, velo,
+ * filo) está en [GlassTokens]; aquí solo la geometría y las marcas.
  */
 object WheelGlass {
     /**
@@ -34,28 +33,14 @@ object WheelGlass {
      */
     const val PAST_AXIS_DP = 24f
 
-    /** Saturación del arte desenfocado (1 = la de siempre). */
-    const val SATURATION = 1.1f
-
-    /** El desenfoque del arte dentro del cristal (dp): mínimo, el arte se ve casi tal cual. */
-    const val BLUR_DP = 6f
-
-    /** El tinte del color del juego encima: casi nada, el cristal es transparente. */
-    const val TINT_ALPHA = 0.02f
-
     /**
      * Sin velo, las marcas del dial y las letras de la tira A–Z van blancas con
      * una sombra fina debajo: se leen sobre arte claro y sobre arte oscuro.
      */
     const val MARK_ALPHA = 0.95f
-    const val MARK_SHADOW_ALPHA = 0.45f
-    const val MARK_SHADOW_DP = 1.5f
 
-    /** El filo de luz por la curva y su halo hacia dentro: apenas se notan. */
-    const val RIM_DP = 1f
-    const val RIM_ALPHA = 0.16f
-    const val GLOW_DP = 10f
-    const val GLOW_ALPHA = 0.03f
+    /** El grosor de la sombra de las marcas; su alfa, con el resto del aspecto del cristal ([GlassTokens.MARK_SHADOW_ALPHA]). */
+    const val MARK_SHADOW_DP = 1.5f
 
     /** Lo más a la izquierda que puede llegar el canto lejos de la línea de foco (dp). */
     const val MIN_EDGE_DP = 120f

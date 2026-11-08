@@ -2,7 +2,6 @@ package com.elyndra.launcher.ui.meridian
 
 import android.os.Build
 import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
@@ -46,21 +45,28 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
 import com.elyndra.launcher.ui.components.edgeBleed
+import com.elyndra.launcher.ui.components.SafeAreaInsets
 import com.elyndra.launcher.ui.components.edgeMirror
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.layout.ContentScale
-import coil.compose.AsyncImage
 import com.elyndra.launcher.ui.theme.HeroText
+import com.elyndra.launcher.ui.theme.LocalPerformance
 import com.elyndra.launcher.ui.theme.LocalHeroText
-import com.elyndra.launcher.ui.theme.WheelGlass
-import java.io.File
+import com.elyndra.launcher.ui.theme.GlassTokens
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -150,17 +156,32 @@ private val MERIDIAN_STAGE = EmptyStage.MERIDIAN.let {
  * rueda (px, bajo su cabecera); [focusY] y [radius] van en dp, medidos desde
  * ese [top]. Sin medir aún, sin curva. [reach] (dp) es hasta dónde tiene que
  * llegar la niebla en la cabecera (el final del dock y su aire; ver
- * [RailHeaderLayout.plan] y [MeridianFog.band]); 0 = sin banda.
+ * [RailHeaderLayout.plan] y [MeridianFog.band]); 0 = sin banda. [screenTop]
+ * y [screenBottom] (dp en la escena) son los filos de la pantalla, con la
+ * franja de la barra de estado y la de abajo: entre ellos va el arco del
+ * cristal claro ([MeridianScrims.glassArc]); sin medir (0 y 0), recto.
  */
 @Immutable
-internal data class FogArc(val top: Float, val focusY: Float, val radius: Float, val reach: Float = 0f) {
+internal data class FogArc(
+    val top: Float,
+    val focusY: Float,
+    val radius: Float,
+    val reach: Float = 0f,
+    val screenTop: Float = 0f,
+    val screenBottom: Float = 0f,
+) {
 
     /** La línea de foco en la escena (dp). */
     fun focusIn(density: Float): Float = top / density + focusY
 
-    /** El canto que se ve de la niebla a la altura [y] de la escena (dp), con la banda de arriba. */
+    /** El canto del cristal claro: el arco simétrico de la pantalla, abierto lo que pida la cabecera. */
+    fun glassArc(axisX: Float, density: Float): GlassArc =
+        MeridianScrims.glassArc(axisX, focusIn(density), screenTop, screenBottom, radius, reach)
+
+    /** El canto que se ve de la niebla a la altura [y] de la escena (dp): el arco del cristal o el velo con la banda de arriba. */
     fun edgeAt(y: Float, axisX: Float, glass: Boolean, density: Float): Float =
-        MeridianFog.visibleEdge(y, axisX, focusIn(density), radius, glass, MeridianFog.band(top / density, reach, axisX, glass))
+        if (glass) glassArc(axisX, density).edgeAt(y)
+        else MeridianFog.visibleEdge(y, axisX, focusIn(density), radius, MeridianFog.band(top / density, reach, axisX, glass = false))
 
     companion object {
         val NONE = FogArc(0f, 0f, 0f)
@@ -172,9 +193,9 @@ internal data class FogArc(val top: Float, val focusY: Float, val radius: Float,
          * lo usa antes de que la rueda se mida, así el dock tiene su ancho de
          * verdad desde el primer fotograma.
          */
-        fun forRail(windowWidth: Float, railHeight: Float, top: Float, aspect: Float, compact: Boolean, railWidth: Float): FogArc {
+        fun forRail(windowWidth: Float, railHeight: Float, top: Float, aspect: Float, compact: Boolean, railWidth: Float, screenTop: Float = 0f, screenBottom: Float = 0f): FogArc {
             val geo = MeridianGeometry.compute(windowWidth, railHeight, aspect, compact, railWidth)
-            return FogArc(top, geo.focusY, geo.arcRadius)
+            return FogArc(top, geo.focusY, geo.arcRadius, screenTop = screenTop, screenBottom = screenBottom)
         }
     }
 }
@@ -243,6 +264,8 @@ internal fun MeridianScene(
     modifier: Modifier = Modifier,
     /** Ancho/alto del arte de las tarjetas (1 iconos, 2/3 carátulas): de ahí sale su tamaño. */
     tileAspect: Float = 1f,
+    /** La cabecera de la rueda es la de la carpeta (dos filas): la columna se calcula con su alto. */
+    folderHeader: Boolean = false,
     adaptive: Boolean = true,
     washPreset: ArtColors? = null,
     /** Sustituye al arte del juego (las vistas previas pintan un degradado). */
@@ -257,14 +280,22 @@ internal fun MeridianScene(
     val skin = LocalSkin.current
     val ink = rememberMeridianInk()
     val lite = rememberMeridianLite()
-    // El desenfoque de verdad (RenderEffect) solo desde Android 12 y fuera de la calidad ligera.
-    val blurred = wheelGlass && !lite && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    // El ajuste "Desenfoque" escala el del cristal; a 0, el cristal deja ver el arte nítido.
+    val userBlur = skin.blur
+    val dark = P.isDark
     BoxWithConstraints(modifier.fillMaxSize()) {
         val width = maxWidth.value
         val screenHeight = maxHeight.value
+        // El cristal que toca: el mismo en cualquier móvil con Android 12+ (ya no depende de la RAM),
+        // salvo en Rendimiento: ahí va por su camino sin RenderEffect (el de Android 8–11),
+        // el mismo panel con más tinte y velo, sin recalcular un desenfoque por fotograma.
+        val liveBlur = LocalPerformance.current.liveBlur
+        val glassSdk = if (liveBlur) Build.VERSION.SDK_INT else GlassPanelLayout.RENDER_EFFECT_API - 1
+        val glassSpec = remember(width, wheelGlass, dark, userBlur, glassSdk) { GlassPanelLayout.resolve(width, glassSdk, wheelGlass, dark, userBlur) }
+        val blurred = glassSpec.path == GlassPanelLayout.Path.Blur
         val compact = MeridianMode.compact(screenHeight)
         // Solo iconos en la rueda (el nombre está en el hero): la columna se estrecha y el arte gana sitio.
-        val railWidth = MeridianGeometry.slimRailWidth(width, screenHeight, tileAspect, compact)
+        val railWidth = MeridianGeometry.slimRailWidth(width, screenHeight, tileAspect, compact, folderHeader)
         val heroLeft = railWidth + MeridianGeometry.HERO_GAP
         val wash = rememberWash(art.imagePath, P.isDark, ink.primary, adaptive, washPreset)
         // El arte más alto y más ancho que la ventana, con el paralaje contrario a la rueda.
@@ -274,6 +305,18 @@ internal fun MeridianScene(
         // lleva su luz: el óvalo y la franja de arriba, pensados para leer sobre arte, se apagan.
         val artShown by animateFloatAsState(if (backdrop != null || art.imagePath != null || art.fallback != null) 1f else 0f, motion(Springs.fade()), label = "artShown")
         val railFog = remember(fogArc, railWidth, wheelGlass, width, compact, tileAspect) { RailFog(fogArc, railWidth, wheelGlass, width, compact, tileAspect) }
+        // El arte de verdad, grabado una vez por fotograma para que el cristal lo pinte desenfocado (ver FrostedArt).
+        val heroLayer = rememberGraphicsLayer()
+        val source = remember(heroLayer) { ArtBackdrop(heroLayer) }
+        // Los filos de la pantalla (con la barra de estado y la franja de abajo): entre ellos va el arco del cristal.
+        val density = LocalDensity.current
+        val insets = SafeAreaInsets
+        val screenTop = -insets.getTop(density) / density.density
+        val screenBottom = screenHeight + insets.getBottom(density) / density.density
+        SideEffect {
+            val a = fogArc.value
+            if (a.screenTop != screenTop || a.screenBottom != screenBottom) fogArc.value = a.copy(screenTop = screenTop, screenBottom = screenBottom)
+        }
 
         CompositionLocalProvider(
             LocalMeridianFrame provides frame,
@@ -281,42 +324,44 @@ internal fun MeridianScene(
             LocalWheelGlass provides wheelGlass,
             LocalRailFog provides railFog,
         ) {
-            if (backdrop != null) backdrop() else HeroArtLayer(
+            // Hasta el filo de la ventana, bajo la muesca. Con el cristal desenfocado se
+            // graba aquí, dentro del fundido de entrada (el cristal lleva el suyo aparte).
+            val heroModifier = Modifier
+                .fillMaxSize()
+                .edgeBleed()
+                .clipToBounds()
+                .graphicsLayer { alpha = MeridianMotion.heroFade(enterMs()) }
+                .then(if (blurred) Modifier.recordBackdrop(source) else Modifier)
+            if (backdrop != null) Box(heroModifier) { backdrop() } else HeroArtLayer(
                 fallback = art.fallback,
                 heroKey = art.key,
                 imagePath = art.imagePath,
                 backgroundVanishing = art.vanishing,
                 onBackgroundVanished = art.onVanished,
                 stage = { EmptyStageBackdrop(MERIDIAN_STAGE, Modifier.fillMaxSize()) },
-                // Hasta el filo de la ventana, bajo la muesca. El arte esmerilado de
-                // la rueda (FrostedArt) crece igual, así que los dos siguen alineados.
-                modifier = Modifier
-                    .fillMaxSize()
-                    .edgeBleed()
-                    .clipToBounds()
-                    .graphicsLayer { alpha = MeridianMotion.heroFade(enterMs()) },
+                modifier = heroModifier,
                 layer = artLayer,
             )
-            Box(Modifier.fillMaxSize().meridianScrims(heroLeft, skin.scrim, wash, if (compact) TOP_BAR_COMPACT else TOP_BAR, clean = true) { artShown })
+            Box(Modifier.fillMaxSize().edgeMirror(left = false, right = false, top = true).meridianScrims(heroLeft, skin.scrim, wash, if (compact) TOP_BAR_COMPACT else TOP_BAR, clean = true) { artShown })
             // Detrás de la rueda, lo elegido en Ajustes: el cristal curvo como la lista
             // (ver WheelGlass) o el difuminado de siempre.
             if (wheelGlass) {
                 WheelGlassLayer(
                     state = wash,
-                    windowWidth = width,
+                    spec = glassSpec,
                     axisX = railWidth,
-                    artExtra = ART_EXTRA.value,
                     arc = { fogArc.value },
                     frosted = if (!blurred) null else {
-                        { FrostedArt(art, backdrop, artLayer, Modifier.edgeBleed().graphicsLayer { alpha = MeridianMotion.heroFade(enterMs()) }) }
+                        { FrostedArt(source, glassSpec.blurDp, glassSpec.blurDp * GlassPanelLayout.BLUR_BLEED, Modifier.graphicsLayer { alpha = MeridianMotion.heroFade(enterMs()) }) }
                     },
-                    // Dibuja con sus propias coordenadas (eje, niebla): no se mueve, su canto
-                    // se refleja en la franja de la muesca si está a la izquierda.
+                    // Arriba y abajo crece hasta el filo de la pantalla (su arco va de punta a
+                    // punta; reflejado, el canto inclinado hacía un pico bajo la barra de estado).
+                    // A la izquierda, su canto se refleja en la franja de la muesca.
                     modifier = Modifier
                         .edgeMirror(right = false)
+                        .edgeBleed(sides = false)
                         .fillMaxHeight()
-                        // Más ancho si la banda de arriba pasa del canto de la línea de foco.
-                        .width(MeridianScrims.glassRight(railWidth, width, fogArc.value.reach).dp)
+                        .width(MeridianScrims.glassRight(fogArc.value.glassArc(railWidth, density.density), width, fogArc.value.reach).dp)
                         .graphicsLayer { alpha = MeridianMotion.heroFade(enterMs()) },
                 )
             } else {
@@ -327,7 +372,7 @@ internal fun MeridianScene(
                     artExtra = ART_EXTRA.value,
                     lite = lite,
                     arc = { fogArc.value },
-                    modifier = Modifier.edgeMirror(right = false).fillMaxHeight().width(MeridianScrims.clearAt(railWidth, width).dp),
+                    modifier = Modifier.edgeMirror(right = false, top = true).fillMaxHeight().width(MeridianScrims.clearAt(railWidth, width).dp),
                 )
             }
 
@@ -381,6 +426,8 @@ internal fun MeridianScene(
                     .padding(top = MeridianTopRow.top(compact).dp, end = MeridianTopRow.END.dp)
                     .widthIn(max = MeridianTopRow.barMaxWidth(width, railWidth).dp),
             ) { topEnd() }
+            // Solo en depuración (src/debug): qué cristal se pinta y con qué valores, en el log y, si se pide, en pantalla.
+            GlassDebug.Report(glassSpec, lite)
         }
     }
 }
@@ -449,31 +496,76 @@ private fun Modifier.meridianParallax(reduced: Boolean, wheel: () -> WheelState?
 }
 
 /** Más color: el cristal deja pasar el arte avivado, no un gris lechoso. */
-private val GlassSaturation = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(WheelGlass.SATURATION) })
+private val GlassSaturation = android.graphics.ColorMatrix().apply { setSaturation(GlassTokens.SATURATION) }
 
 /**
- * El arte desenfocado dentro del cristal curvo del tema claro (API 31+): el
- * mismo arte, con el mismo marco y el mismo paralaje ([layer]), avivado
- * ([WheelGlass.SATURATION]) y pasado por un desenfoque de [WheelGlass.BLUR_DP] con
- * los cantos estirados. Se funde al cambiar de juego como el de verdad. Las
- * vistas previas desenfocan su [backdrop].
+ * El arte de la escena, grabado en una capa ([layer]) donde se pinta: el
+ * cristal la vuelve a pintar debajo de sí, desenfocada. Guarda dónde está el
+ * arte ([origin]) y dónde el cristal ([target]) para pintarla con el mismo
+ * desplazamiento, en coordenadas de pantalla. No es estado: se lee al pintar.
+ */
+@Stable
+internal class ArtBackdrop(val layer: GraphicsLayer) {
+    var origin: LayoutCoordinates? = null
+    var target: LayoutCoordinates? = null
+
+    /** Pinta el arte grabado en [scope] (el cristal), donde cae en la pantalla. */
+    fun drawInto(scope: DrawScope) {
+        val o = origin?.takeIf { it.isAttached } ?: return
+        val t = target?.takeIf { it.isAttached } ?: return
+        val at = t.localPositionOf(o, Offset.Zero)
+        with(scope) { translate(at.x, at.y) { drawLayer(layer) } }
+    }
+}
+
+/** Graba lo que pinta esta capa en [source] (y lo pinta igual que siempre). */
+private fun Modifier.recordBackdrop(source: ArtBackdrop): Modifier = this
+    .onPlaced { source.origin = it }
+    .drawWithContent {
+        source.layer.record { this@drawWithContent.drawContent() }
+        drawLayer(source.layer)
+    }
+
+/**
+ * El arte desenfocado dentro del cristal curvo del tema claro (API 31+): no
+ * una segunda imagen, sino el mismo arte que se ve fuera ([ArtBackdrop]),
+ * vuelto a pintar en el sitio del cristal, avivado ([GlassTokens.SATURATION])
+ * y desenfocado [blurDp] (crece con la ventana, [GlassPanelLayout.blurDp]).
+ *
+ * Antes era otra imagen del arte con su propio marco: no llevaba el zoom de
+ * llegada del hero (1,04 → 1 en unos dos segundos), así que, tras cada
+ * cambio de juego (en una carpeta, a cada ROM que pasa), dentro del cristal
+ * el arte iba un 4 % más pequeño y corrido (~35 dp en una tableta de
+ * 1280 dp): el pelo, el logo o un contorno se veían duplicados y deformados.
+ * Ahora, zoom, paralaje, fundidos, reserva y escenario vacío son los de fuera
+ * por construcción, y no se decodifica nada más.
+ *
+ * Se pinta [bleed] dp más ancho que el cristal: el desenfoque del canto
+ * derecho toma arte de verdad en vez de estirar su último píxel (lo que
+ * sobra cae fuera del arco y se recorta). Solo es tan grande como el
+ * cristal: la capa desenfocada ya no mide el marco entero del arte (1,35
+ * veces la ventana).
  */
 @Composable
-private fun FrostedArt(art: MeridianArt, backdrop: (@Composable () -> Unit)?, layer: (Any) -> Modifier, modifier: Modifier) {
-    val context = LocalContext.current
-    Crossfade(targetState = art.key to art.imagePath, modifier = modifier.fillMaxSize(), animationSpec = motion(Springs.fade()), label = "frostedArt") { (key, path) ->
-        Box(Modifier.fillMaxSize().then(layer(key)).blur(WheelGlass.BLUR_DP.dp)) {
-            when {
-                backdrop != null -> backdrop()
-                path != null -> AsyncImage(
-                    model = remember(path) { File(context.filesDir, path) },
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    alignment = Alignment.TopCenter,
-                    colorFilter = GlassSaturation,
-                    modifier = Modifier.fillMaxSize(),
-                )
+private fun FrostedArt(source: ArtBackdrop, blurDp: Float, bleed: Float, modifier: Modifier) {
+    Box(
+        modifier
+            .fillMaxSize()
+            .layout { measurable, constraints ->
+                val extra = bleed.dp.roundToPx()
+                val placeable = measurable.measure(Constraints.fixed(constraints.maxWidth + extra, constraints.maxHeight))
+                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, 0) }
             }
-        }
-    }
+            .onPlaced { source.target = it }
+            .graphicsLayer {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && GlassPanelLayout.blurs(blurDp)) {
+                    val r = blurDp.dp.toPx()
+                    val blur = android.graphics.RenderEffect.createBlurEffect(r, r, android.graphics.Shader.TileMode.CLAMP)
+                    renderEffect = android.graphics.RenderEffect
+                        .createColorFilterEffect(android.graphics.ColorMatrixColorFilter(GlassSaturation), blur)
+                        .asComposeRenderEffect()
+                }
+            }
+            .drawBehind { source.drawInto(this) },
+    )
 }

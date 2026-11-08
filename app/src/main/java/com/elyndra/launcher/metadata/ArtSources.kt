@@ -1,5 +1,7 @@
 package com.elyndra.launcher.metadata
 
+import com.elyndra.launcher.BuildConfig
+import com.elyndra.launcher.bench.BenchmarkHooks
 import com.elyndra.launcher.data.ArtOrigin
 import com.elyndra.launcher.data.GameMeta
 import com.elyndra.launcher.data.GameSystem
@@ -77,10 +79,25 @@ class ArtSources(
         }
     }
 
+    /**
+     * URL de la que se descargó la imagen puesta de esta clase, si se sabe
+     * (la guarda [store] al elegirla y el raspado al ponerla). El selector la
+     * usa para señalar cuál de sus propuestas es la que ya está puesta. Las
+     * carpetas no guardan el origen: null.
+     */
+    fun appliedUrl(key: String, kind: ArtKind): String? {
+        if (repo.folderByKey(key) != null) return null
+        val meta = repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta ?: return null
+        return meta.artOrigins[kind.media]?.url
+    }
+
     /** ¿Hay imagen de esta clase que se pueda quitar? */
     fun has(key: String, kind: ArtKind): Boolean = path(key, kind) != null
 
     suspend fun candidates(key: String, kind: ArtKind, service: Service): List<ArtCandidate> = withContext(Dispatchers.IO) {
+        // Solo en las variantes del perfil base: las imágenes locales de la biblioteca de prueba, sin red
+        // (src/benchmark). En debug y release BuildConfig.BENCHMARK es false y esto no existe.
+        if (BuildConfig.BENCHMARK) BenchmarkHooks.artCandidates(key, kind)?.let { return@withContext it }
         val rom = repo.romByKey(key)
         val app = repo.appByKey(key)
         val folder = repo.folderByKey(key)

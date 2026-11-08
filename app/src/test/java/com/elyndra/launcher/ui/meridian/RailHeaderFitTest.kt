@@ -72,7 +72,7 @@ class RailHeaderFitTest {
         val straight = RailHeaderLayout.plan(rail, DotTabsLayout.HEIGHT, pills, null)
         val headerH = padTop + straight.height + MeridianTopRow.bottom(compact)
         val geo = MeridianGeometry.compute(w, h - headerH - hints, 1f, compact, rail)
-        val bare = FogArc(headerH, geo.focusY, geo.arcRadius)
+        val bare = FogArc(headerH, geo.focusY, geo.arcRadius, screenTop = 0f, screenBottom = h)
         val plan = RailHeaderLayout.plan(rail, DotTabsLayout.HEIGHT, pills) { y -> bare.edgeAt(padTop + y, rail, glass, 1f) }
         assertEquals(straight.height, plan.height, eps)
         return Scene(w, h, compact, rail, padTop, plan, bare.copy(reach = plan.reach), glass, hints)
@@ -148,10 +148,15 @@ class RailHeaderFitTest {
                 val forLabels = s.plan.dockWidth <= DotTabsLayout.fullWidth(p) + 0.01f
                 assertTrue("$name: %.1f".format(s.plan.dockWidth), minimum || forLabels)
             }
-            // La banda nunca recoge la niebla (solo la ensancha) y no toca la línea de foco ni lo de debajo.
+            // La banda nunca recoge la niebla (solo la ensancha) y, en el velo, no toca la línea de foco ni lo de debajo.
+            // El cristal se abre entero (sigue simétrico): en la línea de foco, como mucho, pasa un poco más.
             val focus = s.arc.focusIn(1f)
-            assertEquals(name, s.curve(focus), s.edge(focus), eps)
-            assertEquals(name, s.curve(s.arc.top + MeridianFog.BAND_BLEND), s.edge(s.arc.top + MeridianFog.BAND_BLEND), eps)
+            if (s.glass) {
+                assertTrue(name, s.edge(focus) >= s.curve(focus) - eps && s.edge(focus) <= s.curve(focus) + 1f)
+            } else {
+                assertEquals(name, s.curve(focus), s.edge(focus), eps)
+                assertEquals(name, s.curve(s.arc.top + MeridianFog.BAND_BLEND), s.edge(s.arc.top + MeridianFog.BAND_BLEND), eps)
+            }
             for (y in listOf(0f, s.dockTop, s.dockBottom, s.arc.top, s.arc.top + 10f)) assertTrue(name, s.edge(y) >= s.curve(y) - eps)
         }
     }
@@ -191,8 +196,8 @@ class RailHeaderFitTest {
         // Bastante antes de donde se vuelve transparente: medir contra los 88 dp decía "cabe" de más.
         assertTrue(MeridianFog.WASH_REACH < MeridianScrims.FADE_DP / 2f)
         // Sin curva, el canto es recto: el eje más lo que llega cada niebla.
-        assertEquals(axis + MeridianFog.WASH_REACH, MeridianFog.visibleEdge(10f, axis, 300f, 0f, glass = false), eps)
-        assertEquals(axis + com.elyndra.launcher.ui.theme.WheelGlass.PAST_AXIS_DP, MeridianFog.visibleEdge(300f, axis, 300f, 0f, glass = true), eps)
+        assertEquals(axis + MeridianFog.WASH_REACH, MeridianFog.visibleEdge(10f, axis, 300f, 0f), eps)
+        assertEquals(axis + com.elyndra.launcher.ui.theme.WheelGlass.PAST_AXIS_DP, MeridianScrims.glassArc(axis, 300f, 0f, 600f, 0f).edgeAt(10f), eps)
     }
 
     @Test
@@ -275,7 +280,7 @@ class RailHeaderFitTest {
             val padBottom = MeridianTopRow.bottom(s.compact)
             val headerH = s.padTop + s.plan.height + padBottom
             // Lo que calcula la cabecera sola, con el hueco que le queda a la rueda entre ella y las pistas.
-            val computed = FogArc.forRail(s.width, s.height - headerH - s.hints, headerH, 1f, s.compact, s.rail)
+            val computed = FogArc.forRail(s.width, s.height - headerH - s.hints, headerH, 1f, s.compact, s.rail, 0f, s.height)
             assertEquals(name, s.arc.copy(reach = 0f), computed)
             val first = RailHeaderLayout.plan(s.rail, DotTabsLayout.HEIGHT, p) { y ->
                 computed.edgeAt(s.padTop + y, s.rail, s.glass, 1f)

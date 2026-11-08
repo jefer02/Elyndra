@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -129,6 +130,8 @@ internal data class WheelEntry(
     /** La imagen de la tarjeta (relativa a filesDir) o la app de su icono: de su canto sale la fuerza de su filo. */
     val art: String? = null,
     val pkg: String? = null,
+    /** La proporción de su carátula si ya se sabe (las vistas previas); si no, se lee de [art]. */
+    val aspect: Float? = null,
 )
 
 /** La fila de "Añadir", al final de la rueda de la biblioteca: un rótulo corto ([title]) y el largo para el lector de pantalla ([label]). */
@@ -188,8 +191,14 @@ internal fun MeridianRail(
     val fling = rememberSnapFlingBehavior(snap)
     val scrolling = rememberUserScrolling(wheel.list)
     val tileH = rowDp
-    val tileW = rowDp * tileAspect
+    // El hueco de la tarjeta: con carátulas, algo más ancho que 2:3 (ver MeridianCoverLayout.SLOT_ASPECT).
+    val tileW = MeridianCoverLayout.slotWidth(geo.rowHeight, tileAspect).dp
     val startPad = geo.inset.dp
+    // Las filas encogen desde el centro de su hueco: vecinas de cualquier proporción en el mismo eje que la enfocada.
+    val pivotPx = with(density) { (startPad + tileW / 2).toPx() }
+    val fadePx = with(density) { MeridianCoverLayout.fadeBand(geo).dp.toPx() }
+    val profile = geo.profile
+    val covers = tileAspect < 1f
     val radiusPx = with(density) { geo.arcRadius.dp.toPx() }
     val openLabel = stringResource(R.string.open)
     val optionsLabel = stringResource(R.string.hint_options)
@@ -216,6 +225,8 @@ internal fun MeridianRail(
                             wheel = wheel,
                             rowDp = rowDp,
                             radiusPx = radiusPx,
+                            pivotPx = pivotPx,
+                            profile = profile,
                             reduced = reduced,
                             lite = lite,
                             enterMs = enterMs,
@@ -231,25 +242,31 @@ internal fun MeridianRail(
                             onBounds = onBounds,
                         ) { bounds ->
                             Row(Modifier.fillMaxSize().padding(start = startPad, end = RAIL_END), verticalAlignment = Alignment.CenterVertically) {
-                                val shape = if (tileAspect < 1f) COVER_SHAPE else ICON_SHAPE
+                                val shape = if (covers) COVER_SHAPE else ICON_SHAPE
                                 val edge by rememberEdgeLuminance(e.art, e.pkg)
-                                Box(
-                                    Modifier
-                                        .size(tileW, tileH)
-                                        .onGloballyPositioned { bounds(it.boundsInWindow()) }
-                                        // Atenuada sin capa aparte: una capa recortaría el halo de la selección.
-                                        .graphicsLayer {
-                                            alpha = if (e.dimmed) 0.5f else 1f
-                                            compositingStrategy = CompositingStrategy.ModulateAlpha
-                                        }
-                                        .contactShadow(shape, dark) { tileStrength(edge, wash) }
-                                        .outerShadow(if (selected) 14.dp else 6.dp, shape, ambientColor = P.shade.copy(alpha = 0.26f), spotColor = P.shade.copy(alpha = 0.26f))
-                                        .selectionFrame(selected, look, shape)
-                                        .clip(shape)
-                                        .fogged(wheel, i, lite, wash)
-                                        .hairline(shape, dark) { tileStrength(edge, wash) },
-                                ) {
-                                    tile(e, i, selected)
+                                // Cada carátula con su proporción, entera en el hueco (2:3): el marco y la sombra van con el arte.
+                                val read by rememberCoverAspect(if (covers && e.aspect == null) e.art else null)
+                                val (fitW, fitH) = if (covers) MeridianCoverLayout.coverBox(tileW.value, tileH.value, e.aspect ?: read) else tileW.value to tileH.value
+                                Box(Modifier.width(tileW), contentAlignment = Alignment.Center) {
+                                    Box(
+                                        Modifier
+                                            .size(fitW.dp, fitH.dp)
+                                            .onGloballyPositioned { bounds(it.boundsInWindow()) }
+                                            // Atenuada sin capa aparte: una capa recortaría el halo de la selección.
+                                            .graphicsLayer {
+                                                alpha = if (e.dimmed) 0.5f else 1f
+                                                compositingStrategy = CompositingStrategy.ModulateAlpha
+                                            }
+                                            .contactShadow(shape, dark) { tileStrength(edge, wash) }
+                                            .outerShadow(if (selected) 14.dp else 6.dp, shape, ambientColor = P.shade.copy(alpha = 0.26f), spotColor = P.shade.copy(alpha = 0.26f))
+                                            .selectionFrame(selected, look, shape)
+                                            .clip(shape)
+                                            .edgeFaded(wheel, i, fadePx)
+                                            .fogged(wheel, i, lite, wash)
+                                            .hairline(shape, dark) { tileStrength(edge, wash) },
+                                    ) {
+                                        tile(e, i, selected)
+                                    }
                                 }
                             }
                         }
@@ -267,6 +284,8 @@ internal fun MeridianRail(
                             wheel = wheel,
                             rowDp = rowDp,
                             radiusPx = radiusPx,
+                            pivotPx = pivotPx,
+                            profile = profile,
                             reduced = reduced,
                             lite = lite,
                             enterMs = enterMs,
@@ -282,7 +301,7 @@ internal fun MeridianRail(
                             onBounds = {},
                         ) { _ ->
                             Row(Modifier.fillMaxSize().padding(start = startPad, end = RAIL_END), verticalAlignment = Alignment.CenterVertically) {
-                                AddTile(tileH, selected, look)
+                                AddTile(tileH, selected, look, Modifier.edgeFaded(wheel, i, fadePx))
                             }
                         }
                     }
@@ -318,6 +337,9 @@ private fun WheelRow(
     wheel: WheelState,
     rowDp: Dp,
     radiusPx: Float,
+    /** Desde dónde encoge la fila (px): el centro del hueco de su tarjeta. */
+    pivotPx: Float,
+    profile: WheelProfile,
     reduced: Boolean,
     lite: Boolean,
     enterMs: () -> Float,
@@ -352,19 +374,21 @@ private fun WheelRow(
                 val d = wheel.distance(index)
                 val ms = enterMs()
                 val enter = if (reduced) MeridianMotion.heroFade(ms) else MeridianMotion.cascade(ms, index - cascadeTop)
-                val s = WheelTransform.scale(d)
+                val s = WheelTransform.scale(d, profile)
                 val row = size.height
                 val lift = wheel.lift()
-                val dy = WheelTransform.center(d) * row
-                val edge = RailEdge.fade(wheel.focusPx + lift + dy, s * row, 0f, wheel.railPx)
+                val dy = WheelTransform.center(d, profile) * row
+                // En un móvil la vecina solo asoma: la funde la máscara, igual arriba que abajo; apagarla entera la borraría.
+                val edge = if (profile.maskOnly) 1f else RailEdge.fade(wheel.focusPx + lift + dy, s * row, 0f, wheel.railPx)
                 scaleX = s
                 scaleY = s
                 alpha = WheelTransform.alpha(d, lite) * enter * edge
-                translationX = WheelArc.offset(dy, radiusPx) - if (reduced) 0f else (1f - enter) * shift
-                translationY = WheelTransform.shift(d) * row + lift
+                translationX = profile.curve * WheelArc.offset(dy, radiusPx) - if (reduced) 0f else (1f - enter) * shift
+                translationY = WheelTransform.shift(d, profile) * row + lift
                 rotationY = WheelTransform.rotationY(d, reduced || lite)
                 cameraDistance = camera
-                transformOrigin = TransformOrigin(0f, 0.5f)
+                // Encoge desde el centro del hueco: las vecinas no se van contra el filo de la pantalla.
+                transformOrigin = TransformOrigin(if (size.width > 0f) (pivotPx / size.width).coerceIn(0f, 1f) else 0f, 0.5f)
             }
             .onGloballyPositioned { anchor.coordinates = it }
             .pointerInput(Unit) {
@@ -393,6 +417,41 @@ private fun WheelRow(
             if (selectedNow) onBounds(r)
         }
     }
+}
+
+/**
+ * El fundido de los cantos de la rueda ([MeridianCoverLayout.edgeMask]): la
+ * fila que se mete en la franja de arriba o de abajo se vuelve transparente
+ * hacia el canto en vez de cortarse en seco bajo la cabecera. Va dentro del
+ * recorte de la tarjeta, así que su capa aparte (del tamaño de la tarjeta) no
+ * recorta ni la sombra ni el halo de la selección, y solo existe mientras la
+ * fila toca la franja.
+ */
+private fun Modifier.edgeFaded(wheel: WheelState, index: Int, bandPx: Float): Modifier = this
+    .graphicsLayer {
+        compositingStrategy = if (edgeMaskOf(wheel, index, bandPx) != null) CompositingStrategy.Offscreen else CompositingStrategy.Auto
+    }
+    .drawWithContent {
+        drawContent()
+        val m = edgeMaskOf(wheel, index, bandPx) ?: return@drawWithContent
+        // La tarjeta puede ser más baja que la fila (carátula apaisada): sus coordenadas, centradas en ella.
+        val dy = (wheel.rowPx - size.height) / 2f
+        if (m.topSolid - dy > 0f) {
+            drawRect(Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black, startY = m.topClear - dy, endY = m.topSolid - dy), blendMode = BlendMode.DstIn)
+        }
+        if (m.bottomSolid - dy < size.height) {
+            drawRect(Brush.verticalGradient(0f to Color.Black, 1f to Color.Transparent, startY = m.bottomSolid - dy, endY = m.bottomClear - dy), blendMode = BlendMode.DstIn)
+        }
+    }
+
+/** La franja de fundido de la fila [index] ahora mismo (solo al dibujar), o null si no toca ningún canto. */
+private fun edgeMaskOf(wheel: WheelState, index: Int, bandPx: Float): MeridianCoverLayout.EdgeMask? {
+    val row = wheel.rowPx
+    if (row <= 0f || wheel.railPx <= 0f) return null
+    val d = wheel.distance(index)
+    val p = wheel.profile
+    val center = wheel.focusPx + wheel.lift() + WheelTransform.center(d, p) * row
+    return MeridianCoverLayout.edgeMask(center, WheelTransform.scale(d, p), row, 0f, wheel.railPx, bandPx)
 }
 
 /** La niebla sobre el arte: el color del fondo según la distancia, que lo empuja hacia atrás y le quita color. Sin ella en calidad ligera. */
@@ -430,6 +489,20 @@ private fun Modifier.contactShadow(shape: Shape, dark: Boolean, strength: () -> 
     }
 }
 
+/**
+ * La proporción (ancho/alto) de la imagen de una carátula: se lee solo su
+ * cabecera, fuera del hilo principal, y se guarda. Null mientras tanto, o sin
+ * imagen (el arte de reserva llena el hueco 2:3).
+ */
+@SuppressLint("ProduceStateDoesNotAssignValue")
+@Composable
+private fun rememberCoverAspect(art: String?): State<Float?> {
+    val context = LocalContext.current
+    return produceState(art?.let(ArtSampler::cachedAspect), art) {
+        if (art != null) value = ArtSampler.aspect(context, art)
+    }
+}
+
 /** La luminancia del canto de la tarjeta (de la caché o leída fuera del hilo principal). */
 @SuppressLint("ProduceStateDoesNotAssignValue")
 @Composable
@@ -441,14 +514,16 @@ private fun rememberEdgeLuminance(art: String?, pkg: String?): State<Double?> {
     }
 }
 
-/** El arte de la fila de "Añadir": cristal con un "+" del acento. */
+/** El arte de la fila de "Añadir": cristal con un "+" del acento. [modifier] va dentro de su recorte (el fundido de los cantos). */
 @Composable
-private fun AddTile(side: Dp, selected: Boolean, look: SelectionLook) {
+private fun AddTile(side: Dp, selected: Boolean, look: SelectionLook, modifier: Modifier = Modifier) {
     val skin = LocalSkin.current
     Box(
         Modifier
             .size(side)
             .selectionFrame(selected, look, ICON_SHAPE)
+            .clip(ICON_SHAPE)
+            .then(modifier)
             .liquidGlass(ICON_SHAPE, skin.a1.copy(alpha = 0.6f)),
         contentAlignment = Alignment.Center,
     ) {

@@ -1,6 +1,7 @@
 package com.elyndra.launcher.ui.meridian
 
 import com.elyndra.launcher.data.ColorMath
+import com.elyndra.launcher.ui.theme.WheelGlass
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -49,11 +50,13 @@ class MeridianFogTest {
         for (w in widths) {
             val g = geo(w)
             val x = g.axisX + (MeridianScrims.clearAt(g.axisX, w) - g.axisX) * 0.3f
-            val centre = MeridianFog.alphaAt(x, g.focusY, g.axisX, w, g.focusY, g.arcRadius)
-            val edge = MeridianFog.alphaAt(x, g.focusY - g.railHeight / 2f, g.axisX, w, g.focusY, g.arcRadius)
+            // La línea de foco bajada lo justo para que ninguna muestra caiga junto al borde de arriba (ver TOP_EASE).
+            val focus = g.focusY + MeridianFog.TOP_EASE
+            val centre = MeridianFog.alphaAt(x, focus, g.axisX, w, focus, g.arcRadius)
+            val edge = MeridianFog.alphaAt(x, focus - g.railHeight / 2f, g.axisX, w, focus, g.arcRadius)
             assertTrue("w=$w $edge < $centre", edge < centre)
             // Simétrica arriba y abajo.
-            assertEquals(edge, MeridianFog.alphaAt(x, g.focusY + g.railHeight / 2f, g.axisX, w, g.focusY, g.arcRadius), 1e-6f)
+            assertEquals(edge, MeridianFog.alphaAt(x, focus + g.railHeight / 2f, g.axisX, w, focus, g.arcRadius), 1e-6f)
         }
     }
 
@@ -89,22 +92,69 @@ class MeridianFogTest {
         }
     }
 
+    /** El arco del cristal en una ventana [w] de alto la mitad, con la cabecera y las pistas de siempre. */
+    private fun glass(w: Float, reach: Float = 0f): Pair<MeridianGeometry, GlassArc> {
+        val g = geo(w)
+        val h = w * 0.5f
+        val focus = 40f + g.focusY
+        return g to MeridianScrims.glassArc(g.axisX, focus, -24f, h, g.arcRadius, reach)
+    }
+
     @Test
-    fun `the light glass edge passes the dial at the focus line and curves back like the rows`() {
+    fun `the light glass edge passes the dial at the focus line`() {
+        for (w in widths) {
+            val (g, arc) = glass(w)
+            val atFocus = arc.edgeAt(40f + g.focusY)
+            // En la línea de foco: el dial con su nodo y su resplandor (~6 dp pasado el eje) dentro, con aire; el hero, fuera.
+            assertTrue(atFocus >= g.axisX + WheelGlass.PAST_AXIS_DP - 1e-3f)
+            assertTrue(atFocus <= g.heroLeft - 16f)
+            assertTrue(MeridianScrims.glassRight(arc, w) >= arc.peak)
+        }
+    }
+
+    @Test
+    fun `the light glass edge is one symmetric curve from the top of the screen to the bottom`() {
+        for (w in widths) {
+            val (_, arc) = glass(w)
+            val top = -24f
+            val bottom = w * 0.5f
+            val c = (top + bottom) / 2f
+            // Simétrica respecto al centro de la pantalla, y se recoge siempre hacia las puntas (sin picos ni tramos rectos).
+            for (d in listOf(10f, 80f, 160f, (bottom - top) / 2f)) assertEquals(arc.edgeAt(c - d), arc.edgeAt(c + d), 1e-3f)
+            var prev = arc.edgeAt(c)
+            var y = c
+            while (y > top) {
+                y -= 4f
+                val x = arc.edgeAt(y)
+                assertTrue("y=$y", x < prev)
+                prev = x
+            }
+            assertTrue(arc.edgeAt(top) >= WheelGlass.MIN_EDGE_DP - 1e-3f)
+        }
+    }
+
+    @Test
+    fun `a wide header opens the arc but keeps it symmetric`() {
+        for (w in widths) {
+            val (_, bare) = glass(w)
+            val reach = bare.edgeAt(0f) + minOf(30f, (bare.peak - bare.edgeAt(0f)) / 2f)
+            val (_, open) = glass(w, reach)
+            assertTrue(open.edgeAt(0f) >= reach - 1e-3f)
+            assertTrue(open.radius > bare.radius)
+            assertEquals(open.edgeAt(open.centerY - 100f), open.edgeAt(open.centerY + 100f), 1e-3f)
+        }
+    }
+
+    @Test
+    fun `the glass edge reaches the top of the layer flat, so its mirror under the status bar has no peak`() {
         for (w in widths) {
             val g = geo(w)
-            val focus = 40f + g.focusY
-            val atFocus = MeridianScrims.glassEdgeAt(focus, g.axisX, focus, g.arcRadius)
-            // En la línea de foco: el dial con su nodo y su resplandor (~6 dp pasado el eje) dentro, con aire; el hero, fuera.
-            assertTrue(atFocus >= g.axisX + 18f)
-            assertTrue(atFocus <= g.heroLeft - 16f)
-            assertEquals(MeridianScrims.glassRight(g.axisX, w), atFocus, 1e-3f)
-            // Lejos de la línea, se recoge como las filas (simétrico y sin pasar del mínimo).
-            val up = MeridianScrims.glassEdgeAt(focus - 200f, g.axisX, focus, g.arcRadius)
-            val down = MeridianScrims.glassEdgeAt(focus + 200f, g.axisX, focus, g.arcRadius)
-            assertTrue(up < atFocus)
-            assertEquals(up, down, 1e-3f)
-            assertTrue(MeridianScrims.glassEdgeAt(focus + 5000f, g.axisX, focus, g.arcRadius) >= 120f)
+            // El velo oscuro sigue reflejándose bajo la barra de estado: su canto llega plano.
+            val at = { y: Float -> MeridianFog.visibleEdge(y, g.axisX, g.focusY, g.arcRadius) }
+            assertEquals(at(0f), at(1f), 0.05f)
+            val y = MeridianFog.TOP_EASE
+            assertEquals(g.axisX + MeridianFog.WASH_REACH + WheelArc.offset(y + 10f - g.focusY, g.arcRadius), at(y + 10f), 1e-3f)
+            assertTrue(abs(at(y) - at(y - 1f)) < 1f)
         }
     }
 

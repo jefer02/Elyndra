@@ -42,8 +42,7 @@ import kotlinx.coroutines.launch
    Foco del mando, en un solo sitio.
 
    Las pantallas de formulario (Ajustes, Añadir, Masha) y las capas que
-   no maneja el InputController (ficha, selector de arte, editar nombre)
-   se recorren con el foco de Compose: la cruceta y el stick llegan como
+   no maneja el InputController (ficha, editar nombre) se recorren con el foco de Compose: la cruceta y el stick llegan como
    teclas de cruceta (ver MainActivity) y A como DPAD_CENTER.
 
    Lo que aquí se reparte:
@@ -77,7 +76,8 @@ private val LocalPadScope = staticCompositionLocalOf<PadFocusScope?> { null }
 /**
  * Grupo de foco de una pantalla o capa. Todas las pantallas lo llevan de
  * serie (ElyndraApp); las capas que se manejan con el foco de Compose (ficha,
- * selector de arte, editar nombre) también.
+ * editar nombre) también. El selector de arte lo lleva el InputController
+ * (como el menú de acciones) y solo usa el grupo como frontera ([padFocus] false).
  *
  * - [modal]: capa encima de otra: el foco no sale de ella.
  * - [blocked]: hay una capa encima: el foco no entra aquí desde ella.

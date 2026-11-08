@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.elyndra.launcher.ui.theme.LocalPoppins
@@ -18,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -68,6 +68,9 @@ import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.heroDescription
 import com.elyndra.launcher.ui.rememberDescription
 import com.elyndra.launcher.ui.screens.EmulatorSelector
+import com.elyndra.launcher.ui.screens.EMULATOR_LABEL_SP
+import com.elyndra.launcher.ui.FolderBarLayout
+import androidx.compose.ui.graphics.Shadow
 import com.elyndra.launcher.ui.screens.FolderChips
 import com.elyndra.launcher.ui.screens.playedLabel
 import com.elyndra.launcher.ui.selection.rememberSelectionLook
@@ -118,31 +121,36 @@ internal fun MeridianFolder(vm: ElyndraViewModel, item: LibraryItem.Folder) {
         wheel = { wheel.value },
         artIndex = { key -> keyIndex[key] },
         railHeader = {
-            val compact = LocalMeridianFrame.current.compact
-            // El mismo tope que la barra de la derecha: las dos filas comparten la línea central.
-            Column(Modifier.fillMaxWidth().padding(top = MeridianTopRow.top(compact).dp, bottom = MeridianTopRow.bottom(compact).dp)) {
-                Row(Modifier.padding(start = 22.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    ConsoleIconButton(onClick = { vm.go(Screen.Library) }, focused = vm.input.isBarFocused(BarItem.Back)) { glyph ->
-                        Box(glyph) { BackChevron(color = Color.White) }
+            FolderRailHeader(
+                compact = LocalMeridianFrame.current.compact,
+                bar = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ConsoleIconButton(onClick = { vm.go(Screen.Library) }, focused = vm.input.isBarFocused(BarItem.Back)) { glyph ->
+                            Box(glyph) { BackChevron(color = Color.White) }
+                        }
+                        PadGlyphBadge("B", vm.input.gamepadPresent)
+                        Spacer(Modifier.width(8.dp))
+                        OpenButton(enabled = rom != null, focused = vm.input.isBarFocused(BarItem.Open)) { openKey(rom?.key) }
                     }
-                    PadGlyphBadge("B", vm.input.gamepadPresent)
-                    Spacer(Modifier.width(8.dp))
-                    OpenButton(enabled = rom != null, focused = vm.input.isBarFocused(BarItem.Open)) { openKey(rom?.key) }
-                    Spacer(Modifier.width(8.dp))
-                    EmulatorSelector(vm, item, emulatorLabel, Modifier.weight(1f, fill = false))
-                }
-                Spacer(Modifier.height(if (compact) 4.dp else 8.dp))
-                Box(Modifier.fillMaxWidth().padding(start = 22.dp, end = 16.dp), contentAlignment = Alignment.CenterEnd) {
-                    FolderChips(vm, item, roms.size)
-                }
-            }
+                },
+            )
         },
         topEnd = {
-            FolderHeader(item.system.name, item.folder.displayPath) {
+            // El emulador va con el sistema, a la derecha: en la cabecera de la rueda
+            // obligaba al cristal a abrirse arriba y perdía su curva.
+            FolderHeader(
+                title = item.system.name,
+                path = item.folder.displayPath,
+                emulatorLabel = emulatorLabel,
+                emulator = { iconOnly -> EmulatorSelector(vm, item, emulatorLabel, iconOnly = iconOnly) },
+                // La ficha de la carpeta, con el sistema (antes bajo volver y "Abrir", quitándole alto a la rueda).
+                pill = { short -> FolderChips(vm, item, roms.size, short = short) },
+            ) {
                 if (vm.settings.statusVisible) StatusStrip(vm.settings.statusMode)
             }
         },
         tileAspect = COVER_RATIO,
+        folderHeader = true,
         hints = {
             PadHints(hints = FOLDER_WHEEL_HINTS, visible = vm.input.gamepadPresent, modifier = Modifier.padding(start = 12.dp, bottom = 4.dp))
         },
@@ -205,6 +213,33 @@ internal fun MeridianFolder(vm: ElyndraViewModel, item: LibraryItem.Folder) {
     }
 }
 
+/**
+ * La cabecera de la rueda de la carpeta: solo volver y "Abrir", en una fila,
+ * alineados a la izquierda ([RailHeaderLayout.START]) y con el mismo tope que
+ * la barra de la derecha. La ficha de la carpeta ("4 ROMs · 0h 16m") iba
+ * debajo y le quitaba a la rueda ~28 dp de alto; ahora va arriba a la derecha,
+ * con el emulador y el sistema ([FolderHeader]). Le dice a la niebla (o al
+ * cristal) hasta dónde llegar en su banda ([FogArc.reach]).
+ */
+@Composable
+internal fun FolderRailHeader(compact: Boolean, bar: @Composable () -> Unit) {
+    val fog = LocalRailFog.current
+    Layout(
+        content = { Box { bar() } },
+        modifier = Modifier.fillMaxWidth().padding(top = MeridianTopRow.top(compact).dp, bottom = MeridianTopRow.bottom(compact).dp),
+    ) { measurables, constraints ->
+        val rail = constraints.maxWidth.toDp().value
+        val loose = Constraints(maxWidth = RailHeaderLayout.dockMaxWidth(rail).dp.roundToPx())
+        val barP = measurables[0].measure(loose)
+        val start = RailHeaderLayout.START.dp.roundToPx()
+        val reach = RailHeaderLayout.START + barP.width.toDp().value + RailHeaderLayout.FOG_MARGIN
+        layout(constraints.maxWidth, barP.height) {
+            barP.place(start, 0)
+            fog?.arc?.let { state -> if (state.value.reach != reach) state.value = state.value.copy(reach = reach) }
+        }
+    }
+}
+
 /** La fila de una ROM: su título, "2h 10m jugado · ISO" y, enfocada, sus fichas. */
 private fun romEntry(res: Resources, rom: RomEntry, folder: LibraryItem.Folder): WheelEntry {
     val played = if (rom.stats.minutes > 0) res.getString(R.string.played_time, fmtMinutes(rom.stats.minutes)) else res.getString(R.string.never_played)
@@ -238,9 +273,10 @@ private fun RomWheelTile(vm: ElyndraViewModel, rom: RomEntry) {
         }
         val unnamed = remember(rom.displayTitle) { !NameCheck.isNameUsable(rom.displayTitle) }
         if (unnamed) NeedsNameBadge(Modifier.align(Alignment.TopStart).padding(3.dp), onDark = true)
+        // Sin carátula, el título de la reserva va abajo a la izquierda: la extensión sube para no taparlo.
         Box(
             Modifier
-                .align(Alignment.BottomEnd)
+                .align(if (rom.meta.cover == null) Alignment.TopEnd else Alignment.BottomEnd)
                 .padding(3.dp)
                 .clip(RoundedCornerShape(4.dp))
                 // Va encima de la carátula, no de una superficie del tema: clara con tinta oscura en los dos modos.
@@ -300,28 +336,102 @@ private val FOLDER_WHEEL_HINTS = listOf(
 )
 
 /**
- * La cabecera de la carpeta, arriba a la derecha: su nombre en una línea y,
+ * La cabecera de la carpeta, arriba a la derecha: el emulador de la carpeta
+ * ([emulator], con su rótulo [emulatorLabel]), su nombre en una línea y,
  * debajo, la ruta en otra línea pequeña y tenue, recortada por el centro
  * ("…") para que se vean el principio y la carpeta final. La píldora de hora
  * y batería ([status]) va siempre entera, a 12 dp como poco: el texto cede el
- * sitio, ella no. Va sobre el velo de arriba del arte (blanco ≥ 4,5:1).
+ * sitio, ella no. Si no cabe todo, el emulador se recorta y, en lo más
+ * justo, se queda en su icono ([FolderBarLayout]); [emulator] recibe si va
+ * solo con el icono. Va sobre el velo de arriba del arte (blanco ≥ 4,5:1).
+ *
+ * Con [spread] (el Clásico, tras volver y "Abrir") el emulador va al
+ * principio del hueco y el nombre con la píldora al final; si no, todo junto
+ * a la derecha. [shadow], la sombra del texto sobre el hero del Clásico.
  */
 @Composable
-internal fun FolderHeader(title: String, path: String, status: @Composable () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f, fill = false), horizontalAlignment = Alignment.End) {
-            ElyText(title, size = 13f, weight = FontWeight.SemiBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, align = TextAlign.End)
-            Spacer(Modifier.height(2.dp))
-            MiddleEllipsisText(path, size = 9f, color = Color.White.copy(alpha = ArtWash.TOP_TEXT_ALPHA))
+internal fun FolderHeader(
+    title: String,
+    path: String,
+    modifier: Modifier = Modifier,
+    emulatorLabel: String = "",
+    emulator: (@Composable (iconOnly: Boolean) -> Unit)? = null,
+    spread: Boolean = false,
+    shadow: Shadow? = null,
+    /** La ficha de la carpeta, a la izquierda del emulador: entera o, si no cabe, sin el tiempo ([FolderBarLayout.Pill]). */
+    pill: (@Composable (short: Boolean) -> Unit)? = null,
+    status: @Composable () -> Unit,
+) {
+    val measurer = rememberTextMeasurer()
+    val family = LocalPoppins.current
+    val density = LocalDensity.current
+    // El rótulo del emulador medido de verdad (fuente, idioma y escala de letra).
+    val labelWidth = remember(emulatorLabel, family, density) {
+        val style = TextStyle(fontFamily = family, fontSize = EMULATOR_LABEL_SP.sp, fontWeight = FontWeight.SemiBold)
+        measurer.measure(emulatorLabel, style, maxLines = 1, density = density).size.width / density.density
+    }
+    Layout(
+        content = {
+            Box { emulator?.invoke(false) }
+            Box { emulator?.invoke(true) }
+            Column(horizontalAlignment = Alignment.End) {
+                ElyText(title, size = 13f, weight = FontWeight.SemiBold, color = Color.White, shadow = shadow, maxLines = 1, overflow = TextOverflow.Ellipsis, align = TextAlign.End)
+                Spacer(Modifier.height(2.dp))
+                MiddleEllipsisText(path, size = 9f, color = Color.White.copy(alpha = ArtWash.TOP_TEXT_ALPHA), shadow = shadow)
+            }
+            Box { status() }
+            Box { pill?.invoke(false) }
+            Box { pill?.invoke(true) }
+        },
+        modifier = modifier,
+    ) { measurables, constraints ->
+        val maxW = if (constraints.hasBoundedWidth) constraints.maxWidth else Int.MAX_VALUE / 2
+        val statusP = measurables[3].measure(Constraints(maxWidth = maxW))
+        // Las dos fichas de la carpeta medidas de verdad (idioma y escala de letra): el plan elige una.
+        val pillFull = measurables[4].measure(Constraints(maxWidth = maxW))
+        val pillShort = measurables[5].measure(Constraints(maxWidth = maxW))
+        val plan = if (emulator == null && pill == null) {
+            null
+        } else {
+            FolderBarLayout.plan(
+                maxW.toDp().value,
+                if (emulator == null) 0f else labelWidth,
+                statusP.width.toDp().value,
+                pillWidth = pillFull.width.toDp().value,
+                pillShortWidth = pillShort.width.toDp().value,
+            )
         }
-        Spacer(Modifier.width(12.dp))
-        status()
+        val chipP = if (emulator == null) null else plan?.let {
+            if (it.fit.emulatorLabel) measurables[0].measure(Constraints(maxWidth = it.chipWidth.dp.roundToPx())) else measurables[1].measure(Constraints())
+        }
+        val pillP = when (plan?.pill) {
+            FolderBarLayout.Pill.Full -> pillFull.takeIf { it.width > 0 }
+            FolderBarLayout.Pill.Short -> pillShort.takeIf { it.width > 0 }
+            else -> null
+        }
+        val gap = FolderBarLayout.GAP.dp.roundToPx()
+        val statusGap = if (statusP.width > 0) gap else 0
+        val chipSpace = chipP?.let { it.width + gap } ?: 0
+        val pillSpace = pillP?.let { it.width + gap } ?: 0
+        val titleP = measurables[2].measure(Constraints(maxWidth = (maxW - chipSpace - pillSpace - statusGap - statusP.width).coerceAtLeast(0)))
+        val content = pillSpace + chipSpace + titleP.width + statusGap + statusP.width
+        val w = maxOf(content, constraints.minWidth).coerceAtMost(maxW)
+        val h = maxOf(chipP?.height ?: 0, pillP?.height ?: 0, titleP.height, statusP.height, constraints.minHeight)
+        layout(w, h) {
+            val statusX = w - statusP.width
+            statusP.place(statusX, (h - statusP.height) / 2)
+            val titleX = statusX - statusGap - titleP.width
+            titleP.place(titleX, (h - titleP.height) / 2)
+            val chipX = if (spread) pillSpace else titleX - chipSpace
+            chipP?.place(chipX, (h - chipP.height) / 2)
+            pillP?.place(if (spread) 0 else chipX - pillSpace, (h - pillP.height) / 2)
+        }
     }
 }
 
 /** Una línea recortada por el centro a lo que quepa (lo mide de verdad, en cualquier idioma y tamaño de letra). */
 @Composable
-private fun MiddleEllipsisText(text: String, size: Float, color: Color) {
+private fun MiddleEllipsisText(text: String, size: Float, color: Color, shadow: Shadow? = null) {
     val measurer = rememberTextMeasurer()
     val family = LocalPoppins.current
     val density = LocalDensity.current
@@ -339,7 +449,6 @@ private fun MiddleEllipsisText(text: String, size: Float, color: Color) {
             }
             MiddleEllipsis.shorten(text, lo)
         }
-        ElyText(shown, size = size, color = color, letterSpacing = tracking(0.06f), maxLines = 1, align = TextAlign.End)
+        ElyText(shown, size = size, color = color, letterSpacing = tracking(0.06f), shadow = shadow, maxLines = 1, align = TextAlign.End)
     }
 }
-

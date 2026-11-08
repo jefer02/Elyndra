@@ -4,6 +4,7 @@ import com.elyndra.launcher.data.BrandTokens
 import com.elyndra.launcher.data.ColorMath
 import com.elyndra.launcher.ui.DotTabsLayout
 import com.elyndra.launcher.ui.TopBarLayout
+import com.elyndra.launcher.ui.theme.GlassTokens
 import com.elyndra.launcher.ui.theme.WheelGlass
 import java.text.Normalizer
 import kotlin.math.abs
@@ -44,12 +45,18 @@ enum class LayoutStyle(val id: String) {
 
 /**
  * El fondo detrás de la rueda de Meridian (Ajustes → Apariencia): cristal
- * curvo (el arte casi tal cual) o difuminado (el velo de siempre, que funde
- * el arte con el color del tema). Sin elegir nunca, cristal en el tema claro
- * y difuminado en el oscuro; elegido, el mismo en los dos.
+ * curvo (el arte esmerilado) o difuminado (el velo de siempre, que funde el
+ * arte con el color del tema). Sin elegir, cristal en los dos temas: antes el
+ * oscuro llevaba el difuminado, así que en un móvil en tema oscuro el cristal
+ * nuevo no aparecía nunca (se veía el velo de siempre). Elegido, el mismo en
+ * los dos.
  */
 object WheelBackdrop {
-    fun glass(choice: Boolean?, dark: Boolean): Boolean = choice ?: !dark
+    @Suppress("UNUSED_PARAMETER")
+    fun glass(choice: Boolean?, dark: Boolean): Boolean = choice ?: true
+
+    /** Lo que se usaba sin elegir antes de la versión 2 de los ajustes del cristal (ver `SettingsStore.migrateGlass`). */
+    fun legacyDefault(dark: Boolean): Boolean = !dark
 }
 
 object MeridianMode {
@@ -133,10 +140,11 @@ object WheelTransform {
      * Alto de la tarjeta enfocada respecto al alto de la rueda: iconos
      * cuadrados (y apaisadas) y carátulas verticales. Las carátulas iban al
      * 48 %: en una tableta sus vecinas no cabían y se cortaban en seco contra
-     * la cabecera y el pie. Ahora miden lo que deja [NEIGHBOR_REACH].
+     * la cabecera y el pie. Ahora miden lo que deja [NEIGHBOR_REACH]: con las
+     * vecinas al 60 %, un 43 % (antes 39 %; en la tableta se veían pequeñas).
      */
     const val ICON_TILE = 0.38f
-    const val COVER_TILE = 0.39f
+    const val COVER_TILE = 0.43f
 
     /** Ancho máximo de la tarjeta enfocada: respecto a la ventana y respecto a la rueda (al nombre le queda sitio). */
     const val MAX_TILE_WIDTH = 0.24f
@@ -146,20 +154,25 @@ object WheelTransform {
     const val TILE_MIN = 88f
     const val TILE_MAX = 380f
 
-    /** Escala por distancia (la enfocada mide 1). Las vecinas, al 72 % (antes 64 %): se reconocen sin tener que enfocarlas. */
-    val SCALE = floatArrayOf(1f, 0.72f, 0.52f, 0.37f, 0.28f)
+    /**
+     * Escala por distancia (la enfocada mide 1). Las vecinas, al 60 %: al 72 %
+     * casi medían lo que la enfocada y en una tableta no se veía cuál estaba
+     * seleccionada; lo que encogen se lo queda la enfocada ([COVER_TILE]).
+     */
+    val SCALE = floatArrayOf(1f, 0.6f, 0.44f, 0.33f, 0.26f)
 
     /** Opacidad por distancia: desde ±4, invisible. */
-    val ALPHA = floatArrayOf(1f, 0.85f, 0.5f, 0.25f, 0f)
+    val ALPHA = floatArrayOf(1f, 0.8f, 0.45f, 0.22f, 0f)
 
     /** Calidad ligera: solo ±2. */
-    val ALPHA_LITE = floatArrayOf(1f, 0.85f, 0.5f, 0f, 0f)
+    val ALPHA_LITE = floatArrayOf(1f, 0.8f, 0.45f, 0f, 0f)
 
     /** Giro en perspectiva por distancia (grados). */
     val ROTATION = floatArrayOf(0f, 6f, 12f, 18f, 18f)
 
     /** Niebla sobre el arte por distancia (alfa del color del fondo). */
-    val FOG = floatArrayOf(0f, 0.12f, 0.26f, 0.42f, 0.55f)
+    /** Las vecinas, algo más apagadas (antes 0,12): la enfocada es la única a todo color. */
+    val FOG = floatArrayOf(0f, 0.22f, 0.34f, 0.46f, 0.55f)
 
     /** Cuánto texto conserva la fila: el nombre se lee en la enfocada y sus vecinas; desde ±2, solo el arte. */
     val DETAIL = floatArrayOf(1f, 1f, 0f, 0f, 0f)
@@ -191,18 +204,33 @@ object WheelTransform {
 
     /** Cuerpo (sp) del nombre de las filas que no están en la línea (la escala de la capa lo deja en ~12–13 sp a una fila). */
     const val NEIGHBOR_SP = 20f
-    const val NEIGHBOR_SP_COMPACT = 19f
+    const val NEIGHBOR_SP_COMPACT = 20f
 
     /**
      * Alto de la tarjeta enfocada (dp) para una rueda de [railHeight] × [railWidth] dp,
      * una ventana de [windowWidth] dp y una proporción ancho/alto [aspect].
-     * Nunca tanto que una vecina se salga de la rueda ([NEIGHBOR_REACH]).
+     * En una ventana normal (tableta, tele), nunca tanto que una vecina se
+     * salga ([NEIGHBOR_REACH]). En una baja ([compact], móvil apaisado), lo
+     * que deja asomar la misma franja de cada vecina
+     * ([MeridianCoverLayout.phoneTile]), sin pasar del 24 % del ancho de la ventana.
      */
-    fun tileHeight(railHeight: Float, windowWidth: Float, aspect: Float, railWidth: Float = Float.MAX_VALUE): Float {
+    fun tileHeight(railHeight: Float, windowWidth: Float, aspect: Float, railWidth: Float = Float.MAX_VALUE, compact: Boolean = false): Float {
+        val cap = railHeight.coerceAtLeast(TILE_MIN)
+        if (compact) {
+            // Las carátulas, solo con el tope de la ventana: la columna crece con ellas. Los iconos de la
+            // biblioteca guardan además el de la columna de siempre: su barra de la derecha (Masha, orden,
+            // buscar, Ajustes) y el dock que asoma necesitan ese ancho en un móvil.
+            val byWidth = if (aspect < 1f) {
+                windowWidth * MAX_TILE_WIDTH / MeridianCoverLayout.slotAspect(aspect)
+            } else {
+                min(windowWidth * MAX_TILE_WIDTH, railWidth * MAX_TILE_RAIL) / aspect.coerceAtLeast(0.1f)
+            }
+            return min(MeridianCoverLayout.phoneTile(railHeight), byWidth).coerceIn(TILE_MIN, TILE_MAX).coerceAtMost(cap)
+        }
         val byHeight = railHeight * if (aspect < 1f) COVER_TILE else ICON_TILE
         val byWidth = min(windowWidth * MAX_TILE_WIDTH, railWidth * MAX_TILE_RAIL) / aspect.coerceAtLeast(0.1f)
         val byNeighbors = railHeight * FOCUS_FRACTION / NEIGHBOR_REACH
-        return minOf(byHeight, byWidth, byNeighbors).coerceIn(TILE_MIN, TILE_MAX).coerceAtMost(railHeight.coerceAtLeast(TILE_MIN))
+        return minOf(byHeight, byWidth, byNeighbors).coerceIn(TILE_MIN, TILE_MAX).coerceAtMost(cap)
     }
 
     /** Interpolación lineal de una tabla por la distancia (sin signo); más allá de la última entrada, la última. */
@@ -215,7 +243,7 @@ object WheelTransform {
         return table[i] + (table[i + 1] - table[i]) * t
     }
 
-    fun scale(distance: Float): Float = lookup(SCALE, distance)
+    fun scale(distance: Float, profile: WheelProfile = WheelProfile.DEFAULT): Float = lookup(profile.scales, distance)
 
     fun alpha(distance: Float, lite: Boolean = false): Float = lookup(if (lite) ALPHA_LITE else ALPHA, distance)
 
@@ -230,15 +258,16 @@ object WheelTransform {
     /** Giro en perspectiva (grados): las filas se vuelven hacia el arte al alejarse. Sin giro con "reducir movimiento" ni en calidad ligera. */
     fun rotationY(distance: Float, flat: Boolean): Float = if (flat) 0f else -lookup(ROTATION, distance)
 
-    /** Centro visual (altos de tarjeta, con signo). Más allá de la tabla sigue con el paso de la última fila. */
-    fun center(distance: Float): Float {
+    /** Centro visual (altos de tarjeta, con signo) con el reparto [profile]. Más allá de la tabla sigue con el paso de la última fila. */
+    fun center(distance: Float, profile: WheelProfile = WheelProfile.DEFAULT): Float {
+        val centers = profile.centers
         val x = abs(distance)
-        val last = CENTER.size - 1
+        val last = centers.size - 1
         val c = if (x >= last) {
-            CENTER[last] + (x - last) * (SCALE[last] + GAP[GAP.size - 1])
+            centers[last] + (x - last) * (profile.scales[last] + GAP[GAP.size - 1])
         } else {
             val i = x.toInt()
-            CENTER[i] + (CENTER[i + 1] - CENTER[i]) * (x - i)
+            centers[i] + (centers[i + 1] - centers[i]) * (x - i)
         }
         return sign(distance) * c
     }
@@ -248,7 +277,7 @@ object WheelTransform {
      * escala de la capa no cambia lo que mide la fila, así que cada una se
      * mueve de donde la pone la lista ([distance] huecos) a su centro visual.
      */
-    fun shift(distance: Float): Float = center(distance) - distance
+    fun shift(distance: Float, profile: WheelProfile = WheelProfile.DEFAULT): Float = center(distance, profile) - distance
 
     /** Orden de dibujo: las cercanas por encima de las lejanas (se fija al cambiar la selección, no al girar). */
     fun zOrder(index: Int, focused: Int): Float = -abs(index - focused).toFloat()
@@ -276,6 +305,39 @@ object WheelTransform {
         detail = detail(distance),
         fog = fog(distance, lite),
     )
+}
+
+/**
+ * Cómo se reparten las vecinas en la rueda: su escala (la de ±1; las demás en
+ * la misma proporción que en [WheelTransform.SCALE]), el aire entre la
+ * enfocada y ellas ([focusGap], en altos de tarjeta), cuánto siguen la curva
+ * del dial ([curve], 1 = el arco entero, 0 = en el mismo eje vertical que la
+ * enfocada), si las listas cortas se centran en la rueda y si los cantos se
+ * funden solo con la máscara ([maskOnly], sin apagar la fila entera).
+ * [DEFAULT] es el de siempre (tableta, tele); el del móvil lo da
+ * [MeridianCoverLayout.profile]. Al ser simétrico en la distancia, las dos
+ * vecinas son siempre iguales.
+ */
+data class WheelProfile(
+    val neighborScale: Float = WheelTransform.SCALE[1],
+    val focusGap: Float = WheelTransform.GAP[0],
+    val curve: Float = 1f,
+    val centerShortLists: Boolean = true,
+    val maskOnly: Boolean = false,
+) {
+    /** Escala por distancia (0, ±1, ±2…). */
+    val scales: FloatArray = FloatArray(WheelTransform.SCALE.size) { n ->
+        if (n == 0) 1f else WheelTransform.SCALE[n] * neighborScale / WheelTransform.SCALE[1]
+    }
+
+    /** Centro visual por distancia, sumando mitades y huecos (el primero, [focusGap]). */
+    val centers: FloatArray = FloatArray(scales.size).also { c ->
+        for (n in 1 until c.size) c[n] = c[n - 1] + (scales[n - 1] + scales[n]) / 2f + if (n == 1) focusGap else WheelTransform.GAP[n - 1]
+    }
+
+    companion object {
+        val DEFAULT = WheelProfile()
+    }
 }
 
 data class WheelPose(
@@ -312,13 +374,15 @@ object ShortList {
      * rueda en [position], [count] filas, una rueda de [railTiles] tarjetas de
      * alto y la línea de siempre a [focusTiles]. La enfocada nunca se sale.
      */
-    fun lift(position: Float, count: Int, railTiles: Float, focusTiles: Float): Float {
-        val k = weight(count)
+    fun lift(position: Float, count: Int, railTiles: Float, focusTiles: Float, profile: WheelProfile = WheelProfile.DEFAULT): Float {
+        // En un móvil la enfocada va siempre en el centro: con ella tan grande, centrar la pila
+        // la subía contra la cabecera y dejaba un hueco abajo (falta una vecina, y nada más).
+        val k = if (profile.centerShortLists) weight(count) else 0f
         if (k == 0f) return 0f
         val first = -position
         val last = count - 1 - position
-        val top = WheelTransform.center(first) - WheelTransform.scale(first) / 2f
-        val bottom = WheelTransform.center(last) + WheelTransform.scale(last) / 2f
+        val top = WheelTransform.center(first, profile) - WheelTransform.scale(first, profile) / 2f
+        val bottom = WheelTransform.center(last, profile) + WheelTransform.scale(last, profile) / 2f
         val centered = railTiles / 2f - (top + bottom) / 2f
         val target = centered.coerceIn(0.5f, (railTiles - 0.5f).coerceAtLeast(0.5f))
         return k * (target - focusTiles)
@@ -332,10 +396,15 @@ object ShortList {
  */
 object RailEdge {
 
+    /**
+     * Ya no apaga a la vecina que asoma (con su centro dentro de la rueda): de
+     * fundir el canto se encarga la máscara ([MeridianCoverLayout.edgeMask]).
+     * Solo se va la fila que ya ha pasado el canto con su centro.
+     */
     fun fade(centerY: Float, visualHeight: Float, top: Float, bottom: Float): Float {
         val h = visualHeight.coerceAtLeast(1f)
-        val a = WheelTransform.smoothstep(top - h * 0.2f, top + h * 0.35f, centerY)
-        val b = 1f - WheelTransform.smoothstep(bottom - h * 0.35f, bottom + h * 0.2f, centerY)
+        val a = WheelTransform.smoothstep(top - h * 0.45f, top + h * 0.05f, centerY)
+        val b = 1f - WheelTransform.smoothstep(bottom - h * 0.05f, bottom + h * 0.45f, centerY)
         return min(a, b)
     }
 }
@@ -557,6 +626,8 @@ data class MeridianGeometry(
     /** La línea de foco medida desde arriba de la rueda (sin el ajuste de las listas cortas). */
     val focusY: Float,
     val compact: Boolean = false,
+    /** Cómo se reparten las vecinas (el de móvil en ventana baja, ver [MeridianCoverLayout.profile]). */
+    val profile: WheelProfile = WheelProfile.DEFAULT,
 ) {
     val axisX: Float get() = railWidth
     val heroLeft: Float get() = railWidth + HERO_GAP
@@ -569,7 +640,7 @@ data class MeridianGeometry(
     val padBottom: Float get() = (railHeight - focusY - rowHeight / 2f).coerceAtLeast(0f)
 
     /** Margen izquierdo de las tarjetas: la curva de las vecinas (±1) no las saca de la pantalla; las lejanas pueden asomar. */
-    val inset: Float get() = insetFor(rowHeight, arcRadius)
+    val inset: Float get() = insetFor(rowHeight, arcRadius, profile)
 
     companion object {
         const val RAIL_FRACTION = 0.42f
@@ -585,16 +656,15 @@ data class MeridianGeometry(
 
         /**
          * El margen izquierdo de las tarjetas de [tile] dp en un círculo de
-         * [radius]: [RAIL_START] más lo que la curva corre a las vecinas. La
-         * fila encoge desde su canto izquierdo, así que el margen encoge con
-         * ella: con carátulas grandes (tableta) la vecina, al 72 % y corrida
-         * por la curva, quedaba fuera del filo. Se da lo que haga falta para
-         * dejarle [NEIGHBOR_START].
+         * [radius]: [RAIL_START] más lo que la curva corre a las vecinas. Las
+         * filas encogen desde el canto izquierdo de su tarjeta (no desde el de
+         * la pantalla): antes el margen encogía con ellas y, para que la
+         * vecina no se saliera, la enfocada se iba ~50 dp a la derecha y las
+         * vecinas quedaban a 8 dp del filo. Ahora todas quedan a
+         * [RAIL_START] del filo, y ese sitio es carátula.
          */
-        fun insetFor(tile: Float, radius: Float): Float {
-            val curve = abs(WheelArc.offset(WheelTransform.center(1f) * tile, radius))
-            return maxOf(RAIL_START + curve, (NEIGHBOR_START + curve) / WheelTransform.SCALE[1])
-        }
+        fun insetFor(tile: Float, radius: Float, profile: WheelProfile = WheelProfile.DEFAULT): Float =
+            maxOf(RAIL_START, NEIGHBOR_START) + profile.curve * abs(WheelArc.offset(WheelTransform.center(1f, profile) * tile, radius))
 
         /**
          * La rueda ya no lleva el nombre junto a cada icono (está en el hero): su
@@ -612,14 +682,17 @@ data class MeridianGeometry(
          * El ancho de la columna de la rueda (solo iconos) para una ventana de
          * [width] × [height] dp con tarjetas de proporción [aspect]. El icono
          * conserva el tamaño de siempre (el que daba la columna ancha).
+         * [folderHeader]: la cabecera de la carpeta, de dos filas; con la de
+         * la biblioteca la carátula estimada salía mayor que la de verdad y
+         * sobraba cristal entre ella y el dial.
          */
-        fun slimRailWidth(width: Float, height: Float, aspect: Float = 1f, compact: Boolean = false): Float {
+        fun slimRailWidth(width: Float, height: Float, aspect: Float = 1f, compact: Boolean = false, folderHeader: Boolean = false): Float {
             val classic = railWidthFor(width, compact)
-            val railH = (height - if (compact) HEADER_ESTIMATE_COMPACT else HEADER_ESTIMATE).coerceAtLeast(WheelTransform.TILE_MIN)
-            val tile = WheelTransform.tileHeight(railH, width, aspect, classic)
-            val inset = insetFor(tile, WheelArc.radius(railH))
+            val railH = (height - MeridianCoverLayout.headerEstimate(compact, folderHeader)).coerceAtLeast(WheelTransform.TILE_MIN)
+            val tile = WheelTransform.tileHeight(railH, width, aspect, classic, compact)
+            val inset = insetFor(tile, WheelArc.radius(railH), MeridianCoverLayout.profile(compact, tile))
             // Nunca más que la de siempre (que con una ventana sin medir aún vale 0).
-            return (inset + tile * aspect + TILE_TO_DIAL).coerceAtLeast(SLIM_MIN).coerceAtMost(classic)
+            return (inset + MeridianCoverLayout.slotWidth(tile, aspect) + MeridianCoverLayout.tileToDial(compact)).coerceAtLeast(SLIM_MIN).coerceAtMost(classic)
         }
 
         /**
@@ -654,9 +727,9 @@ data class MeridianGeometry(
         fun compute(width: Float, railHeight: Float, aspect: Float = 1f, compact: Boolean = false, railWidth: Float = railWidthFor(width, compact)): MeridianGeometry {
             val h = railHeight.coerceAtLeast(WheelTransform.TILE_MIN)
             val rail = railWidth
-            val tile = WheelTransform.tileHeight(h, width, aspect, railWidthFor(width, compact))
+            val tile = WheelTransform.tileHeight(h, width, aspect, railWidthFor(width, compact), compact)
             val focus = (h * WheelTransform.FOCUS_FRACTION).coerceIn(tile / 2f, (h - tile / 2f).coerceAtLeast(tile / 2f))
-            return MeridianGeometry(rail, h, tile, focus, compact)
+            return MeridianGeometry(rail, h, tile, focus, compact, MeridianCoverLayout.profile(compact, tile))
         }
     }
 }
@@ -671,6 +744,28 @@ data class MeridianGeometry(
  *
  * Todo en dp (quien pinta en px convierte antes: ver la máscara de [MeridianFog]).
  */
+/**
+ * El canto del cristal claro ([MeridianScrims.glassArc]): un arco de radio
+ * [radius] con su punto más a la derecha ([peak], dp) a la altura [centerY].
+ * Simétrico arriba y abajo; con radio infinito, recto.
+ */
+data class GlassArc(val peak: Float, val centerY: Float, val radius: Float) {
+
+    fun edgeAt(y: Float): Float = peak - sag(radius, y - centerY)
+
+    companion object {
+        /** Lo que se recoge un círculo de radio [r] a [dy] de su centro (≥ 0; más allá del radio, el radio). */
+        fun sag(r: Float, dy: Float): Float {
+            if (r.isInfinite()) return 0f
+            val d = min(abs(dy), r)
+            return r - sqrt(r * r - d * d)
+        }
+
+        /** El radio del círculo que a [d] de su centro se ha recogido [s] (sin recogerse, infinito). */
+        fun radiusThrough(d: Float, s: Float): Float = if (s <= 0f) Float.POSITIVE_INFINITY else (d * d + s * s) / (2f * s)
+    }
+}
+
 object MeridianScrims {
 
     const val MIN_TEXT = 4.5
@@ -740,18 +835,39 @@ object MeridianScrims {
     }
 
     /**
-     * El canto del cristal curvo del tema claro (dp) a la altura [y]: en la
-     * línea de foco ([focusY]) pasa [WheelGlass.PAST_AXIS_DP] del eje, y se
-     * corre a la izquierda lo mismo que las filas al seguir el círculo de la
-     * rueda ([radius]); nunca más allá de [WheelGlass.MIN_EDGE_DP]. En la
-     * banda de arriba ([band]) no se recoge más de lo que pide el dock.
+     * El canto del cristal curvo del tema claro: un arco de círculo simétrico
+     * de punta a punta de la pantalla, de [top] a [bottom] (dp en la escena;
+     * [top] < 0 cuando el cristal sube bajo la barra de estado), con su punto
+     * más a la derecha en el centro. Antes seguía el círculo de la rueda desde
+     * la línea de foco y, arriba, se ensanchaba para cubrir la cabecera: la
+     * forma quedaba torcida (recta arriba, recogida abajo).
+     *
+     * En la línea de foco ([focusY]) pasa [WheelGlass.PAST_AXIS_DP] del eje. Se
+     * recoge como mucho lo que las filas ([radius], el círculo de la rueda) y
+     * nunca más allá de [WheelGlass.MIN_EDGE_DP]. Si la cabecera pide llegar a
+     * [reach] arriba, el arco se abre (radio mayor), igual arriba y abajo: la
+     * forma sigue siendo simétrica, solo menos curva.
      */
-    fun glassEdgeAt(y: Float, axisX: Float, focusY: Float, radius: Float, band: MeridianFog.Band = MeridianFog.Band.NONE): Float =
-        (axisX + WheelGlass.PAST_AXIS_DP - MeridianFog.shift(y, focusY, radius, band)).coerceAtLeast(WheelGlass.MIN_EDGE_DP)
+    fun glassArc(axisX: Float, focusY: Float, top: Float, bottom: Float, radius: Float, reach: Float = 0f): GlassArc {
+        val half = (bottom - top) / 2f
+        if (half <= 0f || radius <= 0f) return GlassArc(axisX + WheelGlass.PAST_AXIS_DP, 0f, Float.POSITIVE_INFINITY)
+        val center = (top + bottom) / 2f
+        val peak = axisX + WheelGlass.PAST_AXIS_DP + GlassArc.sag(maxOf(radius, half), focusY - center)
+        var r = maxOf(radius, half)
+        // En las puntas, nunca más a la izquierda del mínimo.
+        r = maxOf(r, GlassArc.radiusThrough(half, peak - WheelGlass.MIN_EDGE_DP))
+        // Arriba del área segura (y = 0), hasta donde pide la cabecera, pero sin
+        // llegar a enderezarse: con la cabecera más allá del pico el radio era
+        // infinito y el canto, una raya vertical (sobre todo en tableta, donde
+        // el arco se recoge más dp a la altura de la cabecera). Lo que no quepa
+        // asoma sobre el arte en su propio cristal oscuro.
+        if (reach > 0f) r = maxOf(r, minOf(GlassArc.radiusThrough(center, peak - reach), GlassPanelLayout.maxRadius(half)))
+        return GlassArc(peak, center, r)
+    }
 
-    /** Lo más ancho que llega el cristal (en la línea de foco, o hasta [reachX] si la banda de arriba pasa de ahí), en dp. */
-    fun glassRight(axisX: Float, width: Float, reachX: Float = 0f): Float =
-        maxOf(axisX + WheelGlass.PAST_AXIS_DP, reachX + WheelGlass.RIM_DP).coerceAtMost(width)
+    /** Lo más ancho que llega el cristal ([arc] en su punto más a la derecha, o hasta [reachX] si la cabecera pasa de ahí), en dp. */
+    fun glassRight(arc: GlassArc, width: Float, reachX: Float = 0f): Float =
+        (maxOf(arc.peak, reachX) + GlassTokens.RIM_DP).coerceAtMost(width)
 
     /** Las paradas del degradado horizontal: (posición 0…1 del ancho, opacidad). */
     fun stops(axisX: Float, width: Float): List<Pair<Float, Float>> {
@@ -826,9 +942,20 @@ object MeridianFog {
     /** Lo que tarda la banda en volver a la curva por debajo de la cabecera (dp). */
     const val BAND_BLEND = 32f
 
+    /**
+     * Lo que tarda el canto en llegar plano al borde de arriba de la capa (dp).
+     * La capa se refleja en la franja de la barra de estado (ver `edgeMirror`):
+     * con el canto inclinado en y = 0, el reflejo dibujaba un pico en vez de
+     * seguir la curva.
+     */
+    const val TOP_EASE = 48f
+
+    /** La altura a la que se lee la curva junto al borde de arriba: pendiente 0 en y = 0, la de siempre desde [TOP_EASE]. */
+    fun easedTop(y: Float): Float = if (y >= TOP_EASE) y else TOP_EASE / 2f + y.coerceAtLeast(0f).let { it * it } / (2f * TOP_EASE)
+
     /** [shift] con la banda de arriba ([band]): nunca más de su tope dentro de ella, y de vuelta a la curva justo debajo. */
     fun shift(y: Float, focusY: Float, radius: Float, band: Band): Float {
-        val s = shift(y, focusY, radius)
+        val s = shift(easedTop(y), focusY, radius)
         if (s <= band.maxShift) return s
         return band.maxShift + (s - band.maxShift) * WheelTransform.smoothstep(band.bottom, band.bottom + BAND_BLEND, y)
     }
@@ -862,14 +989,14 @@ object MeridianFog {
     fun reach(glass: Boolean): Float = if (glass) WheelGlass.PAST_AXIS_DP else WASH_REACH
 
     /**
-     * El canto que se ve de la niebla a la altura [y] (dp): el del cristal
-     * claro ([glass], ver [MeridianScrims.glassEdgeAt]) o el del velo oscuro,
-     * los dos curvados por el círculo de la rueda y con la banda de arriba.
+     * El canto que se ve del velo oscuro a la altura [y] (dp), curvado por el
+     * círculo de la rueda y con la banda de arriba (el del cristal claro es
+     * [MeridianScrims.glassArc]).
      * Lo que va sobre la niebla (el dock de la cabecera, el bocadillo de
      * Masha) se queda a este lado, con su aire.
      */
-    fun visibleEdge(y: Float, axisX: Float, focusY: Float, radius: Float, glass: Boolean, band: Band = Band.NONE): Float =
-        if (glass) MeridianScrims.glassEdgeAt(y, axisX, focusY, radius, band) else axisX + WASH_REACH - shift(y, focusY, radius, band)
+    fun visibleEdge(y: Float, axisX: Float, focusY: Float, radius: Float, band: Band = Band.NONE): Float =
+        axisX + WASH_REACH - shift(y, focusY, radius, band)
 
     /**
      * La banda de arriba hasta [bottom] para que el canto llegue a [reachX]

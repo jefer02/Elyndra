@@ -143,10 +143,13 @@ fun Modifier.shelfSurface(extension: Dp = 0.dp): Modifier {
     val safe = SafeAreaInsets
     if (extension > 0.dp) {
         val solid = shelfColor()
-        val bottom = ShelfLayout.shelfBottomAlpha(dark)
+        // Opaco hasta el pie y algo más hondo abajo (ver ShelfLayout.shelfFootColor):
+        // el pie translúcido dejaba ver el fondo como una franja gris lavada.
+        val paper = P.paper
+        val foot = remember(paper, skin.a1, dark) { Color(ShelfLayout.shelfFootColor(paper.argb(), skin.a1.argb(), dark)) }
         return drawWithCache {
             val top = extension.roundToPx().toFloat().coerceAtMost(size.height)
-            val brush = Brush.verticalGradient(listOf(solid, solid.copy(alpha = bottom)), startY = top, endY = size.height)
+            val brush = Brush.verticalGradient(listOf(solid, foot), startY = top, endY = size.height)
             onDrawBehind {
                 if (top < size.height) bleed(safe) { drawRect(brush, topLeft = Offset(0f, top), size = Size(size.width, size.height - top)) }
             }

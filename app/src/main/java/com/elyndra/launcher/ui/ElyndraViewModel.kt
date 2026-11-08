@@ -22,8 +22,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.elyndra.launcher.BuildConfig
 import com.elyndra.launcher.ElyndraApplication
 import com.elyndra.launcher.R
+import com.elyndra.launcher.bench.BenchmarkHooks
 import com.elyndra.launcher.data.AppEntry
 import com.elyndra.launcher.data.BannerHub
 import com.elyndra.launcher.data.Emulators
@@ -358,9 +360,24 @@ class ElyndraViewModel @Inject constructor(
     /** ¿A este juego le falta un nombre que sirva para buscarlo? (ver [NameCheck]). */
     fun needsName(title: String): Boolean = !NameCheck.isNameUsable(title)
 
-    /** Hay algún juego sin nombre: solo entonces sale el filtro "Sin nombre". */
+    /** [anyUnnamed] para la última biblioteca vista (por identidad, como [derived]). */
+    private var unnamedCache: Pair<Library, Boolean>? = null
+
+    /**
+     * Hay algún juego sin nombre: solo entonces sale el filtro "Sin nombre".
+     *
+     * Se guarda por biblioteca: lo pide `availableFilters()` en cada
+     * recomposición de la biblioteca (cada paso de la selección) y recorrer
+     * todas las ROMs con [NameCheck] en el hilo principal era lo más caro de
+     * moverse por una biblioteca grande en un móvil modesto.
+     */
     val anyUnnamed: Boolean
-        get() = library.apps.any { needsName(it.displayTitle) } || library.roms.any { needsName(it.displayTitle) }
+        get() {
+            val lib = library
+            unnamedCache?.takeIf { it.first === lib }?.let { return it.second }
+            return (lib.apps.any { needsName(it.displayTitle) } || lib.roms.any { needsName(it.displayTitle) })
+                .also { unnamedCache = lib to it }
+        }
 
     /** Los filtros que se enseñan (y que recorren L1/R1). */
     fun availableFilters(): List<LibraryFilter> =
@@ -414,7 +431,8 @@ class ElyndraViewModel @Inject constructor(
 
     suspend fun refreshInstalled() {
         val pkgs = withContext(Dispatchers.IO) { app.apps.launchable().map { it.packageName }.toSet() }
-        installedPackages = pkgs
+        // En las variantes del perfil base, las apps y emuladores de la biblioteca de prueba (src/benchmark).
+        installedPackages = if (BuildConfig.BENCHMARK) pkgs + BenchmarkHooks.installedPackages else pkgs
     }
 
     /* ── navegación ───────────────────────────────────────────── */
@@ -1586,6 +1604,7 @@ class ElyndraViewModel @Inject constructor(
                     preview = art.path(key, kind),
                     opensSheet = true,
                     artSlot = kind,
+                    testTag = UiTags.artAction(kind),
                 ) { chooseArtSource(key, title, kind) }
             }
             if (has) {
@@ -1769,9 +1788,13 @@ class ElyndraViewModel @Inject constructor(
         }
     }
 
-    /** Hoja con los cuatro servicios; los que no están configurados (o no cubren el juego) salen atenuados. */
-    private fun chooseArtSource(key: String, title: String, kind: ArtKind) {
-        val actions = artServices().map { service ->
+    /**
+     * Hoja con los cuatro servicios; los que no están configurados (o no cubren el juego) salen atenuados.
+     * [focus]: el servicio que se señala con el mando al abrirla (al volver de su selector).
+     */
+    private fun chooseArtSource(key: String, title: String, kind: ArtKind, focus: Service? = null) {
+        val services = artServices()
+        val actions = services.map { service ->
             val supported = art.supports(key, service)
             val configured = app.credentials.isConfigured(service)
             val problem = when {
@@ -1784,6 +1807,7 @@ class ElyndraViewModel @Inject constructor(
                 detail = problem,
                 dimmed = problem != null,
                 icon = SheetIcon.Service,
+                testTag = UiTags.artSource(service),
             ) {
                 if (problem != null) showToast(problem) else searchArt(key, title, kind, service)
             }
@@ -1798,21 +1822,23 @@ class ElyndraViewModel @Inject constructor(
         // Si la imagen es una elegida a mano, se puede volver a la automática.
         val reset = SheetAction(UiText.res(R.string.art_reset), icon = SheetIcon.Refresh) { resetArt(key, kind) }
             .takeIf { art.isPinned(key, kind) }
-        showSheet(
-            ActionSheetSpec(
-                UiText.res(kind.label()),
-                UiText.Raw(title),
-                listOf(
-                    SheetGroup(UiText.res(R.string.art_group_yours), listOfNotNull(gallery, reset)),
-                    SheetGroup(UiText.res(R.string.art_group_services), actions),
-                ),
+        val spec = ActionSheetSpec(
+            UiText.res(kind.label()),
+            UiText.Raw(title),
+            listOf(
+                SheetGroup(UiText.res(R.string.art_group_yours), listOfNotNull(gallery, reset)),
+                SheetGroup(UiText.res(R.string.art_group_services), actions),
             ),
         )
+        showSheet(spec)
+        // Un menú en lista se recorre igual en vertical que en horizontal: el reparto da el índice del foco.
+        actions.getOrNull(services.indexOf(focus))?.let { input.focusSheetAction(SheetLayout.of(spec, landscape = false).indexOf(it)) }
     }
 
     private fun searchArt(key: String, title: String, kind: ArtKind, service: Service) {
-        val state = ArtPickerState(key, title, kind, service)
+        val state = ArtPickerState(key, title, kind, service, applied = art.appliedUrl(key, kind))
         artPicker = state
+        input.onArtPickerShown(state)
         artJob?.cancel()
         artJob = viewModelScope.launch {
             val found = try {
@@ -1823,9 +1849,18 @@ class ElyndraViewModel @Inject constructor(
                 null
             }
             if (artPicker === state) {
-                artPicker = state.copy(loading = false, candidates = found.orEmpty(), failed = found == null)
+                val loaded = state.copy(loading = false, candidates = found.orEmpty(), failed = found == null)
+                artPicker = loaded
+                // Llegan los resultados: el foco del mando pasa del botón a la imagen puesta (o a la primera).
+                input.onArtPickerShown(loaded)
             }
         }
+    }
+
+    /** "Reintentar" del selector tras un fallo: la misma búsqueda, en el mismo servicio. */
+    fun retryArtSearch() {
+        val state = artPicker ?: return
+        searchArt(state.key, state.title, state.kind, state.service)
     }
 
     fun applyArt(candidate: ArtCandidate) {
@@ -1874,6 +1909,18 @@ class ElyndraViewModel @Inject constructor(
     fun closeArtPicker() {
         artJob?.cancel()
         artPicker = null
+    }
+
+    /**
+     * B del mando en el selector: lo cierra sin cambiar nada y vuelve a la hoja
+     * de servicios, con el foco en el que lo abrió — como volver un paso en
+     * una consola. El dedo (tocar fuera, el gesto de atrás) sigue cerrándolo
+     * del todo con [closeArtPicker], como siempre.
+     */
+    fun closeArtPickerToSource() {
+        val state = artPicker ?: return
+        closeArtPicker()
+        chooseArtSource(state.key, state.title, state.kind, focus = state.service)
     }
 
     fun pickFolderEmulator(folder: RomFolder) {
@@ -1994,13 +2041,19 @@ class ElyndraViewModel @Inject constructor(
 
     fun dismissSheet() { sheet = null }
 
-    fun showToast(text: UiText) {
+    fun showToast(text: UiText, durationMs: Long = 2_800) {
         toast = text
         toastJob?.cancel()
         toastJob = viewModelScope.launch {
-            delay(2_800)
+            delay(durationMs)
             toast = null
         }
+    }
+
+    /** Tocar el aviso lo cierra (los largos, como el del paso a Rendimiento, no hay que esperarlos). */
+    fun dismissToast() {
+        toastJob?.cancel()
+        toast = null
     }
 
     override fun onCleared() {
