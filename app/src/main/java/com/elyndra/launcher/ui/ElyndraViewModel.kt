@@ -37,6 +37,10 @@ import com.elyndra.launcher.data.RomFolder
 import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.data.fmtMinutes
 import com.elyndra.launcher.ui.components.ArtFallback
+import com.elyndra.launcher.ports.GitHubClient
+import com.elyndra.launcher.ports.OriginalArt
+import com.elyndra.launcher.ports.PortInstaller
+import com.elyndra.launcher.ports.PortCatalogRepository
 import com.elyndra.launcher.update.UpdateInstaller
 import com.elyndra.launcher.update.UpdateRepository
 import com.elyndra.launcher.sound.BackgroundMusic
@@ -95,6 +99,10 @@ class ElyndraViewModel @Inject constructor(
     /** Releases de GitHub y su instalación (ver [UpdateController]). */
     updateRepository: UpdateRepository,
     updateInstaller: UpdateInstaller,
+    /** El catálogo de la tienda de ports y la API de GitHub (ver [PortsController]). */
+    portCatalog: PortCatalogRepository,
+    github: GitHubClient,
+    portInstaller: PortInstaller,
 ) : AndroidViewModel(application) {
 
     val app = application as ElyndraApplication
@@ -176,6 +184,10 @@ class ElyndraViewModel @Inject constructor(
     val masha = MashaController(this, brain)
     /** Actualizaciones desde las releases de GitHub. */
     val updates = UpdateController(this, updateRepository, updateInstaller)
+    /** La tienda de ports nativos. */
+    val ports = PortsController(this, portCatalog, github)
+    /** Descargar e instalar ports, y llevarlos a la biblioteca. */
+    val portInstall = PortInstallController(this, portInstaller)
 
     private var launchJob: Job? = null
     private var toastJob: Job? = null
@@ -188,6 +200,8 @@ class ElyndraViewModel @Inject constructor(
             repo.awaitLoaded()
             loaded = true
             refreshInstalled()
+            // El catálogo de ports (de su copia si es reciente): la ficha de un juego dice si tiene port nativo.
+            ports.onOpen()
         }
     }
 
@@ -433,6 +447,21 @@ class ElyndraViewModel @Inject constructor(
         val pkgs = withContext(Dispatchers.IO) { app.apps.launchable().map { it.packageName }.toSet() }
         // En las variantes del perfil base, las apps y emuladores de la biblioteca de prueba (src/benchmark).
         installedPackages = if (BuildConfig.BENCHMARK) pkgs + BenchmarkHooks.installedPackages else pkgs
+        // Los ports desinstalados desde fuera dejan de contar como instalados.
+        portInstall.reconcile()
+    }
+
+    /**
+     * El arte del juego original en la app de un port recién instalado
+     * (carátula, héroe y logo, fijados). Sin carátula del original, la imagen
+     * del propio port.
+     */
+    suspend fun applyPortArt(key: String, original: OriginalArt, fallbackCover: String) {
+        val wanted = listOf(ArtKind.Cover to (original.cover ?: fallbackCover), ArtKind.Background to original.hero, ArtKind.Logo to original.logo)
+        for ((kind, url) in wanted) {
+            if (url == null) continue
+            if (runCatching { art.apply(key, kind, url) is MediaResult.Saved }.getOrDefault(false) && key == selectedKey) materializeArt(key, kind)
+        }
     }
 
     /* ── navegación ───────────────────────────────────────────── */
@@ -442,6 +471,18 @@ class ElyndraViewModel @Inject constructor(
         if (target == Screen.Settings) settings.onOpen(fromPage = screen.isSettingsPage)
         sortMenuOpen = false
         screen = target
+    }
+
+    /** La tienda de ports, el destino del final del dock. */
+    fun openPorts() {
+        ports.onOpen()
+        go(Screen.Ports)
+    }
+
+    /** De la tienda a la biblioteca en la sección [to] (L1/R1 desde la tienda, ver [DockNav]). */
+    fun leavePortsTo(to: LibraryFilter) {
+        go(Screen.Library)
+        updateFilter(to)
     }
 
     val canGoBack: Boolean
@@ -461,6 +502,8 @@ class ElyndraViewModel @Inject constructor(
         priorityGrab = settings.priorityGrab != null,
         settingsPageOpen = settings.compact && settings.detailOpen,
         searchOpen = searchOpen,
+        portDetail = ports.detailId != null,
+        portsSearch = ports.hasFilters,
     )
 
     fun back() {
@@ -477,6 +520,8 @@ class ElyndraViewModel @Inject constructor(
             BackPriority.Target.PriorityGrab -> settings.releaseGrab()
             BackPriority.Target.SettingsCategory -> settings.closeCategory()
             BackPriority.Target.SettingsPage -> go(Screen.Settings)
+            BackPriority.Target.PortDetail -> ports.closeDetail()
+            BackPriority.Target.PortsSearch -> ports.clearFilters()
             BackPriority.Target.Screen -> go(Screen.Library)
             BackPriority.Target.Search -> toggleSearch()
             // El teclado lo cierra el mando (InputController) o el propio sistema.
