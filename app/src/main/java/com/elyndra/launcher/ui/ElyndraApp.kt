@@ -7,6 +7,7 @@ import androidx.compose.ui.platform.testTag
 import com.elyndra.launcher.ui.components.rememberBackdropStack
 import com.elyndra.launcher.ui.components.LocalBackdropStack
 import com.elyndra.launcher.ui.components.OverlayHost
+import com.elyndra.launcher.ui.screens.ports.PortsScreen
 import com.elyndra.launcher.ui.screens.IdentifySheet
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
@@ -254,6 +255,7 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                                 Screen.Masha -> MashaScreen(vm)
                                 Screen.Licenses -> LicensesScreen(vm)
                                 Screen.VoiceSync -> VoiceSyncScreen(vm)
+                                Screen.Ports -> PortsScreen(vm)
                             }
                         }
                     }
