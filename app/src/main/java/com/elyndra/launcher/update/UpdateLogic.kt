@@ -132,7 +132,15 @@ object UpdateLogic {
     private fun hasToken(name: String, token: String): Boolean =
         Regex("(?<![a-z0-9_])" + Regex.escape(token) + "(?![a-z0-9_])").containsMatchIn(name)
 
-    private fun mentionsAnyAbi(name: String): Boolean = ABI_ALIASES.values.flatten().any { hasToken(name, it) }
+    /** ¿El nombre dice alguna ABI? (sin ninguna, el APK vale para todas). También lo usa el selector de ports. */
+    fun mentionsAnyAbi(name: String): Boolean = ABI_ALIASES.values.flatten().any { hasToken(name.lowercase(), it) }
+
+    /** ¿El nombre lleva [abi] (o uno de sus sinónimos) como token suelto? */
+    fun namesAbi(name: String, abi: String): Boolean {
+        val n = name.lowercase()
+        val tokens = ABI_ALIASES[abi.lowercase()] ?: listOf(abi.lowercase())
+        return tokens.any { hasToken(n, it) }
+    }
 
     /**
      * El APK para este dispositivo.
@@ -146,11 +154,10 @@ object UpdateLogic {
         val apks = assets.filter { it.name.lowercase().endsWith(".apk") }
         if (apks.isEmpty()) return null
         for (abi in supportedAbis) {
-            val tokens = ABI_ALIASES[abi.lowercase()] ?: listOf(abi.lowercase())
-            apks.firstOrNull { a -> val n = a.name.lowercase(); tokens.any { hasToken(n, it) } }?.let { return it }
+            apks.firstOrNull { namesAbi(it.name, abi) }?.let { return it }
         }
         apks.firstOrNull { hasToken(it.name.lowercase(), "universal") }?.let { return it }
-        return apks.filter { !mentionsAnyAbi(it.name.lowercase()) }.singleOrNull()
+        return apks.filter { !mentionsAnyAbi(it.name) }.singleOrNull()
     }
 
     /** El `.sha256` publicado junto al APK (`<nombre>.sha256`), si lo hay. */
