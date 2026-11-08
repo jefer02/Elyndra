@@ -699,6 +699,30 @@ class SettingsController(private val vm: ElyndraViewModel) {
         states[field.service] = idleState(field.service)
     }
 
+    /* ── tienda de ports: token de GitHub y catálogo ──────────── */
+
+    /** El token de GitHub, descifrado al enseñarlo (como las demás credenciales). */
+    private val githubTokenState by lazy { mutableStateOf(secrets.get(SecretKeys.GITHUB_TOKEN)) }
+    val githubToken: String get() = githubTokenState.value
+
+    fun updateGithubToken(value: String) {
+        githubTokenState.value = value
+        secrets.set(SecretKeys.GITHUB_TOKEN, value.trim())
+    }
+
+    private val catalogUrlState by lazy { mutableStateOf(store.portsCatalogUrl) }
+    val portsCatalogUrl: String get() = catalogUrlState.value
+
+    /** Solo https: un catálogo por http podría cambiarse por el camino. Al cambiarlo, se vuelve a leer. */
+    fun updatePortsCatalogUrl(value: String) {
+        catalogUrlState.value = value
+        val clean = value.trim()
+        if (clean.isEmpty() || clean.startsWith("https://")) {
+            store.portsCatalogUrl = clean
+            vm.ports.invalidate()
+        }
+    }
+
     var showSsDev by mutableStateOf(false); private set
 
     fun toggleSsDev() { showSsDev = !showSsDev }
