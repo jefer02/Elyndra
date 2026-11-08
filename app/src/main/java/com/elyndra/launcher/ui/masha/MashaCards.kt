@@ -96,6 +96,7 @@ internal fun HoloMessage(vm: ElyndraViewModel, msg: ChatMessage, glow: Color, la
                         is MashaAttachment.Plan -> PlanCard(vm, a, glow)
                         is MashaAttachment.ArcCard -> ArcStrip(vm, a)
                         is MashaAttachment.Confirm -> ConfirmCard(vm, a, glow)
+                        is MashaAttachment.Ports -> PortsStrip(vm, a)
                         is MashaAttachment.Done, null -> msg.game?.let { GameMention(it) { vm.showDetails(it.key) } }
                     }
                     if (msg.offline) {
@@ -163,6 +164,29 @@ private fun DoneChips(done: List<String>, glow: Color) {
                     .padding(horizontal = 9.dp, vertical = 5.dp),
             ) {
                 ElyText(label, size = 10f, weight = FontWeight.SemiBold, color = Holo.text, maxLines = 1)
+            }
+        }
+    }
+}
+
+/** Ports de la tienda: una ficha por port (nombre y juego original) que abre su página. */
+@Composable
+private fun PortsStrip(vm: ElyndraViewModel, a: MashaAttachment.Ports) {
+    val ports = a.ids.mapNotNull { id -> vm.ports.catalog.firstOrNull { it.id == id } }
+    if (ports.isEmpty()) return
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ports.forEach { port ->
+            val shape = RoundedCornerShape(10.dp)
+            Column(
+                Modifier
+                    .width(150.dp)
+                    .clip(shape)
+                    .background(Holo.text.copy(alpha = 0.06f))
+                    .shapeClickable(shape) { vm.ports.openPort(port.id) }
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+            ) {
+                ElyText(port.name, size = 10.5f, weight = FontWeight.SemiBold, color = Holo.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                ElyText(port.original.title, size = 9f, color = Holo.dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
