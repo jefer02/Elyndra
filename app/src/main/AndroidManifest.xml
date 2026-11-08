@@ -95,13 +95,15 @@
     </queries>
 
     <!-- allowBackup desactivado: los permisos de carpeta (SAF) y la clave del
-         Keystore que cifra las credenciales no sobreviven a una restauración. -->
+         Keystore que cifra las credenciales no sobreviven a una restauración.
+         La etiqueta sale de app/build.gradle.kts: @string/app_name, salvo en las
+         variantes del perfil base ("Elyndra Bench"). -->
     <application
         android:name=".ElyndraApplication"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:banner="@drawable/tv_banner"
-        android:label="@string/app_name"
+        android:label="${appLabel}"
         android:localeConfig="@xml/locales_config"
         android:supportsRtl="true"
         android:enableOnBackInvokedCallback="true"

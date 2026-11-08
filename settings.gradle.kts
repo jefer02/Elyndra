@@ -25,3 +25,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Elyndra"
 include(":app")
+// Perfil base y pruebas de arranque (docs/RELEASING.md). No entra en el APK.
+include(":baselineprofile")
