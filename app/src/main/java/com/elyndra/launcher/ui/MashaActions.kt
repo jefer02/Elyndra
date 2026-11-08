@@ -3,6 +3,7 @@ package com.elyndra.launcher.ui
 import com.elyndra.launcher.masha.MashaWrites
 import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.library.Names
+import com.elyndra.launcher.domain.ports.StoreRows
 import com.elyndra.launcher.masha.MashaAttachment
 import com.elyndra.launcher.masha.MashaBrain
 import com.elyndra.launcher.masha.MashaToolbox
@@ -19,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
+import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 
@@ -78,6 +80,7 @@ class MashaActions(
             MashaTools.LIST_EMULATORS -> library.listEmulators()
             MashaTools.SET_PREFERRED_EMULATOR -> library.setPreferred(a)
             MashaTools.UNDO_LAST_ACTION -> library.undo()
+            MashaTools.FIND_PORT -> findPort(a.str("query"), a.bool("open") == true)
             else -> toolFail("unknown tool ${call.name}")
         }
     }
@@ -134,6 +137,38 @@ class MashaActions(
                 if (missing.isEmpty()) return toolOk("nothing is missing metadata")
                 onMain { vm.updateMetadata(missing, force = false) }
                 toolOk("updating ${missing.size} games with missing metadata", MashaAttachment.Done("↻ ${missing.size}"), mutating = true)
+            }
+        }
+    }
+
+    /**
+     * Ports del catálogo de la tienda. Solo títulos, plataformas y repositorios:
+     * nada de rutas ni de URLs de descarga, y nunca ROMs.
+     */
+    private suspend fun findPort(query: String?, open: Boolean): ToolResult {
+        val ports = vm.ports
+        if (ports.catalog.isEmpty()) onMain { ports.onOpen() }.also { ports.awaitCatalog() }
+        val owned = onMain { ports.owned() }
+        val found = StoreRows.find(ports.catalog, query, owned)
+        if (open) found.firstOrNull()?.let { first -> onMain { ports.openPort(first.id) } }
+        if (found.isEmpty()) return toolOk("no ports found", mutating = open)
+        return toolOk(attachment = MashaAttachment.Ports(query, found.map { it.id }), mutating = open) {
+            put("count", found.size)
+            putJsonArray("ports") {
+                found.forEach { p ->
+                    addJsonObject {
+                        put("name", p.name)
+                        put("original_game", p.original.title)
+                        put("original_platform", p.original.platform)
+                        put("kind", p.kind)
+                        put("repo", p.releaseRepo.slug)
+                        put("installable_on_android", p.installable)
+                        put("installed", p.id in ports.installed)
+                        put("in_library", owned.any { it.port.id == p.id })
+                        put("needs_own_copy", p.requires.userRom)
+                        put("verified", p.verified)
+                    }
+                }
             }
         }
     }
