@@ -227,6 +227,7 @@ private fun AndroidTab(vm: ElyndraViewModel, wide: Boolean) {
         verticalArrangement = Arrangement.spacedBy(Space.s),
     ) {
         item(key = "toolbar", span = { GridItemSpan(maxLineSpan) }) { AppsToolbar(vm, wide) }
+        item(key = "ports", span = { GridItemSpan(maxLineSpan) }) { PortsCard(vm) }
         if (!add.appsLoading && shown.isEmpty()) {
             item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
                 ElyText(
@@ -249,6 +250,25 @@ private fun AndroidTab(vm: ElyndraViewModel, wide: Boolean) {
                     .then(if (i == 0) Modifier.padInitialFocus() else Modifier),
                 onToggle = { add.togglePicked(app.packageName) },
             )
+        }
+    }
+}
+
+/**
+ * La tienda de ports, a mano desde "Añadir": un juego de consola también
+ * puede entrar como app nativa (el port), no solo como ROM.
+ */
+@Composable
+private fun PortsCard(vm: ElyndraViewModel) {
+    GlassCard(onClick = vm::openPorts, cornerRadius = 16.dp, padding = PaddingValues(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                ElyText(stringResource(R.string.ports_add_card_title), size = 12.5f, weight = FontWeight.SemiBold)
+                Spacer(Modifier.height(2.dp))
+                ElyText(stringResource(R.string.ports_add_card_body), size = 10f, color = P.ink2, lineHeightRatio = 1.4f, maxLines = 3)
+            }
+            Spacer(Modifier.width(Space.s))
+            ElyText(stringResource(R.string.ports_browse) + "  ›", size = 11f, weight = FontWeight.SemiBold, color = LocalSkin.current.a1)
         }
     }
 }
