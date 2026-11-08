@@ -279,6 +279,14 @@ class InputController(private val vm: ElyndraViewModel) {
             when (vm.screen) {
                 Screen.Settings -> { vm.settings.onBumper(delta); true }
                 Screen.Add -> { vm.add.updateTab(if (delta < 0) AddTab.Android else AddTab.Roms); true }
+                // En la tienda, L1/R1 siguen recorriendo el dock: vuelven a la biblioteca (ver DockNav).
+                Screen.Ports -> {
+                    when (val stop = DockNav.next(vm.availableFilters(), DockNav.Stop.Ports, delta)) {
+                        is DockNav.Stop.Filter -> vm.leavePortsTo(stop.filter)
+                        DockNav.Stop.Ports -> Unit
+                    }
+                    true
+                }
                 else -> false
             }
         }
@@ -327,9 +335,11 @@ class InputController(private val vm: ElyndraViewModel) {
             BarItem.Settings -> vm.go(Screen.Settings)
             BarItem.Back -> vm.go(Screen.Library)
             BarItem.Emulator -> vm.currentFolder()?.let { vm.pickFolderEmulator(it.folder) }
-            BarItem.Sections -> vm.availableFilters().getOrNull(dockFocus)?.let {
+            BarItem.Sections -> {
+                val filters = vm.availableFilters()
                 addFocus = false
-                vm.updateFilter(it)
+                // El hueco de después de la última sección es la tienda de ports.
+                if (dockFocus == filters.size) vm.openPorts() else filters.getOrNull(dockFocus)?.let { vm.updateFilter(it) }
             }
             BarItem.Sort -> vm.openSortMenu()
         }
@@ -344,7 +354,9 @@ class InputController(private val vm: ElyndraViewModel) {
     private fun libraryTop(pad: Pad, fallback: (Pad) -> Boolean): Boolean {
         var current = barFocus ?: return fallback(pad)
         val rows = if (meridian) LibraryFocus.meridianRows(vm.searchOpen) else LibraryFocus.rows(dockInBar, vm.searchOpen)
-        dockFocus = dockFocus.coerceIn(0, (vm.availableFilters().size - 1).coerceAtLeast(0))
+        // Un hueco más que secciones: el destino del final (la tienda).
+        val dockStops = vm.availableFilters().size + 1
+        dockFocus = dockFocus.coerceIn(0, dockStops - 1)
         // Lo señalado ya no está (al abrir el buscador se va "Abrir"): el buscador.
         if (rows.none { current in it }) {
             current = BarItem.Search
@@ -353,7 +365,7 @@ class InputController(private val vm: ElyndraViewModel) {
         return when (pad) {
             Pad.Left, Pad.Right -> {
                 val delta = if (pad == Pad.Left) -1 else 1
-                val dot = if (current == BarItem.Sections) LibraryFocus.stepDot(dockFocus, delta, vm.availableFilters().size) else null
+                val dot = if (current == BarItem.Sections) LibraryFocus.stepDot(dockFocus, delta, dockStops) else null
                 if (dot != null) dockFocus = dot else focusTop(LibraryFocus.side(rows, current, delta), fromLeft = delta > 0)
                 true
             }
@@ -373,7 +385,7 @@ class InputController(private val vm: ElyndraViewModel) {
     private fun focusTop(item: BarItem, fromLeft: Boolean? = null) {
         if (item == BarItem.Sections && barFocus != BarItem.Sections) {
             val all = vm.availableFilters()
-            dockFocus = LibraryFocus.entryDot(all.indexOf(vm.filter), all.size, fromLeft)
+            dockFocus = LibraryFocus.entryDot(all.indexOf(vm.filter), all.size + 1, fromLeft)
         }
         barFocus = item
     }
@@ -465,13 +477,15 @@ class InputController(private val vm: ElyndraViewModel) {
     /** Lo que hace la biblioteca igual con carrusel y con rueda. */
     private fun libraryCommon(p: Pad): Boolean = when (p) {
         // L1/R1 son el atajo estándar de mando para cambiar de sección:
-        // Todos, Android, Consolas.
+        // Todos, Android, Consolas… y, al final, la tienda de ports.
         Pad.PagePrev -> cycleFilter(-1)
         Pad.PageNext -> cycleFilter(1)
         // Con mando se abre igual que con el dedo.
         // Una sola pulsación abre: carpeta, juego o app (nada que seleccionar antes).
         Pad.Confirm -> vm.selected()?.let { if (vm.tryOpen()) vm.requestOpen(it); true } ?: false
-        Pad.Details -> vm.selected()?.let { vm.showDetails(it.key); true } ?: false
+        // Con la biblioteca vacía, X es la segunda acción del estado vacío: la tienda de ports.
+        Pad.Details -> vm.selected()?.let { vm.showDetails(it.key); true }
+            ?: if (vm.library.apps.isEmpty() && vm.library.folders.isEmpty()) { vm.openPorts(); true } else false
         Pad.Options -> vm.selected()?.let { vm.itemOptions(it); true } ?: false
         Pad.Menu -> { vm.go(Screen.Settings); true }
         Pad.Search -> { vm.toggleSearch(); true }
@@ -488,12 +502,20 @@ class InputController(private val vm: ElyndraViewModel) {
         return true
     }
 
+    /** L1/R1: la sección de al lado; tras la última (o antes de la primera), la tienda de ports. */
     private fun cycleFilter(delta: Int): Boolean {
         val all = vm.availableFilters()
-        val next = all[(all.indexOf(vm.filter) + delta + all.size) % all.size]
         addFocus = false
-        if (barFocus == BarItem.Sections) dockFocus = all.indexOf(next)
-        vm.updateFilter(next)
+        when (val next = DockNav.next(all, DockNav.Stop.Filter(vm.filter), delta)) {
+            is DockNav.Stop.Filter -> {
+                if (barFocus == BarItem.Sections) dockFocus = all.indexOf(next.filter)
+                vm.updateFilter(next.filter)
+            }
+            DockNav.Stop.Ports -> {
+                if (barFocus == BarItem.Sections) dockFocus = all.size
+                vm.openPorts()
+            }
+        }
         return true
     }
 
