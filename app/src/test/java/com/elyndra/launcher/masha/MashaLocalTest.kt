@@ -72,6 +72,27 @@ class MashaLocalTest {
     }
 
     @Test
+    fun nativePortsAreUnderstoodInEveryLanguage() {
+        listOf(
+            "¿hay algún port nativo?",
+            "is there a native port of Zelda?",
+            "tem algum port nativo?",
+            "y a-t-il un portage natif ?",
+            "gibt es eine native Portierung?",
+            "busca recompilaciones de Xbox 360",
+            "show me decompilations",
+        ).forEach { assertEquals(it, OfflineIntent.FindPort, OfflineIntents.detect(it)) }
+    }
+
+    @Test
+    fun portInsideOtherWordsDoesNotFool() {
+        assertTrue(OfflineIntents.detect("pon el modo portrait") !is OfflineIntent.FindPort)
+        assertTrue(OfflineIntents.detect("no importa, qué juego me recomiendas") !is OfflineIntent.FindPort)
+        assertTrue(OfflineIntents.detect("¿qué soporte tiene mi mando?") !is OfflineIntent.FindPort)
+        assertTrue(OfflineIntents.detect("ouvre les portes") !is OfflineIntent.FindPort)
+    }
+
+    @Test
     fun maintenanceIsUnderstood() {
         assertEquals(OfflineIntent.UpdateMetadata, OfflineIntents.detect("actualiza las carátulas"))
         assertEquals(OfflineIntent.UpdateMetadata, OfflineIntents.detect("download the missing covers"))
