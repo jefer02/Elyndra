@@ -52,13 +52,17 @@ class UpdateInstaller @Inject constructor(@ApplicationContext private val contex
      * Copia [apk] en una sesión, la confirma y espera el resultado. El APK se
      * borra en cuanto está copiado (la sesión guarda su propia copia), salga
      * como salga.
+     *
+     * [packageName]: el paquete que tiene que traer el APK (Android rechaza la
+     * sesión si trae otro). Por defecto, el de Elyndra (actualizarse); la
+     * tienda de ports pasa el del port, leído del propio APK.
      */
-    suspend fun install(apk: File): InstallResult {
+    suspend fun install(apk: File, packageName: String = context.packageName): InstallResult {
         val installer = context.packageManager.packageInstaller
         val sessionId = try {
             withContext(Dispatchers.IO) {
                 val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
-                    setAppPackageName(context.packageName)
+                    setAppPackageName(packageName)
                     setSize(apk.length())
                 }
                 val id = installer.createSession(params)
