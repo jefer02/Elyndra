@@ -17,6 +17,9 @@ import com.elyndra.launcher.metadata.Service
 enum class Screen {
     Library, Folder, Add, Settings, Masha,
 
+    /** La tienda de ports nativos (ver PortsController): el destino del final del dock. */
+    Ports,
+
     /** Subpantallas de Ajustes: "atrás" vuelve a Ajustes. */
     Licenses, VoiceSync;
 
