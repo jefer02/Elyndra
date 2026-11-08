@@ -244,6 +244,8 @@ private fun DetailsContent(
 
     val subtitle = buildList {
         add(system?.name ?: stringResource(R.string.chip_android_app))
+        // Un port instalado desde la tienda lo dice (es la "etiqueta" de port de la biblioteca).
+        if (app != null && vm.portInstall.isPortKey(key)) add(stringResource(R.string.ports_port_badge))
         add(if (stats.minutes > 0) stringResource(R.string.played_time, fmtMinutes(stats.minutes)) else stringResource(R.string.never_played))
     }
 
@@ -290,6 +292,18 @@ private fun DetailsContent(
                             }
                             CompactAction(identify, accent, Modifier.weight(1f).fillMaxHeight()) {
                                 vm.identify.open(key)
+                            }
+                        }
+                        // Si este juego tiene un port nativo en el catálogo: a su ficha de la tienda.
+                        val native = remember(rom, vm.ports.catalog) { rom?.let { vm.ports.portFor(it) } }
+                        if (native != null) {
+                            val play = remember(native.id) {
+                                SheetAction(UiText.res(R.string.ports_play_native), detail = UiText.Raw(native.name), icon = SheetIcon.Play) {}
+                            }
+                            Spacer(Modifier.height(GAP))
+                            CompactAction(play, accent, Modifier.fillMaxWidth()) {
+                                vm.closeDetails()
+                                vm.ports.openPort(native.id)
                             }
                         }
                     }
