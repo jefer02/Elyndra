@@ -26,3 +26,11 @@ annotation class UpdateHttp
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class UpdateReleasesUrl
+
+/**
+ * Cliente HTTP de la tienda de ports: no sigue redirecciones solo (las sigue
+ * PortsHttp comprobando cada host) y sin tope de tiempo total, como el del actualizador.
+ */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class PortsHttpClient
