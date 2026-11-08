@@ -143,6 +143,19 @@ Plasma; nada guardado se pisa. El acento Plasma arranca su relleno en
   con arriba/abajo, A aplica y B cierra (`BackPriority`: después de la ficha).
 - Ajustes: la cruceta recorre con el foco de Compose; LB/RB cambian de
   categoría, salvo si hay una fuente "cogida" en la prioridad: entonces la mueven.
+- Selector de arte (carátula, fondo, logo, icono: una sola hoja,
+  `ArtPickerSheet`): lo lleva el `InputController` (`artFocus`), no el foco de
+  Compose. La rejilla se pinta con las columnas que da `GridNav.columns` (la
+  cuenta de `GridCells.Adaptive`) y el mando se mueve con esas mismas
+  (`GridNav`, `GridNavTest`): sin vuelta en los cantos, abajo hacia una última
+  fila incompleta cae en el último elemento, arriba desde la primera fila se
+  queda (no hay cabecera con botones). Empieza en la imagen puesta (si está en
+  la lista) o en la primera. A pone · B cierra sin cambios y vuelve a la hoja
+  de servicios con el foco en el que se abrió · LB/RB saltan una pantalla de
+  filas. La señalada lleva el marco de selección de las cards; la puesta, filo
+  de acento, insignia ✓ y "En uso". Buscando, sin resultados o con error hay
+  botones (Reintentar / Cerrar) y el foco va a ellos. Mantener la cruceta
+  desplaza sin animar, para no ir por detrás de la repetición.
 
 ## 5. Movimiento
 
@@ -210,7 +223,7 @@ Vistas previas en claro y oscuro: `ConsolePreviews.kt` (anotación `@ConsolePrev
 
 | Categoría | Contenido |
 |---|---|
-| Pantalla y tema | Modo oscuro, intro, fotogramas por segundo, alta fluidez de Masha, hora y batería (apagada de serie), idioma |
+| Pantalla y tema | Modo oscuro, intro, fotogramas por segundo, alta fluidez de Masha, rendimiento (Auto / Calidad / Rendimiento), hora y batería (apagada de serie), idioma |
 | Sonido | Sonidos de la interfaz, volumen, sonido al navegar, paquete, sonidos propios (plegados) |
 | Música y fondo | Música del menú, fondo de la interfaz |
 | Apariencia | Estilo de la lista (Meridian o Clásico, con miniaturas), color de fondo adaptable (Meridian), paleta de firma, color de acento, liquid glass, selección (halo y partículas, con su color) |
@@ -220,8 +233,9 @@ Vistas previas en claro y oscuro: `ConsolePreviews.kt` (anotación `@ConsolePrev
 | Acerca de | Actualizaciones (GitHub Releases), autor y enlaces, versión, licencia, licencias de terceros, opciones de desarrollador |
 
 Las claves de `SettingsStore` no cambian: solo cambia dónde se enseña cada opción.
-Las únicas claves nuevas son `layout.style` ("meridian" o "classic"; sin valor, Meridian) y
-`meridian.adaptiveColor` (encendida de serie).
+Las únicas claves nuevas son `layout.style` ("meridian" o "classic"; sin valor, Meridian),
+`meridian.adaptiveColor` (encendida de serie) y `perf.mode` ("quality" o "performance";
+sin valor, Auto).
 La lógica pura (categorías, prioridad, grupos de sistemas, resúmenes) está en
 `ui/SettingsNav.kt` y `ui/ConsoleLogic.kt`, con sus pruebas en `ConsoleLogicTest`.
 
@@ -265,6 +279,76 @@ Cambia de juego con el mismo fundido y acercamiento lento del hero; el color del
 pinta una sola vez encima del fundido, así la costura no parpadea al cambiar.
 Sin cards (biblioteca o carpeta vacías) no hay extensión: el estado vacío va
 sobre el estante liso.
+
+**Clásico: reparto y compactación** (`ClassicLayout`, `ClassicLayoutTest`).
+Sustituye en este modo al carrusel de `ShelfLayout.compute` y al hero fijo de
+`metrics()`: antes el bloque de título iba pegado al pie del hero sin saber de
+la barra, y en un móvil apaisado (360 dp) se subía encima de volver / "Abrir" /
+el emulador, con carátulas de ~110 dp. Ahora:
+
+- La carátula seleccionada manda: 48 % del alto en una ventana baja (≤ 480 dp),
+  bajando con suavidad al 36 % en una alta (≥ 900 dp), 30 % en vertical; topes
+  por ancho (22 % de la ventana en apaisado; en vertical, 42 % de la fila la
+  carátula y 46 % el icono) y absolutos (240 dp carátula, 200 dp icono
+  cuadrado, que va al 85 % del alto de una carátula). Las vecinas, al 90 % (94 %
+  en vertical), encogen **desde el pie** dentro de la misma
+  caja; la seleccionada sube 10 dp. Las dos cosas van en la capa
+  (`classicCard`), así que todos los nombres van en una línea y nada recompone.
+- El estante mide exactamente la fila (halo, subida, card, nombre, margen y
+  pistas) y el hero se queda el resto, nunca menos que la barra más el bloque
+  compacto.
+- El bloque del hero empieza, como muy arriba, bajo la barra (6 dp de aire) y
+  se compacta en este orden: (1) fuera la pista táctil o la sinopsis; (2) el
+  logo encoge hasta el 60 %; (3) las fichas se funden en una línea de texto;
+  (4) la ficha de la carpeta ("4 ROMs · 0h 0m") sube a la barra, junto al
+  sistema, como en Meridian. La pista táctil nunca sale con mando.
+- En apaisado la fila llena el ancho: el aire entre cards (14–40 dp) deja k
+  cards enteras y media más asomando, y al moverse queda una card delante de la
+  seleccionada.
+- En vertical manda el aire **a la vista**, de filo dibujado a filo dibujado
+  con la vecina ya encogida: 9 dp en un móvil y 12 en tableta
+  (`ClassicLayout.rowStyle`). Las vecinas van al 94 % (no al 90 %) y la maqueta
+  pone solo lo que falta tras lo que encogen por su lado (~4–5 dp en un
+  móvil). Antes se fijaba el aire de maqueta (16 dp) y, sumado a los ~6 dp que
+  la vecina al 90 % dejaba libres, a la vista quedaban ~22 dp. La card es una
+  fracción de la fila: carátulas al 42 % (~136 dp en un móvil de 360) e iconos
+  al 46 % (~149 dp), unas 2,1–2,3 a la vista; en tableta crecen hasta los
+  topes de siempre. El halo de la seleccionada (estela y luz en el estante) se
+  recorta al aire menos 2 dp (`selectionFrame(haloSpread)`) y los nombres van
+  del ancho de lo que se ve de la card. Apaisado no cambia
+  (`ClassicLandscapeRegressionTest`). La seleccionada va en el primer hueco con 24 dp de la anterior
+  asomando; la primera, pegada al margen, y al final la fila se para en el
+  margen derecho. Antes el aire de "llenar la fila" se iba a 40 dp con una card
+  y media por pantalla y, con una card entera delante, la seleccionada quedaba
+  cortada por la derecha (`ClassicLayout.anchor`, `selectedSpan`,
+  `ClassicPortraitTest`).
+- Con el dock en la costura (vertical), el bloque del hero guarda 10 dp sobre
+  él; la sinopsis pierde líneas (3 → 1) antes de irse.
+- El pie del estante es opaco (`shelfFootColor`): tinta algo más honda en
+  oscuro y perla con un poco más de acento en claro. El pie translúcido dejaba
+  ver el fondo como una franja gris lavada.
+- El arte del hero se pide al tamaño de su caja y en ARGB_8888
+  (`HeroArtQuality`); si hay que ampliarlo más de 1,8 veces, se suaviza
+  (desenfoque leve con RenderEffect y un velo algo más oscuro) en vez de
+  enseñar los píxeles.
+
+**Rendimiento** (Ajustes → Pantalla y tema → Rendimiento: Auto / Calidad /
+Rendimiento; `PerformanceTier`, `SocCatalog`, `DevicePerformance`,
+`LocalPerformance`). Auto elige Rendimiento en un equipo modesto:
+`isLowRamDevice`; chip de una familia de entrada (Helio, Unisoc, Snapdragon
+4xx/6xx bajos, cajas de TV…), salvo gama alta conocida o clase de rendimiento ≥
+Android 12; < 4 GB; ningún núcleo a 2,2 GHz o < 6 núcleos; o < 5,5 GB sin una
+CPU de 2,6 GHz. También con el ahorro de batería, y como último recurso si la
+biblioteca va a tirones sostenidos (`JankFallback`, `JankMonitor`: p90 > 25 ms
+en 4 ventanas seguidas de 5 s, sin contar arranque, intro, Masha ni
+descargas); eso se guarda (`perf.stutter`), se avisa una vez y se deshace
+eligiendo Auto otra vez. Bajo Auto, Ajustes dice el motivo.
+Es la misma app: el cristal va por su camino teñido (el de Android 8–11), el
+fondo vivo se decodifica a 32 px y se amplía con bilineal en vez de
+desenfocarse con RenderEffect, la flotación de logos, la respiración de la
+pista y los acercamientos lentos se quedan quietos en su pose, la pantalla va a
+60 fps salvo un 120 elegido a mano, Masha usa `masha_lite.glb` y su voz se
+suelta a los 10 s de salir de su pantalla.
 
 ## 10. Masha en la biblioteca
 
@@ -351,6 +435,25 @@ enteras) y, con iconos, dos tenues más. El margen izquierdo (`insetFor`)
 cuenta con que la fila encoge desde su canto: la vecina, encogida y corrida
 por la curva, queda al menos a 8 dp del filo (`NEIGHBOR_START`).
 
+**Carátulas en un móvil apaisado** (`MeridianCoverLayout`, `WheelProfile`).
+En ventana baja (`MeridianMode.compact`) la rueda lleva otro reparto: la
+carátula enfocada mide lo que deja asomar 32 dp de cada vecina (`PEEK_MIN`,
+con 8 dp de aire, `PEEK_GAP`): ~289 dp en 1600 × 720 px, el 70 % del alto
+(antes ~191, y al principio ~147). Va en el centro exacto de la rueda y las
+dos vecinas son simétricas por construcción: misma escala (72 %), misma
+distancia, misma opacidad, el mismo eje vertical que la enfocada (sin la
+curva del dial) y el mismo fundido en los dos cantos (la máscara, sin apagar
+la fila entera). Las listas cortas no se centran en un móvil: la enfocada
+sigue en el centro y solo falta la vecina que no hay. Tabletas y tele siguen
+con el 43 %, las vecinas enteras sobre el arco. Los iconos de la biblioteca
+toman el mismo reparto, pero sin pasar del ancho de la columna de siempre
+(su barra de la derecha lo necesita). Cada carátula se encaja entera con su
+proporción en un hueco de 0,70 (`SLOT_ASPECT`): PSP, Switch, 2:3 y PS2 miden
+lo mismo de alto, centradas; las más anchas encajan enteras, más bajas. Sin
+carátula, la reserva es una caja 2:3 a todo el alto, con el título encogido a
+su caja (`PlaceholderTitleLayout`) y la extensión arriba a la derecha. Las
+filas encogen desde el centro de su hueco y quedan a 16 dp del filo como poco.
+
 Al moverla con el dedo, la fila que se queda 70 ms en la línea de foco ya se
 selecciona (`WheelEffects`): el hero cambia mientras se recorre, no al
 pararse del todo; a toda velocidad no se queda ninguna y el hero no parpadea.
@@ -408,7 +511,36 @@ y la máscara de la niebla (`MeridianFog`): 0,86 desde el canto hasta el eje
 graduada `(1 − smoothstep)^1,7` en una banda fija de 88 dp (`FADE_DP`; antes
 el 16 % del ancho, hasta ~200 dp en tableta): densa junto a la rueda, un tercio
 a mitad del tramo, y sin canto (por debajo de ~80 dp bajaría más de 0,02 por
-dp). La máscara se calcula en dp. En claro, el cristal curvo pasa 24 dp del eje
+dp). La máscara se calcula en dp.
+
+**El cristal claro** (`WheelGlassLayer`, el mismo en Biblioteca y Carpeta)
+no lleva una imagen propia: el arte de la escena se graba en una capa
+(`ArtBackdrop`) y el cristal la vuelve a pintar en su sitio, avivada y
+desenfocada (API 31+). Así, zoom de llegada, paralaje, fundidos, reserva y
+escenario vacío son los de fuera por construcción: antes, la copia propia no
+llevaba el zoom de llegada (1,04 → 1) y en tableta el arte de dentro iba
+corrido ~35 dp. El desenfoque y el halo crecen con el ancho de la ventana
+(`GlassPanelLayout`). Todos los valores del aspecto están en `GlassTokens`:
+desenfoque 18 dp a 900 dp de ancho (14–28; la primera versión 20, 16–32; la
+"más transparente" 14, 10–22), tinte del juego 0,10 (0,06 → 0,03 → 0,10), un
+velo blanco nuevo de 0,07 en claro y 0,035 en oscuro (lo que la hace
+esmerilada), filo 0,30 (0,16 → 0,24 → 0,30) y halo 0,06. El ajuste
+"Desenfoque" lo escala desde ahí (18 px = 1×, como mucho 2×; a 0, sin
+desenfocar). `GlassPanelLayout.resolve` elige el camino: RenderEffect en
+Android 12+ en cualquier móvil (ya no depende de la RAM: la calidad ligera de
+Masha dejaba sin desenfoque a los móviles de menos de 5,5 GB), o, en Android
+8–11, el arte nítido con tinte 0,18 y velo 0,14 (0,07 en oscuro). El cristal
+es el fondo de la rueda de serie en los dos temas: antes el oscuro llevaba el
+difuminado, y en un móvil en tema oscuro el cristal nuevo no aparecía nunca.
+Una migración única (`SettingsStore.migrateGlass`, `glass.version` = 2) borra
+lo guardado que era el valor por defecto de antes (el fondo de la rueda igual
+al de su tema, "Desenfoque" en 18) y respeta lo demás. En depuración,
+`GlassDebug` (src/debug) escribe en el log `ElyndraGlass` el camino y los
+valores, y los pinta en pantalla con `cache/glass_debug`. El canto
+se recoge siempre al menos un 6 % de medio alto en los filos (12–48 dp): una
+cabecera ancha lo abre, pero ya no lo endereza.
+
+En claro, el cristal curvo pasa 24 dp del eje
 (el dial con su nodo dentro; antes 84, para la cápsula del contador). Lo que va
 encima de la niebla (el dock de la cabecera, el bocadillo de Masha) se mide
 contra su canto *visible* y curvo a su altura (`MeridianFog.visibleEdge`): el
@@ -440,8 +572,20 @@ el ajuste, el velo neutro de siempre (perla cálida en claro, tinta en oscuro).
 **Barra y píldoras**: arriba, un velo de la tinta honda del arte (luminosidad
 10 %) que se mantiene lo que mide la barra y se apaga en 24 dp, con la
 opacidad justa para el texto blanco (≥ 4,5:1 sobre el píxel más claro de esa
-zona). La cabecera de Carpeta: nombre en una línea, ruta en otra recortada
-por el centro, a 12 dp de la píldora de la batería. Todas las píldoras de
+zona). La cabecera de Carpeta: el emulador de la carpeta, el nombre en una
+línea y la ruta en otra recortada por el centro, a 12 dp de la píldora de la
+batería (`FolderBarLayout`, la misma en el Clásico). El emulador va ahí, con
+el sistema que nombra la carpeta, y no junto a volver y "Abrir": en la
+cabecera de la rueda obligaba al cristal a abrirse hasta enderezarse. En
+Meridian lleva además, a la izquierda del emulador y en la misma fila, la
+ficha de la carpeta ("4 ROMs · 0h 16m"), que iba bajo volver y "Abrir" y le
+quitaba a la rueda ~28 dp de alto; en la misma fila y no bajo la ruta, para
+que el grupo no baje hasta los chips del hero en un móvil. Si no cabe, se
+compacta en este orden: el nombre y la ruta encogen hasta 96 dp (la ruta por
+el centro), la ficha pierde el tiempo ("4 ROMs"), el rótulo del emulador se
+recorta (hasta 56 dp) y se queda en su icono (con el nombre para el lector de
+pantalla) y, en lo más justo, la ficha se quita; la píldora de estado no cede. El mando
+la recorre igual: volver, Abrir, emulador. Todas las píldoras de
 cristal oscuro (volver, Abrir, emulador, hora, buscar, Ajustes)
 llevan en Meridian un suelo de tinta de 0,66 (`MeridianGlass`, `LocalGlassFloor`):
 texto ≥ 4,5:1 e iconos ≥ 3:1 sobre cualquier fondo. Se tocan en 48 dp
