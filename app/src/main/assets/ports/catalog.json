@@ -1,0 +1,417 @@
+{
+  "schema": 1,
+  "updated": "2026-11-08",
+  "ports": [
+    {
+      "id": "soh",
+      "name": "Ship of Harkinian",
+      "kind": "decomp",
+      "developer": "HarbourMasters · Android: linkzenic",
+      "repo": { "owner": "linkzenic", "name": "Shipwright-Ports" },
+      "upstream": { "owner": "HarbourMasters", "name": "Shipwright" },
+      "original": { "title": "The Legend of Zelda: Ocarina of Time", "platform": "n64" },
+      "builds": [
+        { "platform": "android", "asset": "(?i)android.*\\.apk$", "abis": ["arm64-v8a", "universal"] },
+        { "platform": "windows", "repo": { "owner": "HarbourMasters", "name": "Shipwright" }, "asset": "(?i)win64\\.zip$" }
+      ],
+      "requires": {
+        "userRom": true,
+        "text": {
+          "en": "Your own Ocarina of Time ROM (N64 NTSC/PAL, GameCube or Master Quest, in .z64 format). The app extracts the game data from it on first launch.",
+          "es": "Tu propia ROM de Ocarina of Time (N64 NTSC/PAL, GameCube o Master Quest, en formato .z64). La app extrae los datos del juego al abrirla por primera vez."
+        },
+        "roms": [
+          { "label": "NTSC 1.0 (US)", "system": "n64", "sha1": "ad69c91157f6705e8ab06c79fe08aad47bb57ba7" },
+          { "label": "NTSC 1.1 (US)", "system": "n64", "sha1": "d3ecb253776cd847a5aa63d859d8c89a2f37b364" },
+          { "label": "NTSC 1.2 (US)", "system": "n64", "sha1": "41b3bdc48d98c48529219919015a1af22f5057c2" },
+          { "label": "NTSC 1.0 (JP)", "system": "n64", "sha1": "c892bbda3993e66bd0d56a10ecd30b1ee612210f" },
+          { "label": "NTSC 1.1 (JP)", "system": "n64", "sha1": "dbfc81f655187dc6fefd93fa6798face770d579d" },
+          { "label": "NTSC 1.2 (JP)", "system": "n64", "sha1": "fa5f5942b27480d60243c2d52c0e93e26b9e6b86" },
+          { "label": "PAL 1.0", "system": "n64", "sha1": "328a1f1beba30ce5e178f031662019eb32c5f3b5" },
+          { "label": "PAL 1.1", "system": "n64", "sha1": "cfbb98d392e4a9d39da8285d10cbef3974c2f012" },
+          { "label": "PAL GC", "system": "n64", "sha1": "0227d7c0074f2d0ac935631990da8ec5914597b4" },
+          { "label": "PAL MQ", "system": "n64", "sha1": "f46239439f59a2a594ef83cf68ef65043b1bffe2" },
+          { "label": "NTSC GC (US)", "system": "n64", "sha1": "b82710ba2bd3b4c6ee8aa1a7e9acf787dfc72e9b" },
+          { "label": "NTSC MQ (US)", "system": "n64", "sha1": "8b5d13aac69bfbf989861cfdc50b1d840945fc1d" },
+          { "label": "NTSC GC (JP)", "system": "n64", "sha1": "0769c84615422d60f16925cd859593cdfa597f84" },
+          { "label": "NTSC GC (JP) (Collector's Edition)", "system": "n64", "sha1": "2ce2d1a9f0534c9cd9fa04ea5317b80da21e5e73" },
+          { "label": "NTSC MQ (JP)", "system": "n64", "sha1": "dd14e143c4275861fe93ea79d0c02e36ae8c6c2f" }
+        ]
+      },
+      "tags": ["adventure", "action", "widescreen", "60fps", "mods", "randomizer"],
+      "short": {
+        "en": "Native PC port of Ocarina of Time, rebuilt from the decompilation, running natively on Android.",
+        "es": "Port nativo de Ocarina of Time reconstruido desde la decompilación, funcionando de forma nativa en Android."
+      },
+      "long": {
+        "en": "Ship of Harkinian runs Ocarina of Time natively from the zeldaret decompilation: widescreen, high frame rates, modern controls, a randomizer, cosmetics and mod support. This Android build is maintained by linkzenic on top of HarbourMasters' releases.",
+        "es": "Ship of Harkinian ejecuta Ocarina of Time de forma nativa a partir de la decompilación de zeldaret: pantalla panorámica, tasas de imagen altas, controles modernos, aleatorizador, cosméticos y mods. Esta versión para Android la mantiene linkzenic sobre las releases de HarbourMasters."
+      },
+      "license": null,
+      "verified": true,
+      "featured": true
+    },
+    {
+      "id": "2s2h",
+      "name": "2 Ship 2 Harkinian",
+      "kind": "decomp",
+      "developer": "HarbourMasters · Android: linkzenic",
+      "repo": { "owner": "linkzenic", "name": "2ship2harkinian-Android" },
+      "upstream": { "owner": "HarbourMasters", "name": "2ship2harkinian" },
+      "original": { "title": "The Legend of Zelda: Majora's Mask", "platform": "n64" },
+      "builds": [
+        { "platform": "android", "asset": "(?i)\\.apk$", "abis": ["arm64-v8a", "universal"] },
+        { "platform": "windows", "repo": { "owner": "HarbourMasters", "name": "2ship2harkinian" }, "asset": "(?i)win64\\.zip$" }
+      ],
+      "requires": {
+        "userRom": true,
+        "text": {
+          "en": "Your own Majora's Mask ROM: N64 NTSC-U 1.0 or the GameCube NTSC-U version, in .z64 format.",
+          "es": "Tu propia ROM de Majora's Mask: N64 NTSC-U 1.0 o la versión de GameCube NTSC-U, en formato .z64."
+        },
+        "roms": [
+          { "label": "NTSC-U 1.0", "system": "n64", "sha1": "d6133ace5afaa0882cf214cf88daba39e266c078" },
+          { "label": "NTSC-U GC", "system": "n64", "sha1": "9743aa026e9269b339eb0e3044cd5830a440c1fd" }
+        ]
+      },
+      "tags": ["adventure", "action", "widescreen", "60fps", "mods"],
+      "short": {
+        "en": "Majora's Mask rebuilt from the decompilation, with modern enhancements, on Android.",
+        "es": "Majora's Mask reconstruido desde la decompilación, con mejoras modernas, en Android."
+      },
+      "long": {
+        "en": "2 Ship 2 Harkinian is HarbourMasters' native port of Majora's Mask: widescreen, high frame rates, quality-of-life options and mods. This unofficial Android fork is maintained by linkzenic.",
+        "es": "2 Ship 2 Harkinian es el port nativo de Majora's Mask de HarbourMasters: pantalla panorámica, tasas de imagen altas, opciones de comodidad y mods. Este fork no oficial para Android lo mantiene linkzenic."
+      },
+      "license": "CC0-1.0",
+      "verified": true,
+      "featured": true
+    },
+    {
+      "id": "moonpearl",
+      "name": "Moonpearl",
+      "kind": "reimpl",
+      "developer": "DoutorRaposo (based on snesrev/zelda3)",
+      "repo": { "owner": "DoutorRaposo", "name": "moonpearl" },
+      "upstream": { "owner": "snesrev", "name": "zelda3" },
+      "original": { "title": "The Legend of Zelda: A Link to the Past", "platform": "snes" },
+      "builds": [
+        { "platform": "android", "asset": "(?i)^moonpearl.*\\.apk$", "abis": ["arm64-v8a", "universal"] }
+      ],
+      "requires": {
+        "userRom": true,
+        "text": {
+          "en": "Your own SNES ROM of A Link to the Past (USA), as .sfc or .smc (zipped is fine). The app sets everything up from it; the ROM is not kept.",
+          "es": "Tu propia ROM de SNES de A Link to the Past (USA), en .sfc o .smc (también comprimida). La app lo prepara todo a partir de ella y no la guarda."
+        },
+        "roms": []
+      },
+      "tags": ["adventure", "action", "widescreen", "rewind", "shaders"],
+      "short": {
+        "en": "Android port of the zelda3 reimplementation of A Link to the Past: widescreen, rewind, shaders.",
+        "es": "Port para Android de la reimplementación zelda3 de A Link to the Past: panorámica, rebobinado y shaders."
+      },
+      "long": {
+        "en": "Moonpearl wraps snesrev's zelda3 (a full C reimplementation of A Link to the Past) in an Android app with widescreen, rewind, save states, RetroArch-style shaders, MSU-1 audio and controller support.",
+        "es": "Moonpearl lleva zelda3 de snesrev (una reimplementación completa en C de A Link to the Past) a una app de Android con pantalla panorámica, rebobinado, estados de guardado, shaders al estilo de RetroArch, audio MSU-1 y soporte de mandos."
+      },
+      "license": "MIT",
+      "verified": false,
+      "featured": true
+    },
+    {
+      "id": "zelda3-android",
+      "name": "zelda3 for Android",
+      "kind": "reimpl",
+      "developer": "Waterdish (based on snesrev/zelda3)",
+      "repo": { "owner": "Waterdish", "name": "zelda3-android" },
+      "upstream": { "owner": "snesrev", "name": "zelda3" },
+      "original": { "title": "The Legend of Zelda: A Link to the Past", "platform": "snes" },
+      "builds": [
+        { "platform": "android", "asset": "(?i)\\.apk$", "abis": ["universal"], "package": "com.dishii.zelda3" },
+        { "platform": "windows", "repo": { "owner": "snesrev", "name": "zelda3" }, "asset": "(?i)\\.zip$" }
+      ],
+      "requires": {
+        "userRom": true,
+        "text": {
+          "en": "A zelda3_assets.dat extracted from your own USA ROM of A Link to the Past (see the repository's instructions).",
+          "es": "Un zelda3_assets.dat extraído de tu propia ROM USA de A Link to the Past (ver las instrucciones del repositorio)."
+        },
+        "roms": []
+      },
+      "tags": ["adventure", "action", "classic"],
+      "short": {
+        "en": "The original Android build of zelda3, the C reimplementation of A Link to the Past.",
+        "es": "La versión original para Android de zelda3, la reimplementación en C de A Link to the Past."
+      },
+      "long": {
+        "en": "An early Android port of snesrev's zelda3. It needs the asset file generated from your own ROM. Last updated in 2023; Moonpearl is the more complete option.",
+        "es": "Un port temprano de zelda3 de snesrev para Android. Necesita el archivo de recursos generado desde tu propia ROM. Última actualización en 2023; Moonpearl es la opción más completa."
+      },
+      "license": null,
+      "verified": true,
+      "featured": false
+    },
+    {
+      "id": "perfect-dark",
+      "name": "Perfect Dark (Android)",
+      "kind": "decomp",
+      "developer": "Mr4xd3mn (based on fgsfdsfgs/perfect_dark)",
+      "repo": { "owner": "Mr4xd3mn", "name": "perfect-dark-android" },
+      "upstream": { "owner": "fgsfdsfgs", "name": "perfect_dark" },
+      "original": { "title": "Perfect Dark", "platform": "n64" },
+      "builds": [
+        { "platform": "android", "asset": "(?i)\\.apk$", "abis": ["arm64-v8a", "universal"] },
+        { "platform": "windows", "repo": { "owner": "fgsfdsfgs", "name": "perfect_dark" }, "asset": "(?i)x86_64-windows\\.zip$" }
+      ],
+      "requires": {
+        "userRom": true,
+        "text": {
+          "en": "Your own Perfect Dark N64 ROM: NTSC final (US v1.1), NTSC 1.0, JPN final or PAL final.",
+          "es": "Tu propia ROM de Perfect Dark de N64: NTSC final (US v1.1), NTSC 1.0, JPN final o PAL final."
+        },
+        "roms": [
+          { "label": "NTSC final (US v1.1)", "system": "n64", "md5": "e03b088b6ac9e0080440efed07c1e40f" },
+          { "label": "NTSC 1.0 (US v1.0)", "system": "n64", "md5": "7f4171b0c8d17815be37913f535e4e93" },
+          { "label": "JPN final", "system": "n64", "md5": "538d2b75945eae069b29c46193e74790" },
+          { "label": "PAL final", "system": "n64", "md5": "d9b5cd305d228424891ce38e71bc9213" }
+        ]
+      },
+      "tags": ["shooter", "fps", "widescreen", "60fps", "touch-controls"],
+      "short": {
+        "en": "Native Android port of the Perfect Dark decompilation, with on-screen touch controls.",
+        "es": "Port nativo para Android de la decompilación de Perfect Dark, con controles táctiles en pantalla."
+      },
+      "long": {
+        "en": "Built on fgsfdsfgs' PC port of the Perfect Dark decompilation: high frame rates, widescreen, mouse-style aiming and on-screen touch controls. New, small project: check the repository before installing.",
+        "es": "Basado en el port de PC de la decompilación de Perfect Dark de fgsfdsfgs: tasas de imagen altas, panorámica, apuntado tipo ratón y controles táctiles. Proyecto nuevo y pequeño: revisa el repositorio antes de instalar."
+      },
+      "license": null,
+      "verified": false,
+      "featured": false
+    },
+    {
+      "id": "nsmbw-recomp",
+      "name": "NSMB Wii Recompiled",
+      "kind": "recomp",
+      "developer": "WitherBlitz",
+      "repo": { "owner": "WitherBlitz", "name": "NSMB-Wii-Recompilation" },
+      "original": { "title": "New Super Mario Bros. Wii", "platform": "wii" },
+      "builds": [
+        { "platform": "android", "asset": "(?i)android.*\\.apk$", "abis": ["arm64-v8a", "universal"] },
+        { "platform": "windows", "asset": "(?i)windows-x64\\.zip$" }
+      ],
+      "requires": {
+        "userRom": true,
+        "text": {
+          "en": "Your own disc image of New Super Mario Bros. Wii (USA, SMNE01).",
+          "es": "Tu propia imagen de disco de New Super Mario Bros. Wii (USA, SMNE01)."
+        },
+        "roms": []
+      },
+      "tags": ["platformer", "multiplayer", "widescreen", "gyro"],
+      "short": {
+        "en": "New Super Mario Bros. Wii running natively on Android through PowerPC static recompilation.",
+        "es": "New Super Mario Bros. Wii funcionando de forma nativa en Android mediante recompilación estática de PowerPC."
+      },
+      "long": {
+        "en": "A static recompilation of New Super Mario Bros. Wii for Android and Windows, with tilt controls, local multiplayer, key remapping and a performance monitor.",
+        "es": "Una recompilación estática de New Super Mario Bros. Wii para Android y Windows, con control por inclinación, multijugador local, reasignación de botones y monitor de rendimiento."
+      },
+      "license": "GPL-3.0",
+      "verified": false,
+      "featured": true
+    },
+    {
+      "id": "unleashed-recomp",
+      "name": "Unleashed Recompiled (Android)",
+      "kind": "recomp",
+      "developer": "SansNope (based on hedge-dev/UnleashedRecomp)",
+      "repo": { "owner": "SansNope", "name": "UnleashedRecomp-Android" },
+      "upstream": { "owner": "hedge-dev", "name": "UnleashedRecomp" },
+      "original": { "title": "Sonic Unleashed", "platform": "xbox360" },
+      "builds": [
+        { "platform": "android", "asset": "(?i)\\.apk$", "abis": ["arm64-v8a", "universal"] },
+        { "platform": "windows", "repo": { "owner": "hedge-dev", "name": "UnleashedRecomp" }, "asset": "(?i)windows\\.zip$" }
+      ],
+      "requires": {
+        "userRom": true,
+        "text": {
+          "en": "Files from your own Xbox 360 copy of Sonic Unleashed (base game, optional title update and DLC).",
+          "es": "Archivos de tu propia copia de Sonic Unleashed para Xbox 360 (juego base y, opcionalmente, actualización y DLC)."
+        },
+        "roms": []
+      },
+      "tags": ["action", "platformer", "recomp", "vulkan"],
+      "short": {
+        "en": "Unofficial Android port of Unleashed Recompiled, the Xbox 360 static recompilation of Sonic Unleashed.",
+        "es": "Port no oficial para Android de Unleashed Recompiled, la recompilación estática de Sonic Unleashed de Xbox 360."
+      },
+      "long": {
+        "en": "Brings hedge-dev's Unleashed Recompiled to Android with an in-app installer for your game files, custom Vulkan drivers (Turnip) and controller support. Best on Adreno GPUs; Mali is experimental.",
+        "es": "Lleva Unleashed Recompiled de hedge-dev a Android con un instalador integrado para tus archivos del juego, drivers Vulkan personalizados (Turnip) y soporte de mandos. Mejor en GPU Adreno; Mali es experimental."
+      },
+      "license": "GPL-3.0",
+      "verified": false,
+      "featured": true
+    },
+    {
+      "id": "fh2-recomp",
+      "name": "Forza Horizon 2 Recompiled",
+      "kind": "recomp",
+      "developer": "Gabrick75",
+      "repo": { "owner": "Gabrick75", "name": "fh2-recompiled" },
+      "original": { "title": "Forza Horizon 2", "platform": "xbox360" },
+      "builds": [
+        { "platform": "android", "asset": "(?i)\\.apk$", "abis": ["arm64-v8a", "universal"] }
+      ],
+      "requires": {
+        "userRom": true,
+        "text": {
+          "en": "Your own Xbox 360 disc image (.iso) of Forza Horizon 2.",
+          "es": "Tu propia imagen de disco (.iso) de Forza Horizon 2 para Xbox 360."
+        },
+        "roms": []
+      },
+      "tags": ["racing", "open-world", "recomp", "early-access"],
+      "short": {
+        "en": "Work-in-progress static recompilation of Forza Horizon 2 (Xbox 360) for Android.",
+        "es": "Recompilación estática en desarrollo de Forza Horizon 2 (Xbox 360) para Android."
+      },
+      "long": {
+        "en": "Recompiles the game's PowerPC code ahead of time on top of the ReXGlue SDK and reads the game straight from your disc image. Boots and races, but performance is still far from the console. Pre-release builds only.",
+        "es": "Recompila de antemano el código PowerPC del juego sobre el SDK ReXGlue y lee el juego directamente de tu imagen de disco. Arranca y se puede correr, pero el rendimiento aún está lejos de la consola. Solo versiones preliminares."
+      },
+      "license": "GPL-3.0",
+      "verified": false,
+      "featured": false
+    },
+    {
+      "id": "nfsmw-android",
+      "name": "Most Wanted for Android",
+      "kind": "recomp",
+      "developer": "RanggaCasper",
+      "repo": { "owner": "RanggaCasper", "name": "MostWanted-Android" },
+      "original": { "title": "Need for Speed: Most Wanted", "platform": "xbox" },
+      "builds": [
+        { "platform": "android", "asset": "(?i)\\.apk$", "abis": ["arm64-v8a", "universal"] }
+      ],
+      "requires": {
+        "userRom": true,
+        "text": {
+          "en": "Your own original Xbox Black Edition disc of Need for Speed: Most Wanted (USA): the disc image or default.xbe with its NFS folder.",
+          "es": "Tu propio disco Black Edition de Need for Speed: Most Wanted para la Xbox original (USA): la imagen de disco o default.xbe con su carpeta NFS."
+        },
+        "roms": []
+      },
+      "tags": ["racing", "open-world", "recomp", "vulkan"],
+      "short": {
+        "en": "Unofficial native Android port of Need for Speed: Most Wanted (original Xbox, Black Edition).",
+        "es": "Port nativo no oficial para Android de Need for Speed: Most Wanted (Xbox original, Black Edition)."
+      },
+      "long": {
+        "en": "The game's x86 code is statically recompiled to C++ ahead of time and built for arm64, drawing through Vulkan. Saves live in a MostWanted folder on your storage so they survive reinstalls.",
+        "es": "El código x86 del juego se recompila de antemano a C++ y se compila para arm64, dibujando con Vulkan. Las partidas se guardan en una carpeta MostWanted del almacenamiento, así sobreviven a una reinstalación."
+      },
+      "license": "MIT",
+      "verified": false,
+      "featured": false
+    },
+    {
+      "id": "starship",
+      "name": "Starship",
+      "kind": "decomp",
+      "developer": "HarbourMasters",
+      "repo": { "owner": "HarbourMasters", "name": "Starship" },
+      "original": { "title": "Star Fox 64", "platform": "n64" },
+      "builds": [
+        { "platform": "windows", "asset": "(?i)windows\\.zip$" },
+        { "platform": "linux", "asset": "(?i)linux\\.zip$" }
+      ],
+      "requires": {
+        "userRom": true,
+        "text": {
+          "en": "Your own Star Fox 64 ROM (US 1.1).",
+          "es": "Tu propia ROM de Star Fox 64 (US 1.1)."
+        },
+        "roms": []
+      },
+      "tags": ["shooter", "widescreen", "60fps", "mods"],
+      "short": {
+        "en": "PC port of Star Fox 64 from the decompilation. No Android build yet.",
+        "es": "Port para PC de Star Fox 64 desde la decompilación. Aún sin versión para Android."
+      },
+      "long": {
+        "en": "HarbourMasters' native port of Star Fox 64 with widescreen, high frame rates and mod support. Releases include Windows, Linux and Switch builds, but no Android APK.",
+        "es": "El port nativo de Star Fox 64 de HarbourMasters con panorámica, tasas de imagen altas y mods. Las releases traen versiones para Windows, Linux y Switch, pero ningún APK de Android."
+      },
+      "license": null,
+      "verified": true,
+      "featured": false
+    },
+    {
+      "id": "spaghettikart",
+      "name": "SpaghettiKart",
+      "kind": "decomp",
+      "developer": "HarbourMasters",
+      "repo": { "owner": "HarbourMasters", "name": "SpaghettiKart" },
+      "original": { "title": "Mario Kart 64", "platform": "n64" },
+      "builds": [
+        { "platform": "windows", "asset": "(?i)windows\\.zip$" },
+        { "platform": "linux", "asset": "(?i)linux\\.zip$" }
+      ],
+      "requires": {
+        "userRom": true,
+        "text": {
+          "en": "Your own Mario Kart 64 ROM (US).",
+          "es": "Tu propia ROM de Mario Kart 64 (US)."
+        },
+        "roms": []
+      },
+      "tags": ["racing", "multiplayer", "widescreen", "mods"],
+      "short": {
+        "en": "PC port of Mario Kart 64 from the decompilation. No Android build yet.",
+        "es": "Port para PC de Mario Kart 64 desde la decompilación. Aún sin versión para Android."
+      },
+      "long": {
+        "en": "HarbourMasters' native port of Mario Kart 64. Releases ship Windows, Linux and macOS builds only.",
+        "es": "El port nativo de Mario Kart 64 de HarbourMasters. Las releases solo traen versiones para Windows, Linux y macOS."
+      },
+      "license": null,
+      "verified": true,
+      "featured": false
+    },
+    {
+      "id": "sm64coopdx",
+      "name": "sm64coopdx",
+      "kind": "decomp",
+      "developer": "coop-deluxe",
+      "repo": { "owner": "coop-deluxe", "name": "sm64coopdx" },
+      "original": { "title": "Super Mario 64", "platform": "n64" },
+      "builds": [
+        { "platform": "windows", "asset": "(?i)windows\\.zip$" },
+        { "platform": "linux", "asset": "(?i)linux\\.zip$" }
+      ],
+      "requires": {
+        "userRom": true,
+        "text": {
+          "en": "Your own Super Mario 64 ROM (US).",
+          "es": "Tu propia ROM de Super Mario 64 (US)."
+        },
+        "roms": []
+      },
+      "tags": ["platformer", "online", "multiplayer", "mods"],
+      "short": {
+        "en": "Online co-op Super Mario 64 built on the decompilation. No official Android build.",
+        "es": "Super Mario 64 cooperativo online sobre la decompilación. Sin versión oficial para Android."
+      },
+      "long": {
+        "en": "sm64coopdx turns the Super Mario 64 decompilation into an online multiplayer game with a large mod ecosystem. Official releases cover Windows, Linux and macOS.",
+        "es": "sm64coopdx convierte la decompilación de Super Mario 64 en un juego multijugador online con un gran ecosistema de mods. Las releases oficiales cubren Windows, Linux y macOS."
+      },
+      "license": null,
+      "verified": true,
+      "featured": false
+    }
+  ]
+}
