@@ -422,7 +422,7 @@ internal fun RailHeaderRow(compact: Boolean, pills: FloatArray, dock: @Composabl
             }
         }?.copy(reach = 0f) // La curva sin la banda que pide la propia cabecera (si no, el dock se iría ensanchando con ella).
         val edge: ((Float) -> Float)? = if (fog == null || arc == null) null else { y -> arc.edgeAt(padTop.value + y, fog.axisX, fog.glass, dens) }
-        val plan = RailHeaderLayout.plan(rail, DotTabsLayout.HEIGHT, pills, edge)
+        val plan = RailHeaderLayout.plan(rail, DotTabsLayout.HEIGHT, pills, edge, dest = true)
         val dockP = measurables[0].measure(Constraints(maxWidth = ceil(plan.dockWidth * dens).toInt()))
         val height = plan.height.dp.roundToPx()
         layout(constraints.maxWidth, height) {
@@ -486,6 +486,9 @@ private fun LibraryHero(vm: ElyndraViewModel, item: LibraryItem?, onAdd: Boolean
                 titleBox = LogoFit.box(frame.heroWidth, maxWidth.value, screen.height.value, frame.compact, density = density),
                 padGlyphs = vm.input.gamepadPresent,
                 compact = frame.compact,
+                // Biblioteca vacía: también la tienda de ports nativos.
+                secondary = if (libraryEmpty) stringResource(R.string.ports_browse) else null,
+                onSecondary = vm::openPorts,
             )
         }
         return
