@@ -22,7 +22,9 @@ import androidx.compose.ui.layout.positionInParent
 import com.elyndra.launcher.ui.components.PAD_HINTS_HEIGHT
 import com.elyndra.launcher.ui.components.PadHint
 import com.elyndra.launcher.ui.components.PadHints
+import com.elyndra.launcher.ui.components.DockDestination
 import com.elyndra.launcher.ui.components.DotTabs
+import com.elyndra.launcher.ui.screens.ports.StoreGlyph
 import com.elyndra.launcher.ui.components.SortButton
 import com.elyndra.launcher.ui.components.SortPopover
 import com.elyndra.launcher.ui.DockPlacement
@@ -408,7 +410,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         vm = vm,
                         available = (windowWidth - m.pad * 2).value,
                         landscape = m.landscape,
-                        dockWidth = if (dockInBar) SectionDockLayout.minWidth(vm.availableFilters().size) else 0f,
+                        dockWidth = if (dockInBar) SectionDockLayout.minWidth(vm.availableFilters().size, dest = true) else 0f,
                     )
                     Row(
                         Modifier
@@ -652,6 +654,13 @@ internal fun SectionTabs(vm: ElyndraViewModel, modifier: Modifier = Modifier, gl
         focusIndex = if (dockFocused) vm.input.dockFocus else -1,
         glassMinAlpha = glassMinAlpha,
         light = light,
+        // Tras una raya, la tienda de ports: otra pantalla, no una sección (ver DockDestination).
+        destination = DockDestination(
+            label = stringResource(R.string.ports_dock_a11y),
+            icon = StoreGlyph,
+            active = vm.screen == Screen.Ports,
+            onSelect = vm::openPorts,
+        ),
     )
 }
 
@@ -1024,6 +1033,9 @@ private fun EmptyHeroBlock(vm: ElyndraViewModel, m: Metrics, searching: Boolean,
             padGlyphs = vm.input.gamepadPresent,
             compact = compact,
             titleMaxSp = m.titleSize,
+            // Biblioteca vacía: también la tienda de ports nativos (X del mando).
+            secondary = if (!searching && libraryEmpty) stringResource(R.string.ports_browse) else null,
+            onSecondary = vm::openPorts,
         )
     }
 }
