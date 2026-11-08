@@ -96,6 +96,25 @@ class MigrationTest {
     }
 
     @Test
+    fun migration5to6MatchesTheExportedSchema() {
+        val v5 = schema(5)
+        val v6 = schema(6)
+        val sql = sqlOf(ElyndraDatabase.MIGRATION_5_6)
+        // Una tabla nueva y su índice, creados igual que los declara Room; nada más cambia.
+        val table = v6.getValue("installed_ports")
+        val create = table["createSql"]!!.jsonPrimitive.content.replace("\${TABLE_NAME}", "installed_ports")
+        assertTrue(sql.contains(create))
+        table["indices"]!!.jsonArray.forEach { index ->
+            val createIndex = index.jsonObject["createSql"]!!.jsonPrimitive.content.replace("\${TABLE_NAME}", "installed_ports")
+            assertTrue(createIndex, sql.contains(createIndex))
+        }
+        assertEquals(2, sql.size)
+        assertEquals(v5.keys + "installed_ports", v6.keys)
+        for (name in v5.keys) assertEquals(name, columns(v5.getValue(name)), columns(v6.getValue(name)))
+        assertEquals(setOf("catalog_id", "package_name", "installed_tag", "asset_name", "installed_at"), columns(table))
+    }
+
+    @Test
     fun androidDescriptionsNotFromPlayAreForgottenAndRomsAreUntouched() {
         val update = sqlOf(ElyndraDatabase.MIGRATION_4_5).single { it.startsWith("UPDATE") }
         assertTrue(update.contains("`game_key` LIKE 'a:%'"))
