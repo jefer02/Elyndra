@@ -55,4 +55,16 @@ class BackPriorityTest {
         assertEquals(Target.Details, next(State(sortMenu = true, details = true)))
         assertEquals(Target.Sheet, next(State(sortMenu = true, sheet = true)))
     }
+
+    @Test
+    fun `in the ports store back closes the detail then the filters then the screen`() {
+        var s = State(screen = Screen.Ports, portDetail = true, portsSearch = true)
+        assertEquals(Target.PortDetail, next(s)); s = s.copy(portDetail = false)
+        assertEquals(Target.PortsSearch, next(s)); s = s.copy(portsSearch = false)
+        assertEquals(Target.Screen, next(s))
+        // Una capa encima (el diálogo de instalar) se cierra antes que la ficha.
+        assertEquals(Target.Dialog, next(State(screen = Screen.Ports, portDetail = true, dialog = true)))
+        // Fuera de la tienda esos estados no cuentan.
+        assertEquals(Target.Screen, next(State(screen = Screen.Add, portDetail = true)))
+    }
 }
