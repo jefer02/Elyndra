@@ -34,8 +34,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ArcStepEntity::class,
         AiCacheEntity::class,
         DescriptionTranslationEntity::class,
+        InstalledPortEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class ElyndraDatabase : RoomDatabase() {
@@ -46,6 +47,7 @@ abstract class ElyndraDatabase : RoomDatabase() {
     abstract fun arcDao(): ArcDao
     abstract fun aiCacheDao(): AiCacheDao
     abstract fun translationDao(): TranslationDao
+    abstract fun portDao(): PortDao
 
     companion object {
         const val NAME = "elyndra.db"
@@ -109,6 +111,20 @@ abstract class ElyndraDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+        /**
+         * 5 → 6: los ports instalados desde la tienda (`installed_ports`).
+         * Solo una tabla nueva: nada de lo que había cambia.
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `installed_ports` (`catalog_id` TEXT NOT NULL, `package_name` TEXT NOT NULL, " +
+                        "`installed_tag` TEXT NOT NULL, `asset_name` TEXT, `installed_at` INTEGER NOT NULL, PRIMARY KEY(`catalog_id`))",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_installed_ports_package_name` ON `installed_ports` (`package_name`)")
+            }
+        }
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
     }
 }
