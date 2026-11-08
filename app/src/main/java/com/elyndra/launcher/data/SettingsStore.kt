@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import com.elyndra.launcher.core.device.StutterMemory
+import com.elyndra.launcher.ports.PortCatalogRepository
 import com.elyndra.launcher.ui.meridian.WheelBackdrop
 
 /** Ajustes no sensibles (aspecto, opciones de metadatos, sesión de juego en curso). */
@@ -440,6 +441,18 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
     var updateEtag: String?
         get() = prefs.getString("update.etag", null)
         set(v) = prefs.edit { if (v == null) remove("update.etag") else putString("update.etag", v) }
+
+    /** De dónde se lee el catálogo de la tienda de ports (vacío = el de siempre). */
+    var portsCatalogUrl: String
+        get() = prefs.getString("ports.catalogUrl", null)?.takeIf { it.isNotBlank() } ?: PortCatalogRepository.DEFAULT_URL
+        set(v) = prefs.edit {
+            if (v.isBlank() || v == PortCatalogRepository.DEFAULT_URL) remove("ports.catalogUrl") else putString("ports.catalogUrl", v.trim())
+        }
+
+    /** Tienda de ports: enseñar también los que solo tienen versión de PC. */
+    var portsShowPcOnly: Boolean
+        get() = prefs.getBoolean("ports.showPcOnly", false)
+        set(v) = prefs.edit { putBoolean("ports.showPcOnly", v) }
 
     /** Versión (etiqueta) que se canceló: la comprobación automática no vuelve a ofrecerla. */
     var updateSkippedTag: String?
