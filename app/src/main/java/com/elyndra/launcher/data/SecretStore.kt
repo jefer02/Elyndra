@@ -90,4 +90,7 @@ object SecretKeys {
 
     /** Clave de DeepSeek puesta por el usuario; manda sobre la compilada (BuildConfig). */
     const val MASHA_KEY = "masha.key"
+
+    /** Token personal de GitHub, opcional: sube el cupo de la tienda de ports de 60 a 5 000 peticiones por hora. */
+    const val GITHUB_TOKEN = "github.token"
 }
