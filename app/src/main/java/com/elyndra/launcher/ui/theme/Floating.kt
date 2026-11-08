@@ -45,8 +45,11 @@ class FloatClock {
 @Composable
 fun rememberFloatClock(): FloatClock {
     val clock = remember { FloatClock() }
-    val reduced = LocalReducedMotion.current
-    if (!reduced) {
+    // Con "reducir movimiento" o en Rendimiento el reloj no arranca: es un
+    // fotograma tras otro mientras la pantalla está abierta, aunque no pase
+    // nada más (y con él se vuelve a pintar todo lo de detrás, desenfoques incluidos).
+    val still = LocalReducedMotion.current || !LocalPerformance.current.ambientMotion
+    if (!still) {
         LaunchedEffect(clock) {
             val start = withFrameNanos { it }
             while (true) withFrameNanos { now -> clock.seconds = (now - start) / 1_000_000_000f }

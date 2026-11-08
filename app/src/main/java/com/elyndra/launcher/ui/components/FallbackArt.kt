@@ -1,5 +1,13 @@
 package com.elyndra.launcher.ui.components
 
+import com.elyndra.launcher.ui.theme.LocalPoppins
+import com.elyndra.launcher.ui.TitleFit
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.runtime.remember
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
@@ -107,7 +115,6 @@ internal object FallbackArtCache {
     private const val SIDE = 32
     private val cache = LruCache<String, FallbackLook>(256)
 
-    @Volatile private var lite: Boolean? = null
 
     private fun id(f: ArtFallback) = "${f.key}|${f.iconPath}|${f.packageName}"
 
@@ -145,9 +152,11 @@ internal object FallbackArtCache {
         return f.packageName?.let { appIconPixels(context, it, SIDE) }
     }
 
-    /** Equipo modesto (el mismo criterio que la calidad ligera de Masha): sin deriva. */
-    fun lite(context: Context): Boolean =
-        lite ?: (MashaQuality.detect(context) == MashaQuality.Lite).also { lite = it }
+    /**
+     * Perfil ahorrador (el mismo que la calidad ligera de Masha): sin deriva y
+     * con menos polvo estelar. Ya no se guarda: sigue a Ajustes → Rendimiento.
+     */
+    fun lite(context: Context): Boolean = MashaQuality.detect(context) == MashaQuality.Lite
 }
 
 /** Tesela de grano: ruido blanco y negro muy tenue, generado una sola vez. */
@@ -217,20 +226,21 @@ fun FallbackArt(
                         )
                     }
                     if (showTitle) {
-                        // Sin icono el título es la carátula: más grande.
-                        val size = (w.value * if (icon) 0.095f else 0.125f).coerceIn(9f, 26f)
+                        // El cuerpo que cabe en la caja (ver PlaceholderTitleLayout): un nombre largo
+                        // encoge antes de cortarse, y la carátula de reserva no parece otra tarjeta.
+                        val size = rememberPlaceholderTitleSp(fallback.title, w.value, maxHeight.value, icon)
                         ElyText(
                             fallback.title,
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
-                                .padding(horizontal = w * 0.09f, vertical = w * 0.08f),
+                                .padding(horizontal = w * PlaceholderTitleLayout.PAD_X, vertical = w * PlaceholderTitleLayout.PAD_Y),
                             size = size,
                             weight = FontWeight.SemiBold,
                             color = Color.White,
                             letterSpacing = tracking(0.005f),
-                            lineHeightRatio = 1.16f,
+                            lineHeightRatio = TITLE_LINE_HEIGHT,
                             shadow = TitleShadow,
-                            maxLines = if (icon) 3 else 4,
+                            maxLines = PlaceholderTitleLayout.maxLines(icon),
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
@@ -250,6 +260,32 @@ fun FallbackArt(
 }
 
 private val TitleShadow = Shadow(Color.Black.copy(alpha = 0.45f), Offset(0f, 1.5f), 8f)
+
+private const val TITLE_LINE_HEIGHT = 1.16f
+
+/**
+ * El cuerpo (sp) del título de una carátula de reserva de [boxWidth] × [boxHeight] dp:
+ * el más grande con el que [title] cabe en sus líneas y en su parte de la caja, medido de
+ * verdad (fuente, idioma y escala de letra); si ni con el mínimo cabe, el mínimo y puntos suspensivos.
+ */
+@Composable
+private fun rememberPlaceholderTitleSp(title: String, boxWidth: Float, boxHeight: Float, icon: Boolean): Float {
+    val measurer = rememberTextMeasurer()
+    val family = LocalPoppins.current
+    val density = LocalDensity.current
+    return remember(title, boxWidth, boxHeight, icon, family, density) {
+        val widthPx = with(density) { PlaceholderTitleLayout.textWidth(boxWidth).dp.roundToPx() }
+        val budgetPx = with(density) { PlaceholderTitleLayout.heightBudget(boxWidth, boxHeight, icon).dp.toPx() }
+        val lines = PlaceholderTitleLayout.maxLines(icon)
+        val max = PlaceholderTitleLayout.maxSp(boxWidth, icon)
+        if (widthPx <= 0) return@remember PlaceholderTitleLayout.MIN_SP
+        TitleFit.largest(PlaceholderTitleLayout.MIN_SP, max) { sp ->
+            val style = TextStyle(fontFamily = family, fontSize = sp.sp, fontWeight = FontWeight.SemiBold, lineHeight = (sp * TITLE_LINE_HEIGHT).sp)
+            val r = measurer.measure(title, style, maxLines = lines, constraints = Constraints(maxWidth = widthPx), density = density)
+            !r.hasVisualOverflow && r.size.height <= budgetPx
+        } ?: PlaceholderTitleLayout.MIN_SP
+    }
+}
 
 /** Las capas de superficie (1–5 del esquema de arriba). */
 private fun Modifier.fallbackSurface(

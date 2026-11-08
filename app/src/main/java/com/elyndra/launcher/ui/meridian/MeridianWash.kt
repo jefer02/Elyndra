@@ -2,6 +2,7 @@ package com.elyndra.launcher.ui.meridian
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 import android.util.LruCache
 import androidx.compose.animation.core.Animatable
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import com.elyndra.launcher.ui.theme.GlassTokens
 import com.elyndra.launcher.ui.theme.WheelGlass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -48,6 +50,7 @@ import coil.size.Precision
 import com.elyndra.launcher.data.ColorMath
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.data.argb
+import com.elyndra.launcher.ui.components.SafeAreaInsets
 import com.elyndra.launcher.ui.components.appIconPixels
 import com.elyndra.launcher.ui.theme.LocalReducedMotion
 import com.elyndra.launcher.ui.theme.Swift
@@ -107,6 +110,30 @@ internal object ArtSampler {
     }
 
     fun edgeKey(path: String?, pkg: String?): String? = path ?: pkg?.let { "pkg:$it" }
+
+    /** Proporción (ancho/alto) de cada carátula (NaN = no se pudo leer). */
+    private val aspects = LruCache<String, Float>(320)
+
+    fun cachedAspect(path: String): Float? = aspects.get(path)?.takeUnless(Float::isNaN)
+
+    /**
+     * La proporción de la imagen [path] (relativa a filesDir): solo se lee su
+     * cabecera, sin decodificar píxeles. Cada sistema trae cajas distintas
+     * (PSP alta, SNES apaisada, iconos cuadrados) y la rueda las encaja
+     * enteras, cada una con la suya.
+     */
+    suspend fun aspect(context: Context, path: String): Float? {
+        aspects.get(path)?.let { return it.takeUnless(Float::isNaN) }
+        val ratio = withContext(Dispatchers.IO) {
+            runCatching {
+                val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(File(context.filesDir, path).path, o)
+                if (o.outWidth > 0 && o.outHeight > 0) o.outWidth.toFloat() / o.outHeight else null
+            }.getOrNull()
+        }
+        aspects.put(path, ratio ?: Float.NaN)
+        return ratio
+    }
 
     private suspend fun decode(context: Context, path: String, side: Int): Bitmap? = try {
         val request = ImageRequest.Builder(context)
@@ -342,35 +369,41 @@ internal fun MeridianWashLayer(
 }
 
 /**
- * El tema claro detrás de la rueda: un cristal curvo como la lista (ver
- * [WheelGlass]). Su canto derecho sigue el círculo de la rueda ([arc]): en la
- * línea de foco pasa el dial con su nodo, y arriba y abajo se recoge igual
- * que las filas. Dentro, [frosted] (el arte de verdad desenfocado y avivado,
- * API 31+; sin él, la copia diminuta del arte, que ya va desenfocada) y un
- * tinte pastel del color del juego ([WashState.tone], que se funde al
- * cambiar); por la curva, un filo de luz con su halo. Sin blanco lechoso: el
- * texto lleva su propia tarjeta. [axisX] y [windowWidth] en dp.
+ * El tema claro detrás de la rueda: un cristal curvo (ver [WheelGlass]), el
+ * mismo en Biblioteca y en Carpeta. Su canto derecho es un arco simétrico de
+ * punta a punta de la pantalla ([FogArc.glassArc]): en la línea de foco pasa
+ * el dial con su nodo, y arriba y abajo se recoge lo mismo. La capa llega
+ * hasta los filos de la pantalla (bajo la barra de estado). Dentro,
+ * [frosted]: el arte de verdad desenfocado (API 31+, ver [FrostedArt]); sin
+ * él, el cristal deja ver el arte de debajo tal cual, con más tinte. Encima,
+ * el tinte del color del juego ([WashState.tone], que se funde al cambiar),
+ * un velo blanco suave (el esmerilado) y, por la curva, un filo de luz con su
+ * halo. Todos los valores llegan en [spec] ([GlassPanelLayout.resolve], de
+ * [GlassTokens]). [axisX] en dp.
+ *
+ * Antes, sin desenfoque, pintaba aquí la copia diminuta del arte (48 px)
+ * ampliada al marco: en una tableta era una mancha aumentada, con el aspecto
+ * redondeado de la miniatura y sin el paralaje ni el zoom de entrada del arte
+ * de verdad, así que no casaba con lo de fuera del cristal.
  */
 @Composable
 internal fun WheelGlassLayer(
     state: WashState,
-    windowWidth: Float,
+    spec: GlassPanelLayout.Spec,
     axisX: Float,
-    artExtra: Float,
     modifier: Modifier = Modifier,
     arc: () -> FogArc = { FogArc.NONE },
     frosted: (@Composable () -> Unit)? = null,
 ) {
-    val sharpUnder = frosted != null
+    val insets = SafeAreaInsets
     Box(
         modifier
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
             .drawWithCache {
-                val w = windowWidth.dp.toPx()
                 val h = size.height
-                val fog = arc()
-                val focus = fog.top / density + fog.focusY
-                val band = MeridianFog.band(fog.top / density, fog.reach, axisX, glass = true)
+                // La capa empieza en el filo de arriba de la pantalla; la escena, en el área segura.
+                val above = insets.getTop(this).toFloat()
+                val glassArc = arc().glassArc(axisX, density)
                 val step = WheelGlass.STEP_DP.dp.toPx()
                 val edge = Path()
                 val area = Path()
@@ -378,7 +411,7 @@ internal fun WheelGlassLayer(
                 var y = 0f
                 var first = true
                 while (true) {
-                    val x = MeridianScrims.glassEdgeAt(y / density, axisX, focus, fog.radius, band).dp.toPx().coerceAtMost(size.width)
+                    val x = glassArc.edgeAt((y - above) / density).dp.toPx().coerceAtMost(size.width)
                     if (first) edge.moveTo(x, y) else edge.lineTo(x, y)
                     area.lineTo(x, y)
                     first = false
@@ -387,26 +420,18 @@ internal fun WheelGlassLayer(
                 }
                 area.lineTo(0f, h)
                 area.close()
-                val extra = artExtra.dp.toPx()
-                val fromImage = state.fromAmbient
-                val image = state.ambient
-                val fromFrame = image(fromImage, w * (1f + MeridianArtFrame.FOCAL_SHIFT), h + extra * 2f)
-                val frame = image(image, w * (1f + MeridianArtFrame.FOCAL_SHIFT), h + extra * 2f)
-                val rim = Stroke(WheelGlass.RIM_DP.dp.toPx())
-                val glow = Stroke(WheelGlass.GLOW_DP.dp.toPx())
+                val rim = Stroke(GlassTokens.RIM_DP.dp.toPx())
+                val glow = Stroke(spec.glow.dp.toPx())
                 onDrawWithContent {
-                    val t = state.progress.value
                     clipPath(area) {
                         this@onDrawWithContent.drawContent()
-                        if (!sharpUnder) {
-                            if (fromImage != null && fromImage !== image && t < 1f) drawAmbient(fromImage, fromFrame, extra, 1f - t)
-                            if (image != null) drawAmbient(image, frame, extra, if (fromImage === image) 1f else t)
-                        }
-                        drawRect(state.tone(), alpha = WheelGlass.TINT_ALPHA)
+                        // El tinte del juego y el velo blanco del esmerilado: de [GlassTokens], los mismos en cualquier móvil.
+                        drawRect(state.tone(), alpha = spec.tint)
+                        drawRect(Color.White, alpha = spec.frost)
                         // El halo de luz por dentro del canto (la mitad que cae fuera se recorta).
-                        drawPath(edge, Color.White, alpha = WheelGlass.GLOW_ALPHA, style = glow)
+                        drawPath(edge, Color.White, alpha = GlassTokens.GLOW_ALPHA, style = glow)
                     }
-                    drawPath(edge, Color.White, alpha = WheelGlass.RIM_ALPHA, style = rim)
+                    drawPath(edge, Color.White, alpha = spec.rim, style = rim)
                 }
             },
     ) {

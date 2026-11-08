@@ -41,16 +41,16 @@ val SafeAreaInsets: WindowInsets
     @Composable get() = WindowInsets.systemBars.union(WindowInsets.displayCutout)
 
 /**
- * La capa crece hasta el filo de la ventana: a los lados siempre y, si se
- * pide, arriba y abajo. En la fila ocupa lo mismo que antes; solo se pinta
+ * La capa crece hasta el filo de la ventana: a los lados ([sides]) y arriba
+ * y abajo, lo que se pida. En la fila ocupa lo mismo que antes; solo se pinta
  * más allá. Se lee en la medida, así que girar el móvil no recompone.
  */
 @Composable
-fun Modifier.edgeBleed(top: Boolean = true, bottom: Boolean = true): Modifier {
+fun Modifier.edgeBleed(top: Boolean = true, bottom: Boolean = true, sides: Boolean = true): Modifier {
     val insets = SafeAreaInsets
     return layout { measurable, constraints ->
-        val l = insets.getLeft(this, layoutDirection)
-        val r = insets.getRight(this, layoutDirection)
+        val l = if (sides) insets.getLeft(this, layoutDirection) else 0
+        val r = if (sides) insets.getRight(this, layoutDirection) else 0
         val t = if (top) insets.getTop(this) else 0
         val b = if (bottom) insets.getBottom(this) else 0
         val placeable = measurable.measure(constraints.grow(l + r, t + b))
@@ -62,16 +62,22 @@ fun Modifier.edgeBleed(top: Boolean = true, bottom: Boolean = true): Modifier {
 
 /**
  * Pinta el canto izquierdo y/o derecho de la capa reflejado en la franja
- * de la muesca. No cambia su medida ni su sitio: lo que dibuje con sus
- * propias coordenadas sigue donde estaba.
+ * de la muesca y, con [top], también el de arriba (la barra de estado o la
+ * muesca de arriba): sin él, un cristal que empieza en el área segura deja
+ * una franja de arte nítido encima. No cambia su medida ni su sitio: lo que
+ * dibuje con sus propias coordenadas sigue donde estaba.
  */
 @Composable
-fun Modifier.edgeMirror(left: Boolean = true, right: Boolean = true): Modifier {
+fun Modifier.edgeMirror(left: Boolean = true, right: Boolean = true, top: Boolean = false): Modifier {
     val insets = SafeAreaInsets
     return drawWithContent {
         drawContent()
         val l = if (left) insets.getLeft(this, layoutDirection).toFloat() else 0f
         val r = if (right) insets.getRight(this, layoutDirection).toFloat() else 0f
+        val t = if (top) insets.getTop(this).toFloat() else 0f
+        if (t > 0f) clipRect(left = -l, top = -t, right = size.width + r, bottom = 0f) {
+            scale(scaleX = 1f, scaleY = -1f, pivot = Offset.Zero) { this@drawWithContent.drawContent() }
+        }
         if (l > 0f) clipRect(left = -l, top = 0f, right = 0f, bottom = size.height) {
             scale(scaleX = -1f, scaleY = 1f, pivot = Offset.Zero) { this@drawWithContent.drawContent() }
         }

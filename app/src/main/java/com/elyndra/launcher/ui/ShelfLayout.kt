@@ -151,8 +151,32 @@ object ShelfLayout {
     /** Alfa del tinte del acento sobre el papel del estante. */
     fun shelfTintAlpha(dark: Boolean): Float = if (dark) 0.05f else 0.035f
 
-    /** Alfa del estante en su pie: un poco translúcido, deja adivinar el fondo vivo. */
-    fun shelfBottomAlpha(dark: Boolean): Float = if (dark) 0.9f else 0.94f
+    /**
+     * Alfa del estante en su pie. Era 0,9 / 0,94 para dejar adivinar el fondo
+     * vivo, pero sobre el arte desenfocado (o la aurora) ese 6–10 % se leía
+     * como una franja gris lavada justo bajo los nombres. Ahora es opaco y lo
+     * que da vida al pie es [shelfFootColor].
+     */
+    fun shelfBottomAlpha(@Suppress("UNUSED_PARAMETER") dark: Boolean): Float = 1f
+
+    /** Cuánto se ahonda el pie del estante: tinta en oscuro, velo del acento en claro. */
+    const val FOOT_DEEPEN_DARK = 0.22f
+    const val FOOT_TINT_LIGHT = 0.07f
+
+    /**
+     * El color del pie del estante (ARGB, opaco): el mismo estante, más hondo
+     * en oscuro (tinta) y con algo más del acento en claro (perla tintada, no
+     * gris). El degradado del estante va de [shelfColor] a este: se lee como
+     * una caída de luz intencionada con cualquier acento.
+     */
+    fun shelfFootColor(paper: Int, accent: Int, dark: Boolean): Int {
+        val shelf = shelfColor(paper, accent, dark)
+        return if (dark) {
+            ColorMath.over(ColorMath.withAlpha(0xFF000000.toInt(), FOOT_DEEPEN_DARK), shelf)
+        } else {
+            ColorMath.over(ColorMath.withAlpha(accent, FOOT_TINT_LIGHT), shelf)
+        }
+    }
 
     /** El color liso del estante (ARGB): el papel con un velo del acento. Tinta honda en oscuro, perla en claro. */
     fun shelfColor(paper: Int, accent: Int, dark: Boolean): Int =

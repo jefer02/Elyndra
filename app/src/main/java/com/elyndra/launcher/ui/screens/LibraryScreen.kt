@@ -1,5 +1,7 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.UiTags
+import androidx.compose.ui.platform.testTag
 import com.elyndra.launcher.ui.components.NeedsNameBadge
 import androidx.compose.animation.AnimatedContent
 import com.elyndra.launcher.ui.components.EmptyLibraryHero
@@ -37,6 +39,8 @@ import com.elyndra.launcher.ui.components.rememberOpenLabelWidth
 import com.elyndra.launcher.ui.TopBarLayout
 import com.elyndra.launcher.ui.selection.AuraHalo
 import com.elyndra.launcher.ui.ShelfLayout
+import com.elyndra.launcher.ui.ClassicLayout
+import com.elyndra.launcher.ui.theme.pulseHint
 import com.elyndra.launcher.ui.SortMode
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.SideEffect
@@ -226,13 +230,10 @@ fun LibraryScreen(vm: ElyndraViewModel) {
     // Con mando la selección se mueve sin tocar el carrusel, así que el
     // carrusel va detrás de ella: si no, se estaría eligiendo a ciegas. Nace ya
     // en la selección (al girar desde la rueda no hay que recorrerlo otra vez).
+    // Una card delante de la seleccionada (ClassicLayout.anchorIndex): se ve de dónde se viene.
     val carousel = rememberLazyListState(
-        initialFirstVisibleItemIndex = remember { WheelMath.restoreIndex(items.map { it.key }, sel?.key, addFocused, vm.loaded) },
+        initialFirstVisibleItemIndex = remember { ClassicLayout.anchorIndex(WheelMath.restoreIndex(items.map { it.key }, sel?.key, addFocused, vm.loaded)) },
     )
-    LaunchedEffect(sel?.key, items.size, addFocused) {
-        val index = if (addFocused) items.size else items.indexOfFirst { it.key == sel?.key }
-        if (index >= 0) runCatching { carousel.animateScrollToItem(index) }
-    }
     // Tocar: lo no seleccionado se selecciona; lo seleccionado se abre (ver TapGate).
     val gate = remember { TapGate() }
     val slop = rememberTapSlop()
@@ -282,6 +283,12 @@ fun LibraryScreen(vm: ElyndraViewModel) {
     // El dock (en la barra, en la costura o dentro del hero): el bocadillo de Masha no lo tapa.
     val dockBounds = remember { mutableStateOf(Rect.Zero) }
     val labelBlock = labelBlock(LIBRARY_LABEL_SP)
+    val fontScale = LocalDensity.current.fontScale
+    // La pista táctil: nunca con mando (ni mientras se maneja con él).
+    val showHint = ClassicLayout.showTouchHint(vm.input.gamepadPresent, vm.input.active)
+    // Solo las apps tienen sinopsis en el hero: se mide aquí para repartirlo.
+    val selApp = sel as? LibraryItem.App
+    val description = rememberDescription(vm, selApp?.key, selApp?.app?.meta)
 
     BoxWithConstraints(
         Modifier.fillMaxSize().onGloballyPositioned {
@@ -289,27 +296,76 @@ fun LibraryScreen(vm: ElyndraViewModel) {
             hostBounds.value = it.boundsInWindow()
         },
     ) {
-        val shelfH = (maxHeight - m.iconHeroH).value
-        val shelf = ShelfLayout.compute(
-            available = shelfH,
-            hintsVisible = vm.input.gamepadPresent,
+        // El reparto del Clásico (ClassicLayout): la card manda, el estante mide lo
+        // justo y el hero se queda el resto, con su bloque bajo la barra (cuyo
+        // emblema de Masha es algo más alto que las píldoras).
+        val landscape = m.landscape
+        val barBottom = ClassicLayout.barBottom(landscape, ClassicLayout.BAR_HEIGHT_MASHA)
+        // Con el dock en la costura el bloque guarda SEAM_CLEAR sobre él (la sinopsis no toca las pestañas).
+        val dockInSeam = !dockInBar && !dockInHero
+        val baseBottomPad = if (dockInSeam) ClassicLayout.heroBottomPad(landscape, seamRise.value) else ClassicLayout.heroBottomPad(landscape)
+        val bottomPad = baseBottomPad + heroLift.value
+        val chips = ClassicLayout.chipsHeight(fontScale, landscape)
+        val merged = ClassicLayout.mergedChipsHeight(fontScale, landscape)
+        val frame = ClassicLayout.frame(
+            width = maxWidth.value,
+            height = maxHeight.value,
             aspect = 1f,
-            base = m.iconTile.value,
-            topInset = dockInset.value,
+            hintsVisible = vm.input.gamepadPresent,
             labelBlock = labelBlock,
-            minTile = if (m.landscape) 72f else 96f,
-            maxTile = ICON_TILE_LIMIT,
+            topInset = dockInset.value,
+            heroMin = ClassicLayout.heroMin(barBottom, ClassicLayout.heroBottomPad(landscape), ClassicLayout.Block(chips, merged, logoMax = ClassicLayout.LOGO_MIN)),
         )
+        val heroH = frame.heroHeight.dp
         // Sin cards no hay escena que continuar: el estado vacío va sobre el estante liso.
-        val extension = if (showEmpty) 0.dp else ShelfLayout.artExtension(shelfH, maxHeight.value, shelf.labelTop).dp
-        val tile = shelf.tileHeight.dp
+        val extension = if (showEmpty) 0.dp else ShelfLayout.artExtension(frame.shelfHeight, maxHeight.value, frame.labelTop).dp
+        val tile = frame.tileHeight.dp
+        val rowLandscape = maxWidth >= maxHeight
+        // Aire, escala de las vecinas, halo y nombres de la fila (en vertical, con el aire a la vista).
+        val rowStyle = ClassicLayout.rowStyle((maxWidth - m.pad * 2).value, frame.tileWidth, rowLandscape)
+        val gap = rowStyle.gap
+        // El desplazamiento de la fila hacia la selección (ver ClassicLayout.anchor): en
+        // apaisado, una card entera delante; en vertical, la seleccionada en el primer
+        // hueco con un poco de la anterior asomando. La primera vez se coloca sin
+        // animar (al nacer o al girar); después, con la animación de siempre.
+        val density = LocalDensity.current
+        val placed = remember { booleanArrayOf(false) }
+        LaunchedEffect(sel?.key, items.size, addFocused, frame.tileWidth, gap, rowLandscape) {
+            val index = if (addFocused) items.size else items.indexOfFirst { it.key == sel?.key }
+            if (index < 0) return@LaunchedEffect
+            val a = ClassicLayout.anchor(index, frame.tileWidth, gap, rowLandscape)
+            val offset = with(density) { a.offset.dp.roundToPx() }
+            runCatching {
+                if (placed[0]) carousel.animateScrollToItem(a.index, offset) else carousel.scrollToItem(a.index, offset)
+            }
+            placed[0] = true
+        }
         // Con la barra de pistas el hero encoge y la fila se recoloca: se anima su
         // altura en pantalla (no en el estante), así que se desliza con muelle.
-        val rowY by animateFloatAsState(m.iconHeroH.value + shelf.tileTop, motion(Springs.enter()), label = "shelfRow")
+        val rowY by animateFloatAsState(frame.heroHeight + frame.tileTop, motion(Springs.enter()), label = "shelfRow")
         // Vertical por el sitio que hay (no por la orientación del aparato): vale en
         // tableta y en pantalla partida. Ahí el titular sin logo se ajusta y el logo tiene tope.
         val portrait = maxHeight > maxWidth
         val windowHeight = maxHeight.value
+        val titleSp = ClassicLayout.titleSp(frame.heroHeight, landscape)
+        val logoH = ClassicLayout.logoHeight(frame.heroHeight, landscape)
+        val logoMax = if (portrait) PortraitHero.logoMaxHeight(windowHeight, logoH) else logoH * HERO_LOGO_HEIGHT
+        val secondary = when {
+            description != null -> ClassicLayout.synopsisHeight(fontScale, landscape)
+            sel != null && showHint -> ClassicLayout.hintHeight(fontScale, landscape)
+            else -> 0f
+        }
+        val plan = ClassicLayout.heroPlan(
+            ClassicLayout.heroRoom(frame.heroHeight, barBottom, bottomPad),
+            ClassicLayout.Block(
+                if (sel != null) chips else 0f, merged, logoMax,
+                secondary = secondary,
+                // La sinopsis pierde líneas antes de irse; la pista es una sola.
+                secondaryLines = if (description != null) ClassicLayout.synopsisLines(landscape) else 1,
+                secondaryLine = if (description != null) ClassicLayout.synopsisLineHeight(fontScale) else 0f,
+            ),
+        )
+        val heroBlock = LibraryHero(plan, titleSp, showHint, baseBottomPad)
         // La barra de arriba se mide con el ancho de la ventana (dentro del hero no hay `maxWidth`).
         val windowWidth = maxWidth
         val heroArt = when (sel) {
@@ -339,7 +395,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                 // Quitar el fondo lo deshace en polvo antes de borrarlo.
                 backgroundVanishing = sel?.let { vm.isVanishingArt(it.key, ArtKind.Background) } == true,
                 onBackgroundVanished = { vm.finishVanish() },
-                height = m.iconHeroH,
+                height = heroH,
                 extension = extension,
                 // Sin juego (biblioteca o sección vacía): el escenario de la paleta, no el cristal.
                 stage = { EmptyStageBackdrop(EmptyStage.CLASSIC, Modifier.fillMaxSize(), horizon = true) },
@@ -391,6 +447,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         ConsoleIconButton(
                             onClick = { vm.go(Screen.Settings) },
                             focused = vm.input.isBarFocused(BarItem.Settings),
+                            modifier = Modifier.testTag(UiTags.SETTINGS),
                         ) { glyph -> SettingsGlyph(glyph) }
                     }
                 },
@@ -400,13 +457,17 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                     AnimatedContent(
                         targetState = sel,
                         contentKey = { it?.key },
-                        modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth(),
+                        // Nunca por encima de la barra: el bloque empieza, como muy arriba, bajo ella.
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .padding(top = (barBottom + ClassicLayout.BAR_GAP).dp),
                         contentAlignment = Alignment.BottomStart,
                         transitionSpec = { heroInfoTransition(reduced) },
                         label = "heroInfo",
                     ) { item ->
                         CompositionLocalProvider(LocalHeroText provides heroText) {
-                            HeroInfo(vm, item, m, floatClock, searching = vm.query.isNotBlank(), portrait = portrait, windowHeight = windowHeight, lift = heroLift) { if (vm.tryOpen()) vm.go(Screen.Add) }
+                            HeroInfo(vm, item, m, heroBlock, floatClock, searching = vm.query.isNotBlank(), portrait = portrait, lift = heroLift) { if (vm.tryOpen()) vm.go(Screen.Add) }
                         }
                     }
                 },
@@ -427,15 +488,17 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                     else -> LazyRow(
                         Modifier
                             .fillMaxSize()
-                            .offset { IntOffset(0, (rowY - m.iconHeroH.value - shelf.tileTop).dp.roundToPx()) },
+                            .testTag(UiTags.SHELF)
+                            .offset { IntOffset(0, (rowY - frame.heroHeight - frame.tileTop).dp.roundToPx()) },
                         state = carousel,
                         contentPadding = PaddingValues(
                             start = m.pad,
                             end = m.pad,
-                            // Por encima queda el hueco para lo que la seleccionada sube, crece y alumbra.
-                            top = shelf.tileTop.dp,
+                            // Por encima queda el hueco para lo que la seleccionada sube y alumbra.
+                            top = frame.tileTop.dp,
                         ),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        // El aire que hace que la fila llene el ancho (ClassicLayout.spacing).
+                        horizontalArrangement = Arrangement.spacedBy(gap.dp),
                         verticalAlignment = Alignment.Top,
                     ) {
                         itemsIndexed(items, key = { _, it -> it.key }) { _, item ->
@@ -462,6 +525,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                                         look = look,
                                         tile = tile,
                                         landscape = m.landscape,
+                                        rowStyle = rowStyle,
                                         fallback = vm.fallbackOf(item),
                                         scrolling = userScrolling,
                                         onTap = { at, moving -> onItemTap(item, at, moving) },
@@ -483,7 +547,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         // mientras se lee la biblioteca del disco.
                         if (vm.loaded) {
                             // Sin juegos es lo único que hay (como la fila "Añadir" de Meridian): va señalada.
-                            item(key = "add") { AddTile(tile, addFocused || showEmpty, look) { if (vm.tryOpen()) vm.go(Screen.Add) } }
+                            item(key = "add") { AddTile(tile, addFocused || showEmpty, look, rowStyle) { if (vm.tryOpen()) vm.go(Screen.Add) } }
                         }
                     }
                 }
@@ -500,7 +564,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
         // costura con un muelle (se lee en la fase de colocación: no recompone).
         if (!dockInBar) {
             val dockTop by animateFloatAsState(
-                DockPlacement.top(m.iconHeroH.value, DotTabsLayout.HEIGHT, dockInHero, seamRise.value),
+                DockPlacement.top(frame.heroHeight, DotTabsLayout.HEIGHT, dockInHero, seamRise.value),
                 motion(Springs.enter()),
                 label = "dockTop",
             )
@@ -544,8 +608,8 @@ fun LibraryScreen(vm: ElyndraViewModel) {
     }
 }
 
-/** Tope del lado de la card de icono ya crecida (el tope de `metrics()` más el crecimiento). */
-private const val ICON_TILE_LIMIT = 185f
+/** El bloque del hero de la biblioteca, ya decidido (ver [ClassicLayout.heroPlan]). */
+private class LibraryHero(val plan: ClassicLayout.HeroPlan, val titleSp: Float, val showHint: Boolean, val bottomPad: Float)
 
 /** Cuerpo (sp) del nombre bajo la card de la biblioteca. */
 private const val LIBRARY_LABEL_SP = 9.5f
@@ -582,7 +646,8 @@ internal fun SectionTabs(vm: ElyndraViewModel, modifier: Modifier = Modifier, gl
         labels = filters.map { stringResource(it.label) },
         selected = filters.indexOf(vm.filter).coerceAtLeast(0),
         onSelect = { i -> filters.getOrNull(i)?.let(vm::updateFilter) },
-        modifier = modifier,
+        // La etiqueta dice qué sección está elegida (para el perfil base); no se ve.
+        modifier = modifier.testTag(UiTags.libraryFilter(vm.filter)),
         focused = dockFocused,
         focusIndex = if (dockFocused) vm.input.dockFocus else -1,
         glassMinAlpha = glassMinAlpha,
@@ -692,8 +757,9 @@ internal val SORT_MENU_HINTS = listOf(
  * dice qué pasa: biblioteca vacía, sección vacía o búsqueda sin resultados.
  *
  * En vertical ([portrait]) el titular sin logo baja de cuerpo y se ajusta a
- * dos líneas del ancho que hay (ver [PortraitHero]) y el logo tiene tope de
- * alto; [windowHeight] es el alto disponible (dp).
+ * dos líneas del ancho que hay (ver [PortraitHero]). El logo (o el titular)
+ * mide lo que diga el plan del Clásico ([hero]), que también quita la pista o
+ * la sinopsis y funde las fichas en una línea cuando no caben bajo la barra.
  *
  * [lift] es lo que sube el bloque para dejar sitio al dock cuando va dentro
  * del hero (sección vacía, ver [DockPlacement.insideHero]).
@@ -703,24 +769,27 @@ private fun HeroInfo(
     vm: ElyndraViewModel,
     sel: LibraryItem?,
     m: Metrics,
+    hero: LibraryHero,
     floatClock: FloatClock,
     searching: Boolean,
     portrait: Boolean,
-    windowHeight: Float,
     lift: Dp = 0.dp,
     onAdd: () -> Unit,
 ) {
+    val plan = hero.plan
+    val fontScale = LocalDensity.current.fontScale
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(start = m.pad, end = m.pad, bottom = heroInfoBottomPad(m) + lift),
+            .padding(start = m.pad, end = m.pad, bottom = hero.bottomPad.dp + lift),
     ) {
         if (sel != null) {
-            HeroChipRow(
-                stringResource(if (sel is LibraryItem.Folder) R.string.chip_emulator_folder else R.string.chip_android_app),
-                heroSubline(sel),
-                landscape = m.landscape,
-            )
+            val chip = stringResource(if (sel is LibraryItem.Folder) R.string.chip_emulator_folder else R.string.chip_android_app)
+            if (plan.mergedChips) {
+                MergedChipLine(listOf(chip, heroSubline(sel)), m.landscape)
+            } else {
+                HeroChipRow(chip, heroSubline(sel), landscape = m.landscape)
+            }
         }
         val logo = when (sel) {
             is LibraryItem.App -> sel.app.meta.logo
@@ -729,7 +798,11 @@ private fun HeroInfo(
         }
         // El `sel != null` es para el compilador: el `when` de arriba no le
         // basta para deducir que si hay logo entonces hay elemento.
-        if (sel != null && logo != null) {
+        val logoBox = plan.logoHeight
+        val titleBase = ClassicLayout.titleSpFor(logoBox, fontScale, hero.titleSp)
+        if (sel != null && logoBox < LIBRARY_LOGO_HIDE) {
+            Unit
+        } else if (sel != null && logo != null) {
             // Al quitar el logo se deshace en el sitio donde se está viendo,
             // en vez de desaparecer de golpe.
             MaterializingContainer(
@@ -743,7 +816,7 @@ private fun HeroInfo(
                     HeroLogo(
                         logo,
                         // Con tope: un logo grande se comía el arte (en vertical, aún más bajo).
-                        maxHeight = if (portrait) PortraitHero.logoMaxHeight(windowHeight, m.logoH.value).dp else m.logoH * HERO_LOGO_HEIGHT,
+                        maxHeight = logoBox.dp,
                         modifier = Modifier.floating(floatClock, floatPhaseOf(sel.key), amplitude = 3.dp, periodSeconds = 4.2f),
                     )
                 }
@@ -751,22 +824,24 @@ private fun HeroInfo(
         } else if (sel == null) {
             if (vm.loaded) EmptyHeroBlock(vm, m, searching, lift, onAdd)
         } else if (portrait) {
-            PortraitTitle(sel.name, m.titleSize)
+            PortraitTitle(sel.name, titleBase)
         } else {
-            LandscapeTitle(sel.name, m.titleSize)
+            LandscapeTitle(sel.name, titleBase)
         }
         // Solo las apps tienen sinopsis en el hero; las carpetas no.
         val app = sel as? LibraryItem.App
         val description = rememberDescription(vm, app?.key, app?.app?.meta)
-        if (description != null) {
-            HeroSynopsis(heroDescription(description, vm.settings.lang), m.landscape)
-        } else if (sel != null && !vm.input.gamepadPresent) {
+        if (!plan.showSecondary) {
+            Unit
+        } else if (description != null) {
+            HeroSynopsis(heroDescription(description, vm.settings.lang), m.landscape, maxLines = plan.secondaryLines)
+        } else if (sel != null && hero.showHint) {
             // Con mando, las pistas de sus botones ya van al pie del estante.
             ElyText(
                 stringResource(if (vm.settings.tapOpensSelected) R.string.hint_gestures_tap else R.string.hint_gestures),
                 modifier = Modifier
                     .padding(top = if (m.landscape) 4.dp else 7.dp)
-                    .alpha(pulseHintAlpha()),
+                    .pulseHint(),
                 size = 9f,
                 weight = FontWeight.Medium,
                 color = LocalHeroText.current.secondary(0.8f),
@@ -802,9 +877,12 @@ internal fun HeroChipRow(chip: String, subline: String, landscape: Boolean) {
     }
 }
 
+/** Alto (dp) por debajo del cual el logo (o el titular) no se pinta: no se leería. */
+private const val LIBRARY_LOGO_HIDE = 12f
+
 /** La sinopsis bajo el titular: dos líneas en horizontal, tres en vertical. */
 @Composable
-internal fun HeroSynopsis(text: String, landscape: Boolean) {
+internal fun HeroSynopsis(text: String, landscape: Boolean, maxLines: Int = ClassicLayout.synopsisLines(landscape)) {
     ElyText(
         text,
         modifier = Modifier
@@ -816,7 +894,7 @@ internal fun HeroSynopsis(text: String, landscape: Boolean) {
         letterSpacing = tracking(0.02f),
         lineHeightRatio = 1.28f,
         shadow = LocalHeroText.current.shadow(null),
-        maxLines = if (landscape) 2 else 3,
+        maxLines = maxLines.coerceAtLeast(1),
         overflow = TextOverflow.Ellipsis,
     )
 }
@@ -1053,7 +1131,7 @@ internal fun SearchField(vm: ElyndraViewModel, m: Metrics) {
                 // Se filtra al escribir: "Buscar" en el teclado solo lo cierra para ver los resultados.
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-                modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag(UiTags.SEARCH_FIELD),
                 decorationBox = { inner ->
                     if (vm.query.isEmpty()) {
                         ElyText(stringResource(R.string.search_hint), size = 12f, color = Color.White.copy(alpha = 0.55f), maxLines = 1)
@@ -1219,10 +1297,9 @@ private const val MASHA_BUBBLE_MS = 14_000L
  * pasando del último juego ([focused]) y se abre con A, como cualquier otra.
  */
 @Composable
-private fun AddTile(tile: Dp, focused: Boolean, look: SelectionLook, onClick: () -> Unit) {
+private fun AddTile(tile: Dp, focused: Boolean, look: SelectionLook, rowStyle: ClassicLayout.RowStyle, onClick: () -> Unit) {
     val skin = LocalSkin.current
-    val lift = selectionLift(focused)
-    val scale = selectionScale(focused)
+    val cardMotion = rememberClassicCardMotion(focused, rowStyle.neighborScale)
     val shape = RoundedCornerShape(16.dp)
     // Se pulsa toda la columna (tile y rótulo), pero el realce se dibuja solo
     // en el tile, con su forma: comparten la fuente de interacciones.
@@ -1231,7 +1308,6 @@ private fun AddTile(tile: Dp, focused: Boolean, look: SelectionLook, onClick: ()
         Modifier
             .zIndex(if (focused) 1f else 0f)
             .width(tile)
-            .offset(y = lift)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -1239,27 +1315,24 @@ private fun AddTile(tile: Dp, focused: Boolean, look: SelectionLook, onClick: ()
             Modifier
                 .fillMaxWidth()
                 .height(tile)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                .selectionFrame(focused, look, shape)
+                .classicCard(cardMotion)
+                .selectionFrame(focused, look, shape, rowStyle.haloSpreadDp())
                 .glass(shape, borderColor = skin.a1.copy(alpha = 0.6f))
                 .indication(interaction, focusRing(shape)),
             contentAlignment = Alignment.Center,
         ) {
             ElyText("+", size = 28f, weight = FontWeight.SemiBold, color = skin.a2)
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(ShelfLayout.LABEL_GAP.dp))
         ElyText(
             stringResource(R.string.add_long),
-            size = 9.5f,
+            size = LIBRARY_LABEL_SP,
             weight = FontWeight.SemiBold,
             color = P.ink,
             align = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = rowStyle.labelInset.dp),
         )
     }
 }
@@ -1273,6 +1346,8 @@ private fun LibraryTile(
     /** Lado de la card cuadrada (lo decide [ShelfLayout]). */
     tile: Dp,
     landscape: Boolean,
+    /** Escala de las vecinas, halo y nombres de la fila ([ClassicLayout.rowStyle]). */
+    rowStyle: ClassicLayout.RowStyle,
     fallback: ArtFallback,
     /** ¿Se está moviendo la fila con el dedo? Un toque que la para no selecciona ni abre. */
     scrolling: () -> Boolean,
@@ -1287,8 +1362,8 @@ private fun LibraryTile(
     // Juegos Android y carpetas de emulador se representan con icono, no con
     // carátula: su contenedor es cuadrado.
     val width: Dp = tile
-    val lift = selectionLift(selected)
-    val scale = selectionScale(selected)
+    // Subida y escala en la capa (ClassicCardMotion): el nombre no se mueve y la card no se recompone.
+    val cardMotion = rememberClassicCardMotion(selected, rowStyle.neighborScale)
     val press = rememberPress()
     val pressed = pressScale(press)
     val shape = RoundedCornerShape(16.dp)
@@ -1312,7 +1387,7 @@ private fun LibraryTile(
     Column(
         Modifier
             .width(width)
-            .offset(y = lift)
+            .testTag(if (item is LibraryItem.Folder) UiTags.FOLDER_CARD else UiTags.APP_CARD)
             .onGloballyPositioned {
                 cardBounds = it.boundsInWindow()
                 anchor.coordinates = it
@@ -1361,10 +1436,7 @@ private fun LibraryTile(
             Modifier
                 .fillMaxWidth()
                 .height(tile)
-                .graphicsLayer {
-                    scaleX = scale * pressed.value
-                    scaleY = scale * pressed.value
-                }
+                .classicCard(cardMotion, pressed)
                 // Solo por fuera: la card es cristal translúcido y una sombra de
                 // elevación asomaba a través de ella, detrás del icono.
                 .outerShadow(
@@ -1375,7 +1447,7 @@ private fun LibraryTile(
                 )
                 // Tras la escala (la acompaña) y antes del recorte del cristal:
                 // halo, luz en el estante y partículas asoman por fuera.
-                .selectionFrame(selected, look, shape)
+                .selectionFrame(selected, look, shape, rowStyle.haloSpreadDp())
                 // Sin fondo de serie: cristal semitransparente, que deja ver la
                 // aurora de la pantalla por detrás del icono.
                 .liquidGlass(shape, P.hairline),
@@ -1447,16 +1519,17 @@ private fun LibraryTile(
 
         }
 
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(ShelfLayout.LABEL_GAP.dp))
         ElyText(
             item.name,
-            size = 9.5f,
+            size = LIBRARY_LABEL_SP,
             weight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             color = if (selected) P.ink else P.ink2,
             align = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth(),
+            // Del ancho de lo que se ve de la card (en vertical, la vecina encogida).
+            modifier = Modifier.fillMaxWidth().padding(horizontal = rowStyle.labelInset.dp),
         )
     }
 }

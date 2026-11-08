@@ -133,6 +133,11 @@ data class ArtPickerState(
     val failed: Boolean = false,
     /** URL que se está descargando tras elegirla. */
     val applying: String? = null,
+    /**
+     * URL de la imagen que está puesta ahora (si vino de un servicio): el
+     * selector la marca y el mando empieza en ella.
+     */
+    val applied: String? = null,
 )
 
 @StringRes
@@ -269,6 +274,8 @@ data class SheetAction(
      * menú de un juego empareja así cada "Quitar" con su tarjeta (ver [SheetLayout]).
      */
     val artSlot: ArtKind? = null,
+    /** testTag estable para UiAutomator (ver [UiTags]); no se ve. */
+    val testTag: String? = null,
     val action: () -> Unit,
 )
 

@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,6 +74,7 @@ import com.elyndra.launcher.ui.PadScrollBinding
 import com.elyndra.launcher.ui.SheetAction
 import com.elyndra.launcher.ui.SheetHero
 import com.elyndra.launcher.ui.SheetIcon
+import com.elyndra.launcher.ui.UiTags
 import com.elyndra.launcher.ui.UiText
 import com.elyndra.launcher.ui.rememberDescription
 import com.elyndra.launcher.ui.components.ArcSpinner
@@ -173,7 +175,7 @@ private fun DetailsSheet(vm: ElyndraViewModel, key: String, origin: Rect?, isOpe
     val accent = rememberArtAccent(hero)
     val tone = panelTone(accent)
 
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().testTag(UiTags.DETAILS)) {
         // El mismo velo que el menú: a sangre, y tocar fuera cierra.
         BackdropScrim(open, vm::closeDetails, open = isOpen, z = Backdrop.Z_DETAILS)
         BoxWithConstraints(

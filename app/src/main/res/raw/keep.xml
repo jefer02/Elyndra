@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Los sonidos se buscan por nombre (SoundManager, getIdentifier): el
+     recorte de recursos de la release no puede verlos y no debe quitarlos. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/*" />

@@ -19,6 +19,9 @@ import com.elyndra.launcher.data.Palettes
 import com.elyndra.launcher.data.SecretKeys
 import com.elyndra.launcher.data.SignaturePreset
 import com.elyndra.launcher.data.TINTS
+import com.elyndra.launcher.core.device.DevicePerformance
+import com.elyndra.launcher.core.device.PerformanceTier
+import com.elyndra.launcher.core.device.StutterMemory
 import com.elyndra.launcher.display.FrameRate
 import com.elyndra.launcher.masha.MashaError
 import com.elyndra.launcher.metadata.ApiException
@@ -354,7 +357,7 @@ class SettingsController(private val vm: ElyndraViewModel) {
     private var storedFrameRate by mutableIntStateOf(store.frameRate)
 
     /** Los fps que se piden de verdad a la pantalla; la Activity los aplica al cambiar. */
-    val frameRate: Int get() = FrameRate.effective(storedFrameRate, supportsHighRefresh)
+    val frameRate: Int get() = FrameRate.effective(storedFrameRate, supportsHighRefresh, capped = DevicePerformance.profile.capFrameRate)
 
     /** Masha a 120 Hz (Ajustes → Pantalla); apagado, sus pantallas van a 60. */
     var mashaHighRefresh by mutableStateOf(store.mashaHighRefresh); private set
@@ -370,6 +373,29 @@ class SettingsController(private val vm: ElyndraViewModel) {
         return if (masha && !mashaHighRefresh) minOf(frameRate, FrameRate.STANDARD) else frameRate
     }
 
+    /* ── rendimiento: Auto / Calidad / Rendimiento ──────────────── */
+
+    /** Lo elegido en Ajustes → Pantalla → Rendimiento (Auto de partida). */
+    var performanceMode by mutableStateOf(PerformanceTier.Mode.byId(store.performanceMode)); private set
+
+    /** En Auto, por qué se eligió el perfil (para explicarlo junto a la opción). */
+    val performanceReason: PerformanceTier.Reason get() = DevicePerformance.reason
+
+    /**
+     * Elegir un modo. Elegir Auto, aunque ya lo estuviera, olvida los tirones
+     * medidos y vuelve a decidir con las señales del equipo ([StutterMemory]):
+     * es la forma de deshacer el paso automático a Rendimiento.
+     */
+    fun updatePerformanceMode(mode: PerformanceTier.Mode) {
+        if (mode == performanceMode && mode != PerformanceTier.Mode.Auto) return
+        performanceMode = mode
+        // Auto se guarda como "sin valor": la clave vieja de nadie cambia de significado.
+        store.performanceMode = if (mode == PerformanceTier.Mode.Auto) null else mode.id
+        val memory = StutterMemory.onModeChosen(mode, store.stutterMemory)
+        store.stutterMemory = memory
+        DevicePerformance.updateMode(vm.app, mode, memory.stutter)
+    }
+
     fun updateFrameRate(fps: Int) {
         if (fps == FrameRate.HIGH && !supportsHighRefresh) return
         storedFrameRate = fps
@@ -381,7 +407,19 @@ class SettingsController(private val vm: ElyndraViewModel) {
     var mashaOnline by mutableStateOf(store.mashaOnline); private set
     var mashaAmbient by mutableStateOf(store.mashaAmbient); private set
     var mashaNudges by mutableStateOf(store.mashaNudges); private set
-    var mashaKey by mutableStateOf(vm.brain.config.userKey); private set
+    /**
+     * La clave propia de Masha, descifrada solo cuando se mira (Ajustes →
+     * Masha). Antes se leía al crear el ViewModel: un descifrado con el
+     * Android Keystore (una ida y vuelta al TEE) en el hilo principal antes
+     * del primer fotograma, lento en un MediaTek modesto.
+     */
+    private val storedMashaKey by lazy { vm.brain.config.userKey }
+    private var editedMashaKey by mutableStateOf<String?>(null)
+    var mashaKey: String
+        get() = editedMashaKey ?: storedMashaKey
+        private set(value) {
+            editedMashaKey = value
+        }
     var mashaTest by mutableStateOf<MashaTest>(MashaTest.Idle); private set
 
     /** El usuario ha dado acceso de uso (tiempo de juego exacto). Se relee al abrir Ajustes. */
@@ -640,8 +678,15 @@ class SettingsController(private val vm: ElyndraViewModel) {
         RaKey(SecretKeys.RA_KEY, Service.RetroAchievements, true),
     }
 
-    private val values = mutableStateMapOf<Field, String>().apply {
-        Field.entries.forEach { put(it, secrets.get(it.key)) }
+    /**
+     * Las credenciales, descifradas la primera vez que se enseñan (Ajustes →
+     * Metadatos → servicios), no al arrancar: cada una es un descifrado con el
+     * Android Keystore en el hilo principal y solo esa página las necesita.
+     */
+    private val values by lazy {
+        mutableStateMapOf<Field, String>().apply {
+            Field.entries.forEach { put(it, secrets.get(it.key)) }
+        }
     }
 
     fun value(field: Field): String = values[field].orEmpty()

@@ -3,11 +3,40 @@ package com.elyndra.launcher.data
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import com.elyndra.launcher.core.device.StutterMemory
+import com.elyndra.launcher.ui.meridian.WheelBackdrop
 
 /** Ajustes no sensibles (aspecto, opciones de metadatos, sesión de juego en curso). */
 class SettingsStore internal constructor(private val prefs: SharedPreferences) {
 
     constructor(context: Context) : this(context.getSharedPreferences("settings", Context.MODE_PRIVATE))
+
+    init {
+        migrateGlass()
+    }
+
+    /**
+     * Una vez por instalación (versión [GLASS_VERSION] en [GLASS_VERSION_KEY]):
+     * lo guardado que es igual al valor por defecto de antes se trata como
+     * "sin elegir", para que el cristal nuevo llegue también a quien ya tenía
+     * la app. Lo que el usuario cambió de verdad se respeta.
+     *
+     * - "meridian.wheelGlass": guardado igual a lo que su tema daba sin
+     *   elegir (cristal en claro, difuminado en oscuro) no se distingue de no
+     *   haber elegido, y se borra (ahora el cristal es el de los dos temas).
+     *   Distinto (difuminado en claro, cristal en oscuro) se eligió: se queda.
+     * - "blur": guardado en el valor por defecto (18) se borra; otro valor se
+     *   eligió con el control y se queda (escala el cristal desde el nuevo).
+     */
+    internal fun migrateGlass() {
+        if (prefs.getInt(GLASS_VERSION_KEY, 0) >= GLASS_VERSION) return
+        val dark = prefs.getBoolean("darkMode", Palettes.DEFAULT_DARK)
+        prefs.edit {
+            if (prefs.contains(WHEEL_GLASS_KEY) && prefs.getBoolean(WHEEL_GLASS_KEY, true) == WheelBackdrop.legacyDefault(dark)) remove(WHEEL_GLASS_KEY)
+            if (prefs.contains("blur") && prefs.getInt("blur", Palettes.DEFAULT_BLUR) == LEGACY_DEFAULT_BLUR) remove("blur")
+            putInt(GLASS_VERSION_KEY, GLASS_VERSION)
+        }
+    }
 
     /** Acento guardado; sin guardar (instalación nueva), el de partida (ver Palettes). */
     var accentId: String
@@ -274,6 +303,36 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
         get() = prefs.getString("layout.style", null)
         set(v) = prefs.edit { if (v == null) remove("layout.style") else putString("layout.style", v) }
 
+    /**
+     * Ajustes → Pantalla → Rendimiento: "auto", "quality" o "performance"
+     * (ver `PerformanceTier.Mode`). Clave nueva: sin valor es Auto, así que
+     * quien ya tenía la app no nota nada en un equipo capaz.
+     */
+    var performanceMode: String?
+        get() = prefs.getString("perf.mode", null)
+        set(v) = prefs.edit { if (v == null) remove("perf.mode") else putString("perf.mode", v) }
+
+    /**
+     * En Auto se midieron tirones sostenidos y se pasó a Rendimiento
+     * (`JankFallback`). Sin valor, no. Se olvida al elegir Auto otra vez.
+     */
+    var performanceStutter: Boolean
+        get() = prefs.getBoolean("perf.stutter", false)
+        set(v) = prefs.edit { if (v) putBoolean("perf.stutter", true) else remove("perf.stutter") }
+
+    /** Ya se avisó de ese paso a Rendimiento (el aviso sale una sola vez por decisión). */
+    var performanceStutterNoticed: Boolean
+        get() = prefs.getBoolean("perf.stutterNotice", false)
+        set(v) = prefs.edit { if (v) putBoolean("perf.stutterNotice", true) else remove("perf.stutterNotice") }
+
+    /** Lo guardado de los tirones, junto (ver `StutterMemory`). */
+    var stutterMemory: StutterMemory.Stored
+        get() = StutterMemory.Stored(performanceStutter, performanceStutterNoticed)
+        set(v) {
+            performanceStutter = v.stutter
+            performanceStutterNoticed = v.noticeShown
+        }
+
     /** Meridian: el fondo de la rueda toma el color del arte seleccionado. Apagado, el velo neutro del tema. */
     var meridianAdaptiveColor: Boolean
         get() = prefs.getBoolean("meridian.adaptiveColor", DEFAULT_MERIDIAN_ADAPTIVE_COLOR)
@@ -281,11 +340,11 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
 
     /**
      * Meridian: detrás de la rueda, cristal (true) o difuminado (false). Null
-     * = nunca elegido: cristal en el tema claro y difuminado en el oscuro.
+     * = nunca elegido: cristal en los dos temas (ver [WheelBackdrop]).
      */
     var meridianWheelGlass: Boolean?
-        get() = if (prefs.contains("meridian.wheelGlass")) prefs.getBoolean("meridian.wheelGlass", true) else null
-        set(v) = prefs.edit { if (v == null) remove("meridian.wheelGlass") else putBoolean("meridian.wheelGlass", v) }
+        get() = if (prefs.contains(WHEEL_GLASS_KEY)) prefs.getBoolean(WHEEL_GLASS_KEY, true) else null
+        set(v) = prefs.edit { if (v == null) remove(WHEEL_GLASS_KEY) else putBoolean(WHEEL_GLASS_KEY, v) }
 
     /** Biblioteca y Carpeta: un toque en lo seleccionado lo abre. Apagado, se abre con doble toque, como antes. */
     var tapOpensSelected: Boolean
@@ -407,6 +466,14 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
 
     companion object {
         private const val VOICE_OFFSET = "voice.offset."
+
+        /** La versión de los ajustes del cristal de Meridian (ver [migrateGlass]). */
+        const val GLASS_VERSION_KEY = "glass.version"
+        const val GLASS_VERSION = 2
+        const val WHEEL_GLASS_KEY = "meridian.wheelGlass"
+
+        /** El "Desenfoque" por defecto que guardaban las versiones de antes. */
+        const val LEGACY_DEFAULT_BLUR = 18
 
         /** Cian de fósforo: se ve bien sobre el tema claro y sobre el oscuro. */
         const val DEFAULT_PARTICLE_COLOR = 0xFF5CF2FF.toInt()

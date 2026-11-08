@@ -1,6 +1,8 @@
 package com.elyndra.launcher.ui.screens
 
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.testTag
+import com.elyndra.launcher.ui.UiTags
 import com.elyndra.launcher.ui.components.padInitialFocus
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.focusGroup
@@ -83,6 +85,7 @@ import com.elyndra.launcher.data.ACCENTS
 import com.elyndra.launcher.data.AppLocale
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.data.TINTS
+import com.elyndra.launcher.core.device.PerformanceTier
 import com.elyndra.launcher.display.FrameRate
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.SettingsCategory
@@ -321,6 +324,7 @@ private fun SettingsRail(vm: ElyndraViewModel, modifier: Modifier) {
                     .height(itemHeight)
                     .focusRequester(requesters[i])
                     .semantics { this.selected = selected }
+                    .testTag(UiTags.settingsCategory(category))
                     .shapeClickable(RoundedCornerShape(Radii.s)) { s.openCategory(category) }
                     .padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -398,7 +402,7 @@ private fun CompactSettings(vm: ElyndraViewModel) {
                                 description = stringResource(category.description),
                                 glyph = category.glyph,
                                 onClick = { s.openCategory(category) },
-                                modifier = Modifier.staggerIn(i, key = "settingsList").focusRequester(rows[i]),
+                                modifier = Modifier.staggerIn(i, key = "settingsList").focusRequester(rows[i]).testTag(UiTags.settingsCategory(category)),
                             )
                             if (i < SettingsCategory.entries.lastIndex) SettingsDivider()
                         }
@@ -480,6 +484,36 @@ private fun DisplayPage(vm: ElyndraViewModel) {
             Spacer(Modifier.height(Space.s))
             SwitchRow(stringResource(R.string.masha_high_refresh), stringResource(R.string.masha_high_refresh_desc), s.mashaHighRefresh, s::toggleMashaHighRefresh)
         }
+        Spacer(Modifier.height(Space.s))
+        SettingsDivider()
+        // Rendimiento: Auto (según el equipo y el ahorro de batería), Calidad o
+        // Rendimiento. La app se ve igual; solo cambia cómo se consiguen los efectos.
+        SettingRow(
+            stringResource(R.string.perf_mode_title),
+            description = stringResource(
+                when (s.performanceMode) {
+                    PerformanceTier.Mode.Auto -> when (s.performanceReason) {
+                        PerformanceTier.Reason.BudgetChipset -> R.string.perf_reason_budget_chipset
+                        PerformanceTier.Reason.LowMemory -> R.string.perf_reason_low_memory
+                        PerformanceTier.Reason.Stutter -> R.string.perf_reason_stutter
+                        PerformanceTier.Reason.BatterySaver -> R.string.perf_reason_battery_saver
+                        PerformanceTier.Reason.Capable, PerformanceTier.Reason.Chosen -> R.string.perf_reason_capable
+                    }
+                    PerformanceTier.Mode.Quality -> R.string.perf_mode_quality_desc
+                    PerformanceTier.Mode.Performance -> R.string.perf_mode_performance_desc
+                },
+            ),
+        )
+        SegmentedControl(
+            options = listOf(
+                stringResource(R.string.perf_mode_auto),
+                stringResource(R.string.perf_mode_quality),
+                stringResource(R.string.perf_mode_performance),
+            ),
+            selected = PerformanceTier.Mode.entries.indexOf(s.performanceMode),
+            onSelect = { s.updatePerformanceMode(PerformanceTier.Mode.entries[it]) },
+            modifier = Modifier.testTag(UiTags.PERFORMANCE_MODE),
+        )
         Spacer(Modifier.height(Space.s))
         SettingsDivider()
         // Píldora de hora y batería (Biblioteca y Carpeta).

@@ -34,7 +34,9 @@ import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.isSpecified
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.ui.components.FallbackArtCache
 import com.elyndra.launcher.ui.theme.LocalReducedMotion
@@ -98,17 +100,22 @@ fun rememberSelectionLook(color: Int, glow: Boolean, particles: Boolean, dark: B
  * recorte de la card (para que halo, luz y partículas asomen por fuera) y
  * después de su escala (para acompañarla). Para que el halo no quede bajo las
  * vecinas, la card seleccionada lleva `zIndex` en la raíz de su elemento.
+ *
+ * [haloSpread] recorta lo que el halo y la luz del estante asoman de lado: en
+ * una fila apretada (el Clásico en vertical, ~9 dp entre cards) los 11 dp de
+ * siempre se metían en la carátula de al lado. Sin especificar, el de siempre.
  */
-fun Modifier.selectionFrame(selected: Boolean, look: SelectionLook, shape: Shape): Modifier =
-    this then SelectionFrameElement(selected, look, shape)
+fun Modifier.selectionFrame(selected: Boolean, look: SelectionLook, shape: Shape, haloSpread: Dp = Dp.Unspecified): Modifier =
+    this then SelectionFrameElement(selected, look, shape, haloSpread)
 
 private data class SelectionFrameElement(
     val selected: Boolean,
     val look: SelectionLook,
     val shape: Shape,
+    val haloSpread: Dp,
 ) : ModifierNodeElement<SelectionFrameNode>() {
-    override fun create() = SelectionFrameNode(selected, look, shape)
-    override fun update(node: SelectionFrameNode) = node.update(selected, look, shape)
+    override fun create() = SelectionFrameNode(selected, look, shape, haloSpread)
+    override fun update(node: SelectionFrameNode) = node.update(selected, look, shape, haloSpread)
     override fun InspectorInfo.inspectableProperties() {
         name = "selectionFrame"
         properties["selected"] = selected
@@ -119,6 +126,7 @@ private class SelectionFrameNode(
     private var selected: Boolean,
     private var look: SelectionLook,
     private var shape: Shape,
+    private var haloSpread: Dp,
 ) : Modifier.Node(), DrawModifierNode, CompositionLocalConsumerModifierNode {
 
     private var reveal: Animatable<Float, AnimationVector1D>? = null
@@ -148,11 +156,12 @@ private class SelectionFrameNode(
         loop = null
     }
 
-    fun update(selected: Boolean, look: SelectionLook, shape: Shape) {
+    fun update(selected: Boolean, look: SelectionLook, shape: Shape, haloSpread: Dp) {
         val was = this.selected
         val lookChanged = look != this.look
-        if (shape != this.shape) {
+        if (shape != this.shape || haloSpread != this.haloSpread) {
             this.shape = shape
+            this.haloSpread = haloSpread
             geometry?.invalidate()
             dustDirty = true
         }
@@ -254,7 +263,7 @@ private class SelectionFrameNode(
             return
         }
         val geo = (geometry ?: FrameGeometry().also { geometry = it })
-        geo.update(size, layoutDirection, this, shape)
+        geo.update(size, layoutDirection, this, shape, haloSpread)
         val ink = ink?.takeIf { inkDensity == density } ?: SelectionInks.of(look.color, look.dark, density).also {
             ink = it
             inkDensity = density
@@ -349,6 +358,7 @@ private class FrameGeometry : PerimeterSampler {
     private var size = Size.Unspecified
     private var direction: LayoutDirection? = null
     private var shape: Shape? = null
+    private var haloSpread = Dp.Unspecified
     var density = 1f
         private set
     var ready = false
@@ -405,11 +415,12 @@ private class FrameGeometry : PerimeterSampler {
         ready = false
     }
 
-    fun update(size: Size, direction: LayoutDirection, d: Density, shape: Shape) {
-        if (ready && size == this.size && direction == this.direction && d.density == density && shape == this.shape) return
+    fun update(size: Size, direction: LayoutDirection, d: Density, shape: Shape, haloSpread: Dp) {
+        if (ready && size == this.size && direction == this.direction && d.density == density && shape == this.shape && haloSpread == this.haloSpread) return
         this.size = size
         this.direction = direction
         this.shape = shape
+        this.haloSpread = haloSpread
         density = d.density
         brushInk = null
 
@@ -429,15 +440,21 @@ private class FrameGeometry : PerimeterSampler {
         rimStroke = Stroke(rimW)
         keylineStroke = Stroke(1f * px)
         specularStroke = Stroke(1.2f * px)
-        // Trazos centrados en el contorno: la mitad de fuera es el halo.
-        bloomStrokes = arrayOf(Stroke(2f * 3f * px), Stroke(2f * 6.5f * px), Stroke(2f * 11f * px))
+        // Trazos centrados en el contorno: la mitad de fuera es el halo. Con
+        // [haloSpread] los tres encogen en proporción (la estela sigue igual de
+        // suave, solo más corta); sin él, los de siempre.
+        val spread = if (haloSpread.isSpecified) haloSpread.value.coerceIn(0f, SelectionFx.HALO_DP) else SelectionFx.HALO_DP
+        val k = spread / SelectionFx.HALO_DP
+        bloomStrokes = arrayOf(Stroke(2f * 3f * k * px), Stroke(2f * 6.5f * k * px), Stroke(2f * SelectionFx.HALO_DP * k * px))
         sheenStrokes = arrayOf(
             Stroke(3.5f * px, cap = StrokeCap.Round),
             Stroke(2.75f * px, cap = StrokeCap.Round),
             Stroke(2f * px, cap = StrokeCap.Round),
         )
 
-        underRadius = size.width * 0.58f
+        // La luz del estante asoma de lado lo mismo que la estela, como mucho.
+        underRadius = size.width * SelectionFx.UNDERGLOW_RADIUS
+        if (haloSpread.isSpecified) underRadius = minOf(underRadius, size.width / 2f + spread * px)
         underCenter = Offset(size.width / 2f, size.height + 4f * px)
         underScaleY = (10f * px / underRadius).coerceAtMost(1f)
         ready = length > 0f

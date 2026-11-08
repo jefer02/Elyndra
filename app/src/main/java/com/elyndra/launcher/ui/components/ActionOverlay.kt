@@ -58,6 +58,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import com.elyndra.launcher.data.argb
 import com.elyndra.launcher.data.Palettes
 import androidx.compose.ui.draw.alpha
@@ -104,6 +105,7 @@ import com.elyndra.launcher.ui.SheetHero
 import com.elyndra.launcher.ui.SheetIcon
 import com.elyndra.launcher.ui.SheetLayout
 import com.elyndra.launcher.ui.SheetLayoutBinding
+import com.elyndra.launcher.ui.UiTags
 import com.elyndra.launcher.ui.UiText
 import com.elyndra.launcher.ui.resolve
 import com.elyndra.launcher.ui.theme.LocalLandscape
@@ -206,7 +208,8 @@ fun GameActionOverlayContainer(
                 Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))
-                    .padding(PANEL_MARGIN),
+                    .padding(PANEL_MARGIN)
+                    .testTag(UiTags.ACTION_SHEET),
                 contentAlignment = Alignment.Center,
             ) {
                 ActionPanel(shown, held.origin, open, input, maxHeight, onOverlayDismissed)
@@ -708,6 +711,7 @@ internal fun ActionTile(action: SheetAction, focused: Boolean, accent: Color, mo
     val interaction = remember { MutableInteractionSource() }
     Column(
         modifier
+            .actionTag(action)
             .heightIn(min = TILE_H)
             .revealWhen(focused)
             .pressFeedback(interaction)
@@ -780,6 +784,7 @@ private fun ArtTile(
 
     Box(
         modifier
+            .actionTag(action)
             .height(ART_TILE_H)
             .revealWhen(focused)
             .graphicsLayer {
@@ -1071,6 +1076,9 @@ private fun ListContent(
 }
 
 /** Una fila de menú: glifo en su círculo, rótulo, dato y marca o galón. */
+/** El testTag de la acción, si lleva (perfil base y pruebas de rendimiento, ver UiTags). No cambia nada visible. */
+private fun Modifier.actionTag(action: SheetAction): Modifier = action.testTag?.let { testTag(it) } ?: this
+
 @Composable
 private fun ActionRow(action: SheetAction, focused: Boolean, accent: Color, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
@@ -1084,6 +1092,7 @@ private fun ActionRow(action: SheetAction, focused: Boolean, accent: Color, onCl
     val shape = RoundedCornerShape(TILE_RADIUS)
     Row(
         Modifier
+            .actionTag(action)
             .fillMaxWidth()
             .revealWhen(focused)
             .graphicsLayer {

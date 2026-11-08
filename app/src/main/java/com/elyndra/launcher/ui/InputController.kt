@@ -164,6 +164,15 @@ class InputController(private val vm: ElyndraViewModel) {
         dialogFocus = if (active) 0 else -1
     }
 
+    /**
+     * Menú recién abierto que debe empezar en [index] (la hoja de servicios al
+     * volver de su selector de arte: el servicio del que se venía). Solo con
+     * mando, como [onSheetShown].
+     */
+    fun focusSheetAction(index: Int) {
+        if (active && index >= 0) sheetFocus = index
+    }
+
     /** Se ha tocado la pantalla: los resaltes del mando se apagan hasta la próxima pulsación. */
     fun onTouch() {
         if (active) active = false
@@ -222,7 +231,7 @@ class InputController(private val vm: ElyndraViewModel) {
             // Mientras se lanza un juego no se toca nada: el velo se va solo.
             vm.dialog != null -> dialog(pad)
             vm.sheet != null -> sheet(pad)
-            vm.artPicker != null -> back(pad)
+            vm.artPicker != null -> artPicker(pad)
             // El diálogo de nombre se maneja con el foco de Compose (campo, resultados, botones).
             vm.identify.state != null -> back(pad)
             vm.detailsKey != null -> details(pad)
@@ -624,6 +633,101 @@ class InputController(private val vm: ElyndraViewModel) {
      */
     private fun step(current: Int, delta: Int, size: Int): Int =
         if (current < 0) (if (delta > 0) 0 else size - 1) else (current + delta).coerceIn(0, size - 1)
+
+    /* ── selector de arte ─────────────────────────────────────── */
+
+    /**
+     * Lo señalado en el selector de arte: con rejilla, el índice de la imagen;
+     * sin ella (buscando, nada encontrado, error), el del botón en
+     * [ArtPickerLayout.buttons]. −1 = nada (se abrió con el dedo).
+     */
+    var artFocus by mutableIntStateOf(-1); private set
+
+    /**
+     * Columnas que pinta ahora la rejilla y filas que caben a la vista: lo
+     * publica la propia hoja ([bindArtGrid]), que es quien sabe el ancho real
+     * en este móvil o tableta y con esta clase de imagen.
+     */
+    private var artColumns = 1
+    private var artPageRows = 1
+
+    fun bindArtGrid(columns: Int, pageRows: Int) {
+        artColumns = columns.coerceAtLeast(1)
+        artPageRows = pageRows.coerceAtLeast(1)
+    }
+
+    /**
+     * El selector cambia de fase (se abre, llegan los resultados, se reintenta):
+     * con mando, el foco a la imagen puesta (o la primera) o al primer botón.
+     */
+    fun onArtPickerShown(state: ArtPickerState) {
+        artFocus = if (active) ArtPickerLayout.initialFocus(state) else -1
+    }
+
+    /**
+     * El selector de arte con el mando: la cruceta recorre la rejilla con las
+     * columnas que se ven ([GridNav]); A pone la imagen señalada (lo mismo que
+     * tocarla); LB/RB saltan una pantalla de filas; B cierra sin cambios y
+     * vuelve a la hoja de servicios. No tiene pestañas ni cabecera con botones,
+     * así que arriba desde la primera fila se queda. Lo demás (X, Y, Start…) no
+     * atraviesa la hoja hacia lo de detrás.
+     */
+    private fun artPicker(pad: Pad): Boolean {
+        val state = vm.artPicker ?: return back(pad)
+        if (pad == Pad.Back) {
+            if (BackPriority.next(vm.backState()) == BackPriority.Target.ArtPicker) vm.closeArtPickerToSource() else vm.back()
+            return true
+        }
+        val count = state.candidates.size
+        if (count == 0) return artButtons(pad, state)
+        val initial = ArtPickerLayout.initialFocus(state)
+        fun go(dir: GridNav.Dir): Boolean {
+            // Sin paginación ni cabecera: en los cantos el foco se queda.
+            when (val r = GridNav.move(artFocus, count, artColumns, dir, initial = initial)) {
+                is GridNav.Result.Move -> artFocus = r.index
+                GridNav.Result.Stay, GridNav.Result.ToHeader, GridNav.Result.LoadMore -> Unit
+            }
+            return true
+        }
+        return when (pad) {
+            Pad.Up -> go(GridNav.Dir.Up)
+            Pad.Down -> go(GridNav.Dir.Down)
+            Pad.Left -> go(GridNav.Dir.Left)
+            Pad.Right -> go(GridNav.Dir.Right)
+            Pad.PagePrev, Pad.PageNext -> {
+                val delta = if (pad == Pad.PagePrev) -1 else 1
+                artFocus = if (artFocus in 0 until count) GridNav.page(artFocus, count, artColumns, artPageRows, delta) else initial
+                true
+            }
+            Pad.Confirm -> {
+                // Sin nada señalado, A solo coloca el foco (como la cruceta): no pone una imagen a ciegas.
+                val candidate = state.candidates.getOrNull(artFocus)
+                if (candidate == null) artFocus = initial else vm.applyArt(candidate)
+                true
+            }
+            else -> true
+        }
+    }
+
+    /** Sin rejilla: los botones de la hoja (Reintentar, Cerrar) en una fila. */
+    private fun artButtons(pad: Pad, state: ArtPickerState): Boolean {
+        val buttons = ArtPickerLayout.buttons(state)
+        // Nada señalado (o el botón ya no está): la pulsación solo lo coloca.
+        if (artFocus !in buttons.indices) {
+            artFocus = 0
+            return true
+        }
+        when (pad) {
+            Pad.Left -> artFocus = (artFocus - 1).coerceAtLeast(0)
+            Pad.Right -> artFocus = (artFocus + 1).coerceAtMost(buttons.lastIndex)
+            Pad.Confirm -> when (buttons[artFocus]) {
+                ArtPickerLayout.Button.Retry -> vm.retryArtSearch()
+                ArtPickerLayout.Button.Close -> vm.closeArtPickerToSource()
+            }
+            else -> Unit
+        }
+        return true
+    }
 
     /* ── diálogo ──────────────────────────────────────────────── */
 

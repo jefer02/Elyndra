@@ -1,5 +1,7 @@
 package com.elyndra.launcher.ui.meridian
 
+import com.elyndra.launcher.ui.UiTags
+import androidx.compose.ui.platform.testTag
 import android.content.res.Resources
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -416,7 +418,7 @@ internal fun RailHeaderRow(compact: Boolean, pills: FloatArray, dock: @Composabl
                 // El alto de la cabecera no depende de la curva, así que ya se sabe.
                 val headerPx = padTop.roundToPx() + DotTabsLayout.HEIGHT.dp.roundToPx() + padBottom.roundToPx()
                 val totalPx = constraints.maxHeight + padTop.roundToPx() + padBottom.roundToPx()
-                FogArc.forRail(f.windowWidth, (totalPx - headerPx - f.hintsPx) / dens, headerPx.toFloat(), f.tileAspect, f.compact, f.axisX)
+                FogArc.forRail(f.windowWidth, (totalPx - headerPx - f.hintsPx) / dens, headerPx.toFloat(), f.tileAspect, f.compact, f.axisX, measured.screenTop, measured.screenBottom)
             }
         }?.copy(reach = 0f) // La curva sin la banda que pide la propia cabecera (si no, el dock se iría ensanchando con ella).
         val edge: ((Float) -> Float)? = if (fog == null || arc == null) null else { y -> arc.edgeAt(padTop.value + y, fog.axisX, fog.glass, dens) }
@@ -460,7 +462,7 @@ private fun TopEnd(vm: ElyndraViewModel, m: Metrics, enabled: Boolean, onMasha: 
         Spacer(Modifier.width(8.dp))
         SearchField(vm, m)
         Spacer(Modifier.width(8.dp))
-        ConsoleIconButton(onClick = { vm.go(Screen.Settings) }, focused = vm.input.isBarFocused(BarItem.Settings)) { glyph -> SettingsGlyph(glyph) }
+        ConsoleIconButton(onClick = { vm.go(Screen.Settings) }, modifier = Modifier.testTag(UiTags.SETTINGS), focused = vm.input.isBarFocused(BarItem.Settings)) { glyph -> SettingsGlyph(glyph) }
     }
 }
 

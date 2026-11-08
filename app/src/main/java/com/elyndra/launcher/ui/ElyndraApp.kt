@@ -1,5 +1,9 @@
 package com.elyndra.launcher.ui
 
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import com.elyndra.launcher.ui.components.rememberBackdropStack
 import com.elyndra.launcher.ui.components.LocalBackdropStack
 import com.elyndra.launcher.ui.components.OverlayHost
@@ -26,6 +30,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.snap
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -81,6 +87,7 @@ import com.elyndra.launcher.data.argb
  * dispositivo de verdad, así que la bandera `L` (el layout ancho de 892×412)
  * la decide la orientación real de la pantalla.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun ElyndraApp(vm: ElyndraViewModel) {
     val configuration = LocalConfiguration.current
@@ -146,7 +153,9 @@ fun ElyndraApp(vm: ElyndraViewModel) {
         // insets) quedaría clara junto a ellas. Las demás llevan su arte hasta
         // el filo (ver EdgeBleed); lo que no, se queda sobre el papel.
         val holoScreen = vm.screen == Screen.Masha || vm.screen == Screen.VoiceSync
-        Box(Modifier.fillMaxSize().background(if (holoScreen) Holo.bg else P.paper)) {
+        // Los testTag salen como resource-id para UiAutomator (perfil base y
+        // pruebas de rendimiento, ver :baselineprofile). No cambia nada visible.
+        Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }.background(if (holoScreen) Holo.bg else P.paper)) {
             // Las barras van ocultas (pantalla completa), así que sus insets son 0;
             // se mantiene el del recorte de pantalla para que en un móvil con muesca
             // el contenido no quede debajo. Los fondos de cada pantalla sí pasan
@@ -232,7 +241,7 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                         // nace con algo señalado, recupera lo que tenía al cerrarse una
                         // capa y, mientras hay una capa encima, el foco no se cuela aquí.
                         PadFocusGroup(
-                            Modifier.fillMaxSize(),
+                            Modifier.fillMaxSize().testTag(UiTags.screen(screen)),
                             blocked = overlayOpen,
                             // Biblioteca y Carpeta van con la selección del InputController.
                             padFocus = screen != Screen.Library && screen != Screen.Folder,
@@ -275,7 +284,9 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                     Modifier
                         .align(Alignment.BottomCenter)
                         .windowInsetsPadding(WindowInsets.systemBars)
-                        .padding(bottom = 76.dp),
+                        .padding(bottom = 76.dp)
+                        // Tocar el aviso lo cierra (sin realce: no es un botón).
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = vm::dismissToast),
                 )
             }
 
@@ -285,7 +296,7 @@ fun ElyndraApp(vm: ElyndraViewModel) {
             if (vm.intro.visible) {
                 val skin = LocalSkin.current
                 val accent = SignaturePalettes.accentPair(skin.accent.id, skin.a1.argb(), skin.secondary.argb())
-                key(vm.intro.run) { BootIntro(vm.intro, vm.settings.introColor.pair(accent)) }
+                key(vm.intro.run) { Box(Modifier.testTag(UiTags.INTRO)) { BootIntro(vm.intro, vm.settings.introColor.pair(accent)) } }
             }
         }
     }

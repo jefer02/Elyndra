@@ -65,8 +65,8 @@ class MeridianLogicTest {
 
     @Test
     fun `scale alpha and rotation follow the tuned tables by distance`() {
-        val scale = floatArrayOf(1f, 0.72f, 0.52f, 0.37f, 0.28f)
-        val alpha = floatArrayOf(1f, 0.85f, 0.5f, 0.25f, 0f)
+        val scale = floatArrayOf(1f, 0.6f, 0.44f, 0.33f, 0.26f)
+        val alpha = floatArrayOf(1f, 0.8f, 0.45f, 0.22f, 0f)
         val rot = floatArrayOf(0f, 6f, 12f, 18f)
         for (d in 0..4) {
             assertEquals(scale[d], WheelTransform.scale(d.toFloat()), 1e-6f)
@@ -75,8 +75,8 @@ class MeridianLogicTest {
         }
         for (d in 0..3) assertEquals(-rot[d], WheelTransform.rotationY(d.toFloat(), flat = false), 1e-6f)
         assertEquals(0f, WheelTransform.alpha(7f), 0f)
-        assertEquals(0.28f, WheelTransform.scale(9f), 1e-6f)
-        assertEquals((0.72f + 0.52f) / 2f, WheelTransform.scale(1.5f), 1e-6f)
+        assertEquals(0.26f, WheelTransform.scale(9f), 1e-6f)
+        assertEquals((0.6f + 0.44f) / 2f, WheelTransform.scale(1.5f), 1e-6f)
         // El nombre: en la enfocada y sus vecinas; desde ±2, solo el arte.
         assertEquals(1f, WheelTransform.detail(1f), 0f)
         assertEquals(0f, WheelTransform.detail(2f), 0f)
@@ -165,12 +165,13 @@ class MeridianLogicTest {
 
     @Test
     fun `focused tiles are big, sized from the rail height and capped by the window and the rail`() {
-        // Iconos: 38 % del alto; carátulas: lo que deja ver enteras a sus vecinas (~39 %).
+        // Iconos: 38 % del alto; carátulas: lo que deja ver enteras a sus vecinas (~43 %).
         assertEquals(600f * 0.38f, WheelTransform.tileHeight(600f, 1600f, 1f), 1e-3f)
         assertEquals(600f * WheelTransform.COVER_TILE, WheelTransform.tileHeight(600f, 1600f, 2f / 3f), 1e-3f)
-        assertTrue(WheelTransform.COVER_TILE in 0.36f..0.42f)
+        assertTrue(WheelTransform.COVER_TILE in 0.40f..0.46f)
         assertTrue(WheelTransform.ICON_TILE in 0.36f..0.40f)
-        // Ni iconos ni carátulas dejan a una vecina (±1) fuera de la rueda: el corte en seco de la tableta.
+        // Fuera de una ventana baja (tableta, tele) ni iconos ni carátulas dejan a una vecina (±1) fuera: el corte en seco de la tableta.
+        // En un móvil apaisado las vecinas asoman (ver MeridianCoverLayoutTest).
         for (rail in listOf(300f, 457f, 656f, 740f)) for (aspect in listOf(1f, 2f / 3f)) {
             val t = WheelTransform.tileHeight(rail, 1280f, aspect)
             val reach = (WheelTransform.center(1f) + WheelTransform.scale(1f) / 2f) * t
@@ -184,9 +185,9 @@ class MeridianLogicTest {
         // Topes absolutos.
         assertEquals(WheelTransform.TILE_MIN, WheelTransform.tileHeight(120f, 1600f, 1f), 0f)
         assertEquals(WheelTransform.TILE_MAX, WheelTransform.tileHeight(3000f, 4000f, 1f), 0f)
-        // La tableta de las capturas (853 × 533 dp, rueda de 457 dp): la carátula enfocada ~39 % de la rueda.
+        // La tableta de las capturas (853 × 533 dp, rueda de 457 dp): la carátula enfocada ~43 % de la rueda.
         val g = MeridianGeometry.compute(853f, 457f, 2f / 3f)
-        assertTrue("${g.rowHeight / 457f}", g.rowHeight / 457f in 0.36f..0.42f)
+        assertTrue("${g.rowHeight / 457f}", g.rowHeight / 457f in 0.40f..0.46f)
         assertTrue(g.rowHeight * 2f / 3f <= 853f * 0.24f + 1e-3f)
     }
 
@@ -287,7 +288,7 @@ class MeridianLogicTest {
             val f = focus + lift
             assertTrue("$count@$at: la enfocada dentro", f - 0.5f >= -1e-4f && f + 0.5f <= railTiles + 1e-4f)
             if (f > 0.5f + 1e-4f && f < railTiles - 0.5f - 1e-4f) assertEquals("$count@$at", railTiles / 2f, (top + bottom) / 2f, 1e-3f)
-            // (Una sola carátula, centrada, deja algo más: la carátula mide ~39 % de la rueda.)
+            // (Una sola carátula, centrada, deja algo más: la carátula mide ~43 % de la rueda.)
             assertTrue("$count@$at hueco ${top}", top <= railTiles * 0.32f)
         }
         // Desde 6 filas, nada se mueve.
@@ -321,12 +322,14 @@ class MeridianLogicTest {
         val h = 140f
         // Lejos de los cantos, entera.
         assertEquals(1f, RailEdge.fade(300f, h, top = 0f, bottom = 600f), 0f)
-        // Con su centro por encima del canto de arriba (el bocadillo), apagada.
-        assertEquals(0f, RailEdge.fade(80f - h * 0.3f, h, top = 80f, bottom = 600f), 0f)
+        // Con su centro ya casi media fila por encima del canto de arriba, apagada.
+        assertEquals(0f, RailEdge.fade(80f - h * 0.45f, h, top = 80f, bottom = 600f), 0f)
         // Igual abajo.
-        assertEquals(0f, RailEdge.fade(600f + h * 0.3f, h, top = 0f, bottom = 600f), 0f)
-        // Una vecina algo recortada arriba, sin bocadillo, apenas se apaga.
+        assertEquals(0f, RailEdge.fade(600f + h * 0.45f, h, top = 0f, bottom = 600f), 0f)
+        // Una vecina algo recortada arriba apenas se apaga.
         assertTrue(RailEdge.fade(h * 0.4f, h, top = 0f, bottom = 600f) > 0.9f)
+        // La que asoma en un móvil (con el centro justo dentro) se ve entera: el canto lo funde la máscara, no la opacidad.
+        assertEquals(1f, RailEdge.fade(h * 0.05f, h, top = 0f, bottom = 600f), 1e-4f)
     }
 
     /* ── Bocadillo de Masha ── */
@@ -516,10 +519,11 @@ class MeridianLogicTest {
     /* ── Fondo de la rueda ── */
 
     @Test
-    fun `the wheel backdrop follows the theme until the user picks one, then it is the same in both`() {
-        // Sin elegir: cristal en claro, difuminado en oscuro (como estaba).
+    fun `the wheel backdrop is glass in both themes until the user picks one, then it is the same in both`() {
+        // Sin elegir: cristal en los dos (antes, difuminado en oscuro: el cristal nuevo no se veía en un móvil en tema oscuro).
         assertTrue(WheelBackdrop.glass(null, dark = false))
-        assertFalse(WheelBackdrop.glass(null, dark = true))
+        assertTrue(WheelBackdrop.glass(null, dark = true))
+        assertFalse(WheelBackdrop.legacyDefault(dark = true))
         // Elegido: lo mismo en los dos temas.
         for (dark in listOf(false, true)) {
             assertTrue(WheelBackdrop.glass(true, dark))
@@ -576,19 +580,23 @@ class MeridianLogicTest {
         assertEquals(g.focusY, g.padTop + g.rowHeight / 2f, 1e-3f)
         assertEquals(g.railHeight, g.padTop + g.rowHeight + g.padBottom, 1e-3f)
         assertTrue(g.heroLeft > g.axisX)
-        // Las vecinas (±1) no se salen por la izquierda con la curva, ya encogidas (la fila encoge desde su canto izquierdo).
+        // Las vecinas (±1) no se salen por la izquierda con la curva, ya encogidas (encogen desde el canto izquierdo de su tarjeta).
         assertTrue(g.inset + WheelArc.offset(WheelTransform.center(1f) * g.rowHeight, g.arcRadius) >= MeridianGeometry.RAIL_START - 1e-3f)
         for ((w, h) in listOf(1280f to 656f, 853f to 457f, 915f to 355f)) for (aspect in listOf(1f, 2f / 3f)) {
             val m = MeridianGeometry.compute(w, h, aspect)
-            val left = m.inset * WheelTransform.scale(1f) + WheelArc.offset(WheelTransform.center(1f) * m.rowHeight, m.arcRadius)
-            assertTrue("$w×$h $aspect: $left", left >= MeridianGeometry.NEIGHBOR_START - 1e-3f)
+            val left = m.inset + WheelArc.offset(WheelTransform.center(1f) * m.rowHeight, m.arcRadius)
+            // Ni contra el filo de la pantalla: al menos RAIL_START (antes 8 dp).
+            assertEquals("$w×$h $aspect: $left", MeridianGeometry.RAIL_START, left, 1e-3f)
         }
         // Al nombre de la enfocada le queda sitio (más de un tercio de la rueda) en tableta, móvil y el umbral.
         for ((w, h, compact) in listOf(Triple(853f, 457f, false), Triple(1280f, 720f, false), Triple(915f, 340f, true), Triple(800f, 300f, true), Triple(640f, 300f, true))) {
             for (aspect in listOf(1f, 2f / 3f)) {
+                // En un móvil las carátulas llenan la columna a propósito (el nombre va en el hero y la columna
+                // estrecha crece con ellas: ver MeridianCoverLayoutTest); aquí solo cuentan los iconos.
+                if (compact && aspect < 1f) continue
                 val m = MeridianGeometry.compute(w, h, aspect, compact)
                 val text = m.railWidth - m.inset - m.rowHeight * aspect - 14f - 34f
-                assertTrue("$w×$h $aspect: $text", text >= 90f)
+                assertTrue("$w×$h $aspect: $text", text >= 80f)
             }
         }
     }

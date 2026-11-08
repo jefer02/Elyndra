@@ -22,6 +22,16 @@ import kotlin.random.Random
 object SelectionFx {
 
     /**
+     * Hasta dónde llega el halo por fuera del contorno (dp): el más ancho de
+     * sus tres trazos (3, 6,5 y 11 dp). Una fila apretada (el Clásico en
+     * vertical) lo recorta y los tres encogen en proporción.
+     */
+    const val HALO_DP = 11f
+
+    /** Radio de la luz en el estante, en fracción del ancho de la card. */
+    const val UNDERGLOW_RADIUS = 0.58f
+
+    /**
      * Perímetro (dp) de una card típica: la de icono de un móvil en vertical
      * o una carátula 2:3 de ~150 dp de alto. Es la vara de medir del barrido y
      * del número de partículas.

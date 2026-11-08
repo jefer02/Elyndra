@@ -16,7 +16,9 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.elyndra.launcher.ui.UiTags
 import com.elyndra.launcher.ui.selection.SelectionLook
 import kotlin.math.roundToInt
 
@@ -73,7 +75,7 @@ internal fun BoxScope.MeridianWheelArea(
         targetState = section,
         transitionSpec = { sectionSwap(forward, reduced) },
         // Al deslizar, la rueda no se sube a la cabecera ni baja a las pistas.
-        modifier = Modifier.fillMaxSize().clipToBounds(),
+        modifier = Modifier.fillMaxSize().clipToBounds().testTag(UiTags.WHEEL),
         label = "meridianSection",
     ) { key ->
         val live = key == section
@@ -85,6 +87,7 @@ internal fun BoxScope.MeridianWheelArea(
             wheel.railPx = railPx
             wheel.focusPx = focusPx
             wheel.count = rows
+            wheel.profile = geo.profile
             if (live) {
                 wheel.target = focusedRow
                 current.value = wheel

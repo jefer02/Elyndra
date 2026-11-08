@@ -26,6 +26,7 @@ import com.elyndra.launcher.data.SignaturePalettes
 import com.elyndra.launcher.data.argb
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.Swift
+import com.elyndra.launcher.ui.theme.GlassTokens
 import com.elyndra.launcher.ui.theme.WheelGlass
 import kotlin.math.abs
 import kotlin.math.asin
@@ -205,7 +206,7 @@ internal fun MeridianDial(
                             if (!bareMarks) {
                                 drawLine(tickColor, Offset(sx, sy), Offset(ex, ey), strokeWidth = tw, alpha = tickAlpha * a * (1f - lit))
                             } else {
-                                drawLine(Color.Black, Offset(sx, sy), Offset(ex, ey), strokeWidth = tw + markShadow * 2f, alpha = WheelGlass.MARK_SHADOW_ALPHA * a * (1f - lit), cap = StrokeCap.Round)
+                                drawLine(Color.Black, Offset(sx, sy), Offset(ex, ey), strokeWidth = tw + markShadow * 2f, alpha = GlassTokens.MARK_SHADOW_ALPHA * a * (1f - lit), cap = StrokeCap.Round)
                                 drawLine(Color.White, Offset(sx, sy), Offset(ex, ey), strokeWidth = tw, alpha = WheelGlass.MARK_ALPHA * a * (1f - lit))
                             }
                             if (lit > 0.01f) {

@@ -35,7 +35,7 @@ class SettingsStoreStatusTest {
 }
 
 /** SharedPreferences en memoria: lo justo para leer y escribir ajustes sin Android. */
-private class MemoryPrefs(private val values: MutableMap<String, Any?> = mutableMapOf()) : SharedPreferences {
+internal class MemoryPrefs(private val values: MutableMap<String, Any?> = mutableMapOf()) : SharedPreferences {
     override fun getAll(): MutableMap<String, *> = values.toMutableMap()
     override fun getString(key: String, defValue: String?) = values[key] as? String ?: defValue
     @Suppress("UNCHECKED_CAST")

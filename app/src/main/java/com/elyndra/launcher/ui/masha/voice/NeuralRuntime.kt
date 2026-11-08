@@ -25,6 +25,17 @@ object NeuralRuntime {
     private const val TAG = "MashaVoice"
     private const val LINGER_MS = 90_000L
 
+    /**
+     * En Rendimiento el modelo (~200 MB) se suelta mucho antes al salir de
+     * Masha: en un móvil con poca RAM, tenerlo vivo minuto y medio es lo que
+     * hace que el sistema cierre Elyndra al lanzar un emulador. Volver a
+     * Masha lo recarga (unos cientos de ms en el hilo del motor, no en el principal).
+     */
+    private const val LINGER_LOW_END_MS = 10_000L
+
+    private val lingerMs: Long
+        get() = if (com.elyndra.launcher.core.device.DevicePerformance.profile.lowEnd) LINGER_LOW_END_MS else LINGER_MS
+
     /** Por encima, la voz natural no llega a tiempo y se usa la del sistema. */
     const val MAX_RTF = RtfGate.MAX_RTF
 
@@ -57,7 +68,7 @@ object NeuralRuntime {
 
     fun release() = synchronized(lock) {
         users = (users - 1).coerceAtLeast(0)
-        if (users == 0) main.postDelayed(closer, LINGER_MS)
+        if (users == 0) main.postDelayed(closer, lingerMs)
     }
 
     /** Memoria justa (onTrimMemory) o modelo borrado: fuera ya si nadie lo usa. */

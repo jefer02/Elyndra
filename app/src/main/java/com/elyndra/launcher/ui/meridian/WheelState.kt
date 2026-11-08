@@ -10,6 +10,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -46,6 +47,9 @@ internal class WheelState(val list: LazyListState, initialTarget: Int) {
     var focusPx by mutableFloatStateOf(0f)
     var count by mutableIntStateOf(0)
 
+    /** Cómo se reparten las vecinas (lo pone la rueda con su geometría): el centrado de las listas cortas y el fundido lo leen. */
+    var profile by mutableStateOf(WheelProfile.DEFAULT)
+
     /** La fila que tiene que quedar en la línea de foco. */
     var target by mutableIntStateOf(initialTarget)
 
@@ -72,7 +76,7 @@ internal class WheelState(val list: LazyListState, initialTarget: Int) {
     fun lift(): Float {
         val row = rowPx
         if (row <= 0f) return 0f
-        return ShortList.lift(position, count, railPx / row, focusPx / row) * row
+        return ShortList.lift(position, count, railPx / row, focusPx / row, profile) * row
     }
 
     /**
