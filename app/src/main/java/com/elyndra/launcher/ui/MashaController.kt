@@ -357,6 +357,18 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                     if (result.ok) ctx.getString(R.string.masha_off_renamed, focused, intent.name) else ctx.getString(R.string.masha_off_rename_bad, intent.name)
                 }
             }
+            OfflineIntent.FindPort -> {
+                val result = actions.execute(ToolCall("local", MashaTools.FIND_PORT, buildJsonObject {}))
+                val found = result.attachment as? MashaAttachment.Ports
+                if (found != null) {
+                    attachment = found
+                    ctx.getString(R.string.masha_off_ports)
+                } else {
+                    // Nada de la biblioteca tiene port: la tienda, para mirar.
+                    vm.openPorts()
+                    ctx.getString(R.string.masha_off_ports_none)
+                }
+            }
             OfflineIntent.Unknown -> ctx.getString(if (brain.config.hasKey) R.string.masha_off_unknown else R.string.masha_off_unknown_nokey)
         }
         val prefix = failure?.let { ctx.getString(failureLine(it)) + "\n\n" }.orEmpty()
@@ -514,6 +526,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     private fun workingLabel(call: ToolCall): UiText = UiText.res(
         when (call.name) {
             MashaTools.FIND_GAMES, MashaTools.OPEN_LIST -> R.string.masha_working_search
+            MashaTools.FIND_PORT -> R.string.masha_working_ports
             MashaTools.GET_GAME_PROFILE, MashaTools.SUGGEST_EMULATOR -> R.string.masha_working_profile
             MashaTools.PLAN_SESSION -> R.string.masha_working_plan
             MashaTools.CREATE_ARC, MashaTools.GET_ARCS -> R.string.masha_working_arc
