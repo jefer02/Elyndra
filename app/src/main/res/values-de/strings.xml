@@ -47,6 +47,10 @@
         <item quantity="one">%1$d ROM · %2$s</item>
         <item quantity="other">%1$d ROMs · %2$s</item>
     </plurals>
+    <plurals name="roms_count">
+        <item quantity="one">%1$d ROM</item>
+        <item quantity="other">%1$d ROMs</item>
+    </plurals>
 
     <!-- Menüs und Dialoge -->
     <string name="details">Details</string>
@@ -103,6 +107,7 @@
     <string name="rescan_folder">Ordner neu scannen</string>
     <string name="change_emulator">Emulator wechseln</string>
     <string name="choose_emulator">Emulator wählen</string>
+    <string name="folder_emulator_a11y">Emulator des Ordners: %1$s</string>
     <string name="emulator_for_game">Emulator für dieses Spiel</string>
     <string name="use_folder_emulator">Emulator des Ordners verwenden</string>
     <string name="other_app">Andere App…</string>
@@ -538,6 +543,18 @@
     <string name="frame_rate_120">120 fps</string>
     <string name="frame_rate_60">60 fps</string>
     <string name="frame_rate_unsupported">Dieses Display unterstützt keine 120 Hz, daher werden 60 fps verwendet.</string>
+    <string name="perf_mode_title">Leistung</string>
+    <string name="perf_mode_auto">Auto</string>
+    <string name="perf_mode_quality">Qualität</string>
+    <string name="perf_mode_performance">Leistung</string>
+    <string name="perf_reason_capable">Auto · Qualität: Dieses Gerät nutzt alle Effekte. Mit Energiesparmodus wird auf Leistung umgeschaltet.</string>
+    <string name="perf_reason_budget_chipset">Auto · Leistung: Einsteiger-Chipsatz. Gleiches Aussehen, leichtere Effekte.</string>
+    <string name="perf_reason_low_memory">Auto · Leistung: wenig Arbeitsspeicher. Gleiches Aussehen, leichtere Effekte.</string>
+    <string name="perf_reason_stutter">Auto · Leistung: Ruckler in der Bibliothek erkannt. Wähle erneut Auto, um neu zu prüfen.</string>
+    <string name="perf_reason_battery_saver">Auto · Leistung: Energiesparmodus ist an.</string>
+    <string name="perf_stutter_notice">Die Bibliothek hat geruckelt, daher hat Elyndra auf Leistung umgeschaltet (gleiches Aussehen, leichtere Effekte). Zum erneuten Prüfen wähle Auto unter Einstellungen → Anzeige.</string>
+    <string name="perf_mode_quality_desc">Live-Unschärfe, Umgebungsbewegung und alle Partikel, auch auf einfachen Geräten.</string>
+    <string name="perf_mode_performance_desc">Gleiches Aussehen mit leichteren Effekten: getöntes Glas statt Live-Unschärfe, weniger Partikel, keine Umgebungsbewegung, 60 fps und die leichte Masha.</string>
     <string name="masha_high_refresh">Masha: hohe Flüssigkeit (120 Hz)</string>
     <string name="masha_high_refresh_desc">Aus: Masha läuft mit 60 fps – für ein Hologramm genauso flüssig, mit halber GPU-Last, weniger Akkuverbrauch und weniger Wärme bei langen Gesprächen.</string>
     <string name="masha_particles_title">Partikelfarbe</string>
@@ -748,6 +765,10 @@
     <string name="hint_category">Kategorie</string>
     <string name="hint_keyboard">Tastatur</string>
     <string name="hint_move">Verschieben</string>
+    <string name="hint_apply">Anwenden</string>
+    <string name="hint_page">Seite</string>
+    <!-- Insignia y rótulo de la imagen que ya está puesta, en el selector de arte. -->
+    <string name="art_in_use">Aktiv</string>
     <string name="empty_filter_title">Hier ist noch nichts</string>
     <string name="empty_library_message">Füge deine Android-Spiele oder einen ROM-Ordner hinzu, dann erscheinen sie hier.</string>
     <string name="art_state_add">Hinzufügen</string>

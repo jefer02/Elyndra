@@ -5,6 +5,10 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import coil.ImageLoader
 import coil.ImageLoaderFactory
+import coil.memory.MemoryCache
+import com.elyndra.launcher.bench.BenchmarkHooks
+import com.elyndra.launcher.core.device.DevicePerformance
+import com.elyndra.launcher.core.device.PerformanceTier
 import com.elyndra.launcher.data.LibraryRepository
 import com.elyndra.launcher.data.SecretStore
 import com.elyndra.launcher.data.SettingsStore
@@ -17,6 +21,7 @@ import com.elyndra.launcher.metadata.LocalMedia
 import com.elyndra.launcher.metadata.MediaCache
 import com.elyndra.launcher.metadata.MetadataEngine
 import com.elyndra.launcher.metadata.ServiceCredentials
+import com.elyndra.launcher.ui.masha.MashaQuality
 import com.elyndra.launcher.ui.intro.IntroGate
 import com.elyndra.launcher.work.ElyndraWork
 import dagger.hilt.android.HiltAndroidApp
@@ -57,10 +62,19 @@ class ElyndraApplication : Application(), ImageLoaderFactory, Configuration.Prov
     override fun onCreate() {
         // Hilt inyecta los campos en `super.onCreate()`.
         super.onCreate()
+        // Solo en las variantes del perfil base (src/benchmark): ajustes fijos y la biblioteca de
+        // prueba. En debug y release no hace nada (src/noBenchmark).
+        BenchmarkHooks.onAppCreate(this)
+        // Antes que nada que pinte o decodifique: el perfil de coste decide la
+        // caché de Coil, la calidad de Masha y los efectos (son unas lecturas
+        // del sistema, sin disco: no retrasan el arranque).
+        DevicePerformance.init(this, PerformanceTier.Mode.byId(settings.performanceMode), stutter = settings.performanceStutter)
         library.load()
         // Iniciar WorkManager (su base de datos, sus planificadores) no puede
         // retrasar el primer fotograma: se programa fuera del hilo principal.
-        scope.launch { work.schedulePeriodic() }
+        // En las variantes del perfil base no se programa nada: metadatos, widget y avisos de Masha
+        // irían a la red o saltarían a mitad de una medida.
+        if (!BuildConfig.BENCHMARK) scope.launch { work.schedulePeriodic() }
     }
 
     /** Con memoria justa, fuera el modelo de la voz natural si nadie lo está usando (~200 MB). */
@@ -77,8 +91,24 @@ class ElyndraApplication : Application(), ImageLoaderFactory, Configuration.Prov
             .setMinimumLoggingLevel(android.util.Log.WARN)
             .build()
 
-    override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
-        .crossfade(220)
-        .respectCacheHeaders(false)
-        .build()
+    /**
+     * En un equipo modesto (la calidad ligera de Masha) las carátulas opacas
+     * se decodifican en RGB_565 (la mitad de memoria por píxel) y la caché
+     * en memoria es más pequeña: menos recolección y menos riesgo de que el
+     * sistema cierre la app al volver de un emulador.
+     */
+    override fun newImageLoader(): ImageLoader {
+        val lite = MashaQuality.detect(this) == MashaQuality.Lite
+        return ImageLoader.Builder(this)
+            .crossfade(220)
+            .respectCacheHeaders(false)
+            .allowRgb565(lite)
+            .memoryCache { MemoryCache.Builder(this).maxSizePercent(if (lite) LITE_MEMORY_CACHE else FULL_MEMORY_CACHE).build() }
+            .build()
+    }
+
+    private companion object {
+        const val LITE_MEMORY_CACHE = 0.15
+        const val FULL_MEMORY_CACHE = 0.25
+    }
 }

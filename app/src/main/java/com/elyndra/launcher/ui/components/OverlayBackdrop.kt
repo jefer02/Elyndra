@@ -7,6 +7,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import com.elyndra.launcher.core.device.DevicePerformance
 import com.elyndra.launcher.ui.BackdropStack
 import com.elyndra.launcher.ui.BackdropLevels
 import androidx.compose.ui.draw.drawBehind
@@ -68,8 +69,12 @@ object Backdrop {
     /** Con "reducir movimiento": un fundido corto y nada más. */
     const val REDUCED_FADE_MS = 160
 
-    /** ¿Hay RenderEffect? */
-    val blurSupported: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    /**
+     * ¿Se desenfoca? Hace falta RenderEffect (Android 12) y el perfil
+     * Calidad: en Rendimiento va el velo más denso de siempre sin desenfoque.
+     */
+    val blurSupported: Boolean
+        get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DevicePerformance.profile.liveBlur
 
     /** El orden de dibujo de las capas, de abajo arriba (ver [BackdropStack]). */
     const val Z_MENU = 0

@@ -1,5 +1,17 @@
 package com.elyndra.launcher.ui.components
 
+import android.os.Build
+import androidx.compose.foundation.background
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
+import coil.request.ImageRequest
+import coil.size.Precision
+import com.elyndra.launcher.ui.HeroArtQuality
+import com.elyndra.launcher.ui.theme.LocalPerformance
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -364,13 +376,7 @@ internal fun HeroArtLayer(
                         onAnimationEnd = onBackgroundVanished,
                         modifier = Modifier.fillMaxSize(),
                     ) {
-                        AsyncImage(
-                            model = file,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            alignment = Alignment.TopCenter,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                        HeroImage(file, Modifier.fillMaxSize())
                     }
                 }
             } else if (bg.fallback != null) {
@@ -427,15 +433,84 @@ private fun rampBrush(stops: FloatArray, color: Color, startY: Float, endY: Floa
     return Brush.verticalGradient(*pairs, startY = startY, endY = endY)
 }
 
+/**
+ * El arte del hero a su tamaño de verdad (ver [HeroArtQuality]).
+ *
+ * - Se espera a medir la caja y se pide a ese tamaño (en Rendimiento, a
+ *   `heroDecodeScale` de él): nunca a tamaño de miniatura para luego ampliarlo.
+ *   `INEXACT`: si la imagen es más pequeña que la caja no se amplía al
+ *   decodificar (más memoria y nada más de detalle), y así se sabe su tamaño real.
+ * - Siempre ARGB_8888: en RGB_565 (la calidad ligera de las carátulas) un
+ *   fondo grande con degradados se veía en escalones.
+ * - Si la imagen es tan pequeña que se verían los píxeles, se suaviza: un
+ *   desenfoque leve (solo con desenfoque en vivo, Android 12+ en Calidad) y
+ *   un velo algo más oscuro, que es lo que se ve siempre en Rendimiento.
+ */
+@Composable
+private fun HeroImage(file: File, modifier: Modifier) {
+    val context = LocalContext.current
+    val perf = LocalPerformance.current
+    val density = LocalDensity.current.density
+    var box by remember { mutableStateOf(IntSize.Zero) }
+    // 0 = se ve bien; si no, cuántos dp ocupa cada píxel de la imagen al cubrir la caja.
+    var lowRes by remember(file) { mutableFloatStateOf(0f) }
+    Box(modifier.onSizeChanged { box = it }) {
+        if (box.width <= 0 || box.height <= 0) return@Box
+        val (w, h) = HeroArtQuality.requestSize(box.width, box.height, perf.heroDecodeScale)
+        val request = remember(file, w, h) {
+            ImageRequest.Builder(context)
+                .data(file)
+                .size(w, h)
+                .precision(Precision.INEXACT)
+                .allowRgb565(false)
+                .build()
+        }
+        val blur = lowRes > 0f && perf.liveBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        AsyncImage(
+            model = request,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = Alignment.TopCenter,
+            filterQuality = FilterQuality.High,
+            onSuccess = { state ->
+                val d = state.result.drawable
+                val perPixel = HeroArtQuality.dpPerPixel(d.intrinsicWidth, d.intrinsicHeight, box.width, box.height, density)
+                lowRes = if (perPixel > HeroArtQuality.LOW_RES_DP_PER_PIXEL) perPixel else 0f
+                if (com.elyndra.launcher.BuildConfig.DEBUG) {
+                    // Diagnóstico temporal: adb logcat -s HeroDebug
+                    val bmp = (d as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                    android.util.Log.d(
+                        "HeroDebug",
+                        "file=${file.path.substringAfter("/files/")} key=${state.result.memoryCacheKey?.key} " +
+                            "req=${w}x$h bitmap=${bmp?.width}x${bmp?.height} intrinsic=${d.intrinsicWidth}x${d.intrinsicHeight} " +
+                            "box=${box.width}x${box.height} density=$density sdk=${Build.VERSION.SDK_INT} " +
+                            "scale=${HeroArtQuality.cropScale(d.intrinsicWidth, d.intrinsicHeight, box.width, box.height)} " +
+                            "dpPerPx=$perPixel lowRes=${lowRes > 0f} liveBlur=${perf.liveBlur} source=${state.result.dataSource}",
+                    )
+                }
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (blur) Modifier.blur(HeroArtQuality.softBlurDp(lowRes).dp, BlurredEdgeTreatment.Rectangle) else Modifier),
+        )
+        if (lowRes > 0f) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = HeroArtQuality.LOW_RES_DIM)))
+    }
+}
+
 /** Lo que pinta el fondo del hero: cambia (y se funde) cuando cambia cualquiera de los tres. */
 private data class HeroBackdrop(val imagePath: String?, val fallback: ArtFallback?, val key: Any)
 
-/** Acercamiento de 1,04 a 1 muy lento al llegar un fondo; con "reducir movimiento", quieto. */
+/**
+ * Acercamiento de 1,04 a 1 muy lento al llegar un fondo; con "reducir
+ * movimiento" o en Rendimiento, quieto: son varios segundos de fotogramas
+ * seguidos tras cada cambio de selección, con el arte entero recompuesto.
+ */
 @Composable
 private fun Modifier.slowSettle(reduced: Boolean): Modifier {
-    val zoom = remember { Animatable(if (reduced) 1f else 1.04f) }
+    val still = reduced || !LocalPerformance.current.ambientMotion
+    val zoom = remember { Animatable(if (still) 1f else 1.04f) }
     LaunchedEffect(Unit) {
-        if (!reduced) zoom.animateTo(1f, spring(dampingRatio = 1f, stiffness = 10f))
+        if (!still) zoom.animateTo(1f, spring(dampingRatio = 1f, stiffness = 10f))
     }
     return graphicsLayer {
         scaleX = zoom.value

@@ -1,6 +1,6 @@
 package com.elyndra.launcher.ui.masha
 
-import android.app.ActivityManager
+import com.elyndra.launcher.core.device.DevicePerformance
 import android.content.Context
 import com.elyndra.launcher.BuildConfig
 import android.opengl.EGLContext
@@ -61,21 +61,36 @@ enum class MashaQuality(val model: String) {
     ;
 
     companion object {
+        /** El fichero de depuración se lee una vez por proceso. */
+        @Volatile private var debugOverride: MashaQuality? = null
+        @Volatile private var debugRead = false
+
+        /**
+         * La calidad sale del perfil de coste ([DevicePerformance]): Ajustes →
+         * "Rendimiento" (Auto / Calidad / Rendimiento) manda, y en Auto el
+         * mismo criterio de equipo modesto de siempre (< 5,5 GB o
+         * `isLowRamDevice`, salvo clase de rendimiento ≥ Android 12), ahora en
+         * [com.elyndra.launcher.core.device.PerformanceTier]. Ya no se guarda:
+         * cambiar el modo se nota la próxima vez que se abre Masha.
+         */
         fun detect(context: Context): MashaQuality {
+            debugOverride(context.applicationContext)?.let { return it }
+            return if (DevicePerformance.profile.lowEnd) Lite else High
+        }
+
+        private fun debugOverride(context: Context): MashaQuality? {
             // Solo debug (medir fps en las dos calidades en el mismo móvil):
             //   adb shell "run-as com.elyndra.launcher sh -c 'echo lite > cache/masha_quality'"   (o high; borrar = automático)
-            if (BuildConfig.DEBUG) {
-                when (runCatching { java.io.File(context.cacheDir, "masha_quality").readText().trim() }.getOrNull()) {
-                    "lite" -> return Lite
-                    "high" -> return High
+            if (!BuildConfig.DEBUG) return null
+            if (!debugRead) {
+                debugOverride = when (runCatching { java.io.File(context.cacheDir, "masha_quality").readText().trim() }.getOrNull()) {
+                    "lite" -> Lite
+                    "high" -> High
+                    else -> null
                 }
+                debugRead = true
             }
-            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            if (am.isLowRamDevice) return Lite
-            val info = ActivityManager.MemoryInfo().also(am::getMemoryInfo)
-            val gb = info.totalMem / (1024.0 * 1024 * 1024)
-            val perfClass = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.VERSION.MEDIA_PERFORMANCE_CLASS else 0
-            return if (gb >= 5.5 || perfClass >= Build.VERSION_CODES.S) High else Lite
+            return debugOverride
         }
     }
 }

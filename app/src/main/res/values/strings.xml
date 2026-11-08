@@ -51,6 +51,10 @@
         <item quantity="one">%1$d ROM · %2$s</item>
         <item quantity="other">%1$d ROMs · %2$s</item>
     </plurals>
+    <plurals name="roms_count">
+        <item quantity="one">%1$d ROM</item>
+        <item quantity="other">%1$d ROMs</item>
+    </plurals>
 
     <!-- Menús y diálogos -->
     <string name="details">Details</string>
@@ -109,6 +113,7 @@
     <string name="rescan_folder">Rescan folder</string>
     <string name="change_emulator">Change emulator</string>
     <string name="choose_emulator">Choose emulator</string>
+    <string name="folder_emulator_a11y">Folder emulator: %1$s</string>
     <string name="emulator_for_game">Emulator for this game</string>
     <string name="use_folder_emulator">Use the folder\'s emulator</string>
     <string name="other_app">Other app…</string>
@@ -544,6 +549,18 @@
     <string name="frame_rate_120">120 fps</string>
     <string name="frame_rate_60">60 fps</string>
     <string name="frame_rate_unsupported">This display doesn\'t support 120 Hz, so 60 fps is used.</string>
+    <string name="perf_mode_title">Performance</string>
+    <string name="perf_mode_auto">Auto</string>
+    <string name="perf_mode_quality">Quality</string>
+    <string name="perf_mode_performance">Performance</string>
+    <string name="perf_reason_capable">Auto · Quality: this device handles the full effects. Battery saver switches to Performance.</string>
+    <string name="perf_reason_budget_chipset">Auto · Performance: budget chipset. Same look, lighter effects.</string>
+    <string name="perf_reason_low_memory">Auto · Performance: low memory. Same look, lighter effects.</string>
+    <string name="perf_reason_stutter">Auto · Performance: stutter detected in the library. Choose Auto again to re-check.</string>
+    <string name="perf_reason_battery_saver">Auto · Performance: battery saver is on.</string>
+    <string name="perf_stutter_notice">The library was stuttering, so Elyndra switched to Performance mode (same look, lighter effects). To re-check, choose Auto in Settings → Display.</string>
+    <string name="perf_mode_quality_desc">Live blur, ambient motion and full particles, even on modest devices.</string>
+    <string name="perf_mode_performance_desc">Same look with lighter effects: tinted glass instead of live blur, fewer particles, no ambient motion, 60 fps and the lite Masha.</string>
     <string name="masha_high_refresh">Masha: high smoothness (120 Hz)</string>
     <string name="masha_high_refresh_desc">Off, Masha runs at 60 fps: just as fluid for a hologram, with half the GPU work, less battery and less heat in long chats.</string>
     <string name="masha_particles_title">Particle color</string>
@@ -754,6 +771,10 @@
     <string name="hint_category">Category</string>
     <string name="hint_keyboard">Keyboard</string>
     <string name="hint_move">Move</string>
+    <string name="hint_apply">Apply</string>
+    <string name="hint_page">Page</string>
+    <!-- Insignia y rótulo de la imagen que ya está puesta, en el selector de arte. -->
+    <string name="art_in_use">In use</string>
     <string name="empty_filter_title">Nothing here yet</string>
     <string name="empty_library_message">Add your Android games or a folder of ROMs and they will show up here.</string>
     <string name="art_state_add">Add</string>

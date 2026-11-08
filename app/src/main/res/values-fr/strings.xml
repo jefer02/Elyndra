@@ -50,6 +50,11 @@
         <item quantity="many">%1$d ROMs · %2$s</item>
         <item quantity="other">%1$d ROMs · %2$s</item>
     </plurals>
+    <plurals name="roms_count">
+        <item quantity="one">%1$d ROM</item>
+        <item quantity="many">%1$d ROMs</item>
+        <item quantity="other">%1$d ROMs</item>
+    </plurals>
 
     <!-- Menus et boîtes de dialogue -->
     <string name="details">Détails</string>
@@ -106,6 +111,7 @@
     <string name="rescan_folder">Réanalyser le dossier</string>
     <string name="change_emulator">Changer d\'émulateur</string>
     <string name="choose_emulator">Choisir l\'émulateur</string>
+    <string name="folder_emulator_a11y">Émulateur du dossier : %1$s</string>
     <string name="emulator_for_game">Émulateur pour ce jeu</string>
     <string name="use_folder_emulator">Utiliser l\'émulateur du dossier</string>
     <string name="other_app">Autre app…</string>
@@ -552,6 +558,18 @@
     <string name="frame_rate_120">120 i/s</string>
     <string name="frame_rate_60">60 i/s</string>
     <string name="frame_rate_unsupported">Cet écran ne prend pas en charge 120 Hz : 60 i/s sont utilisées.</string>
+    <string name="perf_mode_title">Performances</string>
+    <string name="perf_mode_auto">Auto</string>
+    <string name="perf_mode_quality">Qualité</string>
+    <string name="perf_mode_performance">Performances</string>
+    <string name="perf_reason_capable">Auto · Qualité : cet appareil a tous les effets. L\'économiseur de batterie passe en Performances.</string>
+    <string name="perf_reason_budget_chipset">Auto · Performances : puce d\'entrée de gamme. Même apparence, effets plus légers.</string>
+    <string name="perf_reason_low_memory">Auto · Performances : peu de mémoire. Même apparence, effets plus légers.</string>
+    <string name="perf_reason_stutter">Auto · Performances : saccades détectées dans la bibliothèque. Choisissez Auto à nouveau pour revérifier.</string>
+    <string name="perf_reason_battery_saver">Auto · Performances : l\'économiseur de batterie est activé.</string>
+    <string name="perf_stutter_notice">La bibliothèque saccadait : Elyndra est passée en Performances (même apparence, effets plus légers). Pour revérifier, choisissez Auto dans Paramètres → Affichage.</string>
+    <string name="perf_mode_quality_desc">Flou en direct, mouvement d\'ambiance et toutes les particules, même sur les appareils modestes.</string>
+    <string name="perf_mode_performance_desc">Même apparence avec des effets plus légers : verre teinté au lieu du flou en direct, moins de particules, sans mouvement d\'ambiance, 60 i/s et Masha allégée.</string>
     <string name="masha_high_refresh">Masha : haute fluidité (120 Hz)</string>
     <string name="masha_high_refresh_desc">Désactivé, Masha tourne à 60 i/s : tout aussi fluide pour un hologramme, avec deux fois moins de travail GPU, moins de batterie et moins de chaleur lors de longues conversations.</string>
     <string name="masha_particles_title">Couleur des particules</string>
@@ -762,6 +780,10 @@
     <string name="hint_category">Catégorie</string>
     <string name="hint_keyboard">Clavier</string>
     <string name="hint_move">Déplacer</string>
+    <string name="hint_apply">Appliquer</string>
+    <string name="hint_page">Page</string>
+    <!-- Insignia y rótulo de la imagen que ya está puesta, en el selector de arte. -->
+    <string name="art_in_use">Utilisée</string>
     <string name="empty_filter_title">Rien ici pour l\'instant</string>
     <string name="empty_library_message">Ajoutez vos jeux Android ou un dossier de ROMs et ils apparaîtront ici.</string>
     <string name="art_state_add">Ajouter</string>

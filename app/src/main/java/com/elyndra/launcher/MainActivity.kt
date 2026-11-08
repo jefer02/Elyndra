@@ -31,10 +31,18 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.elyndra.launcher.bench.BenchmarkHooks
 import com.elyndra.launcher.data.AppLocale
 import com.elyndra.launcher.data.BrandTokens
 import com.elyndra.launcher.sound.UiSound
+import com.elyndra.launcher.core.device.DevicePerformance
+import com.elyndra.launcher.core.device.JankMonitor
+import com.elyndra.launcher.core.device.StutterMemory
+import com.elyndra.launcher.ui.JankEligibility
+import com.elyndra.launcher.ui.UiText
 import com.elyndra.launcher.display.FrameRate
+import com.elyndra.launcher.perf.PerfProbe
+import com.elyndra.launcher.ui.theme.LocalPerformance
 import com.elyndra.launcher.input.AxisGate
 import com.elyndra.launcher.input.DirectionalRepeater
 import com.elyndra.launcher.input.Gamepad
@@ -127,6 +135,9 @@ class MainActivity : ComponentActivity() {
         // pantalla, como en el diseño. Los insets se aplican en ElyndraApp.
         enableEdgeToEdge(barStyle(dark), barStyle(dark))
         super.onCreate(savedInstanceState)
+        // Solo en las variantes del perfil base: el modo de rendimiento que pide la prueba, antes de
+        // la primera composición. En debug y release no hace nada.
+        BenchmarkHooks.onActivityCreate(this, intent)
 
         // La intro, solo en un arranque en frío: ni al girar ni al volver a
         // una Activity que el sistema recreó tras matar el proceso.
@@ -160,15 +171,27 @@ class MainActivity : ComponentActivity() {
             val dark = vm.settings.darkMode
             val intro = vm.intro.visible
             LaunchedEffect(dark, intro) { applyTheme(dark, intro) }
-            CompositionLocalProvider(LocalReducedMotion provides reducedMotion()) { ElyndraApp(vm) }
+            // El perfil de coste (Ajustes → Rendimiento, o Auto según el equipo): lo leen los efectos.
+            // Qué pantallas cuentan para medir tirones (fuera de la composición del resto).
+            JankEligibility(vm)
+            CompositionLocalProvider(
+                LocalReducedMotion provides reducedMotion(),
+                LocalPerformance provides DevicePerformance.profile,
+            ) { ElyndraApp(vm) }
         }
 
         // Llegando desde el widget o un aviso de Masha (y no al recrearse por un giro).
         if (savedInstanceState == null) handleShortcut(intent)
+        // Solo en debug (src/debug): tirones por fotograma y tiempo hasta el primer fotograma, al logcat.
+        PerfProbe.install(this)
     }
 
     override fun onResume() {
         super.onResume()
+        // En Auto, el ahorro de batería cuenta: se pudo encender fuera de la app.
+        DevicePerformance.refresh(this)
+        // En Auto y en Calidad, el último recurso: tirones sostenidos en la biblioteca → Rendimiento.
+        JankMonitor.resume(this, ::onStutter)
         vm.sound.setForeground(true)
         vm.music.setForeground(true)
         inputManager.registerInputDeviceListener(deviceListener, null)
@@ -186,7 +209,21 @@ class MainActivity : ComponentActivity() {
         FrameRate.apply(this, vm.settings.frameRateFor(vm.screen))
     }
 
+    /**
+     * [JankMonitor] ha medido tirones sostenidos: se guarda, se pasa a
+     * Rendimiento y se avisa una sola vez (tocar el aviso lo cierra). Elegir
+     * Auto otra vez en Ajustes lo deshace.
+     */
+    private fun onStutter() {
+        val settings = (application as ElyndraApplication).settings
+        val (memory, notice) = StutterMemory.onStutter(settings.stutterMemory)
+        settings.stutterMemory = memory
+        DevicePerformance.markStutter(this)
+        if (notice) vm.showToast(UiText.res(R.string.perf_stutter_notice), durationMs = STUTTER_NOTICE_MS)
+    }
+
     override fun onPause() {
+        JankMonitor.pause()
         // Saliendo de la app (a un juego, al inicio) no suena nada más.
         vm.sound.setForeground(false)
         vm.music.setForeground(false)
@@ -447,6 +484,9 @@ class MainActivity : ComponentActivity() {
 
         /** Fuente de las direcciones que no traen tecla (stick, hat): un mando con cruceta. */
         private const val PAD_SOURCE = InputDevice.SOURCE_DPAD or InputDevice.SOURCE_GAMEPAD
+
+        /** El aviso del paso a Rendimiento se lee entero: más largo que un aviso normal (y se cierra al tocarlo). */
+        private const val STUTTER_NOTICE_MS = 9_000L
 
         /** Velo de las barras donde el sistema no sabe pintar iconos oscuros (navegación en Android 8.0). */
         private const val LIGHT_BARS_FALLBACK_SCRIM = 0x801B1B1B.toInt()

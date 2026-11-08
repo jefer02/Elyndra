@@ -44,6 +44,9 @@
     <plurals name="roms_summary">
         <item quantity="other">%1$d ROM · %2$s</item>
     </plurals>
+    <plurals name="roms_count">
+        <item quantity="other">%1$d ROM</item>
+    </plurals>
 
     <!-- メニューとダイアログ -->
     <string name="details">詳細</string>
@@ -100,6 +103,7 @@
     <string name="rescan_folder">フォルダーを再スキャン</string>
     <string name="change_emulator">エミュレーターを変更</string>
     <string name="choose_emulator">エミュレーターを選択</string>
+    <string name="folder_emulator_a11y">フォルダーのエミュレーター: %1$s</string>
     <string name="emulator_for_game">このゲームのエミュレーター</string>
     <string name="use_folder_emulator">フォルダーのエミュレーターを使う</string>
     <string name="other_app">ほかのアプリ…</string>
@@ -521,6 +525,18 @@
     <string name="frame_rate_120">120fps</string>
     <string name="frame_rate_60">60fps</string>
     <string name="frame_rate_unsupported">このディスプレイは 120Hz に対応していないため、60fps を使用します。</string>
+    <string name="perf_mode_title">パフォーマンス</string>
+    <string name="perf_mode_auto">自動</string>
+    <string name="perf_mode_quality">画質</string>
+    <string name="perf_mode_performance">パフォーマンス</string>
+    <string name="perf_reason_capable">自動・画質：この端末ではすべての効果を使用します。バッテリーセーバー中はパフォーマンスになります。</string>
+    <string name="perf_reason_budget_chipset">自動・パフォーマンス：エントリー向けチップセットのため。見た目はそのままで効果を軽くします。</string>
+    <string name="perf_reason_low_memory">自動・パフォーマンス：メモリが少ないため。見た目はそのままで効果を軽くします。</string>
+    <string name="perf_reason_stutter">自動・パフォーマンス：ライブラリでカクつきを検出しました。もう一度「自動」を選ぶと再判定します。</string>
+    <string name="perf_reason_battery_saver">自動・パフォーマンス：バッテリーセーバーがオンです。</string>
+    <string name="perf_stutter_notice">ライブラリがカクついていたため、Elyndra はパフォーマンスモードに切り替えました（見た目はそのまま、効果は軽め）。再判定するには［設定］→［表示］で「自動」を選んでください。</string>
+    <string name="perf_mode_quality_desc">控えめな端末でも、リアルタイムぼかし・環境モーション・すべてのパーティクルを使用します。</string>
+    <string name="perf_mode_performance_desc">見た目はそのままで効果を軽くします：リアルタイムぼかしの代わりに色付きガラス、パーティクルを減らし、環境モーションなし、60fps、軽量版の Masha。</string>
     <string name="masha_high_refresh">マーシャ：高リフレッシュ（120Hz）</string>
     <string name="masha_high_refresh_desc">オフの場合、マーシャは 60fps で動作します。ホログラムとしては十分滑らかで、GPU の負荷が半分になり、長い会話でもバッテリー消費と発熱を抑えます。</string>
     <string name="masha_particles_title">パーティクルの色</string>
@@ -729,6 +745,10 @@
     <string name="hint_category">カテゴリ</string>
     <string name="hint_keyboard">キーボード</string>
     <string name="hint_move">移動</string>
+    <string name="hint_apply">適用</string>
+    <string name="hint_page">ページ</string>
+    <!-- Insignia y rótulo de la imagen que ya está puesta, en el selector de arte. -->
+    <string name="art_in_use">使用中</string>
     <string name="empty_filter_title">まだ何もありません</string>
     <string name="empty_library_message">Android ゲームや ROM フォルダーを追加すると、ここに表示されます。</string>
     <string name="art_state_add">追加</string>

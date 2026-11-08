@@ -48,10 +48,15 @@ object FrameRate {
     /**
      * Lo que se aplica de verdad a partir de lo guardado: AUTO = 120 si la
      * pantalla puede y 60 si no; 120 en una pantalla que no puede, 60.
+     *
+     * Con [capped] (perfil Rendimiento) AUTO se queda en 60: en un equipo
+     * modesto cada fotograma de más es GPU y batería, y casi todo lo que se
+     * mueve ya va a 60. Un 120 elegido a mano se respeta.
      */
-    fun effective(stored: Int, supportsHigh: Boolean): Int = when {
+    fun effective(stored: Int, supportsHigh: Boolean, capped: Boolean = false): Int = when {
         !supportsHigh -> STANDARD
         stored == STANDARD -> STANDARD
+        capped && stored == AUTO -> STANDARD
         else -> HIGH
     }
 
