@@ -35,11 +35,19 @@ object PortAssetPicker {
     /** Compilaciones que no se instalan nunca: de depuración o sin firmar. */
     private val REJECT = Regex("""(?i)(^|[^a-z])(debug|unsigned)([^a-z]|$)""")
 
-    /** Un APK que se podría instalar: casa con el patrón del catálogo, es `.apk` y no es de depuración. */
-    fun candidates(assets: List<ReleaseAsset>, build: PortBuild): List<ReleaseAsset> {
+    fun isDebug(name: String): Boolean = REJECT.containsMatchIn(name)
+
+    /**
+     * Un APK que se podría instalar: casa con el patrón del catálogo, es
+     * `.apk` (o `.zip`, si el build lo trae dentro de uno: [PortBuild.archive])
+     * y no es de depuración, salvo que el catálogo diga que el port solo
+     * publica builds de depuración ([allowDebug]).
+     */
+    fun candidates(assets: List<ReleaseAsset>, build: PortBuild, allowDebug: Boolean = false): List<ReleaseAsset> {
         val pattern = runCatching { Regex(build.asset) }.getOrNull() ?: return emptyList()
+        val ext = if (build.archive != null) ".zip" else ".apk"
         return assets.filter { a ->
-            a.name.lowercase().endsWith(".apk") && pattern.containsMatchIn(a.name) && !REJECT.containsMatchIn(a.name)
+            a.name.lowercase().endsWith(ext) && pattern.containsMatchIn(a.name) && (allowDebug || !isDebug(a.name))
         }
     }
 
@@ -51,8 +59,8 @@ object PortAssetPicker {
      * "universal" es el APK que lo dice o el que no nombra ninguna ABI. Si
      * nada casa, el mismo criterio que el actualizador de Elyndra.
      */
-    fun pick(assets: List<ReleaseAsset>, build: PortBuild, deviceAbis: List<String>): ReleaseAsset? {
-        val apks = candidates(assets, build)
+    fun pick(assets: List<ReleaseAsset>, build: PortBuild, deviceAbis: List<String>, allowDebug: Boolean = false): ReleaseAsset? {
+        val apks = candidates(assets, build, allowDebug)
         if (apks.isEmpty()) return null
         val device = deviceAbis.map { it.lowercase() }
         for (abi in build.abis.map { it.lowercase() }) {
@@ -75,11 +83,11 @@ object PortAssetPicker {
      * Los borradores no cuentan; las pre-releases solo si no hay ninguna
      * estable instalable (hay ports que solo publican pre-releases).
      */
-    fun latest(releases: List<PortRelease>, build: PortBuild, deviceAbis: List<String>): Installable? {
+    fun latest(releases: List<PortRelease>, build: PortBuild, deviceAbis: List<String>, allowDebug: Boolean = false): Installable? {
         val usable = releases
             .filter { !it.draft }
             .sortedByDescending { it.publishedAt }
-            .mapNotNull { r -> pick(r.assets, build, deviceAbis)?.let { Installable(r, it) } }
+            .mapNotNull { r -> pick(r.assets, build, deviceAbis, allowDebug)?.let { Installable(r, it) } }
         return usable.firstOrNull { !it.release.prerelease } ?: usable.firstOrNull()
     }
 
