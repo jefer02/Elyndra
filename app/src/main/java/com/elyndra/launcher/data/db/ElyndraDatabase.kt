@@ -35,8 +35,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AiCacheEntity::class,
         DescriptionTranslationEntity::class,
         InstalledPortEntity::class,
+        PortAvailabilityEntity::class,
     ],
-    version = 6,
+    version = 8,
     exportSchema = true,
 )
 abstract class ElyndraDatabase : RoomDatabase() {
@@ -125,6 +126,40 @@ abstract class ElyndraDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+        /**
+         * Tienda de ports, segunda versión: carpetas virtuales, la carpeta de
+         * cada app (los ports van a la de su sistema) y el seguimiento de
+         * actualizaciones. Todo columnas nuevas con valor por defecto: nada se
+         * pierde ni se recrea.
+         */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `rom_folders` ADD COLUMN `is_virtual` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `android_apps` ADD COLUMN `folder_id` TEXT")
+                db.execSQL("ALTER TABLE `android_apps` ADD COLUMN `folder_manual` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_android_apps_folder_id` ON `android_apps` (`folder_id`)")
+                db.execSQL("ALTER TABLE `installed_ports` ADD COLUMN `system_id` TEXT")
+                db.execSQL("ALTER TABLE `installed_ports` ADD COLUMN `latest_tag` TEXT")
+                db.execSQL("ALTER TABLE `installed_ports` ADD COLUMN `latest_published_at` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `installed_ports` ADD COLUMN `checked_at` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `installed_ports` ADD COLUMN `notified_tag` TEXT")
+                db.execSQL("ALTER TABLE `installed_ports` ADD COLUMN `blocked_tag` TEXT")
+            }
+        }
+
+        /**
+         * Tienda de ports, tercera versión: los ports "aún no en Android" a los
+         * que la comprobación diaria les encuentra un APK. Una tabla nueva.
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `port_availability` (`catalog_id` TEXT NOT NULL, `tag` TEXT NOT NULL, " +
+                        "`asset_name` TEXT NOT NULL, `found_at` INTEGER NOT NULL, PRIMARY KEY(`catalog_id`))",
+                )
+            }
+        }
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
     }
 }
