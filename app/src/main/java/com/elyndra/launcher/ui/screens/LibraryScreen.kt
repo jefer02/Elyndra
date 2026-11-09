@@ -174,6 +174,8 @@ import com.elyndra.launcher.ui.components.LocalScreenSize
 import com.elyndra.launcher.ui.components.MashaInsightBubble
 import com.elyndra.launcher.ui.components.LogoImage
 import com.elyndra.launcher.ui.components.OpenButton
+import com.elyndra.launcher.ui.components.StoreButton
+import com.elyndra.launcher.ui.components.rememberStoreLabelWidth
 import com.elyndra.launcher.ui.components.Metrics
 import com.elyndra.launcher.ui.resolve
 import com.elyndra.launcher.ui.components.MAGNETIC_PULL_MS
@@ -410,7 +412,7 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                         vm = vm,
                         available = (windowWidth - m.pad * 2).value,
                         landscape = m.landscape,
-                        dockWidth = if (dockInBar) SectionDockLayout.minWidth(vm.availableFilters().size, dest = true) else 0f,
+                        dockWidth = if (dockInBar) SectionDockLayout.minWidth(vm.availableFilters().size) else 0f,
                     )
                     Row(
                         Modifier
@@ -445,6 +447,9 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                             Spacer(Modifier.width(8.dp))
                         }
                         SearchField(vm, m)
+                        Spacer(Modifier.width(8.dp))
+                        // La tienda de ports, junto al buscador: con su rótulo si cabe, si no su icono.
+                        StoreButton(focused = vm.input.isBarFocused(BarItem.Store), showLabel = barFit.storeLabel, onClick = vm::openPorts)
                         Spacer(Modifier.width(8.dp))
                         ConsoleIconButton(
                             onClick = { vm.go(Screen.Settings) },
@@ -654,13 +659,6 @@ internal fun SectionTabs(vm: ElyndraViewModel, modifier: Modifier = Modifier, gl
         focusIndex = if (dockFocused) vm.input.dockFocus else -1,
         glassMinAlpha = glassMinAlpha,
         light = light,
-        // Tras una raya, la tienda de ports: otra pantalla, no una sección (ver DockDestination).
-        destination = DockDestination(
-            label = stringResource(R.string.ports_dock_a11y),
-            icon = StoreGlyph,
-            active = vm.screen == Screen.Ports,
-            onSelect = vm::openPorts,
-        ),
     )
 }
 
@@ -734,12 +732,14 @@ private val LIBRARY_HINTS = listOf(
     PadHint("X", R.string.details),
     PadHint("Y", R.string.hint_options),
     PadHint("LB / RB", R.string.hint_section),
+    PadHint("RT", R.string.store_button),
 )
 
 /** Con la sección vacía no hay juego que abrir: A pulsa "Añadir" y LB/RB cambian de sección. */
 private val EMPTY_HINTS = listOf(
     PadHint("A", R.string.hint_select),
     PadHint("LB / RB", R.string.hint_section),
+    PadHint("RT", R.string.store_button),
 )
 
 /** En el dock: A elige la sección señalada. */
@@ -1165,11 +1165,20 @@ internal fun SearchField(vm: ElyndraViewModel, m: Metrics) {
  * con los rótulos medidos de verdad, el buscador como esté y, si va en la
  * barra, lo menos que mide el dock ([dockWidth]). [masha] = el emblema va en
  * esta fila (en Meridian va en la cabecera de la rueda); [sort] = el botón de
- * orden va suelto en esta fila (en Meridian, delante del buscador).
+ * orden va suelto en esta fila (en Meridian, delante del buscador); [store] =
+ * el botón de la tienda va en la barra.
  */
 @Composable
-internal fun rememberTopBarFit(vm: ElyndraViewModel, available: Float, landscape: Boolean, dockWidth: Float = 0f, masha: Boolean = true, sort: Boolean = false): TopBarLayout.Fit =
-    rememberTopBarFit(available, landscape, vm.settings.statusMode, vm.settings.statusVisible, vm.searchOpen, dockWidth, masha, sort)
+internal fun rememberTopBarFit(
+    vm: ElyndraViewModel,
+    available: Float,
+    landscape: Boolean,
+    dockWidth: Float = 0f,
+    masha: Boolean = true,
+    sort: Boolean = false,
+    store: Boolean = true,
+): TopBarLayout.Fit =
+    rememberTopBarFit(available, landscape, vm.settings.statusMode, vm.settings.statusVisible, vm.searchOpen, dockWidth, masha, sort, store)
 
 /** Lo mismo sin ViewModel (también para las vistas previas). */
 @Composable
@@ -1182,16 +1191,19 @@ internal fun rememberTopBarFit(
     dockWidth: Float = 0f,
     masha: Boolean = true,
     sort: Boolean = false,
+    store: Boolean = true,
 ): TopBarLayout.Fit {
     val openLabel = rememberOpenLabelWidth()
+    val storeLabel = rememberStoreLabelWidth()
     val (time, percent) = rememberStatusLabelWidths(statusMode)
     val status = statusVisible && !searchOpen
     return TopBarLayout.fit(
         available = available,
-        fixed = TopBarLayout.fixedWidth(TopBarLayout.searchWidth(searchOpen, landscape), extra = dockWidth, masha = masha, sort = sort),
+        fixed = TopBarLayout.fixedWidth(TopBarLayout.searchWidth(searchOpen, landscape), extra = dockWidth, masha = masha, sort = sort, store = store),
         openLabel = openLabel.takeIf { !searchOpen },
         time = time.takeIf { status },
         percent = percent.takeIf { status },
+        storeLabel = storeLabel.takeIf { store },
     )
 }
 
