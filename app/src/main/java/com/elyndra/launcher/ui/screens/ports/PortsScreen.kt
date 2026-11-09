@@ -24,6 +24,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -46,18 +49,25 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.nativeKeyCode
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
+import com.elyndra.launcher.domain.ports.GameGroup
+import com.elyndra.launcher.domain.ports.PlatformGroup
 import com.elyndra.launcher.domain.ports.PortAction
+import com.elyndra.launcher.domain.ports.PortDisplay
 import com.elyndra.launcher.domain.ports.PortEntry
 import com.elyndra.launcher.domain.ports.StoreFilter
 import com.elyndra.launcher.domain.ports.StoreRow
 import com.elyndra.launcher.domain.ports.StoreRowKind
+import com.elyndra.launcher.domain.ports.StoreRows
+import com.elyndra.launcher.domain.ports.StoreSort
 import com.elyndra.launcher.ports.PortCatalogRepository
 import com.elyndra.launcher.ui.ElyndraViewModel
+import com.elyndra.launcher.ui.PortsGridLayout
 import com.elyndra.launcher.ui.PortsLayout
 import com.elyndra.launcher.ui.components.ArcSpinner
 import com.elyndra.launcher.ui.components.BackChevron
@@ -82,17 +92,24 @@ import kotlinx.coroutines.launch
 class StoreHome(
     val rows: List<StoreRow>,
     val loading: Boolean,
+    /** Sin conexión de verdad: el aviso de "sin conexión" con "Reintentar". */
     val offline: Boolean,
     val rateLimited: Boolean,
     val filter: StoreFilter,
+    /** Hay red, pero el repositorio no dio catálogo (aún no existe, un error): una nota discreta, no un aviso. */
+    val builtIn: Boolean = false,
     val searchOpen: Boolean,
-    val platforms: List<String>,
-    val tags: List<String>,
+    /** Los chips: familias y géneros con algún port, y si hay alguno aún sin APK. */
+    val groups: List<PlatformGroup>,
+    val genres: List<String>,
+    val anyNotOnAndroid: Boolean,
     val action: (PortEntry) -> PortAction,
     val progress: (PortEntry) -> Float?,
     val owned: (PortEntry) -> Boolean,
     /** El arte grande del juego original para el destacado (null: la imagen del port). */
     val heroArt: (PortEntry) -> Any?,
+    /** La carátula del juego original para las cápsulas (null: la imagen del port). */
+    val coverArt: (PortEntry) -> Any? = { null },
 )
 
 /** Lo que se puede hacer en la portada. */
@@ -102,10 +119,14 @@ class StoreHomeActions(
     val back: () -> Unit,
     val toggleSearch: () -> Unit,
     val query: (String) -> Unit,
-    val togglePlatform: (String) -> Unit,
-    val toggleTag: (String) -> Unit,
-    val togglePcOnly: () -> Unit,
+    val showAll: () -> Unit,
+    val toggleGroup: (PlatformGroup) -> Unit,
+    val toggleGenre: (String) -> Unit,
+    val toggleNotOnAndroid: () -> Unit,
+    val setSort: (StoreSort) -> Unit,
     val retry: () -> Unit,
+    /** "Actualizar todo" de la fila de actualizaciones. */
+    val updateAll: (List<PortEntry>) -> Unit = {},
 )
 
 /** La tienda de ports: portada o ficha de un port. */
@@ -137,16 +158,19 @@ private fun storeHome(vm: ElyndraViewModel): StoreHome {
     return StoreHome(
         rows = ports.rows(),
         loading = ports.loading && ports.catalog.isEmpty(),
-        offline = ports.source == PortCatalogRepository.Source.Bundled,
+        offline = ports.source == PortCatalogRepository.Source.Bundled && ports.fallback == PortCatalogRepository.Fallback.Offline,
+        builtIn = ports.source == PortCatalogRepository.Source.Bundled && ports.fallback != PortCatalogRepository.Fallback.Offline,
         rateLimited = ports.rateLimited,
         filter = ports.filter,
         searchOpen = ports.searchOpen,
-        platforms = com.elyndra.launcher.domain.ports.StoreRows.platforms(ports.catalog),
-        tags = com.elyndra.launcher.domain.ports.StoreRows.tags(ports.catalog).take(10),
+        groups = StoreRows.groupChips(ports.catalog),
+        genres = StoreRows.genreChips(ports.catalog),
+        anyNotOnAndroid = ports.catalog.any { !it.installable },
         action = ports::action,
         progress = { vm.portInstall.progress(it.id) },
         owned = { it.id in owned },
         heroArt = ports::heroArt,
+        coverArt = ports::coverArt,
     )
 }
 
@@ -156,10 +180,13 @@ private fun storeActions(vm: ElyndraViewModel) = StoreHomeActions(
     back = vm::back,
     toggleSearch = vm.ports::toggleSearch,
     query = vm.ports::updateQuery,
-    togglePlatform = vm.ports::togglePlatform,
-    toggleTag = vm.ports::toggleTag,
-    togglePcOnly = vm.ports::togglePcOnly,
+    showAll = vm.ports::showAll,
+    toggleGroup = vm.ports::toggleGroup,
+    toggleGenre = vm.ports::toggleGenre,
+    toggleNotOnAndroid = vm.ports::toggleNotOnAndroid,
+    setSort = vm.ports::setSort,
     retry = { vm.ports.load(force = true) },
+    updateAll = vm.portInstall::updateAll,
 )
 
 private val HOME_HINTS = listOf(
@@ -168,7 +195,10 @@ private val HOME_HINTS = listOf(
     PadHint("B", R.string.hint_back),
 )
 
-/** La portada: cabecera, filtros, destacado y filas de cápsulas. */
+/**
+ * La portada: cabecera, filtros, destacado y filas de cápsulas. Con un filtro
+ * o una búsqueda puestos, la cuadrícula de todos los resultados ([StoreGrid]).
+ */
 @Composable
 fun PortsHome(state: StoreHome, actions: StoreHomeActions, modifier: Modifier = Modifier, padHints: Boolean = false) {
     BoxWithConstraints(modifier.fillMaxSize()) {
@@ -176,6 +206,12 @@ fun PortsHome(state: StoreHome, actions: StoreHomeActions, modifier: Modifier = 
         val h = maxHeight.value
         val pad = PortsLayout.pad(w).dp
         val capsule = PortsLayout.capsuleWidth(w).dp
+        val results = state.rows.firstOrNull { it.kind == StoreRowKind.Results }
+        if (state.filter.active && results != null) {
+            StoreGrid(results.groups, state, actions, w, pad)
+            PadHints(GRID_HINTS, padHints, Modifier.align(Alignment.BottomStart).padding(pad), onDark = true)
+            return@BoxWithConstraints
+        }
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 72.dp),
@@ -185,6 +221,8 @@ fun PortsHome(state: StoreHome, actions: StoreHomeActions, modifier: Modifier = 
             item(key = "filters") { StoreFilters(state, actions, pad) }
             if (state.offline || state.rateLimited) {
                 item(key = "banner") { StoreBanner(state, actions, Modifier.padding(horizontal = pad)) }
+            } else if (state.builtIn) {
+                item(key = "builtin") { BuiltInNote(Modifier.padding(horizontal = pad)) }
             }
             if (state.loading) {
                 item(key = "loading") {
@@ -261,20 +299,130 @@ private fun SearchGlyph(color: Color) {
     }
 }
 
+private val GRID_HINTS = listOf(
+    PadHint("A", R.string.hint_select),
+    PadHint("LB / RB", R.string.hint_section),
+    PadHint("B", R.string.ports_hint_clear_filter),
+)
+
+/**
+ * Los chips: Todos, las familias de plataformas, unos pocos géneros y "Aún
+ * no en Android". Las etiquetas sueltas de GitHub no salen aquí.
+ */
 @Composable
 private fun StoreFilters(state: StoreHome, actions: StoreHomeActions, pad: androidx.compose.ui.unit.Dp) {
+    val f = state.filter
     LazyRow(
         contentPadding = PaddingValues(horizontal = pad),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        items(state.platforms, key = { "p_$it" }) { p ->
-            StoreChip(platformLabel(p), selected = p in state.filter.platforms, onClick = { actions.togglePlatform(p) })
+        item(key = "all") {
+            StoreChip(stringResource(R.string.ports_chip_all), selected = f.groups.isEmpty() && f.genres.isEmpty() && !f.notOnAndroid, onClick = actions.showAll)
         }
-        item(key = "pc") {
-            StoreChip(stringResource(R.string.ports_filter_pc_only), selected = state.filter.showPcOnly, onClick = actions.togglePcOnly)
+        items(state.groups, key = { "g_" + it.name }) { g ->
+            StoreChip(groupLabel(g), selected = g in f.groups, onClick = { actions.toggleGroup(g) })
         }
-        items(state.tags, key = { "t_$it" }) { t ->
-            StoreChip(t, selected = t in state.filter.tags, onClick = { actions.toggleTag(t) })
+        items(state.genres, key = { "n_$it" }) { g ->
+            StoreChip(genreLabel(g), selected = g in f.genres, onClick = { actions.toggleGenre(g) })
+        }
+        if (state.anyNotOnAndroid) {
+            item(key = "soon") {
+                StoreChip(stringResource(R.string.ports_chip_not_on_android), selected = f.notOnAndroid, onClick = actions.toggleNotOnAndroid)
+            }
+        }
+    }
+}
+
+@Composable
+internal fun groupLabel(g: PlatformGroup): String = stringResource(
+    when (g) {
+        PlatformGroup.Nintendo -> R.string.ports_row_nintendo
+        PlatformGroup.PlayStation -> R.string.ports_row_playstation
+        PlatformGroup.Sega -> R.string.ports_row_sega
+        PlatformGroup.Xbox -> R.string.ports_row_xbox
+        PlatformGroup.Pc -> R.string.ports_row_pc
+    },
+)
+
+@Composable
+private fun genreLabel(g: String): String = when (g) {
+    "platformer" -> stringResource(R.string.ports_genre_platformer)
+    "racing" -> stringResource(R.string.ports_genre_racing)
+    "rpg" -> stringResource(R.string.ports_genre_rpg)
+    "shooter" -> stringResource(R.string.ports_genre_shooter)
+    "strategy" -> stringResource(R.string.ports_genre_strategy)
+    else -> g
+}
+
+@Composable
+private fun sortLabel(s: StoreSort): String = stringResource(
+    when (s) {
+        StoreSort.Name -> R.string.ports_sort_name
+        StoreSort.RecentlyUpdated -> R.string.ports_sort_recent
+        StoreSort.Trust -> R.string.ports_sort_trust
+        StoreSort.Stars -> R.string.ports_sort_stars
+    },
+)
+
+/**
+ * Todos los juegos de un filtro o una búsqueda, en columnas que bajan (ver
+ * [PortsGridLayout]). La cabecera, los chips y el recuento con el orden van
+ * dentro de la misma rejilla, a lo ancho, para que todo baje junto. Con el
+ * mando, la cruceta va de cápsula en cápsula en las dos direcciones y la
+ * rejilla se desplaza sola hasta la que tiene el foco.
+ */
+@Composable
+private fun StoreGrid(groups: List<GameGroup>, state: StoreHome, actions: StoreHomeActions, width: Float, pad: androidx.compose.ui.unit.Dp) {
+    val columns = PortsGridLayout.columns(width)
+    val capsule = PortsGridLayout.capsuleWidth(width, columns).dp
+    val full: androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan = { GridItemSpan(maxLineSpan) }
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(columns),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = pad, end = pad, bottom = 72.dp),
+        horizontalArrangement = Arrangement.spacedBy(PortsGridLayout.GAP.dp),
+        verticalArrangement = Arrangement.spacedBy(PortsGridLayout.GAP.dp),
+    ) {
+        item(key = "header", span = full) { StoreHeader(state, actions, Modifier.statusBarsPadding().padding(top = 10.dp)) }
+        item(key = "filters", span = full) { StoreFilters(state, actions, 0.dp) }
+        if (state.offline || state.rateLimited) {
+            item(key = "banner", span = full) { StoreBanner(state, actions, Modifier) }
+        } else if (state.builtIn) {
+            item(key = "builtin", span = full) { BuiltInNote(Modifier) }
+        }
+        item(key = "count", span = full) { GridHeader(groups.size, state.filter.sort, actions.setSort) }
+        if (groups.isEmpty() && !state.loading) {
+            item(key = "empty", span = full) { ElyText(stringResource(R.string.ports_empty), size = 12.5f, color = Store.textDim) }
+        }
+        items(groups.size, key = { "c_" + groups[it].key }) { i ->
+            val group = groups[i]
+            val port = group.lead
+            LaunchedEffect(port.id) { actions.focus(port) }
+            PortCapsule(
+                port = port,
+                action = state.action(port),
+                width = capsule,
+                onClick = { actions.open(port) },
+                progress = state.progress(port),
+                owned = group.ports.any(state.owned),
+                onFocus = { actions.focus(port) },
+                art = state.coverArt(port),
+                portCount = group.ports.size,
+            )
+        }
+    }
+}
+
+/** "N juegos" y el orden: Nombre · Actualizados · Confianza · Estrellas. */
+@Composable
+private fun GridHeader(count: Int, sort: StoreSort, onSort: (StoreSort) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 2.dp)) {
+        StoreRowTitle(pluralStringResource(R.plurals.ports_results_count, count, count), Modifier)
+        Spacer(Modifier.height(8.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(StoreSort.entries, key = { "s_" + it.name }) { s ->
+                StoreChip(sortLabel(s), selected = s == sort, onClick = { onSort(s) })
+            }
         }
     }
 }
@@ -301,25 +449,43 @@ private fun StoreBanner(state: StoreHome, actions: StoreHomeActions, modifier: M
     }
 }
 
+/** "Usando el catálogo incluido": hay red, pero el repositorio no dio uno. No es un error ni dice "sin conexión". */
+@Composable
+private fun BuiltInNote(modifier: Modifier) {
+    ElyText(stringResource(R.string.ports_builtin_catalog), modifier, size = 10.5f, color = Store.textFaint)
+}
+
 /** Una fila de cápsulas con su título. */
 @Composable
 private fun StoreShelf(row: StoreRow, state: StoreHome, actions: StoreHomeActions, capsule: androidx.compose.ui.unit.Dp, pad: androidx.compose.ui.unit.Dp) {
     val title = when (row.kind) {
         StoreRowKind.BecauseYouHave -> stringResource(R.string.ports_row_because, row.subject.orEmpty())
         StoreRowKind.Nintendo -> stringResource(R.string.ports_row_nintendo)
+        StoreRowKind.PlayStation -> stringResource(R.string.ports_row_playstation)
+        StoreRowKind.Sega -> stringResource(R.string.ports_row_sega)
         StoreRowKind.Xbox -> stringResource(R.string.ports_row_xbox)
+        StoreRowKind.Pc -> stringResource(R.string.ports_row_pc)
+        StoreRowKind.UpdatesAvailable -> stringResource(R.string.ports_row_updates)
         StoreRowKind.RecentlyUpdated -> stringResource(R.string.ports_row_recent)
         StoreRowKind.Installed -> stringResource(R.string.ports_row_installed)
+        StoreRowKind.ComingToAndroid -> stringResource(R.string.ports_row_coming)
         StoreRowKind.Results -> stringResource(R.string.ports_row_results)
         StoreRowKind.Featured -> stringResource(R.string.ports_row_featured)
     }
     Column {
-        StoreRowTitle(title, Modifier.padding(horizontal = pad).padding(bottom = 8.dp))
+        Row(Modifier.padding(horizontal = pad).padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            StoreRowTitle(title, Modifier.weight(1f, fill = false))
+            if (row.kind == StoreRowKind.UpdatesAvailable) {
+                Spacer(Modifier.width(10.dp))
+                StoreChip(stringResource(R.string.ports_update_all), selected = true, onClick = { actions.updateAll(row.ports) })
+            }
+        }
         LazyRow(
             contentPadding = PaddingValues(horizontal = pad),
             horizontalArrangement = Arrangement.spacedBy(PortsLayout.ROW_GAP.dp),
         ) {
-            items(row.ports, key = { row.kind.name + it.id }) { port ->
+            items(row.groups, key = { row.kind.name + it.key }) { group ->
+                val port = group.lead
                 // Componerse es estar a la vista (o casi): es cuando se piden sus releases.
                 LaunchedEffect(port.id) { actions.focus(port) }
                 PortCapsule(
@@ -328,8 +494,10 @@ private fun StoreShelf(row: StoreRow, state: StoreHome, actions: StoreHomeAction
                     width = capsule,
                     onClick = { actions.open(port) },
                     progress = state.progress(port),
-                    owned = state.owned(port),
+                    owned = group.ports.any(state.owned),
                     onFocus = { actions.focus(port) },
+                    art = state.coverArt(port),
+                    portCount = group.ports.size,
                 )
             }
         }
@@ -412,7 +580,7 @@ private fun HeroPage(port: PortEntry, state: StoreHome, width: Float) {
     val side = PortsLayout.heroSideInfo(width)
     Box(Modifier.fillMaxSize()) {
         // El juego original a sangre, apagado; si no hay arte, la propia imagen del port.
-        StoreImage(state.heroArt(port) ?: port.image, port.original.title, Modifier.fillMaxSize())
+        StoreImage(state.heroArt(port) ?: port.image, PortDisplay.title(port), Modifier.fillMaxSize())
         Box(
             Modifier
                 .fillMaxSize()
@@ -428,8 +596,8 @@ private fun HeroPage(port: PortEntry, state: StoreHome, width: Float) {
             Row(Modifier.fillMaxSize()) {
                 Box(Modifier.weight(1f).fillMaxHeight().padding(14.dp), contentAlignment = Alignment.CenterStart) {
                     StoreImage(
-                        port.image,
-                        port.name,
+                        state.coverArt(port) ?: port.image,
+                        PortDisplay.title(port),
                         Modifier
                             .fillMaxHeight(0.82f)
                             .fillMaxWidth()
@@ -449,8 +617,12 @@ private fun HeroPage(port: PortEntry, state: StoreHome, width: Float) {
 private fun HeroInfo(port: PortEntry, state: StoreHome, modifier: Modifier) {
     val lang = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language
     Column(modifier, verticalArrangement = Arrangement.Bottom) {
-        ElyText(port.name, size = 17f, weight = FontWeight.Bold, color = Store.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        ElyText(platformLabel(port.original.platform) + " · " + port.original.title, size = 10.5f, color = Store.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        ElyText(PortDisplay.title(port), size = 17f, weight = FontWeight.Bold, color = Store.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            PlatformBadge(port.platform)
+            Spacer(Modifier.width(6.dp))
+            ElyText(portLineText(port), size = 10.5f, color = Store.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
         Spacer(Modifier.height(6.dp))
         ElyText(port.shortText(lang), size = 11f, color = Store.text.copy(alpha = 0.85f), maxLines = 3, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(8.dp))

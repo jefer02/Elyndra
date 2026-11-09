@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,8 +39,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.elyndra.launcher.R
-import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.domain.ports.PortAction
+import com.elyndra.launcher.domain.ports.PortDisplay
 import com.elyndra.launcher.domain.ports.PortEntry
 import com.elyndra.launcher.ui.PortsLayout
 import com.elyndra.launcher.ui.components.DotTabIcon
@@ -77,7 +79,50 @@ val StoreGlyph: DotTabIcon = { color ->
 }
 
 /** El nombre corto de la plataforma original ("N64", "XBOX 360"). */
-fun platformLabel(platform: String): String = Systems.byId(platform)?.short ?: platform.uppercase()
+fun platformLabel(platform: String): String = PortDisplay.platformBadge(platform)
+
+/** La línea secundaria de un port: "Port: Ship of Harkinian · por HarbourMasters". */
+@Composable
+fun portLineText(port: PortEntry): String {
+    val line = PortDisplay.portLine(port)
+    return if (line.developer != null) {
+        stringResource(R.string.ports_port_line, line.portName, line.developer)
+    } else {
+        stringResource(R.string.ports_port_line_short, line.portName)
+    }
+}
+
+/**
+ * Las insignias de confianza de un port: sin verificar, prerelease, sin
+ * analizar y revisa requisitos. [compact] (cápsulas): solo las dos que más
+ * importan, para no tapar el arte.
+ */
+fun trustBadges(port: PortEntry, compact: Boolean = false): List<Int> {
+    val all = buildList {
+        // Lo que dice si se puede instalar va primero: es lo que se ve en una cápsula.
+        if (port.vrOnly) add(R.string.ports_badge_vr_only) else if (port.notOnAndroid) add(R.string.ports_action_pc_only)
+        if (port.trust.debugBuild) add(R.string.ports_badge_debug)
+        if (!port.verified) add(R.string.ports_unverified)
+        if (port.trust.prerelease) add(R.string.ports_badge_prerelease)
+        if (port.trust.checkRequirements) add(R.string.ports_badge_check_requirements)
+    }
+    return if (compact) all.take(2) else all
+}
+
+/** La insignia de la plataforma original, junto al nombre del juego. */
+@Composable
+fun PlatformBadge(platform: String, modifier: Modifier = Modifier) {
+    ElyText(
+        platformLabel(platform),
+        modifier
+            .background(Store.chip, RoundedCornerShape(3.dp))
+            .padding(horizontal = 5.dp, vertical = 1.dp),
+        size = 9f,
+        weight = FontWeight.Bold,
+        color = Store.chipText,
+        maxLines = 1,
+    )
+}
 
 @StringRes
 fun kindLabel(kind: String): Int = when (kind) {
@@ -92,8 +137,10 @@ fun actionLabel(action: PortAction): Int = when (action) {
     PortAction.Install -> R.string.ports_action_install
     PortAction.Update -> R.string.ports_action_update
     PortAction.Installed -> R.string.ports_action_installed
-    PortAction.PcOnly -> R.string.ports_action_pc_only
+    PortAction.NotOnAndroid -> R.string.ports_action_pc_only
+    PortAction.VrOnly -> R.string.ports_action_vr_only
     PortAction.Unavailable -> R.string.ports_action_unavailable
+    PortAction.SignatureChanged -> R.string.ports_action_signature_changed
 }
 
 /**
@@ -109,7 +156,7 @@ fun PortActionPill(action: PortAction, modifier: Modifier = Modifier, progress: 
         PortAction.Update -> Brush.horizontalGradient(Store.update)
         PortAction.Installed -> Brush.horizontalGradient(listOf(Store.installed, Store.installed))
         PortAction.Free -> Brush.horizontalGradient(listOf(Store.free, Store.free))
-        PortAction.PcOnly, PortAction.Unavailable -> Brush.horizontalGradient(listOf(Store.muted, Store.muted))
+        PortAction.NotOnAndroid, PortAction.VrOnly, PortAction.Unavailable, PortAction.SignatureChanged -> Brush.horizontalGradient(listOf(Store.muted, Store.muted))
     }
     Box(
         modifier
@@ -137,7 +184,7 @@ fun PortActionPill(action: PortAction, modifier: Modifier = Modifier, progress: 
                 stringResource(actionLabel(action)),
                 size = if (large) 13.5f else 10f,
                 weight = FontWeight.SemiBold,
-                color = if (action == PortAction.PcOnly || action == PortAction.Unavailable) Store.textDim else Store.text,
+                color = if (action == PortAction.NotOnAndroid || action == PortAction.VrOnly || action == PortAction.Unavailable || action == PortAction.SignatureChanged) Store.textDim else Store.text,
                 maxLines = 1,
             )
         }
@@ -201,8 +248,10 @@ fun StoreImage(model: Any?, fallback: String, modifier: Modifier = Modifier, con
 }
 
 /**
- * Una cápsula de la tienda: la imagen del port arriba y, debajo, el nombre, la
- * plataforma original y el área de acción a la derecha.
+ * Una cápsula de la tienda, una por juego: el arte del juego original arriba
+ * (o, mientras no hay, la tarjeta del port) y, debajo, el nombre del juego, la
+ * insignia de su plataforma con el port (o cuántos ports hay) y el área de
+ * acción a la derecha.
  *
  * Al recibir el foco (mando) se ilumina con el acento y avisa con [onFocus]
  * (la tienda aprovecha para pedir sus releases).
@@ -217,6 +266,10 @@ fun PortCapsule(
     progress: Float? = null,
     owned: Boolean = false,
     onFocus: () -> Unit = {},
+    /** El arte del juego original para la cápsula (null: la tarjeta del port). */
+    art: Any? = null,
+    /** Cuántos ports tiene el juego (con más de uno, la cápsula lo dice en vez del nombre del port). */
+    portCount: Int = 1,
 ) {
     val shape = RoundedCornerShape(4.dp)
     val skin = LocalSkin.current
@@ -235,19 +288,22 @@ fun PortCapsule(
     ) {
         Box {
             StoreImage(
-                port.image,
-                port.name,
+                art ?: port.image,
+                PortDisplay.title(port),
                 Modifier
                     .fillMaxWidth()
                     .height(PortsLayout.capsuleImageHeight(width.value).dp),
             )
-            if (!port.verified) {
-                StoreChip(
-                    stringResource(R.string.ports_unverified),
+            val badges = trustBadges(port, compact = true)
+            if (badges.isNotEmpty()) {
+                Row(
                     Modifier
                         .align(Alignment.TopStart)
                         .padding(5.dp),
-                )
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    badges.forEach { StoreChip(stringResource(it)) }
+                }
             }
             if (owned) {
                 ElyText(
@@ -272,14 +328,18 @@ fun PortCapsule(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Column(Modifier.weight(1f)) {
-                ElyText(port.name, size = 11.5f, weight = FontWeight.SemiBold, color = Store.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                ElyText(
-                    platformLabel(port.original.platform) + " · " + port.original.title,
-                    size = 9.5f,
-                    color = Store.textDim,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                ElyText(PortDisplay.title(port), size = 11.5f, weight = FontWeight.SemiBold, color = Store.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PlatformBadge(port.platform)
+                    Spacer(Modifier.width(5.dp))
+                    ElyText(
+                        if (portCount > 1) pluralStringResource(R.plurals.ports_count, portCount, portCount) else portLineText(port),
+                        size = 9.5f,
+                        color = Store.textDim,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             PortActionPill(action, progress = progress)
         }
