@@ -1,0 +1,66 @@
+# Runs in jefer02/elyndra-ports (the contents of Elyndra's tools/ports-catalog at its root).
+#
+# Weekly (and on demand) it regenerates catalog.json and commits it straight to
+# main, together with sources.yaml (new candidates), discovery-state.json and
+# report.md. No pull request. GitHub API calls use the workflow's own
+# GITHUB_TOKEN (no personal token needed); art uses the SGDB/IGDB secrets.
+name: Update ports catalog
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"  # Mondays 04:17 UTC
+  workflow_dispatch:
+    inputs:
+      discover:
+        description: "Look for new candidates"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-catalog
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Unit tests (no network)
+        run: python -m unittest discover -s tests -t .
+
+      - name: Generate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SGDB_API_KEY: ${{ secrets.SGDB_API_KEY }}
+          IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
+          IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
+        run: |
+          args=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.discover }}" = "false" ]; then
+            args="$args --no-discover"
+          fi
+          python generate.py $args
+
+      - name: Commit to main
+        run: |
+          git config user.name "elyndra-catalog-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog.json sources.yaml discovery-state.json report.md
+          if git diff --cached --quiet; then
+            echo "No changes."
+            exit 0
+          fi
+          git commit -m "chore(catalog): weekly update $(date -u +%Y-%m-%d)"
+          git push origin HEAD:main
