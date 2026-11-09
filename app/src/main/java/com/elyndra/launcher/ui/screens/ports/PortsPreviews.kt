@@ -10,16 +10,21 @@ import com.elyndra.launcher.data.RomEntry
 import com.elyndra.launcher.domain.ports.GhRepo
 import com.elyndra.launcher.domain.ports.Installable
 import com.elyndra.launcher.domain.ports.MatchStrength
-import com.elyndra.launcher.domain.ports.OriginalGame
 import com.elyndra.launcher.domain.ports.PortAction
 import com.elyndra.launcher.domain.ports.PortBuild
 import com.elyndra.launcher.domain.ports.PortEntry
+import com.elyndra.launcher.domain.ports.PortGame
+import com.elyndra.launcher.domain.ports.PortGrouping
+import com.elyndra.launcher.domain.ports.PortReleaseInfo
+import com.elyndra.launcher.domain.ports.PortTrust
 import com.elyndra.launcher.domain.ports.PortRelease
 import com.elyndra.launcher.domain.ports.RepoInfo
 import com.elyndra.launcher.domain.ports.Requirement
 import com.elyndra.launcher.domain.ports.RomHash
 import com.elyndra.launcher.domain.ports.RomPortMatch
+import com.elyndra.launcher.domain.ports.PlatformGroup
 import com.elyndra.launcher.domain.ports.StoreFilter
+import com.elyndra.launcher.domain.ports.StoreSort
 import com.elyndra.launcher.domain.ports.StoreRows
 import com.elyndra.launcher.ui.components.PreviewTheme
 import com.elyndra.launcher.update.ReleaseAsset
@@ -48,7 +53,7 @@ private val SAMPLE = listOf(
         developer = "HarbourMasters · Android: linkzenic",
         repo = GhRepo("linkzenic", "Shipwright-Ports"),
         upstream = GhRepo("HarbourMasters", "Shipwright"),
-        original = OriginalGame("The Legend of Zelda: Ocarina of Time", "n64"),
+        game = PortGame("The Legend of Zelda: Ocarina of Time", "n64", igdbId = 1029, releaseYear = 1998),
         builds = listOf(PortBuild("android")),
         requires = Requirement(
             true,
@@ -58,15 +63,27 @@ private val SAMPLE = listOf(
         tags = listOf("adventure", "widescreen", "60fps"),
         short = mapOf("en" to "Ocarina of Time rebuilt from the decompilation, running natively on Android."),
         long = mapOf("en" to "Widescreen, high frame rates, modern controls, a randomizer and mods."),
-        verified = true,
+        release = PortReleaseInfo("v9.3.1-ports.2", "2026-10-30T12:00:00Z"),
+        trust = PortTrust(verified = false, stars = 101, flags = listOf(PortTrust.PRERELEASE)),
         featured = true,
+    ),
+    PortEntry(
+        id = "soh-waterdish",
+        name = "Shipwright Android",
+        developer = "Waterdish",
+        repo = GhRepo("Waterdish", "Shipwright-Android"),
+        game = PortGame("The Legend of Zelda: Ocarina of Time", "n64"),
+        builds = listOf(PortBuild("android")),
+        release = PortReleaseInfo("v9.0.5", "2026-04-02T12:00:00Z"),
+        trust = PortTrust(stars = 410),
     ),
     PortEntry(
         id = "nsmbw",
         name = "NSMB Wii Recompiled",
         kind = "recomp",
+        developer = "WitherBlitz",
         repo = GhRepo("WitherBlitz", "NSMB-Wii-Recompilation"),
-        original = OriginalGame("New Super Mario Bros. Wii", "wii"),
+        game = PortGame("New Super Mario Bros. Wii", "wii", releaseYear = 2009),
         builds = listOf(PortBuild("android")),
         tags = listOf("platformer", "multiplayer"),
         short = mapOf("en" to "Static recompilation of New Super Mario Bros. Wii for Android."),
@@ -77,21 +94,24 @@ private val SAMPLE = listOf(
         name = "Unleashed Recompiled",
         kind = "recomp",
         repo = GhRepo("SansNope", "UnleashedRecomp-Android"),
-        original = OriginalGame("Sonic Unleashed", "xbox360"),
+        game = PortGame("Sonic Unleashed", "xbox360"),
         builds = listOf(PortBuild("android")),
         tags = listOf("action", "recomp"),
     ),
     PortEntry(
-        id = "starship",
-        name = "Starship",
-        repo = GhRepo("HarbourMasters", "Starship"),
-        original = OriginalGame("Star Fox 64", "n64"),
-        builds = listOf(PortBuild("windows")),
-        verified = true,
+        id = "devilutionx",
+        name = "DevilutionX",
+        kind = "reimpl",
+        developer = "diasurgical",
+        repo = GhRepo("diasurgical", "devilutionX"),
+        game = PortGame("Diablo", "pc", steamAppId = 2_456_740, releaseYear = 1996),
+        builds = listOf(PortBuild("android")),
+        tags = listOf("rpg"),
+        trust = PortTrust(verified = true, stars = 9_000),
     ),
 )
 
-private val ACTIONS = mapOf("soh" to PortAction.Installed, "nsmbw" to PortAction.Install, "unleashed" to PortAction.Update, "starship" to PortAction.PcOnly)
+private val ACTIONS = mapOf("soh" to PortAction.Installed, "nsmbw" to PortAction.Install, "unleashed" to PortAction.Update, "soh-waterdish" to PortAction.Install)
 
 private val OOT_ROM = RomEntry(
     id = "1",
@@ -104,10 +124,10 @@ private val OOT_ROM = RomEntry(
     hashes = FileHashes(1, 1, sha1 = "ad69c91157f6705e8ab06c79fe08aad47bb57ba7"),
 )
 
-private fun sampleHome(query: String = "") = StoreHome(
+private fun sampleHome(query: String = "", filter: StoreFilter = StoreFilter(query = query)) = StoreHome(
     rows = StoreRows.home(
         SAMPLE,
-        StoreFilter(query = query),
+        filter,
         owned = listOf(RomPortMatch(SAMPLE[0], OOT_ROM, MatchStrength.Hash)),
         installedIds = setOf("soh"),
         publishedAt = mapOf("nsmbw" to 2L, "soh" to 1L),
@@ -115,17 +135,18 @@ private fun sampleHome(query: String = "") = StoreHome(
     loading = false,
     offline = false,
     rateLimited = false,
-    filter = StoreFilter(query = query),
+    filter = filter,
     searchOpen = query.isNotEmpty(),
-    platforms = StoreRows.platforms(SAMPLE),
-    tags = StoreRows.tags(SAMPLE),
+    groups = StoreRows.groupChips(SAMPLE),
+    genres = StoreRows.genreChips(SAMPLE),
+    anyNotOnAndroid = SAMPLE.any { !it.installable },
     action = { ACTIONS[it.id] ?: PortAction.Free },
     progress = { if (it.id == "unleashed") 0.42f else null },
     owned = { it.id == "soh" },
     heroArt = { null },
 )
 
-private val NO_ACTIONS = StoreHomeActions({}, {}, {}, {}, {}, {}, {}, {}, {})
+private val NO_ACTIONS = StoreHomeActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
 
 private fun sampleDetail(action: PortAction) = PortDetailState(
     port = SAMPLE[0],
@@ -141,8 +162,11 @@ private fun sampleDetail(action: PortAction) = PortDetailState(
     rateLimited = false,
     repo = RepoInfo(101, null, null, 0),
     owned = RomPortMatch(SAMPLE[0], OOT_ROM, MatchStrength.Hash),
-    media = listOf(SAMPLE[0].image),
+    // Sin red en la vista previa: la galería y la carátula pintan su respaldo (degradado con el nombre).
+    media = emptyList(),
     cover = null,
+    siblings = PortGrouping.siblings(SAMPLE[0], SAMPLE),
+    siblingAction = { ACTIONS[it.id] ?: PortAction.Free },
 )
 
 @Composable
@@ -161,6 +185,15 @@ private fun PortsHomePortraitPreview() = StoreFrame { PortsHome(sampleHome(), NO
 @PortsPortraitPreviews
 @Composable
 private fun PortsSearchPortraitPreview() = StoreFrame { PortsHome(sampleHome(query = "zelda"), NO_ACTIONS) }
+
+/** Un filtro de familia: la cuadrícula vertical (cinco columnas en una tableta, dos en un móvil). */
+@PortsLandscapePreviews
+@Composable
+private fun PortsGridLandscapePreview() = StoreFrame { PortsHome(sampleHome(filter = StoreFilter(groups = setOf(PlatformGroup.Nintendo))), NO_ACTIONS) }
+
+@PortsPortraitPreviews
+@Composable
+private fun PortsGridPortraitPreview() = StoreFrame { PortsHome(sampleHome(filter = StoreFilter(groups = setOf(PlatformGroup.Nintendo), sort = StoreSort.Stars)), NO_ACTIONS) }
 
 @PortsLandscapePreviews
 @Composable

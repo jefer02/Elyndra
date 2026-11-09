@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,6 +45,7 @@ import com.elyndra.launcher.R
 import com.elyndra.launcher.domain.ports.Installable
 import com.elyndra.launcher.domain.ports.MatchStrength
 import com.elyndra.launcher.domain.ports.PortAction
+import com.elyndra.launcher.domain.ports.PortDisplay
 import com.elyndra.launcher.domain.ports.PortEntry
 import com.elyndra.launcher.domain.ports.RepoInfo
 import com.elyndra.launcher.domain.ports.RomPortMatch
@@ -78,9 +80,13 @@ class PortDetailState(
     val rateLimited: Boolean,
     val repo: RepoInfo?,
     val owned: RomPortMatch?,
-    /** Lo que enseña la galería: capturas del catálogo, la imagen del port y el arte del original. */
+    /** Lo que enseña la galería: el arte y las capturas del juego original (la tarjeta de GitHub no). */
     val media: List<Any>,
     val cover: Any?,
+    /** Los ports del mismo juego, en el orden del selector (él incluido); con uno solo no hay selector. */
+    val siblings: List<PortEntry> = listOf(port),
+    /** Lo que diría el botón para cada port del selector. */
+    val siblingAction: (PortEntry) -> PortAction = { action },
 )
 
 class PortDetailActions(
@@ -88,6 +94,8 @@ class PortDetailActions(
     val primary: () -> Unit,
     val cancel: () -> Unit,
     val openRepo: () -> Unit,
+    /** El selector: otro port del mismo juego. */
+    val select: (PortEntry) -> Unit = {},
 )
 
 private val DETAIL_HINTS = listOf(
@@ -112,8 +120,10 @@ fun PortDetailScreen(vm: ElyndraViewModel, port: PortEntry) {
         rateLimited = (releases as? PortsController.Releases.Failed)?.rateLimited == true,
         repo = ports.repoInfo[port.id],
         owned = ports.ownedRom(port),
-        media = (port.screenshots + port.image + listOfNotNull(heroArt)).distinct(),
+        media = (listOfNotNull(heroArt) + port.game.art.screenshots + port.screenshots).distinct().ifEmpty { listOfNotNull(ports.coverArt(port)) },
         cover = ports.coverArt(port),
+        siblings = ports.siblings(port),
+        siblingAction = ports::action,
     )
     PortDetail(
         state,
@@ -124,6 +134,7 @@ fun PortDetailScreen(vm: ElyndraViewModel, port: PortEntry) {
             openRepo = {
                 runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(port.releaseRepo.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             },
+            select = { vm.ports.selectPort(it.id) },
         ),
         padHints = vm.input.gamepadPresent,
     )
@@ -167,13 +178,10 @@ fun PortDetail(state: PortDetailState, actions: PortDetailActions, modifier: Mod
                 Gallery(state, column.dp, Modifier.fillMaxWidth())
                 Summary(state, lang, Modifier.fillMaxWidth())
             }
+            PortPicker(state, actions)
             InstallBox(state, actions)
             RequirementBox(state, lang)
-            Column(Modifier.fillMaxWidth().storePanel().padding(14.dp)) {
-                ElyText(stringResource(R.string.ports_about), size = 12f, weight = FontWeight.SemiBold, color = Store.text, uppercase = true)
-                Spacer(Modifier.height(8.dp))
-                ElyText(state.port.longText(lang), size = 12f, color = Store.textDim, lineHeightRatio = 1.45f)
-            }
+            AboutPort(state, lang)
             Changelog(state)
             ElyText(stringResource(R.string.ports_never_roms), size = 10f, color = Store.textFaint)
         }
@@ -189,15 +197,20 @@ private fun DetailHeader(state: PortDetailState, actions: PortDetailActions) {
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            // Migas: Ports › N64 › Ship of Harkinian.
+            // Migas: Ports › N64 › The Legend of Zelda: Ocarina of Time.
             ElyText(
-                stringResource(R.string.ports_title) + "  ›  " + platformLabel(state.port.original.platform) + "  ›  " + state.port.name,
+                stringResource(R.string.ports_title) + "  ›  " + platformLabel(state.port.platform) + "  ›  " + PortDisplay.title(state.port),
                 size = 10f,
                 color = Store.textDim,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            ElyText(state.port.name, size = 21f, weight = FontWeight.Bold, color = Store.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            ElyText(PortDisplay.title(state.port), size = 21f, weight = FontWeight.Bold, color = Store.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                PlatformBadge(state.port.platform)
+                Spacer(Modifier.width(6.dp))
+                ElyText(portLineText(state.port), size = 11f, color = Store.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }
@@ -210,8 +223,8 @@ private fun Gallery(state: PortDetailState, width: Dp, modifier: Modifier) {
     val skin = LocalSkin.current
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         StoreImage(
-            media.getOrNull(selected) ?: state.port.image,
-            state.port.name,
+            media.getOrNull(selected) ?: state.cover,
+            PortDisplay.title(state.port),
             Modifier
                 .fillMaxWidth()
                 .height(PortsLayout.galleryHeight(width.value).dp)
@@ -245,8 +258,8 @@ private fun Summary(state: PortDetailState, lang: String, modifier: Modifier) {
     val port = state.port
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         StoreImage(
-            port.image,
-            port.name,
+            state.cover,
+            PortDisplay.title(port),
             Modifier
                 .fillMaxWidth()
                 .heightIn(max = 160.dp)
@@ -255,7 +268,7 @@ private fun Summary(state: PortDetailState, lang: String, modifier: Modifier) {
         )
         ElyText(port.shortText(lang), size = 11.5f, color = Store.text.copy(alpha = 0.9f), lineHeightRatio = 1.4f)
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            InfoLine(stringResource(R.string.ports_info_original), platformLabel(port.original.platform) + " · " + port.original.title)
+            InfoLine(stringResource(R.string.ports_info_original), platformLabel(port.platform) + " · " + PortDisplay.title(port) + (port.game.releaseYear?.let { " ($it)" } ?: ""))
             InfoLine(stringResource(R.string.ports_info_developer), port.developer ?: port.releaseRepo.owner)
             InfoLine(stringResource(kindLabel(port.kind)), port.upstream?.slug ?: port.repo.slug)
             InfoLine(
@@ -266,7 +279,7 @@ private fun Summary(state: PortDetailState, lang: String, modifier: Modifier) {
                 InfoLine(stringResource(R.string.ports_info_release), l.release.tag + if (l.release.publishedAt > 0) " · " + formatDate(l.release.publishedAt) else "")
                 InfoLine(stringResource(R.string.ports_info_size), formatSize(l.asset.size))
             }
-            state.repo?.let { InfoLine(stringResource(R.string.ports_info_stars), "★ " + it.stars) }
+            (state.repo?.stars ?: port.trust.stars)?.let { InfoLine(stringResource(R.string.ports_info_stars), "★ $it") }
             InfoLine(stringResource(R.string.ports_info_repo), "github.com/" + port.releaseRepo.slug)
         }
         if (port.tags.isNotEmpty()) {
@@ -274,11 +287,25 @@ private fun Summary(state: PortDetailState, lang: String, modifier: Modifier) {
                 port.tags.forEach { StoreChip(it) }
             }
         }
-        if (!port.verified) {
+        TrustNotes(port)
+    }
+}
+
+/** Cada insignia de confianza con lo que quiere decir (y el análisis limpio, si lo hubo). */
+@Composable
+private fun TrustNotes(port: PortEntry) {
+    val notes = buildList {
+        if (port.trust.debugBuild) add(R.string.ports_badge_debug to R.string.ports_debug_note)
+        if (!port.verified) add(R.string.ports_unverified to R.string.ports_unverified_note)
+        if (port.trust.prerelease) add(R.string.ports_badge_prerelease to R.string.ports_prerelease_note)
+        if (port.trust.checkRequirements) add(R.string.ports_badge_check_requirements to R.string.ports_check_requirements_note)
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        notes.forEach { (badge, note) ->
             Row(verticalAlignment = Alignment.CenterVertically) {
-                StoreChip(stringResource(R.string.ports_unverified))
+                StoreChip(stringResource(badge))
                 Spacer(Modifier.width(6.dp))
-                ElyText(stringResource(R.string.ports_unverified_note), Modifier.weight(1f), size = 10f, color = Store.warn)
+                ElyText(stringResource(note), Modifier.weight(1f), size = 10f, color = Store.warn)
             }
         }
     }
@@ -313,8 +340,10 @@ private fun InstallBox(state: PortDetailState, actions: PortDetailActions) {
             } + " " + state.port.name
             ElyText(title, size = 14f, weight = FontWeight.SemiBold, color = Store.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
             val note = when {
-                state.action == PortAction.PcOnly -> stringResource(R.string.ports_pc_only_note)
+                state.action == PortAction.NotOnAndroid -> stringResource(R.string.ports_pc_only_note)
+                state.action == PortAction.VrOnly -> stringResource(R.string.ports_vr_only_note)
                 state.action == PortAction.Unavailable -> stringResource(R.string.ports_unavailable_note)
+                state.action == PortAction.SignatureChanged -> stringResource(R.string.ports_signature_mismatch)
                 state.rateLimited -> stringResource(R.string.ports_rate_limited)
                 state.releasesFailed -> stringResource(R.string.ports_release_failed)
                 else -> null
@@ -326,13 +355,15 @@ private fun InstallBox(state: PortDetailState, actions: PortDetailActions) {
             }
         }
         Spacer(Modifier.width(12.dp))
-        val enabled = state.action != PortAction.PcOnly && state.action != PortAction.Unavailable && state.progress == null && !state.installing
+        val viewOnly = state.action == PortAction.NotOnAndroid || state.action == PortAction.VrOnly
+        val enabled = !viewOnly && state.action != PortAction.Unavailable &&
+            state.action != PortAction.SignatureChanged && state.progress == null && !state.installing
         Box(
             Modifier
                 .padInitialFocus()
                 .clip(shape)
-                .shapeClickable(shape, enabled = enabled || state.action == PortAction.PcOnly, color = skin.a1) {
-                    if (state.action == PortAction.PcOnly) actions.openRepo() else actions.primary()
+                .shapeClickable(shape, enabled = enabled || viewOnly, color = skin.a1) {
+                    if (viewOnly) actions.openRepo() else actions.primary()
                 },
         ) {
             when {
@@ -343,7 +374,7 @@ private fun InstallBox(state: PortDetailState, actions: PortDetailActions) {
                     Box(Modifier.background(androidx.compose.ui.graphics.Brush.horizontalGradient(Store.install)).padding(horizontal = 18.dp, vertical = 10.dp)) {
                         ElyText(stringResource(R.string.ports_action_open), size = 13.5f, weight = FontWeight.SemiBold, color = Store.text)
                     }
-                state.action == PortAction.PcOnly ->
+                viewOnly ->
                     Box(Modifier.background(Store.chip).padding(horizontal = 14.dp, vertical = 10.dp)) {
                         ElyText(stringResource(R.string.ports_view_repo), size = 12f, weight = FontWeight.SemiBold, color = Store.chipText)
                     }
@@ -352,6 +383,67 @@ private fun InstallBox(state: PortDetailState, actions: PortDetailActions) {
                 else -> PortActionPill(state.action, large = true, progress = state.progress)
             }
         }
+    }
+}
+
+/**
+ * El selector de ports del juego (solo si hay más de uno): verificados
+ * primero, luego por estrellas y por la release más reciente. El elegido es
+ * sobre el que actúa el botón grande.
+ */
+@Composable
+private fun PortPicker(state: PortDetailState, actions: PortDetailActions) {
+    if (state.siblings.size < 2) return
+    val skin = LocalSkin.current
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ElyText(stringResource(R.string.ports_picker_title), size = 12f, weight = FontWeight.SemiBold, color = Store.text, uppercase = true)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(state.siblings, key = { it.id }) { p ->
+                val chosen = p.id == state.port.id
+                val shape = RoundedCornerShape(4.dp)
+                Column(
+                    Modifier
+                        .width(190.dp)
+                        .clip(shape)
+                        .background(if (chosen) Store.panelHigh else Store.panel)
+                        .border(if (chosen) 2.dp else 1.dp, if (chosen) skin.a1 else Store.line, shape)
+                        .shapeClickable(shape, color = skin.a1) { actions.select(p) }
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    ElyText(p.name, size = 11.5f, weight = FontWeight.SemiBold, color = Store.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    ElyText(p.developer ?: p.releaseRepo.owner, size = 9.5f, color = Store.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (!p.verified) StoreChip(stringResource(R.string.ports_unverified))
+                        p.trust.stars?.let { ElyText("★ $it", size = 9.5f, color = Store.textDim) }
+                        p.release.publishedAtMillis.takeIf { it > 0 }?.let { ElyText(formatDate(it), size = 9.5f, color = Store.textFaint, maxLines = 1) }
+                        Spacer(Modifier.weight(1f))
+                        PortActionPill(state.siblingAction(p))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** "Sobre este port": el texto del catálogo y, como mucho, la tarjeta del repositorio en miniatura. */
+@Composable
+private fun AboutPort(state: PortDetailState, lang: String) {
+    Row(Modifier.fillMaxWidth().storePanel().padding(14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1f)) {
+            ElyText(stringResource(R.string.ports_about) + " · " + state.port.name, size = 12f, weight = FontWeight.SemiBold, color = Store.text, uppercase = true)
+            Spacer(Modifier.height(8.dp))
+            ElyText(state.port.longText(lang), size = 12f, color = Store.textDim, lineHeightRatio = 1.45f)
+        }
+        StoreImage(
+            state.port.image,
+            "",
+            Modifier
+                .width(PortsLayout.THUMB_WIDTH.dp)
+                .height((PortsLayout.THUMB_WIDTH / 2f).dp)
+                .clip(RoundedCornerShape(3.dp))
+                .border(1.dp, Store.line, RoundedCornerShape(3.dp)),
+        )
     }
 }
 
@@ -416,9 +508,9 @@ fun PortDownloadsBar(vm: ElyndraViewModel, modifier: Modifier = Modifier) {
         tasks.forEach { t ->
             when (t) {
                 is com.elyndra.launcher.ui.PortInstallController.Task.Downloading ->
-                    ElyText(stringResource(R.string.ports_downloading, t.port.name) + " · ${(t.progress * 100).toInt()} %", size = 11f, color = Store.text, maxLines = 1)
+                    ElyText(stringResource(R.string.ports_downloading, PortDisplay.title(t.port)) + " · ${(t.progress * 100).toInt()} %", size = 11f, color = Store.text, maxLines = 1)
                 is com.elyndra.launcher.ui.PortInstallController.Task.Installing ->
-                    ElyText(stringResource(R.string.ports_installing, t.port.name), size = 11f, color = Store.text, maxLines = 1)
+                    ElyText(stringResource(R.string.ports_installing, PortDisplay.title(t.port)), size = 11f, color = Store.text, maxLines = 1)
             }
         }
     }
