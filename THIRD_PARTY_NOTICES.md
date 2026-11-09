@@ -59,6 +59,22 @@ the control-room environment (`room.hdr`), the holographic materials, the UI
 sounds and music, and Masha's ambient loop are made for Elyndra by the scripts
 in [`tools/`](tools/).
 
+## Folder system art
+
+The automatic art on library folder cards (one per system in `Systems.kt`)
+is original vector art made for Elyndra: generic device silhouettes (cartridge
+console, disc console, handhelds, hybrid, arcade cabinet, home computer, PC
+monitor) on a gradient in the system's colours, with the system's short name.
+It is drawn in code (`ui/components/SystemArt.kt`, colours in
+`domain/library/FolderArt.kt`), so there are no bundled image files, and it is
+covered by Elyndra's own license. It doesn't use console photos, box art,
+logos or wordmarks from anyone. Console and company names are trademarks of
+their owners and appear only as text that identifies the system.
+
+| File | Source | License |
+|---|---|---|
+| (none: drawn in code) | Original work for Elyndra | Elyndra's license ([LICENSE](LICENSE)) |
+
 ## Machine-learning model downloaded at runtime
 
 | Model | Copyright | License |
