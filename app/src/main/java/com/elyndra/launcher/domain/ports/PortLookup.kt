@@ -79,8 +79,8 @@ object PortLookup {
         if (wanted.any { w -> (w.system == null || w.system == rom.systemId) && RomMatch.matches(rom.hashes, w) }) {
             return RomPortMatch(port, rom, MatchStrength.Hash)
         }
-        if (rom.systemId != port.original.platform) return null
-        val want = normalizeTitle(port.original.title)
+        if (rom.systemId != port.platform) return null
+        val want = normalizeTitle(port.game.name)
         if (want.isEmpty()) return null
         val titles = listOfNotNull(rom.displayTitle, rom.title, rom.meta.name, rom.meta.libretroName)
         return if (titles.any { normalizeTitle(it) == want }) RomPortMatch(port, rom, MatchStrength.Title) else null

@@ -18,7 +18,7 @@ class PortLookupTest {
         id = "soh",
         name = "Ship of Harkinian",
         repo = GhRepo("linkzenic", "Shipwright-Ports"),
-        original = OriginalGame("The Legend of Zelda: Ocarina of Time", "n64"),
+        game = PortGame("The Legend of Zelda: Ocarina of Time", "n64"),
         builds = listOf(PortBuild("android")),
         requires = Requirement(true, roms = listOf(RomHash("NTSC 1.0 (US)", "n64", sha1 = "ad69c91157f6705e8ab06c79fe08aad47bb57ba7"))),
     )
@@ -26,14 +26,14 @@ class PortLookupTest {
         id = "moonpearl",
         name = "Moonpearl",
         repo = GhRepo("DoutorRaposo", "moonpearl"),
-        original = OriginalGame("The Legend of Zelda: A Link to the Past", "snes"),
+        game = PortGame("The Legend of Zelda: A Link to the Past", "snes"),
         builds = listOf(PortBuild("android")),
     )
     private val pd = PortEntry(
         id = "perfect-dark",
         name = "Perfect Dark",
         repo = GhRepo("o", "r"),
-        original = OriginalGame("Perfect Dark", "n64"),
+        game = PortGame("Perfect Dark", "n64"),
         requires = Requirement(true, roms = listOf(RomHash("crc only", crc = "e03b088b"), RomHash("PAL", md5 = "d9b5cd305d228424891ce38e71bc9213"))),
     )
 
