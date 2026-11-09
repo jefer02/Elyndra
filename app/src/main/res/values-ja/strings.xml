@@ -515,6 +515,8 @@
     <string name="widget_play">プレイ</string>
     <string name="notif_channel_masha">Masha</string>
     <string name="notif_channel_masha_desc">ときどきの提案。数日に一度まで。</string>
+    <string name="notif_channel_ports">ポートのアップデート</string>
+    <string name="notif_channel_ports_desc">インストール済みのポートに新しいリリースがあるとき。</string>
 
     <!-- Mandos, pantalla y partículas de Masha -->
     <string name="gamepad_connected">コントローラーを接続しました：%1$s</string>
@@ -900,8 +902,7 @@
 
     <!-- Tienda de ports -->
     <string name="ports_title">ポート</string>
-    <string name="ports_dock_a11y">ネイティブポートストア</string>
-    <string name="ports_subtitle">名作ゲームのAndroidネイティブ移植版。ゲーム本体はご自身でご用意ください。</string>
+    <string name="ports_subtitle">コンソールとPCの名作のネイティブAndroidポート。ゲームはご自身でご用意ください。</string>
     <string name="ports_search_hint">ポートを検索</string>
     <string name="ports_search">検索</string>
     <string name="ports_row_featured">おすすめ</string>
@@ -911,14 +912,40 @@
     <string name="ports_row_recent">最近の更新</string>
     <string name="ports_row_installed">インストール済み</string>
     <string name="ports_row_results">検索結果</string>
-    <string name="ports_filter_pc_only">PC版のみも表示</string>
+    <string name="ports_row_playstation">PlayStation</string>
+    <string name="ports_row_sega">セガ</string>
+    <string name="ports_row_pc">PC</string>
+    <string name="ports_row_updates">アップデートあり</string>
+    <string name="ports_update_all">すべてアップデート</string>
+    <string name="ports_badge_prerelease">プレリリース</string>
+    <string name="ports_badge_check_requirements">要件を確認</string>
+    <string name="ports_prerelease_note">開発者が公開したテスト版です。不具合があるかもしれません。</string>
+    <string name="ports_check_requirements_note">このポートに何が必要か不明です。インストール前にリポジトリを確認してください。</string>
+    <string name="ports_unverified_title">未確認のポート</string>
+    <string name="ports_unverified_message">github.com/%1$s
+★ %2$s · 最新リリース: %3$s
+
+コミュニティ製で、レビューされていません。インストール前にリポジトリを確認してください。</string>
+    <string name="ports_unverified_continue">続ける</string>
+    <string name="ports_port_line">ポート: %1$s · %2$s</string>
+    <string name="ports_port_line_short">ポート: %1$s</string>
+    <string name="ports_port_badge_named">PORT · %1$s</string>
+    <string name="ports_move_to_folder">フォルダーに移動…</string>
+    <string name="ports_picker_title">このゲームのポート</string>
+    <plurals name="ports_count">
+        <item quantity="other">%d 件のポート</item>
+    </plurals>
     <string name="ports_filter_clear">フィルターを解除</string>
     <string name="ports_action_free">無料</string>
     <string name="ports_action_install">インストール</string>
     <string name="ports_action_update">アップデート</string>
     <string name="ports_action_installed">インストール済み</string>
-    <string name="ports_action_pc_only">PC版のみ</string>
+    <string name="ports_action_pc_only">Android未対応</string>
     <string name="ports_action_unavailable">APKなし</string>
+    <string name="ports_action_signature_changed">鍵が変更</string>
+    <plurals name="ports_updates_notification">
+        <item quantity="other">%d 件のポートにアップデートがあります</item>
+    </plurals>
     <string name="ports_action_open">開く</string>
     <string name="ports_action_cancel">ダウンロードを中止</string>
     <string name="ports_in_library">✓ ライブラリにあります</string>
@@ -949,7 +976,7 @@
     <string name="ports_requirement_title">必要なもの</string>
     <string name="ports_changelog">更新内容</string>
     <string name="ports_about">このポートについて</string>
-    <string name="ports_pc_only_note">PC版のみ公開されています。ElyndraはAndroid版のみインストールします。</string>
+    <string name="ports_pc_only_note">Android版のAPKはまだありません。Elyndraが毎日確認し、公開されしだいインストールできるようにします。</string>
     <string name="ports_unavailable_note">最新リリースにこの端末用のAPKはありません。</string>
     <string name="ports_confirm_title">%1$s をインストールしますか？</string>
     <string name="ports_confirm_message">github.com/%1$s から\nライセンス：%2$s · ★ %3$s · %4$s\n\n%5$s\n\nサードパーティ製アプリです。Androidが確認を求めます。</string>
@@ -959,7 +986,7 @@
     <string name="ports_install_failed">%1$s をインストールできませんでした</string>
     <string name="ports_install_cancelled">インストールを中止しました</string>
     <string name="ports_checksum_failed">ダウンロードがチェックサムと一致しなかったため削除しました。</string>
-    <string name="ports_signature_mismatch">署名の異なる別バージョンがインストールされています。先にアンインストールしてください。</string>
+    <string name="ports_signature_mismatch">開発者がこのポートの署名鍵を変更したため、Androidは上書きでアップデートをインストールできません。再インストールするとこのポートのセーブデータが消えるため、Elyndraはアップデートしません。新しいバージョンが必要な場合は、セーブをバックアップしてからご自身で再インストールしてください。</string>
     <string name="ports_package_mismatch">APKがカタログの想定と異なるため、インストールしませんでした。</string>
     <string name="ports_download_failed">ダウンロードに失敗しました。中断した位置から再開します。</string>
     <string name="ports_permission_title">Elyndraにアプリのインストールを許可</string>
@@ -968,17 +995,42 @@
     <string name="ports_port_badge">PORT</string>
     <string name="ports_play_native">ネイティブ移植版で遊ぶ</string>
     <string name="ports_add_card_title">ネイティブポート</string>
-    <string name="ports_add_card_body">逆コンパイルから再構築された任天堂・Xboxの名作のAndroid移植版を見てみましょう。ゲーム本体はご自身で。</string>
+    <string name="ports_add_card_body">逆コンパイルやソースコードから再構築された、コンソールとPCの名作のAndroidポートを探せます。ゲームはご自身でご用意ください。</string>
     <string name="ports_browse">ポートを見る</string>
     <string name="ports_retry">再試行</string>
     <string name="ports_screenshots">メディア</string>
-    <string name="ports_view_repo">GitHubで見る</string>
+    <string name="ports_view_repo">GitHubでプロジェクトを見る</string>
     <string name="settings_github">GitHub（ポートストア）</string>
     <string name="settings_github_desc">任意。トークンなしでは1時間に60回、個人用トークン（権限不要）では5,000回までリクエストできます。トークンはapi.github.comにのみ送信されます。</string>
     <string name="settings_github_token">個人用アクセストークン</string>
     <string name="settings_ports_catalog">カタログのURL</string>
+    <string name="settings_ports_auto_update">ポートを自動でアップデート</string>
+    <string name="settings_ports_auto_update_desc">オフ: Elyndraは通知のみ行います。オン: Android 12以降で、Elyndraがインストールしたポートは確認なしでアップデートされます。それ以外はいつもどおりAndroidが確認します。</string>
     <string name="masha_working_ports">ネイティブポートを探しています…</string>
     <string name="masha_off_ports">ライブラリに合うネイティブポートです。タップすると必要なものを確認できます。</string>
     <string name="masha_off_ports_none">まだカタログにあなたのゲームのネイティブポートはありません。ストアを開くので見てみてください。</string>
     <string name="masha_ports_title">ネイティブポート</string>
+    <string name="ports_chip_all">すべて</string>
+    <string name="ports_chip_not_on_android">Android未対応</string>
+    <string name="ports_genre_platformer">アクション</string>
+    <string name="ports_genre_racing">レース</string>
+    <string name="ports_genre_rpg">RPG</string>
+    <string name="ports_genre_shooter">シューティング</string>
+    <string name="ports_genre_strategy">ストラテジー</string>
+    <string name="ports_sort_name">名前</string>
+    <string name="ports_sort_recent">最近の更新</string>
+    <string name="ports_sort_trust">信頼度</string>
+    <string name="ports_sort_stars">スター</string>
+    <plurals name="ports_results_count">
+        <item quantity="other">%d本</item>
+    </plurals>
+    <string name="ports_row_coming">Android版はまだ？</string>
+    <string name="ports_hint_clear_filter">絞り込み解除</string>
+    <string name="ports_action_vr_only">VRヘッドセット専用</string>
+    <string name="ports_badge_vr_only">VRヘッドセット専用</string>
+    <string name="ports_vr_only_note">このビルドはスタンドアロンのVRヘッドセット（Meta Questなど）専用のため、この端末にはインストールできません。</string>
+    <string name="ports_badge_debug">デバッグ版</string>
+    <string name="ports_debug_note">デバッグ版のみ公開されています。更新時に再インストールが必要になることがあり、その場合このポートのセーブデータは消えます。</string>
+    <string name="store_button">ストア</string>
+    <string name="ports_builtin_catalog">内蔵カタログを使用しています。</string>
 </resources>

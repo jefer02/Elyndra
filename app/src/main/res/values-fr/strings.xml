@@ -548,6 +548,8 @@
     <string name="widget_play">Jouer</string>
     <string name="notif_channel_masha">Masha</string>
     <string name="notif_channel_masha_desc">Suggestions occasionnelles. Au plus une tous les quelques jours.</string>
+    <string name="notif_channel_ports">Mises à jour des portages</string>
+    <string name="notif_channel_ports_desc">Quand un portage installé a une nouvelle version.</string>
 
     <!-- Mandos, pantalla y partículas de Masha -->
     <string name="gamepad_connected">Manette connectée : %1$s</string>
@@ -942,8 +944,7 @@
 
     <!-- Tienda de ports -->
     <string name="ports_title">Ports</string>
-    <string name="ports_dock_a11y">Boutique de portages natifs</string>
-    <string name="ports_subtitle">Portages Android natifs de classiques console. Apportez votre propre jeu.</string>
+    <string name="ports_subtitle">Portages Android natifs de classiques console et PC. Apportez votre jeu.</string>
     <string name="ports_search_hint">Rechercher des portages</string>
     <string name="ports_search">Rechercher</string>
     <string name="ports_row_featured">À la une</string>
@@ -953,14 +954,42 @@
     <string name="ports_row_recent">Mis à jour récemment</string>
     <string name="ports_row_installed">Installés</string>
     <string name="ports_row_results">Résultats</string>
-    <string name="ports_filter_pc_only">Afficher PC seul.</string>
+    <string name="ports_row_playstation">PlayStation</string>
+    <string name="ports_row_sega">Sega</string>
+    <string name="ports_row_pc">PC</string>
+    <string name="ports_row_updates">Mises à jour disponibles</string>
+    <string name="ports_update_all">Tout mettre à jour</string>
+    <string name="ports_badge_prerelease">Préversion</string>
+    <string name="ports_badge_check_requirements">Vérifiez les prérequis</string>
+    <string name="ports_prerelease_note">Version de test publiée par le développeur : elle peut contenir des bugs.</string>
+    <string name="ports_check_requirements_note">On ne sait pas bien ce dont ce portage a besoin : lisez le dépôt avant d\'installer.</string>
+    <string name="ports_unverified_title">Portage non vérifié</string>
+    <string name="ports_unverified_message">github.com/%1$s
+★ %2$s · Dernière version : %3$s
+
+Fait par la communauté, non vérifié. Consultez le dépôt avant d\'installer.</string>
+    <string name="ports_unverified_continue">Continuer</string>
+    <string name="ports_port_line">Portage : %1$s · par %2$s</string>
+    <string name="ports_port_line_short">Portage : %1$s</string>
+    <string name="ports_port_badge_named">PORT · %1$s</string>
+    <string name="ports_move_to_folder">Déplacer vers un dossier…</string>
+    <string name="ports_picker_title">Portages de ce jeu</string>
+    <plurals name="ports_count">
+        <item quantity="one">%d portage</item>
+        <item quantity="other">%d portages</item>
+    </plurals>
     <string name="ports_filter_clear">Effacer les filtres</string>
     <string name="ports_action_free">Gratuit</string>
     <string name="ports_action_install">Installer</string>
     <string name="ports_action_update">Mettre à jour</string>
     <string name="ports_action_installed">Installé</string>
-    <string name="ports_action_pc_only">PC seul.</string>
+    <string name="ports_action_pc_only">Pas encore sur Android</string>
     <string name="ports_action_unavailable">Pas d\'APK</string>
+    <string name="ports_action_signature_changed">Clé modifiée</string>
+    <plurals name="ports_updates_notification">
+        <item quantity="one">Une mise à jour est disponible pour %d portage</item>
+        <item quantity="other">Mises à jour disponibles pour %d portages</item>
+    </plurals>
     <string name="ports_action_open">Ouvrir</string>
     <string name="ports_action_cancel">Annuler le téléchargement</string>
     <string name="ports_in_library">✓ Dans votre bibliothèque</string>
@@ -991,7 +1020,7 @@
     <string name="ports_requirement_title">Configuration requise</string>
     <string name="ports_changelog">Nouveautés</string>
     <string name="ports_about">À propos de ce portage</string>
-    <string name="ports_pc_only_note">Seules des versions PC sont publiées. Elyndra n\'installe que des versions Android.</string>
+    <string name="ports_pc_only_note">Il n’y a pas encore d’APK Android. Elyndra vérifie chaque jour et vous laisse l’installer dès qu’un APK est publié.</string>
     <string name="ports_unavailable_note">La dernière version n\'a pas d\'APK pour cet appareil.</string>
     <string name="ports_confirm_title">Installer %1$s ?</string>
     <string name="ports_confirm_message">Depuis github.com/%1$s\nLicence : %2$s · ★ %3$s · %4$s\n\n%5$s\n\nL\'application provient d\'un tiers. Android vous demandera de confirmer.</string>
@@ -1001,7 +1030,7 @@
     <string name="ports_install_failed">Impossible d\'installer %1$s</string>
     <string name="ports_install_cancelled">Installation annulée</string>
     <string name="ports_checksum_failed">Le téléchargement ne correspondait pas à sa somme de contrôle et a été supprimé.</string>
-    <string name="ports_signature_mismatch">Une autre version de cette application avec une autre signature est installée. Désinstallez-la d\'abord.</string>
+    <string name="ports_signature_mismatch">Le développeur a changé la clé de signature de ce portage : Android ne peut pas installer la mise à jour par-dessus. Le réinstaller effacerait ses sauvegardes, donc Elyndra ne le met pas à jour. Sauvegardez vos parties et réinstallez-le vous-même si vous voulez la nouvelle version.</string>
     <string name="ports_package_mismatch">L\'APK n\'est pas l\'application attendue par le catalogue. Rien n\'a été installé.</string>
     <string name="ports_download_failed">Le téléchargement a échoué. Il reprendra là où il s\'est arrêté.</string>
     <string name="ports_permission_title">Autorisez Elyndra à installer des applis</string>
@@ -1010,17 +1039,43 @@
     <string name="ports_port_badge">PORT</string>
     <string name="ports_play_native">Jouer au portage natif</string>
     <string name="ports_add_card_title">Portages natifs</string>
-    <string name="ports_add_card_body">Parcourez des portages Android de classiques Nintendo et Xbox, reconstruits à partir de leur décompilation. Vous apportez le jeu.</string>
+    <string name="ports_add_card_body">Parcourez des portages Android de classiques console et PC, reconstruits à partir de leurs décompilations et de leur code source. Vous apportez le jeu.</string>
     <string name="ports_browse">Voir les portages</string>
     <string name="ports_retry">Réessayer</string>
     <string name="ports_screenshots">Médias</string>
-    <string name="ports_view_repo">Voir sur GitHub</string>
+    <string name="ports_view_repo">Voir le projet sur GitHub</string>
     <string name="settings_github">GitHub (boutique de portages)</string>
     <string name="settings_github_desc">Facultatif. Sans jeton, la boutique peut faire 60 requêtes par heure ; avec un jeton personnel (sans autorisation), 5 000. Le jeton n\'est envoyé qu\'à api.github.com.</string>
     <string name="settings_github_token">Jeton d\'accès personnel</string>
     <string name="settings_ports_catalog">URL du catalogue</string>
+    <string name="settings_ports_auto_update">Mettre à jour les portages automatiquement</string>
+    <string name="settings_ports_auto_update_desc">Désactivé : Elyndra vous prévient seulement. Activé : sur Android 12+, les portages installés par Elyndra se mettent à jour sans demander ; sinon, Android demande comme d\'habitude.</string>
     <string name="masha_working_ports">Recherche de portages natifs…</string>
     <string name="masha_off_ports">Ces portages natifs correspondent à votre bibliothèque. Touchez-en un pour voir ce qu\'il nécessite.</string>
     <string name="masha_off_ports_none">Aucun de vos jeux n\'a encore de portage natif dans le catalogue. J\'ouvre la boutique pour que vous jetiez un œil.</string>
     <string name="masha_ports_title">Portages natifs</string>
+    <string name="ports_chip_all">Tous</string>
+    <string name="ports_chip_not_on_android">Pas encore sur Android</string>
+    <string name="ports_genre_platformer">Plateforme</string>
+    <string name="ports_genre_racing">Course</string>
+    <string name="ports_genre_rpg">RPG</string>
+    <string name="ports_genre_shooter">Tir</string>
+    <string name="ports_genre_strategy">Stratégie</string>
+    <string name="ports_sort_name">Nom</string>
+    <string name="ports_sort_recent">Mis à jour</string>
+    <string name="ports_sort_trust">Confiance</string>
+    <string name="ports_sort_stars">Étoiles</string>
+    <plurals name="ports_results_count">
+        <item quantity="one">%d jeu</item>
+        <item quantity="other">%d jeux</item>
+    </plurals>
+    <string name="ports_row_coming">Bientôt sur Android ?</string>
+    <string name="ports_hint_clear_filter">Effacer le filtre</string>
+    <string name="ports_action_vr_only">Casque VR uniquement</string>
+    <string name="ports_badge_vr_only">Casque VR uniquement</string>
+    <string name="ports_vr_only_note">Cette version ne fonctionne que sur un casque VR autonome (comme Meta Quest) : elle ne peut pas être installée ici.</string>
+    <string name="ports_badge_debug">Version de débogage</string>
+    <string name="ports_debug_note">Seules des versions de débogage sont publiées. Une mise à jour peut demander une réinstallation, qui efface les sauvegardes de ce port.</string>
+    <string name="store_button">Boutique</string>
+    <string name="ports_builtin_catalog">Catalogue intégré utilisé.</string>
 </resources>
