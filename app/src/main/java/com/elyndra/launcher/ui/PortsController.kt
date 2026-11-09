@@ -10,20 +10,27 @@ import com.elyndra.launcher.data.RomEntry
 import com.elyndra.launcher.domain.ports.InstalledPort
 import com.elyndra.launcher.domain.ports.Installable
 import com.elyndra.launcher.domain.ports.PortAction
+import com.elyndra.launcher.domain.ports.PortArt
 import com.elyndra.launcher.domain.ports.PortAssetPicker
+import com.elyndra.launcher.domain.ports.PortAvailability
 import com.elyndra.launcher.domain.ports.PortEntry
+import com.elyndra.launcher.domain.ports.PortGrouping
+import com.elyndra.launcher.domain.ports.PlatformGroup
 import com.elyndra.launcher.domain.ports.PortLookup
 import com.elyndra.launcher.domain.ports.PortRelease
 import com.elyndra.launcher.domain.ports.PortStatus
+import com.elyndra.launcher.domain.ports.PortUpdates
 import com.elyndra.launcher.domain.ports.RepoInfo
 import com.elyndra.launcher.domain.ports.RomPortMatch
 import com.elyndra.launcher.domain.ports.StoreFilter
 import com.elyndra.launcher.domain.ports.StoreRow
 import com.elyndra.launcher.domain.ports.StoreRows
+import com.elyndra.launcher.domain.ports.StoreSort
 import com.elyndra.launcher.ports.GitHubClient
-import com.elyndra.launcher.ports.OriginalArt
+import com.elyndra.launcher.domain.ports.OriginalArt
 import com.elyndra.launcher.ports.PortArtResolver
 import com.elyndra.launcher.ports.PortCatalogRepository
+import com.elyndra.launcher.ports.VrDevice
 import com.elyndra.launcher.update.UpdateError
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -51,15 +58,20 @@ class PortsController(
     }
 
     var catalog by mutableStateOf<List<PortEntry>>(emptyList()); private set
+
+    private val isVrHeadset: Boolean by lazy { VrDevice.isHeadset(vm.app.packageManager) }
     var loading by mutableStateOf(false); private set
     var source by mutableStateOf<PortCatalogRepository.Source?>(null); private set
 
-    var filter by mutableStateOf(StoreFilter(showPcOnly = vm.app.settings.portsShowPcOnly)); private set
+    /** Por qué se enseña el catálogo del APK (null: es el de la red). */
+    var fallback by mutableStateOf<PortCatalogRepository.Fallback?>(null); private set
+
+    var filter by mutableStateOf(StoreFilter()); private set
 
     /** El campo de búsqueda abierto (con el mando, el teclado en pantalla). */
     var searchOpen by mutableStateOf(false); private set
 
-    /** El port de la ficha abierta, o null en la portada. */
+    /** El port elegido en la ficha abierta (la ficha es del juego; el selector cambia de port), o null en la portada. */
     var detailId by mutableStateOf<String?>(null); private set
 
     val releases = mutableStateMapOf<String, Releases>()
@@ -100,9 +112,14 @@ class PortsController(
         loading = true
         loadJob = vm.viewModelScope.launch {
             val loaded = catalogRepository.load(force)
-            catalog = loaded.catalog.ports
+            // Lo que se puede instalar aquí: los de gafas de RV solo en unas gafas, y los
+            // "aún no en Android" a los que la comprobación diaria les encontró un APK.
+            catalog = PortAvailability.effective(loaded.catalog.ports, isVrHeadset, vm.portInstall.availability())
             source = loaded.source
+            fallback = loaded.fallback
             loading = false
+            // Los ports instalados con la primera versión no guardaban su sistema: con el catálogo ya se sabe.
+            vm.portInstall.place()
             if (force) releases.clear()
         }
     }
@@ -116,10 +133,34 @@ class PortsController(
     /** El port del catálogo para esta ROM (el que mejor casa), si lo hay. Los de solo PC no cuentan. */
     fun portFor(rom: RomEntry): PortEntry? = PortLookup.portsFor(rom, catalog.filter { it.installable }).firstOrNull()?.port
 
-    fun rows(): List<StoreRow> {
-        val published = releases.mapNotNull { (id, r) -> (r as? Releases.Ready)?.latest?.release?.publishedAt?.let { id to it } }.toMap()
-        return StoreRows.home(catalog, filter, owned(), installed.keys, published)
+    /** La fecha de la última release ya leída de cada port (manda sobre la del catálogo). */
+    private fun published(): Map<String, Long> =
+        releases.mapNotNull { (id, r) -> (r as? Releases.Ready)?.latest?.release?.publishedAt?.let { id to it } }.toMap()
+
+    fun rows(): List<StoreRow> = StoreRows.home(catalog, filter, owned(), installed.keys, published(), updateIds())
+
+    /**
+     * Los ports instalados con una release más nueva: la ya leída en la
+     * tienda o la que vio la comprobación diaria (PortUpdateWorker).
+     */
+    fun updateIds(): Set<String> =
+        catalog.filter { it.id in installed && action(it) == PortAction.Update }.mapTo(HashSet()) { it.id } +
+            PortUpdates.known(installed.values.toList()).map { it.portId }
+
+    /** Las releases de [port], esperando a tenerlas (para "Actualizar todo"). */
+    suspend fun loadReleases(port: PortEntry) {
+        if (releases[port.id] !is Releases.Ready) ensureReleases(port, prefetch = false, force = true)
+        while (releases[port.id] == Releases.Loading) kotlinx.coroutines.delay(100)
     }
+
+    /** El sistema original del port instalado como [packageName], si el catálogo ya está leído (ver MetadataEngine.portSystem). */
+    fun systemForPackage(packageName: String): String? {
+        val id = installed.values.firstOrNull { it.packageName == packageName }?.portId ?: return null
+        return catalog.firstOrNull { it.id == id }?.platform
+    }
+
+    /** Los ports del mismo juego que [port], en el orden del selector de la ficha. */
+    fun siblings(port: PortEntry): List<PortEntry> = PortGrouping.siblings(port, catalog.filter { it.installable }, published())
 
     /** ¿Alguna petición de releases chocó con el límite de GitHub? (aviso en la portada). */
     val rateLimited: Boolean get() = releases.values.any { it is Releases.Failed && it.rateLimited }
@@ -134,14 +175,15 @@ class PortsController(
             (meta.hero ?: meta.screenshot ?: meta.cover)?.let { return File(vm.app.filesDir, it) }
         }
         ensureArt(port)
-        return originalArt[port.id]?.let { it.hero ?: it.cover }
+        // El del catálogo ya está (sin red) mientras se resuelve lo demás.
+        return (originalArt[port.id] ?: PortArt.fromCatalog(port)).let { it.hero ?: it.cover }
     }
 
     /** La carátula del juego original (para la ficha). */
     fun coverArt(port: PortEntry): Any? {
         ownedRom(port)?.rom?.meta?.cover?.let { return File(vm.app.filesDir, it) }
         ensureArt(port)
-        return originalArt[port.id]?.cover
+        return (originalArt[port.id] ?: PortArt.fromCatalog(port)).cover
     }
 
     /**
@@ -177,7 +219,7 @@ class PortsController(
         vm.viewModelScope.launch {
             releases[port.id] = try {
                 val all = github.releases(port.releaseRepo, force)
-                Releases.Ready(all, port.android?.let { PortAssetPicker.latest(all, it, deviceAbis) })
+                Releases.Ready(all, port.android?.let { PortAssetPicker.latest(all, it, deviceAbis, allowDebug = port.trust.debugBuild) })
             } catch (e: UpdateError) {
                 Releases.Failed(rateLimited = e is UpdateError.RateLimited)
             }
@@ -198,6 +240,11 @@ class PortsController(
         detailId = id
         ensureReleases(port, prefetch = false)
         ensureRepoInfo(port)
+    }
+
+    /** El selector de la ficha: otro port del mismo juego (el botón grande pasa a actuar sobre él). */
+    fun selectPort(id: String) {
+        if (id != detailId) openDetail(id)
     }
 
     fun closeDetail() {
@@ -226,23 +273,36 @@ class PortsController(
         if (!searchOpen) filter = filter.copy(query = "")
     }
 
-    fun togglePlatform(platform: String) {
-        filter = filter.copy(platforms = filter.platforms.toggled(platform))
+    /** El chip "Todos": quita familias, géneros y "aún no en Android" (la búsqueda sigue). */
+    fun showAll() {
+        filter = filter.copy(groups = emptySet(), genres = emptySet(), notOnAndroid = false)
     }
 
-    fun toggleTag(tag: String) {
-        filter = filter.copy(tags = filter.tags.toggled(tag))
+    fun toggleGroup(group: PlatformGroup) {
+        filter = filter.copy(groups = filter.groups.toggled(group))
     }
 
-    fun togglePcOnly() {
-        filter = filter.copy(showPcOnly = !filter.showPcOnly)
-        vm.app.settings.portsShowPcOnly = filter.showPcOnly
+    fun toggleGenre(genre: String) {
+        filter = filter.copy(genres = filter.genres.toggled(genre))
+    }
+
+    fun toggleNotOnAndroid() {
+        filter = filter.copy(notOnAndroid = !filter.notOnAndroid)
+    }
+
+    fun setSort(sort: StoreSort) {
+        filter = filter.copy(sort = sort)
+    }
+
+    /** L1/R1 en la tienda: de familia en familia (Todos → Nintendo → … → PC → Todos). */
+    fun cycleGroup(delta: Int) {
+        filter = filter.copy(groups = StoreRows.cycleGroup(filter.groups, StoreRows.groupChips(catalog), delta))
     }
 
     /** "Atrás" con la búsqueda o los filtros puestos: los quita (ver [BackPriority]). */
     fun clearFilters() {
         searchOpen = false
-        filter = StoreFilter(showPcOnly = filter.showPcOnly)
+        filter = filter.cleared()
     }
 
     val hasFilters: Boolean get() = searchOpen || filter.active
