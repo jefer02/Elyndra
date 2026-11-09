@@ -464,6 +464,16 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
             if (v.isBlank() || v == PortCatalogRepository.DEFAULT_URL) remove("ports.catalogUrl") else putString("ports.catalogUrl", v.trim())
         }
 
+    /** Tienda de ports: cuándo apareció cada port en el catálogo ("id=ms" por línea, ver PortFirstSeen). */
+    var portsFirstSeen: String
+        get() = prefs.getString("ports.firstSeen", "").orEmpty()
+        set(v) = prefs.edit { putString("ports.firstSeen", v) }
+
+    /** Tienda de ports: la lista de deseos (ids de port del catálogo). */
+    var portsWishlist: Set<String>
+        get() = prefs.getStringSet("ports.wishlist", emptySet()).orEmpty().toSet()
+        set(v) = prefs.edit { putStringSet("ports.wishlist", v) }
+
     /** Tienda de ports: solo avisar de las actualizaciones (por defecto) o instalarlas solas cuando Android lo deja. */
     var portsUpdateMode: com.elyndra.launcher.domain.ports.PortUpdateMode
         get() = if (prefs.getBoolean("ports.autoUpdate", false)) {
