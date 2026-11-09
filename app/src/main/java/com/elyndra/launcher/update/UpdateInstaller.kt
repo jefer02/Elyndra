@@ -27,6 +27,8 @@ sealed interface InstallResult {
     data object Cancelled : InstallResult
     /** La app instalada está firmada con otra clave (p. ej. una build de depuración): Android no la sustituye. */
     data object SignatureMismatch : InstallResult
+    /** Instalación sin preguntar que Android no aceptó: hace falta el diálogo, y en segundo plano no se puede abrir. */
+    data object NeedsUserAction : InstallResult
     data class Failed(val message: String?) : InstallResult
 }
 
@@ -56,14 +58,19 @@ class UpdateInstaller @Inject constructor(@ApplicationContext private val contex
      * [packageName]: el paquete que tiene que traer el APK (Android rechaza la
      * sesión si trae otro). Por defecto, el de Elyndra (actualizarse); la
      * tienda de ports pasa el del port, leído del propio APK.
+     *
+     * [silent]: sin diálogo (Android 12+, `USER_ACTION_NOT_REQUIRED`; solo vale
+     * para apps que instaló Elyndra). Si aun así Android pide confirmación, no
+     * se abre nada: [InstallResult.NeedsUserAction].
      */
-    suspend fun install(apk: File, packageName: String = context.packageName): InstallResult {
+    suspend fun install(apk: File, packageName: String = context.packageName, silent: Boolean = false): InstallResult {
         val installer = context.packageManager.packageInstaller
         val sessionId = try {
             withContext(Dispatchers.IO) {
                 val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
                     setAppPackageName(packageName)
                     setSize(apk.length())
+                    if (silent && Build.VERSION.SDK_INT >= 31) setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
                 }
                 val id = installer.createSession(params)
                 try {
@@ -86,15 +93,21 @@ class UpdateInstaller @Inject constructor(@ApplicationContext private val contex
         } finally {
             apk.delete()
         }
-        return commit(installer, sessionId)
+        return commit(installer, sessionId, silent)
     }
 
-    private suspend fun commit(installer: PackageInstaller, sessionId: Int): InstallResult = suspendCancellableCoroutine { cont ->
+    private suspend fun commit(installer: PackageInstaller, sessionId: Int, silent: Boolean): InstallResult = suspendCancellableCoroutine { cont ->
         val action = "${context.packageName}.UPDATE_INSTALL.$sessionId"
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
                 val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
                 val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
+                if (status == PackageInstaller.STATUS_PENDING_USER_ACTION && silent) {
+                    // Sin preguntar no pudo ser: no se abre el diálogo (puede ser desde segundo plano).
+                    runCatching { installer.abandonSession(sessionId) }
+                    finish(InstallResult.NeedsUserAction)
+                    return
+                }
                 if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
                     // El sistema pide confirmación: su diálogo, encima de Elyndra.
                     @Suppress("DEPRECATION")
