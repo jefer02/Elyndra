@@ -183,7 +183,7 @@ class MashaLibraryActions(private val vm: ElyndraViewModel, private val writes: 
             ?: return toolFail("'$query' is not an emulator Elyndra knows; it cannot be launched safely")
         if (emuId !in system.emulators) return toolFail("${vm.orchestrator.name(emuId)} doesn't run ${system.name} games")
         if (!vm.orchestrator.isInstalled(emuId)) return toolFail("${vm.orchestrator.name(emuId)} is not installed")
-        if (vm.library.folders.none { it.systemId == system.id }) {
+        if (vm.library.realFolders.none { it.systemId == system.id }) {
             return toolFail("there is no ${system.name} folder in the library yet; add one first ($OPEN_ADD)")
         }
         val name = vm.orchestrator.name(emuId)

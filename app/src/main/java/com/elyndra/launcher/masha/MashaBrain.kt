@@ -72,7 +72,8 @@ class MashaBrain @Inject constructor(
     /** Sugerencias ambientales, la más útil primero, sin las descartadas hoy. */
     suspend fun insights(): List<Insight> {
         val s = knowledge.snapshot()
-        val missing = s.library.folders.mapNotNull { f ->
+        // Las carpetas virtuales (ports) no tienen emulador: nada que echar en falta.
+        val missing = s.library.realFolders.mapNotNull { f ->
             val emulator = f.emulatorId ?: return@mapNotNull null
             if (orchestrator.isInstalled(emulator)) null else Triple(f.id, Systems.byId(f.systemId)?.name ?: f.systemId, emulator)
         }
