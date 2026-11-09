@@ -120,12 +120,18 @@ data class RomEntry(
     val portPackage: String? = null,
     /** El nombre del port ("Ship of Harkinian"), la línea secundaria en la carpeta. */
     val portName: String? = null,
+    /** [portPackage] no es un port: una app Android que el usuario puso en esta carpeta (ver FolderAdd). */
+    val androidApp: Boolean = false,
 ) {
     val key: String get() = portPackage?.let { "a:$it" } ?: "r:$id"
     val isPort: Boolean get() = portPackage != null
     /** El nombre que se enseña: el que puso el usuario manda; luego el de los metadatos y el del archivo. */
     val displayTitle: String get() = meta.lockedName ?: meta.name?.takeIf { it.isNotBlank() } ?: title
-    val extension: String get() = if (isPort) "PORT" else fileName.substringAfterLast('.', "").uppercase()
+    val extension: String get() = when {
+        androidApp -> "ANDROID"
+        isPort -> "PORT"
+        else -> fileName.substringAfterLast('.', "").uppercase()
+    }
     /** Lo que va junto a lo jugado: la extensión, o "PORT · <port>" (dos ports del mismo juego se distinguen así). */
     val subtitle: String get() = portName?.let { "PORT · $it" } ?: extension
 }

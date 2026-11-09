@@ -1,6 +1,9 @@
 package com.elyndra.launcher.ui
 
 import com.elyndra.launcher.domain.ports.PortPlacement
+import com.elyndra.launcher.domain.library.FolderAdd
+import com.elyndra.launcher.domain.library.FolderArt
+import com.elyndra.launcher.domain.library.FolderArtResolver
 import com.elyndra.launcher.library.SafGuard
 import com.elyndra.launcher.library.RomScanner
 import com.elyndra.launcher.metadata.MediaFailure
@@ -190,6 +193,8 @@ class ElyndraViewModel @Inject constructor(
     val ports = PortsController(this, portCatalog, github)
     /** Descargar e instalar ports, y llevarlos a la biblioteca. */
     val portInstall = PortInstallController(this, portInstaller)
+    /** "Añadir juego" dentro de una carpeta. */
+    val folderAdd = FolderAddController(this)
 
     private var launchJob: Job? = null
     private var toastJob: Job? = null
@@ -251,6 +256,8 @@ class ElyndraViewModel @Inject constructor(
                 logoPath = f.logo,
                 iconPath = f.icon,
                 emulatorPackage = emulatorPackage(f.emulatorId),
+                // El de su sistema, o un mosaico de sus carátulas; el icono elegido a mano manda (ver FolderArtResolver).
+                art = FolderArtResolver.resolve(f.icon, f.systemId, FolderArtResolver.collageCovers(list.filter { !it.isPort })),
             )
         }
         return Derived(lib, inst, folders, roms).also { derivedCache = it }
@@ -270,6 +277,8 @@ class ElyndraViewModel @Inject constructor(
         addedAt = app.addedAt,
         portPackage = app.packageName,
         portName = portInstall.portNameFor(app.packageName),
+        // Puesta a mano en la carpeta y sin ser un port instalado: una app Android más (ver FolderAdd).
+        androidApp = app.folderManual && ports.installed.values.none { it.packageName == app.packageName },
     )
 
     private class ItemsKey(
@@ -508,6 +517,12 @@ class ElyndraViewModel @Inject constructor(
     fun openPorts() {
         ports.onOpen()
         go(Screen.Ports)
+    }
+
+    /** "Añadir juego" → "Buscar un port": la tienda con solo los de la plataforma [systemId]. */
+    fun openPortsFor(systemId: String) {
+        openPorts()
+        ports.filterPlatform(systemId)
     }
 
     val canGoBack: Boolean
@@ -1478,6 +1493,7 @@ class ElyndraViewModel @Inject constructor(
                         listOf(SheetAction(UiText.res(R.string.open), icon = SheetIcon.Play, primary = true) { open(item) }),
                     ),
                     artworkGroup(item.key, item.system.name),
+                    SheetGroup(UiText.res(R.string.sheet_group_manage), listOf(addGameAction(item.folder)) + folderArtActions(item)),
                 )
             } else listOf(
                 SheetGroup(
@@ -1497,11 +1513,12 @@ class ElyndraViewModel @Inject constructor(
                 SheetGroup(
                     UiText.res(R.string.sheet_group_manage),
                     listOf(
+                        addGameAction(item.folder),
                         SheetAction(UiText.res(R.string.rescan_folder), icon = SheetIcon.Rescan) { rescanFolder(item.folder) },
                         SheetAction(UiText.res(R.string.refresh_metadata), icon = SheetIcon.Refresh) {
                             refreshMetadata(library.roms.filter { it.folderId == item.folder.id }.map { it.key })
                         },
-                    ) + restoreAction(item.folder) + listOfNotNull(
+                    ) + folderArtActions(item) + restoreAction(item.folder) + listOfNotNull(
                         // PS4: los .pkg se instalan en Bachata, no aquí.
                         SheetAction(
                             UiText.res(R.string.open_bachata),
@@ -1666,6 +1683,22 @@ class ElyndraViewModel @Inject constructor(
         )
     }
 
+    /** "Añadir juego" en las opciones de una carpeta (lo mismo que su botón y SELECT). */
+    private fun addGameAction(folder: RomFolder) =
+        SheetAction(UiText.res(R.string.folder_add_title), icon = SheetIcon.Add, opensSheet = true) { folderAdd.open(folder) }
+
+    /**
+     * "Cambiar arte de la carpeta" (el icono de su card) y, si el usuario
+     * eligió uno, "Volver al automático" (el de su sistema, ver FolderArtResolver).
+     */
+    private fun folderArtActions(item: LibraryItem.Folder): List<SheetAction> = listOfNotNull(
+        SheetAction(UiText.res(R.string.folder_art_change), icon = SheetIcon.Icon, opensSheet = true) {
+            chooseArtSource(item.key, item.system.name, ArtKind.Icon)
+        },
+        SheetAction(UiText.res(R.string.folder_art_reset), icon = SheetIcon.Refresh) { clearArt(item.key, ArtKind.Icon) }
+            .takeIf { item.art is FolderArt.Manual },
+    )
+
     /** El bloque destructivo va solo y al final, con su glifo de papelera. */
     private fun removalGroup(label: UiText, action: () -> Unit) =
         SheetGroup(null, listOf(SheetAction(label, destructive = true, icon = SheetIcon.Remove, action = action)))
@@ -1741,7 +1774,9 @@ class ElyndraViewModel @Inject constructor(
         if (targets.isEmpty()) return
         viewModelScope.launch {
             for (key in targets) {
-                for (kind in listOf(ArtKind.Icon, ArtKind.Logo, ArtKind.Background)) {
+                // El icono no: el de la card sale del arte de serie del sistema (FolderArtResolver) y
+                // uno puesto aquí contaría como elegido a mano.
+                for (kind in listOf(ArtKind.Logo, ArtKind.Background)) {
                     if (art.has(key, kind)) continue
                     for (service in artServices()) {
                         if (!app.credentials.isConfigured(service) || !art.supports(key, service)) continue
@@ -1847,6 +1882,11 @@ class ElyndraViewModel @Inject constructor(
     data class MediaRequest(val mimeTypes: List<String>, val onPicked: (Uri?) -> Unit)
 
     var mediaRequest by mutableStateOf<MediaRequest?>(null); private set
+
+    /** Un archivo cualquiera con el selector del sistema (ver [FolderAddController]). */
+    fun requestFile(mimeTypes: List<String>, onPicked: (Uri?) -> Unit) {
+        mediaRequest = MediaRequest(mimeTypes, onPicked)
+    }
 
     fun onMediaPicked(uri: Uri?) {
         val request = mediaRequest ?: return
@@ -2029,7 +2069,10 @@ class ElyndraViewModel @Inject constructor(
                     selected = f.id == app.folderId,
                 ) { repo.update { PortPlacement.move(it, app.packageName, f.id) } }
             }
-        showSheet(ActionSheetSpec(UiText.res(R.string.ports_move_to_folder), UiText.Raw(app.displayTitle), options))
+        // Una app que no es un port puede volver a la lista de apps Android.
+        val none = SheetAction(UiText.res(R.string.folder_move_none)) { repo.update { FolderAdd.unplace(it, app.packageName) } }
+            .takeIf { ports.installed.values.none { it.packageName == app.packageName } }
+        showSheet(ActionSheetSpec(UiText.res(R.string.ports_move_to_folder), UiText.Raw(app.displayTitle), options + listOfNotNull(none)))
     }
 
     fun pickFolderEmulator(folder: RomFolder) {
