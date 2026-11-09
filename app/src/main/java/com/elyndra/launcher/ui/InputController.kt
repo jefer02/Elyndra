@@ -279,13 +279,17 @@ class InputController(private val vm: ElyndraViewModel) {
             when (vm.screen) {
                 Screen.Settings -> { vm.settings.onBumper(delta); true }
                 Screen.Add -> { vm.add.updateTab(if (delta < 0) AddTab.Android else AddTab.Roms); true }
-                // En la tienda, L1/R1 van de familia en familia (Todos, Nintendo… PC), como las pestañas de categoría.
-                Screen.Ports -> { if (vm.ports.detail == null) vm.ports.cycleGroup(delta); true }
+                // En la tienda, L1/R1 cambian de pestaña (Novedades, Colecciones… Explorar), dando la vuelta.
+                Screen.Ports -> { if (vm.ports.detail == null) vm.ports.cycleTab(delta); true }
                 else -> false
             }
         }
         // Y: al botón principal de la pantalla (en Añadir, "Añadir N juegos").
-        Pad.Options -> primaryAction?.let { runCatching { it.requestFocus() }; true } ?: false
+        Pad.Options -> when {
+            // En la tienda, Y abre las utilidades (recargar, actualizar todo, quitar filtros).
+            vm.screen == Screen.Ports && vm.ports.detail == null -> { vm.ports.openUtilities(); true }
+            else -> primaryAction?.let { runCatching { it.requestFocus() }; true } ?: false
+        }
         // Start abre y cierra Ajustes, como el botón de pausa de una consola.
         Pad.Menu -> {
             vm.go(if (vm.screen == Screen.Settings) Screen.Library else Screen.Settings)
