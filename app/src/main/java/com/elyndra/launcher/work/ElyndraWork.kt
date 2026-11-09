@@ -50,6 +50,22 @@ class ElyndraWork @Inject constructor(@ApplicationContext private val context: C
                 .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(true).build())
                 .build(),
         )
+        // Los ports instalados: ¿hay release nueva? Una vez al día, como los metadatos.
+        work.enqueueUniquePeriodicWork(
+            PORT_UPDATES,
+            ExistingPeriodicWorkPolicy.KEEP,
+            PeriodicWorkRequestBuilder<com.elyndra.launcher.notify.PortUpdateWorker>(1, TimeUnit.DAYS)
+                .setConstraints(
+                    Constraints.Builder()
+                        .setRequiredNetworkType(NetworkType.UNMETERED)
+                        .setRequiresBatteryNotLow(true)
+                        .build(),
+                )
+                .setInitialDelay(3, TimeUnit.HOURS)
+                .build(),
+        )
+        // El arte de antes, con SteamGridDB e IGDB primero: una sola vez.
+        scheduleArtUpgrade()
         // Masha mira si tiene algo que de verdad valga un aviso. Casi nunca lo tiene.
         work.enqueueUniquePeriodicWork(
             NUDGE,
@@ -57,6 +73,28 @@ class ElyndraWork @Inject constructor(@ApplicationContext private val context: C
             PeriodicWorkRequestBuilder<MashaNudgeWorker>(12, TimeUnit.HOURS)
                 .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(true).build())
                 .setInitialDelay(6, TimeUnit.HOURS)
+                .build(),
+        )
+    }
+
+    /**
+     * La pasada única que mejora el arte (ArtUpgradeWorker): con red sin
+     * límite y batería no baja. [next]: la tanda siguiente, que sustituye a la
+     * que la encola; si no, la primera, que no se repite si ya está puesta.
+     */
+    fun scheduleArtUpgrade(next: Boolean = false) {
+        work.enqueueUniqueWork(
+            ART_UPGRADE,
+            if (next) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.KEEP,
+            OneTimeWorkRequestBuilder<ArtUpgradeWorker>()
+                .setConstraints(
+                    Constraints.Builder()
+                        .setRequiredNetworkType(NetworkType.UNMETERED)
+                        .setRequiresBatteryNotLow(true)
+                        .setRequiresStorageNotLow(true)
+                        .build(),
+                )
+                .setInitialDelay(if (next) 15L else 30L, TimeUnit.MINUTES)
                 .build(),
         )
     }
@@ -75,5 +113,7 @@ class ElyndraWork @Inject constructor(@ApplicationContext private val context: C
         const val WIDGET = "elyndra.widget.refresh"
         const val WIDGET_NOW = "elyndra.widget.refresh.now"
         const val NUDGE = "elyndra.masha.nudge"
+        const val PORT_UPDATES = "elyndra.ports.updates"
+        const val ART_UPGRADE = "elyndra.art.upgrade"
     }
 }
