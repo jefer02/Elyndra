@@ -1,19 +1,29 @@
 package com.elyndra.launcher.ui.screens.ports
 
 import androidx.annotation.StringRes
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,17 +33,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -42,16 +60,27 @@ import com.elyndra.launcher.R
 import com.elyndra.launcher.domain.ports.PortAction
 import com.elyndra.launcher.domain.ports.PortDisplay
 import com.elyndra.launcher.domain.ports.PortEntry
-import com.elyndra.launcher.ui.PortsLayout
+import com.elyndra.launcher.ui.StoreLayout
+import com.elyndra.launcher.ui.TileStatus
 import com.elyndra.launcher.ui.components.DotTabIcon
 import com.elyndra.launcher.ui.components.ElyText
+import com.elyndra.launcher.ui.theme.LocalReducedMotion
 import com.elyndra.launcher.ui.theme.LocalSkin
 import com.elyndra.launcher.ui.theme.Store
-import com.elyndra.launcher.ui.theme.shapeClickable
+
+/* ─────────────────────────────────────────────────────────────
+   Piezas de la tienda de ports: baldosas cuadradas con su línea de
+   estado, tarjetas apaisadas de los carruseles, carteles grandes,
+   botones redondos y los glifos, todo dibujado a mano.
+
+   El foco es siempre el mismo: un marco blanco de 3 dp con una
+   rendija oscura entre él y la pieza, y un pequeño crecimiento con
+   muelle en las baldosas (StoreLayout.FOCUS_*).
+   ───────────────────────────────────────────────────────────── */
 
 /**
- * El icono de la tienda en el dock: una bolsa con asa. Se dibuja con el color
- * que toca (ver [DotTabIcon]) en un cuadro de 14 dp.
+ * El icono de la tienda en el dock y en su baldosa: una bolsa con asa. Se
+ * dibuja con el color que toca (ver [DotTabIcon]).
  */
 val StoreGlyph: DotTabIcon = { color ->
     val w = size.width
@@ -78,6 +107,95 @@ val StoreGlyph: DotTabIcon = { color ->
     drawPath(bag, color)
 }
 
+/** Los iconos de la fila de pestañas y de la cabecera. */
+enum class StoreIcon { Search, Heart, HeartFilled, Download, More, Sort, Players, Size, Version, Calendar, Link, Gamepad }
+
+/** [icon] en blanco (o [color]) en un cuadro de [size]. */
+@Composable
+fun StoreIconGlyph(icon: StoreIcon, color: Color = Store.text, size: Dp = 20.dp) {
+    Canvas(Modifier.size(size)) { drawStoreIcon(icon, color) }
+}
+
+private fun DrawScope.drawStoreIcon(icon: StoreIcon, color: Color) {
+    val w = size.width
+    val h = size.height
+    val t = w * 0.09f
+    val stroke = Stroke(t, cap = StrokeCap.Round)
+    fun line(x1: Float, y1: Float, x2: Float, y2: Float) = drawLine(color, Offset(w * x1, h * y1), Offset(w * x2, h * y2), t, StrokeCap.Round)
+    fun heart(): Path = Path().apply {
+        moveTo(w * 0.5f, h * 0.88f)
+        cubicTo(w * 0.05f, h * 0.6f, w * 0.02f, h * 0.3f, w * 0.22f, h * 0.18f)
+        cubicTo(w * 0.36f, h * 0.1f, w * 0.48f, h * 0.2f, w * 0.5f, h * 0.3f)
+        cubicTo(w * 0.52f, h * 0.2f, w * 0.64f, h * 0.1f, w * 0.78f, h * 0.18f)
+        cubicTo(w * 0.98f, h * 0.3f, w * 0.95f, h * 0.6f, w * 0.5f, h * 0.88f)
+        close()
+    }
+    when (icon) {
+        StoreIcon.Search -> {
+            drawCircle(color, w * 0.28f, Offset(w * 0.42f, h * 0.42f), style = stroke)
+            line(0.63f, 0.63f, 0.88f, 0.88f)
+        }
+        StoreIcon.Heart -> drawPath(heart(), color, style = stroke)
+        StoreIcon.HeartFilled -> drawPath(heart(), color)
+        StoreIcon.Download -> {
+            line(0.5f, 0.12f, 0.5f, 0.64f)
+            line(0.3f, 0.45f, 0.5f, 0.65f)
+            line(0.7f, 0.45f, 0.5f, 0.65f)
+            line(0.16f, 0.86f, 0.84f, 0.86f)
+        }
+        StoreIcon.More -> for (x in listOf(0.2f, 0.5f, 0.8f)) drawCircle(color, w * 0.08f, Offset(w * x, h * 0.5f))
+        StoreIcon.Sort -> {
+            // Tres renglones que menguan y una flecha hacia abajo: "ordenar".
+            line(0.42f, 0.24f, 0.88f, 0.24f)
+            line(0.42f, 0.5f, 0.76f, 0.5f)
+            line(0.42f, 0.76f, 0.64f, 0.76f)
+            line(0.2f, 0.16f, 0.2f, 0.84f)
+            line(0.08f, 0.7f, 0.2f, 0.84f)
+            line(0.32f, 0.7f, 0.2f, 0.84f)
+        }
+        StoreIcon.Players -> {
+            drawCircle(color, w * 0.18f, Offset(w * 0.5f, h * 0.3f), style = stroke)
+            drawArc(color, 200f, 140f, false, Offset(w * 0.14f, h * 0.56f), Size(w * 0.72f, h * 0.6f), style = stroke)
+        }
+        StoreIcon.Size -> {
+            drawRoundRect(color, Offset(w * 0.18f, h * 0.12f), Size(w * 0.64f, h * 0.76f), CornerRadius(w * 0.08f), style = stroke)
+            line(0.32f, 0.38f, 0.68f, 0.38f)
+            line(0.32f, 0.56f, 0.6f, 0.56f)
+        }
+        StoreIcon.Version -> {
+            val tag = Path().apply {
+                moveTo(w * 0.12f, h * 0.2f)
+                lineTo(w * 0.55f, h * 0.2f)
+                lineTo(w * 0.88f, h * 0.5f)
+                lineTo(w * 0.55f, h * 0.8f)
+                lineTo(w * 0.12f, h * 0.8f)
+                close()
+            }
+            drawPath(tag, color, style = stroke)
+            drawCircle(color, w * 0.06f, Offset(w * 0.3f, h * 0.5f))
+        }
+        StoreIcon.Calendar -> {
+            drawRoundRect(color, Offset(w * 0.14f, h * 0.2f), Size(w * 0.72f, h * 0.66f), CornerRadius(w * 0.08f), style = stroke)
+            line(0.14f, 0.4f, 0.86f, 0.4f)
+            line(0.34f, 0.1f, 0.34f, 0.28f)
+            line(0.66f, 0.1f, 0.66f, 0.28f)
+        }
+        StoreIcon.Link -> {
+            line(0.42f, 0.58f, 0.86f, 0.14f)
+            line(0.6f, 0.14f, 0.86f, 0.14f)
+            line(0.86f, 0.14f, 0.86f, 0.4f)
+            drawRoundRect(color, Offset(w * 0.14f, h * 0.24f), Size(w * 0.6f, h * 0.62f), CornerRadius(w * 0.06f), style = stroke)
+        }
+        StoreIcon.Gamepad -> {
+            drawRoundRect(color, Offset(w * 0.08f, h * 0.28f), Size(w * 0.84f, h * 0.48f), CornerRadius(w * 0.22f), style = stroke)
+            line(0.26f, 0.52f, 0.42f, 0.52f)
+            line(0.34f, 0.44f, 0.34f, 0.6f)
+            drawCircle(color, w * 0.05f, Offset(w * 0.64f, h * 0.48f))
+            drawCircle(color, w * 0.05f, Offset(w * 0.74f, h * 0.58f))
+        }
+    }
+}
+
 /** El nombre corto de la plataforma original ("N64", "XBOX 360"). */
 fun platformLabel(platform: String): String = PortDisplay.platformBadge(platform)
 
@@ -92,36 +210,13 @@ fun portLineText(port: PortEntry): String {
     }
 }
 
-/**
- * Las insignias de confianza de un port: sin verificar, prerelease, sin
- * analizar y revisa requisitos. [compact] (cápsulas): solo las dos que más
- * importan, para no tapar el arte.
- */
-fun trustBadges(port: PortEntry, compact: Boolean = false): List<Int> {
-    val all = buildList {
-        // Lo que dice si se puede instalar va primero: es lo que se ve en una cápsula.
-        if (port.vrOnly) add(R.string.ports_badge_vr_only) else if (port.notOnAndroid) add(R.string.ports_action_pc_only)
-        if (port.trust.debugBuild) add(R.string.ports_badge_debug)
-        if (!port.verified) add(R.string.ports_unverified)
-        if (port.trust.prerelease) add(R.string.ports_badge_prerelease)
-        if (port.trust.checkRequirements) add(R.string.ports_badge_check_requirements)
-    }
-    return if (compact) all.take(2) else all
-}
-
-/** La insignia de la plataforma original, junto al nombre del juego. */
-@Composable
-fun PlatformBadge(platform: String, modifier: Modifier = Modifier) {
-    ElyText(
-        platformLabel(platform),
-        modifier
-            .background(Store.chip, RoundedCornerShape(3.dp))
-            .padding(horizontal = 5.dp, vertical = 1.dp),
-        size = 9f,
-        weight = FontWeight.Bold,
-        color = Store.chipText,
-        maxLines = 1,
-    )
+/** Las insignias de confianza de un port: lo que dice si se instala primero. */
+fun trustBadges(port: PortEntry): List<Int> = buildList {
+    if (port.vrOnly) add(R.string.ports_badge_vr_only) else if (port.notOnAndroid) add(R.string.ports_action_pc_only)
+    if (port.trust.debugBuild) add(R.string.ports_badge_debug)
+    if (!port.verified) add(R.string.ports_unverified)
+    if (port.trust.prerelease) add(R.string.ports_badge_prerelease)
+    if (port.trust.checkRequirements) add(R.string.ports_badge_check_requirements)
 }
 
 @StringRes
@@ -143,86 +238,74 @@ fun actionLabel(action: PortAction): Int = when (action) {
     PortAction.SignatureChanged -> R.string.ports_action_signature_changed
 }
 
+fun formatSize(bytes: Long): String = when {
+    bytes <= 0 -> "—"
+    bytes < 1_048_576 -> "%.0f KB".format(bytes / 1024.0)
+    bytes < 1_073_741_824 -> "%.1f MB".format(bytes / 1_048_576.0)
+    else -> "%.2f GB".format(bytes / 1_073_741_824.0)
+}
+
 /**
- * El área de acción de una cápsula (donde un escaparate pondría el precio):
- * verde para instalar, azul para actualizar, pizarra para lo demás. Con
- * [progress] (0..1) se convierte en la barra de la descarga.
+ * El marco del foco: blanco de [StoreLayout.FOCUS_BORDER] dp por fuera de la
+ * pieza, separado de ella por una rendija oscura. Se pinta fuera de los
+ * límites (la pieza no lo recorta) y aparece con un fundido corto.
  */
 @Composable
-fun PortActionPill(action: PortAction, modifier: Modifier = Modifier, progress: Float? = null, large: Boolean = false) {
-    val shape = RoundedCornerShape(if (large) 6.dp else 3.dp)
-    val fill: Brush = when (action) {
-        PortAction.Install -> Brush.horizontalGradient(Store.install)
-        PortAction.Update -> Brush.horizontalGradient(Store.update)
-        PortAction.Installed -> Brush.horizontalGradient(listOf(Store.installed, Store.installed))
-        PortAction.Free -> Brush.horizontalGradient(listOf(Store.free, Store.free))
-        PortAction.NotOnAndroid, PortAction.VrOnly, PortAction.Unavailable, PortAction.SignatureChanged -> Brush.horizontalGradient(listOf(Store.muted, Store.muted))
-    }
-    Box(
-        modifier
-            .clip(shape)
-            .background(fill)
-            .padding(horizontal = if (large) 18.dp else 8.dp, vertical = if (large) 10.dp else 4.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (progress != null) {
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .background(Color.Black.copy(alpha = 0.35f)),
-            )
-            Box(
-                Modifier
-                    .align(Alignment.CenterStart)
-                    .fillMaxWidth(progress.coerceIn(0f, 1f))
-                    .height(if (large) 3.dp else 2.dp)
-                    .background(Store.ok),
-            )
-            ElyText("${(progress * 100).toInt()} %", size = if (large) 13f else 10f, weight = FontWeight.SemiBold, color = Store.text)
+fun Modifier.storeFocusRing(focused: Boolean, radius: Dp, circle: Boolean = false): Modifier {
+    val reduced = LocalReducedMotion.current
+    val alpha by animateFloatAsState(if (focused) 1f else 0f, if (reduced) tween(0) else tween(StoreLayout.FOCUS_MS), label = "ring")
+    return drawBehind {
+        if (alpha <= 0f) return@drawBehind
+        val gap = StoreLayout.FOCUS_GAP.dp.toPx()
+        val border = StoreLayout.FOCUS_BORDER.dp.toPx()
+        val out = gap + border / 2f
+        if (circle) {
+            drawCircle(Color.Black.copy(alpha = 0.85f * alpha), size.minDimension / 2f + gap / 2f, style = Stroke(gap))
+            drawCircle(Store.focus.copy(alpha = alpha), size.minDimension / 2f + out, style = Stroke(border))
         } else {
-            ElyText(
-                stringResource(actionLabel(action)),
-                size = if (large) 13.5f else 10f,
-                weight = FontWeight.SemiBold,
-                color = if (action == PortAction.NotOnAndroid || action == PortAction.VrOnly || action == PortAction.Unavailable || action == PortAction.SignatureChanged) Store.textDim else Store.text,
-                maxLines = 1,
+            val r = radius.toPx()
+            drawRoundRect(
+                Color.Black.copy(alpha = 0.85f * alpha),
+                Offset(-gap / 2f, -gap / 2f),
+                Size(size.width + gap, size.height + gap),
+                CornerRadius(r + gap / 2f),
+                style = Stroke(gap),
+            )
+            drawRoundRect(
+                Store.focus.copy(alpha = alpha),
+                Offset(-out, -out),
+                Size(size.width + 2 * out, size.height + 2 * out),
+                CornerRadius(r + out),
+                style = Stroke(border),
             )
         }
     }
 }
 
-/** Un chip de etiqueta o de filtro: azul apagado, encendido si está elegido. */
+/**
+ * El `clickable` de la tienda: sin el realce de Elyndra por dentro (el foco
+ * es el marco blanco de [storeFocusRing]); va después del recorte de la pieza.
+ */
 @Composable
-fun StoreChip(text: String, modifier: Modifier = Modifier, selected: Boolean = false, onClick: (() -> Unit)? = null) {
-    val shape = RoundedCornerShape(3.dp)
-    val base = modifier
-        .clip(shape)
-        .background(if (selected) Store.chipOn else Store.chip)
-    Box(
-        (if (onClick != null) base.shapeClickable(shape, onClick = onClick) else base)
-            .heightIn(min = if (onClick != null) 32.dp else 0.dp)
-            .padding(horizontal = 9.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        ElyText(text, size = 10.5f, weight = FontWeight.Medium, color = if (selected) Store.text else Store.chipText, maxLines = 1)
-    }
+fun Modifier.storeClickable(enabled: Boolean = true, onClick: () -> Unit): Modifier {
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    return this.clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
 }
 
-/** El título de una fila de la portada: en versalitas, como las tiendas de escritorio. */
-@Composable
-fun StoreRowTitle(text: String, modifier: Modifier = Modifier) {
-    ElyText(text, modifier, size = 11.5f, weight = FontWeight.SemiBold, color = Store.text, uppercase = true, maxLines = 1, overflow = TextOverflow.Ellipsis)
+/** Fondo de la tienda: casi negro, con un brillo suave arriba a la izquierda y viñeta (ver [Store.background]). */
+fun Modifier.storeBackground(): Modifier = drawBehind {
+    drawRect(Store.bg)
+    Store.background(size.width, size.height).forEach { drawRect(it) }
 }
 
 /**
- * Una imagen remota o local con un respaldo de degradado y el nombre
- * mientras carga o si falla (las tarjetas OpenGraph de GitHub siempre
- * existen, pero sin red no).
+ * Una imagen remota o local con un respaldo oscuro y el nombre mientras
+ * carga o si falla (sin red las imágenes no llegan).
  */
 @Composable
 fun StoreImage(model: Any?, fallback: String, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Crop) {
     var failed by remember(model) { mutableStateOf(model == null) }
-    Box(modifier.background(Brush.linearGradient(listOf(Store.panelHigh, Store.capsule)))) {
+    Box(modifier.background(Brush.linearGradient(listOf(Store.tileHigh, Store.tile)))) {
         if (!failed) {
             AsyncImage(
                 model = model,
@@ -231,122 +314,400 @@ fun StoreImage(model: Any?, fallback: String, modifier: Modifier = Modifier, con
                 modifier = Modifier.fillMaxSize(),
                 onError = { failed = true },
             )
-        } else {
+        } else if (fallback.isNotEmpty()) {
             ElyText(
                 fallback,
                 Modifier
                     .align(Alignment.Center)
                     .padding(10.dp),
                 size = 13f,
-                weight = FontWeight.SemiBold,
+                weight = FontWeight.Light,
                 color = Store.textDim,
-                maxLines = 2,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
         }
     }
 }
 
-/**
- * Una cápsula de la tienda, una por juego: el arte del juego original arriba
- * (o, mientras no hay, la tarjeta del port) y, debajo, el nombre del juego, la
- * insignia de su plataforma con el port (o cuántos ports hay) y el área de
- * acción a la derecha.
- *
- * Al recibir el foco (mando) se ilumina con el acento y avisa con [onFocus]
- * (la tienda aprovecha para pedir sus releases).
- */
+/** La caja blanca con letra negra (NUEVO, ACTUALIZADO, v1.3), como la de un descuento. */
 @Composable
-fun PortCapsule(
-    port: PortEntry,
-    action: PortAction,
-    width: Dp,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    progress: Float? = null,
-    owned: Boolean = false,
-    onFocus: () -> Unit = {},
-    /** El arte del juego original para la cápsula (null: la tarjeta del port). */
-    art: Any? = null,
-    /** Cuántos ports tiene el juego (con más de uno, la cápsula lo dice en vez del nombre del port). */
-    portCount: Int = 1,
-) {
-    val shape = RoundedCornerShape(4.dp)
-    val skin = LocalSkin.current
-    var focused by remember { mutableStateOf(false) }
-    Column(
+fun StoreBadge(text: String, modifier: Modifier = Modifier) {
+    ElyText(
+        text,
         modifier
-            .width(width)
-            .clip(shape)
-            .background(if (focused) Store.panelHigh else Store.capsule)
-            .border(1.dp, if (focused) skin.a1 else Store.line, shape)
-            .onFocusChanged {
-                focused = it.isFocused
-                if (it.isFocused) onFocus()
-            }
-            .shapeClickable(shape, color = skin.a1, onClick = onClick),
-    ) {
-        Box {
-            StoreImage(
-                art ?: port.image,
-                PortDisplay.title(port),
-                Modifier
-                    .fillMaxWidth()
-                    .height(PortsLayout.capsuleImageHeight(width.value).dp),
+            .background(Store.badge, RoundedCornerShape(2.dp))
+            .padding(horizontal = 5.dp, vertical = 1.dp),
+        size = 9.5f,
+        weight = FontWeight.Bold,
+        color = Store.badgeText,
+        maxLines = 1,
+        uppercase = true,
+    )
+}
+
+/** El texto de [status] (sin la caja ni lo tachado). */
+@Composable
+fun tileStatusText(status: TileStatus): String = when (status.text) {
+    TileStatus.Text.Free -> stringResource(R.string.ports_action_free)
+    TileStatus.Text.Size -> formatSize(status.size)
+    TileStatus.Text.Installed -> stringResource(R.string.ports_action_installed)
+    TileStatus.Text.Update -> stringResource(R.string.ports_action_update)
+    TileStatus.Text.Downloading -> "${status.percent} %"
+    TileStatus.Text.NotOnAndroid -> stringResource(R.string.ports_action_pc_only)
+    TileStatus.Text.VrOnly -> stringResource(R.string.ports_action_vr_only)
+    TileStatus.Text.Unavailable -> stringResource(R.string.ports_action_unavailable)
+}
+
+/** La línea de estado de una baldosa: [caja] texto ~~tachado~~. */
+@Composable
+fun TileStatusLine(status: TileStatus, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        status.badge?.let { b ->
+            StoreBadge(
+                when (b) {
+                    TileStatus.Badge.New -> stringResource(R.string.store_badge_new)
+                    TileStatus.Badge.Updated -> stringResource(R.string.store_badge_updated)
+                    is TileStatus.Badge.Version -> b.tag
+                },
             )
-            val badges = trustBadges(port, compact = true)
-            if (badges.isNotEmpty()) {
-                Row(
-                    Modifier
-                        .align(Alignment.TopStart)
-                        .padding(5.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    badges.forEach { StoreChip(stringResource(it)) }
-                }
-            }
-            if (owned) {
-                ElyText(
-                    "✓",
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(5.dp)
-                        .background(Store.ok.copy(alpha = 0.9f), RoundedCornerShape(3.dp))
-                        .padding(horizontal = 6.dp, vertical = 1.dp),
-                    size = 11f,
-                    weight = FontWeight.Bold,
-                    color = Color.White,
-                )
-            }
+            Spacer(Modifier.width(6.dp))
         }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .height(PortsLayout.CAPSULE_BAND.dp)
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Column(Modifier.weight(1f)) {
-                ElyText(PortDisplay.title(port), size = 11.5f, weight = FontWeight.SemiBold, color = Store.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    PlatformBadge(port.platform)
-                    Spacer(Modifier.width(5.dp))
-                    ElyText(
-                        if (portCount > 1) pluralStringResource(R.plurals.ports_count, portCount, portCount) else portLineText(port),
-                        size = 9.5f,
-                        color = Store.textDim,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            PortActionPill(action, progress = progress)
+        ElyText(tileStatusText(status), size = 11.5f, weight = FontWeight.Medium, color = Store.text, maxLines = 1)
+        status.struck?.let {
+            Spacer(Modifier.width(6.dp))
+            ElyText(it, size = 11f, color = Store.textDim, maxLines = 1, decoration = TextDecoration.LineThrough)
         }
     }
 }
 
-/** El fino canto de luz que separa bloques de la ficha. */
+/**
+ * Una baldosa cuadrada de la rejilla: el arte recortado a sangre y, abajo a
+ * la izquierda sobre un degradado oscuro, su línea de estado. Con el foco
+ * crece un poco con un muelle, lleva el marco blanco y enseña el nombre del
+ * juego encima de la línea de estado; sin él, se apaga un poco.
+ */
+@Composable
+fun StoreTile(
+    port: PortEntry,
+    status: TileStatus,
+    art: Any?,
+    side: Dp,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onFocus: () -> Unit = {},
+) {
+    val shape = RoundedCornerShape(StoreLayout.TILE_RADIUS.dp)
+    val reduced = LocalReducedMotion.current
+    var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        if (focused) StoreLayout.FOCUS_SCALE else 1f,
+        if (reduced) tween(0) else spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "tileScale",
+    )
+    val dim by animateFloatAsState(if (focused) 0f else 0.14f, if (reduced) tween(0) else tween(StoreLayout.FOCUS_MS), label = "tileDim")
+    val title = PortDisplay.title(port)
+    Box(
+        modifier
+            .size(side)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .storeFocusRing(focused, StoreLayout.TILE_RADIUS.dp)
+            .semantics { contentDescription = title }
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) onFocus()
+            }
+            .clip(shape)
+            .storeClickable(onClick = onClick),
+    ) {
+        StoreImage(art ?: port.image, title, Modifier.fillMaxSize())
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Brush.verticalGradient(0.45f to Color.Transparent, 1f to Store.scrim)),
+        )
+        Column(Modifier.align(Alignment.BottomStart).padding(horizontal = 10.dp, vertical = 9.dp)) {
+            if (focused) {
+                ElyText(title, size = 12.5f, weight = FontWeight.Normal, color = Store.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(3.dp))
+            }
+            TileStatusLine(status)
+        }
+        if (dim > 0f) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = dim)))
+    }
+}
+
+/** Una tarjeta apaisada (16:9) de un carrusel: el arte y, abajo, el nombre y su estado. */
+@Composable
+fun StoreCard(
+    port: PortEntry,
+    status: TileStatus,
+    art: Any?,
+    width: Dp,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onFocus: () -> Unit = {},
+) {
+    val shape = RoundedCornerShape(StoreLayout.TILE_RADIUS.dp)
+    val reduced = LocalReducedMotion.current
+    var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        if (focused) StoreLayout.FOCUS_SCALE else 1f,
+        if (reduced) tween(0) else spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "cardScale",
+    )
+    val title = PortDisplay.title(port)
+    Box(
+        modifier
+            .width(width)
+            .height(StoreLayout.cardHeight(width.value).dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .storeFocusRing(focused, StoreLayout.TILE_RADIUS.dp)
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) onFocus()
+            }
+            .clip(shape)
+            .storeClickable(onClick = onClick),
+    ) {
+        StoreImage(art ?: port.image, title, Modifier.fillMaxSize())
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.4f to Color.Transparent, 1f to Store.scrim)))
+        Column(Modifier.align(Alignment.BottomStart).padding(horizontal = 10.dp, vertical = 8.dp)) {
+            ElyText(title, size = 12f, color = Store.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(2.dp))
+            TileStatusLine(status)
+        }
+    }
+}
+
+/**
+ * Un cartel grande de la portada (≈ 4:3): el arte a sangre y una llamada en
+ * letra gruesa sobre una caja del acento ("PORTS NUEVOS", "RECIÉN ACTUALIZADO").
+ */
+@Composable
+fun StoreHeroBanner(
+    callout: String,
+    title: String,
+    art: Any?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onFocus: () -> Unit = {},
+) {
+    val shape = RoundedCornerShape(8.dp)
+    val skin = LocalSkin.current
+    var focused by remember { mutableStateOf(false) }
+    Box(
+        modifier
+            .storeFocusRing(focused, 8.dp)
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) onFocus()
+            }
+            .clip(shape)
+            .storeClickable(onClick = onClick),
+    ) {
+        StoreImage(art, title, Modifier.fillMaxSize())
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.8f))))
+        Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
+            ElyText(
+                callout,
+                Modifier
+                    .background(skin.a1, RoundedCornerShape(3.dp))
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                size = 20f,
+                weight = FontWeight.ExtraBold,
+                color = Color.White,
+                maxLines = 1,
+                uppercase = true,
+            )
+            Spacer(Modifier.height(8.dp))
+            ElyText(title, size = 15f, weight = FontWeight.Light, color = Store.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** Una colección: el nombre de la familia, cuántos juegos y hasta tres carátulas en abanico. */
+@Composable
+fun StoreCollectionCard(name: String, count: String, arts: List<Any?>, width: Dp, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(StoreLayout.TILE_RADIUS.dp)
+    var focused by remember { mutableStateOf(false) }
+    val reduced = LocalReducedMotion.current
+    val bg by animateColorAsState(if (focused) Store.tileHigh else Store.tile, if (reduced) tween(0) else tween(StoreLayout.FOCUS_MS), label = "collection")
+    Row(
+        modifier
+            .width(width)
+            .height(StoreLayout.cardHeight(width.value).dp)
+            .storeFocusRing(focused, StoreLayout.TILE_RADIUS.dp)
+            .onFocusChanged { focused = it.isFocused }
+            .clip(shape)
+            .background(bg)
+            .storeClickable(onClick = onClick),
+    ) {
+        Column(Modifier.weight(1f).fillMaxHeight().padding(14.dp), verticalArrangement = Arrangement.Bottom) {
+            ElyText(name, size = 18f, weight = FontWeight.Light, color = Store.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            ElyText(count, size = 11f, color = Store.textDim, maxLines = 1)
+        }
+        Row(Modifier.fillMaxHeight().padding(vertical = 12.dp).padding(end = 12.dp), horizontalArrangement = Arrangement.spacedBy((-18).dp)) {
+            arts.take(3).forEach { a ->
+                StoreImage(
+                    a,
+                    "",
+                    Modifier
+                        .fillMaxHeight()
+                        .width(StoreLayout.cardHeight(width.value).dp * 0.5f)
+                        .clip(RoundedCornerShape(3.dp))
+                        .border(1.dp, Store.line, RoundedCornerShape(3.dp)),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Un botón redondo de icono (Buscar, Lista de deseos, Descargas, Más, orden):
+ * sin fondo hasta que tiene el foco, que lo rellena y le pone el aro.
+ */
+@Composable
+fun StoreIconButton(
+    icon: StoreIcon,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = StoreLayout.ICON_BUTTON.dp,
+    filled: Boolean = false,
+    badge: Boolean = false,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val reduced = LocalReducedMotion.current
+    val bg by animateColorAsState(
+        when {
+            focused -> Store.tileHigh
+            filled -> Store.tile
+            else -> Color.Transparent
+        },
+        if (reduced) tween(0) else tween(StoreLayout.FOCUS_MS),
+        label = "iconBg",
+    )
+    Box(
+        modifier
+            .size(size)
+            .storeFocusRing(focused, size / 2, circle = true)
+            .onFocusChanged { focused = it.isFocused }
+            .semantics { contentDescription = description }
+            .clip(CircleShape)
+            .background(bg)
+            .storeClickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        StoreIconGlyph(icon, if (focused || filled) Store.text else Store.text.copy(alpha = 0.85f), size * 0.45f)
+        if (badge) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(size * 0.16f)
+                    .size(9.dp)
+                    .background(LocalSkin.current.a1, CircleShape)
+                    .border(1.5.dp, Store.bg, CircleShape),
+            )
+        }
+    }
+}
+
+/** Una baldosa cuadrada redondeada de la cabecera (la de la tienda y la de descargas). */
+@Composable
+fun StoreHeaderTile(size: Dp, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, description: String? = null, content: @Composable () -> Unit) {
+    val shape = RoundedCornerShape(size * 0.22f)
+    var focused by remember { mutableStateOf(false) }
+    val base = modifier
+        .size(size)
+        .storeFocusRing(focused, size * 0.22f)
+        .onFocusChanged { focused = it.isFocused }
+        .then(if (description != null) Modifier.semantics { contentDescription = description } else Modifier)
+        .clip(shape)
+        .background(if (focused) Store.tileHigh else Store.tile)
+    Box(if (onClick != null) base.storeClickable(onClick = onClick) else base, contentAlignment = Alignment.Center) {
+        content()
+    }
+}
+
+/** Un chip con borde (la consola original, "Android"), como las insignias de plataforma. */
+@Composable
+fun StoreOutlinedChip(text: String, modifier: Modifier = Modifier) {
+    ElyText(
+        text,
+        modifier
+            .border(1.dp, Store.text.copy(alpha = 0.7f), RoundedCornerShape(2.dp))
+            .padding(horizontal = 5.dp, vertical = 1.dp),
+        size = 9.5f,
+        weight = FontWeight.SemiBold,
+        color = Store.text,
+        maxLines = 1,
+        uppercase = true,
+    )
+}
+
+/**
+ * El botón principal de la ficha (Instalar / Actualizar / Abrir), en el
+ * acento de Elyndra y bien redondeado. Mientras baja, es la barra de progreso.
+ */
+@Composable
+fun StorePrimaryButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    progress: Float? = null,
+    busy: Boolean = false,
+) {
+    val skin = LocalSkin.current
+    val shape = RoundedCornerShape(50)
+    var focused by remember { mutableStateOf(false) }
+    val accent = if (enabled) skin.a1 else Store.tileHigh
+    Box(
+        modifier
+            .heightIn(min = 46.dp)
+            .storeFocusRing(focused, 23.dp)
+            .onFocusChanged { focused = it.isFocused }
+            .clip(shape)
+            .background(if (progress != null) Store.tileHigh else accent)
+            .storeClickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (progress != null) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .fillMaxHeight()
+                    .fillMaxWidth(progress.coerceIn(0f, 1f))
+                    .background(accent),
+            )
+        }
+        ElyText(
+            when {
+                progress != null -> "${(progress * 100).toInt()} %"
+                else -> label
+            },
+            Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+            size = 14f,
+            weight = FontWeight.SemiBold,
+            color = if (enabled || progress != null) Color.White else Store.textDim,
+            maxLines = 1,
+        )
+        if (busy) {
+            Box(Modifier.align(Alignment.CenterEnd).padding(end = 14.dp)) {
+                com.elyndra.launcher.ui.components.ArcSpinner(size = 16.dp, color = Color.White)
+            }
+        }
+    }
+}
+
+/** El título de una sección ("Todos los ports", "Recién actualizados"): pequeño y en blanco. */
+@Composable
+fun StoreSectionTitle(text: String, modifier: Modifier = Modifier) {
+    ElyText(text, modifier, size = 14f, weight = FontWeight.Normal, color = Store.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+}
+
+/** El fino canto que separa bloques de la ficha. */
 @Composable
 fun StoreDivider(modifier: Modifier = Modifier) {
     Box(
@@ -357,19 +718,7 @@ fun StoreDivider(modifier: Modifier = Modifier) {
     )
 }
 
-/** Fondo de la tienda (degradado azul noche) con un brillo suave arriba. */
-fun Modifier.storeBackground(): Modifier = this
-    .background(Store.background)
-    .background(
-        Brush.radialGradient(
-            listOf(Color(0x332F6FA8), Color.Transparent),
-            center = Offset(0f, 0f),
-            radius = 900f,
-        ),
-    )
-
-/** Un panel de la ficha: pizarra azul con su canto. */
-fun Modifier.storePanel(radius: Dp = 4.dp): Modifier = this
-    .clip(RoundedCornerShape(radius))
+/** Un panel oscuro redondeado (la ficha, los avisos). */
+fun Modifier.storePanel(radius: Dp = 8.dp, shape: Shape = RoundedCornerShape(radius)): Modifier = this
+    .clip(shape)
     .background(Store.panel)
-    .border(1.dp, Store.line, RoundedCornerShape(radius))
