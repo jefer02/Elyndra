@@ -37,7 +37,10 @@ data class GameSystem(
      */
     val folderGames: Boolean = false,
     val raHash: RaHashKind = RaHashKind.None,
-)
+) {
+    /** Sin emulador: el sistema existe solo para los ports nativos de sus juegos (Switch 2). No se elige para ROMs. */
+    val portsOnly: Boolean get() = emulators.isEmpty()
+}
 
 private fun sys(
     id: String,
@@ -80,6 +83,13 @@ object Systems {
             "switch", "Nintendo Switch", "SWITCH", "NSW", "nsp xci nca nro nso",
             "switch nsw ns nintendoswitch", ss = 225, igdb = listOf(130), ra = null, pair = 0,
             emus = listOf("eden", "eden_nightly", "citron", "sudachi", "yuzu", "kenjinx", "skyline"),
+        ),
+        sys(
+            // Switch 2: no hay emulador ni ROMs que buscar; solo existe para los
+            // ports nativos de sus juegos (la tienda y su carpeta virtual).
+            "switch2", "Nintendo Switch 2", "SWITCH 2", "NS2", "",
+            "switch2 ns2 nintendoswitch2", ss = null, igdb = listOf(508), ra = null, pair = 0,
+            emus = emptyList(),
         ),
         sys(
             // El PC no tiene "ROMs": cada juego es su carpeta con su ejecutable,

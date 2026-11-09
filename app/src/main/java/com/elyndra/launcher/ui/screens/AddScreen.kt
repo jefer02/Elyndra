@@ -630,7 +630,7 @@ private fun SystemStep(vm: ElyndraViewModel) {
         placeholder = stringResource(R.string.add_search_systems),
         trailing = { ConsoleGlyphIcon(ConsoleGlyph.Search, P.ink2, size = 16.dp) },
     )
-    val groups = SystemGroups.group(Systems.ALL, add.systemQuery)
+    val groups = SystemGroups.group(Systems.ALL.filterNot { it.portsOnly }, add.systemQuery)
     if (groups.isEmpty()) {
         Spacer(Modifier.height(10.dp))
         ElyText(stringResource(R.string.add_no_system_match), size = 10.5f, color = P.ink2)
