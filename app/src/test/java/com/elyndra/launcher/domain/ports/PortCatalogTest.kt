@@ -25,15 +25,25 @@ class PortCatalogTest {
         assertEquals(emptyList<String>(), parsed!!.rejected)
         val ports = parsed.catalog.ports
         assertEquals(ports.size, ports.map { it.id }.toSet().size)
-        assertTrue(ports.count { it.installable } >= 9)
-        // Cada port instalable tiene texto de requisito en inglés y español.
-        ports.filter { it.requires.userRom }.forEach { p ->
-            assertNotNull(p.id, p.requires.text["en"])
-            assertNotNull(p.id, p.requires.text["es"])
-        }
-        // Nada de ROMs en el catálogo: ninguna URL apunta a otra cosa que GitHub.
+        assertEquals(PortCatalogParser.SCHEMA, parsed.catalog.schema)
+        assertTrue(ports.count { it.installable } >= 50)
+        // Lo que no se instala es porque aún no tiene APK (solo se enseña) o es para gafas de RV.
+        assertTrue(ports.filterNot { it.installable }.all { it.notOnAndroid || it.vrOnly })
+        // Un "aún no en Android" no trae build de Android que instalar.
+        assertTrue(ports.filter { it.availability == PortEntry.SOURCE }.all { it.android == null })
+        // Un zip siempre dice qué APK sacar de dentro, con un patrón que compila.
+        ports.mapNotNull { it.android?.archive }.forEach { Regex(it) }
+        // Los ids de la primera versión siguen ahí (lo instalado se guarda por id).
+        assertTrue(ports.any { it.id == "soh" })
+        // Un texto de requisito siempre trae el inglés.
+        ports.filter { it.requires.text.isNotEmpty() }.forEach { p -> assertNotNull(p.id, p.requires.text["en"]) }
+        // Nada de ROMs en el catálogo: solo GitHub y las fuentes de arte del juego original.
         assertFalse(text.contains("http://"))
-        assertFalse(Regex("""https://(?!github\.com|opengraph\.githubassets\.com|raw\.githubusercontent\.com)""").containsMatchIn(text))
+        val allowed = listOf(
+            "github\\.com", "opengraph\\.githubassets\\.com", "raw\\.githubusercontent\\.com",
+            "cdn2\\.steamgriddb\\.com", "images\\.igdb\\.com", "cdn\\.akamai\\.steamstatic\\.com", "thumbnails\\.libretro\\.com",
+        )
+        assertFalse(Regex("""https://(?!(${allowed.joinToString("|")})/)""").containsMatchIn(text))
     }
 
     @Test fun `defaults fill a minimal entry`() {
@@ -65,6 +75,52 @@ class PortCatalogTest {
         val parsed = PortCatalogParser.parse(text)!!
         assertEquals(7, parsed.catalog.schema)
         assertTrue(parsed.catalog.ports.single().verified)
+    }
+
+    @Test fun `a schema 1 entry reads as schema 2`() {
+        val p = PortCatalogParser.parse(
+            catalog(entry(extra = ""","verified":true""").replace(""""original":{"title":"Game","platform":"n64"}""", """"original":{"title":"Game","platform":"n64","igdbId":5,"sgdbId":6}""")),
+        )!!.catalog.ports.single()
+        assertEquals(PortGame("Game", "n64", igdbId = 5, sgdbId = 6), p.game)
+        assertTrue(p.trust.verified)
+        // Sin datos del generador no hay insignias.
+        assertEquals(emptyList<String>(), p.trust.flags)
+        assertEquals(0L, p.release.publishedAtMillis)
+    }
+
+    @Test fun `a schema 2 entry keeps game art release and trust`() {
+        val text = """{"schema":2,"ports":[{"id":"soh","name":"Ship of Harkinian","repo":{"owner":"o","name":"r"},
+            "game":{"name":"The Legend of Zelda: Ocarina of Time","originalPlatform":"n64","igdbId":1029,"steamAppId":null,"releaseYear":1998,
+              "art":{"cover":"https://cdn.example/c.jpg","hero":"https://cdn.example/h.jpg","screenshots":["https://cdn.example/s1.jpg"]}},
+            "builds":[{"platform":"android"}],
+            "release":{"tag":"v9.3.1","publishedAt":"2026-10-30T12:00:00Z","prerelease":true},
+            "trust":{"verified":false,"reason":"repo < 1 year","stars":101,"contributors":4,
+              "scan":{"status":"not_scanned"},"flags":["prerelease","not_scanned"]}}]}"""
+        val parsed = PortCatalogParser.parse(text)!!
+        assertEquals(emptyList<String>(), parsed.rejected)
+        val p = parsed.catalog.ports.single()
+        assertEquals(2, parsed.catalog.schema)
+        assertEquals("The Legend of Zelda: Ocarina of Time", p.game.name)
+        assertEquals("n64", p.platform)
+        assertEquals(1998, p.game.releaseYear)
+        assertEquals("https://cdn.example/c.jpg", p.game.art.cover)
+        assertEquals(listOf("https://cdn.example/s1.jpg"), p.game.art.screenshots)
+        assertEquals(1_793_361_600_000L, p.release.publishedAtMillis)
+        assertTrue(p.trust.prerelease)
+        // VirusTotal ya no se usa: `scan` y "not_scanned" de un catálogo viejo se leen y se ignoran.
+        assertTrue("not_scanned" in p.trust.flags)
+        assertEquals(listOf("Unverified"), com.elyndra.launcher.domain.ports.UnverifiedDialog.lines(p).map { it.name })
+        assertFalse(p.trust.checkRequirements)
+        assertFalse(p.verified)
+        assertEquals(101, p.trust.stars)
+    }
+
+    @Test fun `http art is rejected`() {
+        val text = """{"schema":2,"ports":[{"id":"x","name":"X","repo":{"owner":"o","name":"r"},
+            "game":{"name":"G","originalPlatform":"pc","art":{"cover":"http://x/c.jpg"}}}]}"""
+        val parsed = PortCatalogParser.parse(text)!!
+        assertTrue(parsed.catalog.ports.isEmpty())
+        assertTrue(parsed.rejected.single().contains("https"))
     }
 
     @Test fun `text that is not a catalog is null`() {
