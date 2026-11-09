@@ -1078,4 +1078,22 @@ Feito pela comunidade, sem revisão. Confira o repositório antes de instalar.</
     <string name="ports_debug_note">Só são publicadas versões de depuração. Uma atualização pode exigir reinstalar, o que apaga os saves deste port.</string>
     <string name="store_button">Loja</string>
     <string name="ports_builtin_catalog">Usando o catálogo incluído.</string>
+    <string name="folder_add_title">Adicionar jogo</string>
+    <string name="folder_add_android">App Android</string>
+    <string name="folder_add_android_detail">Mostra um app instalado nesta pasta</string>
+    <string name="folder_add_file">Arquivo de jogo</string>
+    <string name="folder_add_file_detail">Copia um arquivo para esta pasta</string>
+    <string name="folder_add_port">Procurar um port</string>
+    <string name="folder_add_no_apps">Não há apps para adicionar</string>
+    <string name="folder_add_app_done">%1$s agora está nesta pasta</string>
+    <string name="folder_add_write_needed">Permita que o Elyndra grave nesta pasta (escolha a mesma pasta)</string>
+    <string name="folder_add_wrong_folder">Essa é outra pasta. Escolha esta para copiar o jogo nela</string>
+    <string name="folder_add_write_denied">O Elyndra não consegue gravar nesta pasta</string>
+    <string name="folder_add_copy_failed">Não foi possível copiar o arquivo</string>
+    <string name="folder_add_exists">%1$s já está nesta pasta</string>
+    <string name="folder_add_copying">Copiando %1$s…</string>
+    <string name="folder_add_copied">%1$s copiado</string>
+    <string name="folder_art_change">Mudar arte da pasta</string>
+    <string name="folder_art_reset">Voltar ao automático</string>
+    <string name="folder_move_none">Sem pasta (apps Android)</string>
 </resources>

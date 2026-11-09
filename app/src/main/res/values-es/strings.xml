@@ -1078,4 +1078,22 @@ Hecho por la comunidad, sin revisar. Mira el repositorio antes de instalar.</str
     <string name="ports_debug_note">Solo se publican versiones de depuración. Una actualización puede pedir reinstalar, y eso borra las partidas de este port.</string>
     <string name="store_button">Tienda</string>
     <string name="ports_builtin_catalog">Usando el catálogo incluido.</string>
+    <string name="folder_add_title">Añadir juego</string>
+    <string name="folder_add_android">App Android</string>
+    <string name="folder_add_android_detail">Muestra una app instalada en esta carpeta</string>
+    <string name="folder_add_file">Archivo de juego</string>
+    <string name="folder_add_file_detail">Copia un archivo a esta carpeta</string>
+    <string name="folder_add_port">Buscar un port</string>
+    <string name="folder_add_no_apps">No hay apps que añadir</string>
+    <string name="folder_add_app_done">%1$s ya está en esta carpeta</string>
+    <string name="folder_add_write_needed">Deja que Elyndra escriba en esta carpeta (elige la misma carpeta)</string>
+    <string name="folder_add_wrong_folder">Esa es otra carpeta. Elige esta para copiar el juego en ella</string>
+    <string name="folder_add_write_denied">Elyndra no puede escribir en esta carpeta</string>
+    <string name="folder_add_copy_failed">No se pudo copiar el archivo</string>
+    <string name="folder_add_exists">%1$s ya está en esta carpeta</string>
+    <string name="folder_add_copying">Copiando %1$s…</string>
+    <string name="folder_add_copied">%1$s copiado</string>
+    <string name="folder_art_change">Cambiar arte de la carpeta</string>
+    <string name="folder_art_reset">Volver al automático</string>
+    <string name="folder_move_none">Sin carpeta (apps Android)</string>
 </resources>

@@ -1066,4 +1066,22 @@ Built by the community, not reviewed. Check the repository before installing.</s
     <string name="ports_debug_note">Only debug builds are published. An update may need a reinstall, which deletes this port’s saves.</string>
     <string name="store_button">Store</string>
     <string name="ports_builtin_catalog">Using the built-in catalog.</string>
+    <string name="folder_add_title">Add game</string>
+    <string name="folder_add_android">Android app</string>
+    <string name="folder_add_android_detail">Show an installed app in this folder</string>
+    <string name="folder_add_file">Game file</string>
+    <string name="folder_add_file_detail">Copy a file into this folder</string>
+    <string name="folder_add_port">Find a port</string>
+    <string name="folder_add_no_apps">No apps to add</string>
+    <string name="folder_add_app_done">%1$s is now in this folder</string>
+    <string name="folder_add_write_needed">Allow Elyndra to write to this folder (pick the same folder)</string>
+    <string name="folder_add_wrong_folder">That is a different folder. Pick this folder to copy the game into it</string>
+    <string name="folder_add_write_denied">Elyndra can’t write to this folder</string>
+    <string name="folder_add_copy_failed">Couldn’t copy the file</string>
+    <string name="folder_add_exists">%1$s is already in this folder</string>
+    <string name="folder_add_copying">Copying %1$s…</string>
+    <string name="folder_add_copied">%1$s copied</string>
+    <string name="folder_art_change">Change folder art</string>
+    <string name="folder_art_reset">Reset to automatic</string>
+    <string name="folder_move_none">No folder (Android apps)</string>
 </resources>
