@@ -25,6 +25,11 @@ secrets.properties
 *.secrets.properties
 .env
 .env.*
+!.env.example
+tools/ports-catalog/.env
+tools/ports-catalog/.venv/
+tools/ports-catalog/.cache/
+__pycache__/
 google-services.json
 *.pem
 *.p12
