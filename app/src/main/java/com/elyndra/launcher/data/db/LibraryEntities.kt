@@ -32,6 +32,7 @@ data class FolderEntity(
     val hero: String?,
     val logo: String?,
     val icon: String?,
+    @ColumnInfo(name = "is_virtual", defaultValue = "0") val isVirtual: Boolean = false,
 )
 
 /** Juego quitado a mano de una carpeta: el siguiente análisis no lo devuelve. */
@@ -99,11 +100,19 @@ data class RomEntity(
 )
 
 /** Juego Android elegido para la biblioteca. */
-@Entity(tableName = "android_apps")
+/**
+ * Una app Android de la biblioteca. [folderId] la pone en una carpeta (los
+ * ports, en la de su sistema original). Sin clave ajena a propósito: borrar
+ * una carpeta no puede borrar la app ni su tiempo de juego; la limpieza va en
+ * el código (PortPlacement), no en cascada.
+ */
+@Entity(tableName = "android_apps", indices = [Index("folder_id")])
 data class AppEntity(
     @PrimaryKey @ColumnInfo(name = "package_name") val packageName: String,
     val label: String,
     @ColumnInfo(name = "added_at") val addedAt: Long,
+    @ColumnInfo(name = "folder_id") val folderId: String? = null,
+    @ColumnInfo(name = "folder_manual", defaultValue = "0") val folderManual: Boolean = false,
 )
 
 /**

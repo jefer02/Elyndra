@@ -40,6 +40,7 @@ object LibraryMapper {
         hero = f.hero,
         logo = f.logo,
         icon = f.icon,
+        isVirtual = f.isVirtual,
     )
 
     fun rom(r: RomEntry) = RomEntity(
@@ -68,7 +69,7 @@ object LibraryMapper {
         addedAt = r.addedAt,
     )
 
-    fun app(a: AppEntry) = AppEntity(a.packageName, a.label, a.addedAt)
+    fun app(a: AppEntry) = AppEntity(a.packageName, a.label, a.addedAt, a.folderId, a.folderManual)
 
     /**
      * La parte de texto de los metadatos, o null si no hay nada que guardar
@@ -177,6 +178,7 @@ object LibraryMapper {
                     logo = f.logo,
                     icon = f.icon,
                     excluded = excluded[f.id].orEmpty().toSet(),
+                    isVirtual = f.isVirtual,
                 )
             },
             // Una ROM sin carpeta no se puede enseñar ni lanzar: no entra.
@@ -206,7 +208,7 @@ object LibraryMapper {
             },
             apps = apps.map { a ->
                 val key = "a:${a.packageName}"
-                AppEntry(a.packageName, a.label, a.addedAt, meta(key), playStats(key))
+                AppEntry(a.packageName, a.label, a.addedAt, meta(key), playStats(key), a.folderId, a.folderManual)
             },
             sessions = sessions.sortedBy { it.startedAt }.map { s ->
                 PlaySession(
