@@ -1,0 +1,8 @@
+# Repositories reviewed by hand: listed ones are always `verified: true`,
+# whatever their age, stars or contributors. Add a repo only after checking it.
+#
+# repos:
+#   - repo: owner/name
+#     note: why it's trusted
+
+repos: []
