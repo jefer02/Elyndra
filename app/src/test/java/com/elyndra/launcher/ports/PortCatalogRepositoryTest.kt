@@ -65,6 +65,36 @@ class PortCatalogRepositoryTest {
         assertEquals(listOf("a"), loaded.catalog.ports.map { it.id })
     }
 
+    @Test fun `a 404 from a repo that doesn't exist yet is not offline`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(404).setBody("404: Not Found"))
+        val loaded = repo.load()
+        assertEquals(PortCatalogRepository.Source.Bundled, loaded.source)
+        assertEquals(PortCatalogRepository.Fallback.Unavailable, loaded.fallback)
+        assertEquals(listOf("bundled"), loaded.catalog.ports.map { it.id })
+    }
+
+    @Test fun `a server error or garbage is not offline either`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(500))
+        assertEquals(PortCatalogRepository.Fallback.Unavailable, repo.load(force = true).fallback)
+        server.enqueue(MockResponse().setBody("<html>Not found</html>"))
+        assertEquals(PortCatalogRepository.Fallback.Unavailable, repo.load(force = true).fallback)
+    }
+
+    @Test fun `no network at all and nothing cached is offline`() = runTest {
+        server.shutdown()
+        val loaded = repo.load()
+        assertEquals(PortCatalogRepository.Source.Bundled, loaded.source)
+        assertEquals(PortCatalogRepository.Fallback.Offline, loaded.fallback)
+    }
+
+    @Test fun `the remote catalog has no fallback reason`() = runTest {
+        server.enqueue(MockResponse().setBody(catalog("a")))
+        assertEquals(null, repo.load().fallback)
+        assertEquals(PortCatalogRepository.Fallback.Offline, PortCatalogRepository.fallbackFor(java.net.UnknownHostException("x")))
+        assertEquals(PortCatalogRepository.Fallback.Unavailable, PortCatalogRepository.fallbackFor(com.elyndra.launcher.update.UpdateError.Server(404)))
+        assertEquals(PortCatalogRepository.Fallback.Unavailable, PortCatalogRepository.fallbackFor(null))
+    }
+
     @Test fun `a host outside the allowlist is never contacted`() = runTest {
         val strict = PortCatalogRepository(
             OkHttpClient(),
