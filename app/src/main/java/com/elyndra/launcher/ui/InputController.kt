@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
  * la barra tampoco usa foco: se señala con [InputController.barFocus] y cada
  * botón se pinta resaltado cuando le toca.
  */
-enum class BarItem { Masha, Open, Search, Settings, Back, Emulator, Sections, Sort }
+enum class BarItem { Masha, Open, Search, Store, Settings, Back, Emulator, Sections, Sort }
 
 /**
  * El mando, ya traducido a lo que hace Elyndra.
@@ -279,14 +279,8 @@ class InputController(private val vm: ElyndraViewModel) {
             when (vm.screen) {
                 Screen.Settings -> { vm.settings.onBumper(delta); true }
                 Screen.Add -> { vm.add.updateTab(if (delta < 0) AddTab.Android else AddTab.Roms); true }
-                // En la tienda, L1/R1 siguen recorriendo el dock: vuelven a la biblioteca (ver DockNav).
-                Screen.Ports -> {
-                    when (val stop = DockNav.next(vm.availableFilters(), DockNav.Stop.Ports, delta)) {
-                        is DockNav.Stop.Filter -> vm.leavePortsTo(stop.filter)
-                        DockNav.Stop.Ports -> Unit
-                    }
-                    true
-                }
+                // En la tienda, L1/R1 van de familia en familia (Todos, Nintendo… PC), como las pestañas de categoría.
+                Screen.Ports -> { if (vm.ports.detail == null) vm.ports.cycleGroup(delta); true }
                 else -> false
             }
         }
@@ -332,14 +326,14 @@ class InputController(private val vm: ElyndraViewModel) {
                 }
             }
             BarItem.Search -> vm.toggleSearch()
+            BarItem.Store -> vm.openPorts()
             BarItem.Settings -> vm.go(Screen.Settings)
             BarItem.Back -> vm.go(Screen.Library)
             BarItem.Emulator -> vm.currentFolder()?.let { vm.pickFolderEmulator(it.folder) }
             BarItem.Sections -> {
                 val filters = vm.availableFilters()
                 addFocus = false
-                // El hueco de después de la última sección es la tienda de ports.
-                if (dockFocus == filters.size) vm.openPorts() else filters.getOrNull(dockFocus)?.let { vm.updateFilter(it) }
+                filters.getOrNull(dockFocus)?.let { vm.updateFilter(it) }
             }
             BarItem.Sort -> vm.openSortMenu()
         }
@@ -354,9 +348,8 @@ class InputController(private val vm: ElyndraViewModel) {
     private fun libraryTop(pad: Pad, fallback: (Pad) -> Boolean): Boolean {
         var current = barFocus ?: return fallback(pad)
         val rows = if (meridian) LibraryFocus.meridianRows(vm.searchOpen) else LibraryFocus.rows(dockInBar, vm.searchOpen)
-        // Un hueco más que secciones: el destino del final (la tienda).
-        val dockStops = vm.availableFilters().size + 1
-        dockFocus = dockFocus.coerceIn(0, dockStops - 1)
+        val dockStops = vm.availableFilters().size
+        dockFocus = dockFocus.coerceIn(0, (dockStops - 1).coerceAtLeast(0))
         // Lo señalado ya no está (al abrir el buscador se va "Abrir"): el buscador.
         if (rows.none { current in it }) {
             current = BarItem.Search
@@ -385,7 +378,7 @@ class InputController(private val vm: ElyndraViewModel) {
     private fun focusTop(item: BarItem, fromLeft: Boolean? = null) {
         if (item == BarItem.Sections && barFocus != BarItem.Sections) {
             val all = vm.availableFilters()
-            dockFocus = LibraryFocus.entryDot(all.indexOf(vm.filter), all.size + 1, fromLeft)
+            dockFocus = LibraryFocus.entryDot(all.indexOf(vm.filter), all.size, fromLeft)
         }
         barFocus = item
     }
@@ -476,10 +469,11 @@ class InputController(private val vm: ElyndraViewModel) {
 
     /** Lo que hace la biblioteca igual con carrusel y con rueda. */
     private fun libraryCommon(p: Pad): Boolean = when (p) {
-        // L1/R1 son el atajo estándar de mando para cambiar de sección:
-        // Todos, Android, Consolas… y, al final, la tienda de ports.
+        // L1/R1 son el atajo estándar de mando para cambiar de sección: Todos, Android, Consolas…
         Pad.PagePrev -> cycleFilter(-1)
         Pad.PageNext -> cycleFilter(1)
+        // R2: la tienda de ports (también el botón de la barra).
+        Pad.Store -> { vm.openPorts(); true }
         // Con mando se abre igual que con el dedo.
         // Una sola pulsación abre: carpeta, juego o app (nada que seleccionar antes).
         Pad.Confirm -> vm.selected()?.let { if (vm.tryOpen()) vm.requestOpen(it); true } ?: false
@@ -502,20 +496,17 @@ class InputController(private val vm: ElyndraViewModel) {
         return true
     }
 
-    /** L1/R1: la sección de al lado; tras la última (o antes de la primera), la tienda de ports. */
+    /**
+     * L1/R1: la sección de al lado, dando la vuelta. La tienda ya no es una
+     * parada del dock: tiene su botón en la barra y su atajo (R2).
+     */
     private fun cycleFilter(delta: Int): Boolean {
         val all = vm.availableFilters()
+        if (all.isEmpty()) return true
         addFocus = false
-        when (val next = DockNav.next(all, DockNav.Stop.Filter(vm.filter), delta)) {
-            is DockNav.Stop.Filter -> {
-                if (barFocus == BarItem.Sections) dockFocus = all.indexOf(next.filter)
-                vm.updateFilter(next.filter)
-            }
-            DockNav.Stop.Ports -> {
-                if (barFocus == BarItem.Sections) dockFocus = all.size
-                vm.openPorts()
-            }
-        }
+        val next = all[Math.floorMod(all.indexOf(vm.filter).coerceAtLeast(0) + delta, all.size)]
+        if (barFocus == BarItem.Sections) dockFocus = all.indexOf(next)
+        vm.updateFilter(next)
         return true
     }
 
@@ -570,6 +561,8 @@ class InputController(private val vm: ElyndraViewModel) {
             Pad.Menu -> { vm.go(Screen.Settings); true }
             Pad.AppMenu -> { vm.currentFolder()?.let { vm.itemOptions(it) }; true }
             Pad.Search -> false
+            // R2 también desde una carpeta: la tienda.
+            Pad.Store -> { vm.openPorts(); true }
             Pad.Back -> { vm.back(); true }
         }
     }
