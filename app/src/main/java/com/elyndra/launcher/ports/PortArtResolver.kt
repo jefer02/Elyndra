@@ -1,6 +1,8 @@
 package com.elyndra.launcher.ports
 
 import com.elyndra.launcher.data.Systems
+import com.elyndra.launcher.domain.ports.OriginalArt
+import com.elyndra.launcher.domain.ports.PortArt
 import com.elyndra.launcher.domain.ports.PortEntry
 import com.elyndra.launcher.metadata.IgdbClient
 import com.elyndra.launcher.metadata.LibretroNames
@@ -13,17 +15,12 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 
-/** El arte del juego original de un port: URLs remotas (las pinta Coil con su caché). */
-data class OriginalArt(val cover: String? = null, val hero: String? = null, val logo: String? = null) {
-    val isEmpty: Boolean get() = cover == null && hero == null && logo == null
-}
-
 /**
- * Busca el arte del juego original de un port con los mismos clientes de
- * metadatos que la biblioteca: SteamGridDB (héroe, logo, carátula) e IGDB
- * (carátula, arte) si el usuario puso sus claves, y las miniaturas de
- * libretro (sin clave) como respaldo. Solo lo pide la tienda para el
- * destacado y la ficha, y se recuerda mientras dura la app.
+ * Busca el arte del juego original de un port en el orden de [PortArt.chain]:
+ * el del catálogo, luego SteamGridDB e IGDB si el usuario puso sus claves, la
+ * CDN de Steam (juegos de PC), las miniaturas de libretro y la tarjeta de
+ * GitHub. Lo pide la tienda para las cápsulas, el destacado y la ficha, y se
+ * recuerda mientras dura la app.
  *
  * Para los juegos que ya están en la biblioteca la tienda usa su arte local
  * (el de MediaCache) y esto ni se llama.
@@ -40,46 +37,50 @@ class PortArtResolver(private val engine: MetadataEngine, private val credential
     }
 
     private suspend fun lookup(port: PortEntry): OriginalArt {
-        val title = port.original.title
-        var art = OriginalArt()
-        if (credentials.sgdbKey().isNotBlank()) {
+        val title = port.game.name
+        val libretroFolder = LibretroNames.folderFor(port.platform)
+        val chain = PortArt.chain(
+            port,
+            hasSgdbKey = credentials.sgdbKey().isNotBlank(),
+            hasIgdbKeys = credentials.igdb().isComplete,
+            hasLibretroFolder = libretroFolder != null,
+        )
+        return PortArt.resolve(chain) { source ->
             runCatching {
-                val sgdb = engine.steamGridDb
-                val id = port.original.sgdbId ?: sgdb.search(title).firstOrNull()?.id
-                if (id != null) {
-                    art = art.copy(
-                        hero = sgdb.heroes(id).firstOrNull()?.url,
-                        logo = sgdb.logos(id).firstOrNull()?.url,
-                        cover = sgdb.grids(id, SteamGridDbClient.PORTRAIT).firstOrNull()?.url,
-                    )
-                }
-            }
-        }
-        if ((art.cover == null || art.hero == null) && credentials.igdb().isComplete) {
-            runCatching {
-                val system = Systems.byId(port.original.platform)
-                val game = port.original.igdbId?.let { engine.igdb.byId(it) }
-                    ?: engine.igdb.search(title, system?.igdbIds?.ifEmpty { null }).firstOrNull()
-                if (game != null) {
-                    art = art.copy(
-                        cover = art.cover ?: game.coverId?.let { IgdbClient.imageUrl(it, "cover_big_2x") },
-                        hero = art.hero ?: (game.artworkIds + game.screenshotIds).firstOrNull()?.let { IgdbClient.imageUrl(it, "1080p") },
-                    )
-                }
-            }
-        }
-        if (art.cover == null || art.hero == null) {
-            runCatching {
-                val folder = LibretroNames.folderFor(port.original.platform)
-                if (folder != null) {
-                    val name = LibretroNames.candidates(title, engine.libretro.names(folder), limit = 1).firstOrNull()
-                    if (name != null) {
-                        val lr = engine.libretro.art(folder, name)
-                        art = art.copy(cover = art.cover ?: lr.boxart, hero = art.hero ?: lr.title)
+                when (source) {
+                    PortArt.Source.Catalog -> PortArt.fromCatalog(port)
+                    PortArt.Source.SteamGridDb -> {
+                        val sgdb = engine.steamGridDb
+                        val id = port.game.sgdbId ?: sgdb.search(title).firstOrNull()?.id
+                        id?.let {
+                            OriginalArt(
+                                cover = sgdb.grids(it, SteamGridDbClient.PORTRAIT).firstOrNull()?.url,
+                                hero = sgdb.heroes(it).firstOrNull()?.url,
+                                logo = sgdb.logos(it).firstOrNull()?.url,
+                            )
+                        }
                     }
+                    PortArt.Source.Igdb -> {
+                        val system = Systems.byId(port.platform)
+                        val game = port.game.igdbId?.let { engine.igdb.byId(it) }
+                            ?: engine.igdb.search(title, system?.igdbIds?.ifEmpty { null }).firstOrNull()
+                        game?.let { g ->
+                            OriginalArt(
+                                cover = g.coverId?.let { IgdbClient.imageUrl(it, "cover_big_2x") },
+                                hero = (g.artworkIds + g.screenshotIds).firstOrNull()?.let { IgdbClient.imageUrl(it, "1080p") },
+                            )
+                        }
+                    }
+                    PortArt.Source.Steam -> port.game.steamAppId?.let { PortArt.steam(it) }
+                    PortArt.Source.Libretro -> libretroFolder?.let { folder ->
+                        LibretroNames.candidates(title, engine.libretro.names(folder), limit = 1).firstOrNull()?.let { name ->
+                            val lr = engine.libretro.art(folder, name)
+                            OriginalArt(cover = lr.boxart, hero = lr.title)
+                        }
+                    }
+                    PortArt.Source.GitHub -> PortArt.gitHub(port)
                 }
-            }
+            }.getOrNull()
         }
-        return art
     }
 }
