@@ -1,0 +1,16 @@
+- name: DevilutionX
+  remakes:
+    - Diablo
+  repo: https://github.com/diasurgical/devilutionX
+  info: Windows, Linux, Android, Switch
+  type: remake
+- name: Some Clone
+  clones:
+    - Tetris
+  repo: https://gitlab.com/x/y
+  info: Android
+- name: Desktop Only
+  remakes:
+    - Doom
+  repo: https://github.com/someone/doomish
+  info: Linux only
