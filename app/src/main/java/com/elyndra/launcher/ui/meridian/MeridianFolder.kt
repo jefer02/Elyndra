@@ -1,5 +1,7 @@
 package com.elyndra.launcher.ui.meridian
 
+import com.elyndra.launcher.ui.screens.AddGameButton
+
 import android.content.res.Resources
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -131,6 +133,8 @@ internal fun MeridianFolder(vm: ElyndraViewModel, item: LibraryItem.Folder) {
                         PadGlyphBadge("B", vm.input.gamepadPresent)
                         Spacer(Modifier.width(8.dp))
                         OpenButton(enabled = rom != null, focused = vm.input.isBarFocused(BarItem.Open)) { openKey(rom?.key) }
+                        Spacer(Modifier.width(8.dp))
+                        AddGameButton(vm, item)
                     }
                 },
             )
@@ -204,8 +208,8 @@ internal fun MeridianFolder(vm: ElyndraViewModel, item: LibraryItem.Folder) {
                 EmptyState(
                     title = null,
                     message = stringResource(R.string.folder_empty),
-                    actionLabel = stringResource(R.string.rescan_folder),
-                    onAction = { vm.rescanFolder(item.folder) },
+                    actionLabel = stringResource(R.string.folder_add_title),
+                    onAction = { vm.folderAdd.open(item.folder) },
                     modifier = Modifier.fillMaxWidth().padding(top = top, end = 24.dp),
                     glyph = ConsoleGlyph.Folder,
                 )
@@ -333,6 +337,7 @@ private fun FolderHero(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: RomE
 /** Pistas del mando bajo la rueda de la carpeta (A, X e Y ya están en el hero). */
 private val FOLDER_WHEEL_HINTS = listOf(
     PadHint("↑↓", R.string.hint_move),
+    PadHint("SELECT", R.string.folder_add_title),
     PadHint("B", R.string.hint_back),
 )
 

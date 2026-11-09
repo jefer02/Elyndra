@@ -339,6 +339,8 @@ private fun FolderContent(
                         Spacer(Modifier.width(8.dp))
                         OpenButton(enabled = rom != null, focused = vm.input.isBarFocused(BarItem.Open)) { rom?.let { vm.openRom(it) } }
                         Spacer(Modifier.width(8.dp))
+                        AddGameButton(vm, item)
+                        Spacer(Modifier.width(8.dp))
                         // La misma cabecera que en Meridian: el emulador al principio del hueco,
                         // el sistema con su ruta (recortada por el centro) y la hora al final.
                         // En vertical, si no cabe, el emulador se recorta y luego se queda en su
@@ -384,8 +386,8 @@ private fun FolderContent(
                 EmptyState(
                     title = null,
                     message = stringResource(R.string.folder_empty),
-                    actionLabel = stringResource(R.string.rescan_folder),
-                    onAction = { vm.rescanFolder(item.folder) },
+                    actionLabel = stringResource(R.string.folder_add_title),
+                    onAction = { vm.folderAdd.open(item.folder) },
                     modifier = Modifier.fillMaxSize().padding(bottom = if (vm.input.gamepadPresent) PAD_HINTS_HEIGHT else 0.dp),
                     glyph = ConsoleGlyph.Folder,
                 )
@@ -453,6 +455,20 @@ private fun FolderContent(
         }
 
     }
+}
+
+/**
+ * "Añadir juego" en la barra de la carpeta (también SELECT y sus opciones):
+ * el más, en un botón cuadrado como volver.
+ */
+@Composable
+internal fun AddGameButton(vm: ElyndraViewModel, item: LibraryItem.Folder) {
+    val label = stringResource(R.string.folder_add_title)
+    ConsoleIconButton(
+        onClick = { vm.folderAdd.open(item.folder) },
+        modifier = Modifier.semantics { contentDescription = label },
+        focused = vm.input.isBarFocused(BarItem.AddGame),
+    ) { glyph -> Box(glyph) { SheetGlyph(SheetIcon.Add, Color.White, 18.dp) } }
 }
 
 /** Cuerpo (sp) del rótulo del emulador: [FolderHeader] lo mide con este mismo para compactar. */
@@ -585,6 +601,7 @@ private val FOLDER_HINTS = listOf(
     PadHint("A", R.string.sheet_play),
     PadHint("X", R.string.details),
     PadHint("Y", R.string.hint_options),
+    PadHint("SELECT", R.string.folder_add_title),
     PadHint("B", R.string.hint_back),
 )
 

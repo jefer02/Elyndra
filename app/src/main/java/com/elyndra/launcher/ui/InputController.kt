@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
  * la barra tampoco usa foco: se señala con [InputController.barFocus] y cada
  * botón se pinta resaltado cuando le toca.
  */
-enum class BarItem { Masha, Open, Search, Store, Settings, Back, Emulator, Sections, Sort }
+enum class BarItem { Masha, Open, Search, Store, Settings, Back, Emulator, AddGame, Sections, Sort }
 
 /**
  * El mando, ya traducido a lo que hace Elyndra.
@@ -296,7 +296,9 @@ class InputController(private val vm: ElyndraViewModel) {
 
     /* ── barra superior ───────────────────────────────────────── */
 
-    private fun folderBar(): List<BarItem> = listOf(BarItem.Back, BarItem.Open, BarItem.Emulator)
+    /** Volver, "Abrir", "Añadir juego" y el emulador (una carpeta virtual no tiene emulador). */
+    private fun folderBar(): List<BarItem> =
+        listOfNotNull(BarItem.Back, BarItem.Open, BarItem.AddGame, BarItem.Emulator.takeIf { vm.currentFolder()?.folder?.isVirtual != true })
 
     /**
      * El mando está en la barra superior. Izquierda/derecha la recorren,
@@ -330,6 +332,7 @@ class InputController(private val vm: ElyndraViewModel) {
             BarItem.Settings -> vm.go(Screen.Settings)
             BarItem.Back -> vm.go(Screen.Library)
             BarItem.Emulator -> vm.currentFolder()?.let { vm.pickFolderEmulator(it.folder) }
+            BarItem.AddGame -> vm.currentFolder()?.let { vm.folderAdd.open(it.folder) }
             BarItem.Sections -> {
                 val filters = vm.availableFilters()
                 addFocus = false
@@ -560,7 +563,8 @@ class InputController(private val vm: ElyndraViewModel) {
             Pad.Options -> vm.selectedRom()?.let { vm.romOptions(it); true } ?: false
             Pad.Menu -> { vm.go(Screen.Settings); true }
             Pad.AppMenu -> { vm.currentFolder()?.let { vm.itemOptions(it) }; true }
-            Pad.Search -> false
+            // SELECT: "Añadir juego" (también el botón de la barra y las opciones de la carpeta).
+            Pad.Search -> { vm.currentFolder()?.let { vm.folderAdd.open(it.folder) }; true }
             // R2 también desde una carpeta: la tienda.
             Pad.Store -> { vm.openPorts(); true }
             Pad.Back -> { vm.back(); true }
