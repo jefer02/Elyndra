@@ -1033,4 +1033,22 @@
     <string name="ports_debug_note">デバッグ版のみ公開されています。更新時に再インストールが必要になることがあり、その場合このポートのセーブデータは消えます。</string>
     <string name="store_button">ストア</string>
     <string name="ports_builtin_catalog">内蔵カタログを使用しています。</string>
+    <string name="folder_add_title">ゲームを追加</string>
+    <string name="folder_add_android">Android アプリ</string>
+    <string name="folder_add_android_detail">インストール済みのアプリをこのフォルダーに表示</string>
+    <string name="folder_add_file">ゲームファイル</string>
+    <string name="folder_add_file_detail">ファイルをこのフォルダーにコピー</string>
+    <string name="folder_add_port">ポートを探す</string>
+    <string name="folder_add_no_apps">追加できるアプリがありません</string>
+    <string name="folder_add_app_done">%1$s をこのフォルダーに追加しました</string>
+    <string name="folder_add_write_needed">このフォルダーへの書き込みを許可してください（同じフォルダーを選択）</string>
+    <string name="folder_add_wrong_folder">別のフォルダーです。ゲームをコピーするにはこのフォルダーを選んでください</string>
+    <string name="folder_add_write_denied">Elyndra はこのフォルダーに書き込めません</string>
+    <string name="folder_add_copy_failed">ファイルをコピーできませんでした</string>
+    <string name="folder_add_exists">%1$s はすでにこのフォルダーにあります</string>
+    <string name="folder_add_copying">%1$s をコピー中…</string>
+    <string name="folder_add_copied">%1$s をコピーしました</string>
+    <string name="folder_art_change">フォルダーの画像を変更</string>
+    <string name="folder_art_reset">自動に戻す</string>
+    <string name="folder_move_none">フォルダーなし（Android アプリ）</string>
 </resources>

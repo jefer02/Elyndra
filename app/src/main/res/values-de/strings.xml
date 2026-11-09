@@ -1060,4 +1060,22 @@ Von der Community erstellt, nicht geprüft. Sieh dir vor der Installation das Re
     <string name="ports_debug_note">Es gibt nur Debug-Builds. Ein Update kann eine Neuinstallation erfordern, die die Spielstände dieses Ports löscht.</string>
     <string name="store_button">Shop</string>
     <string name="ports_builtin_catalog">Integrierter Katalog wird verwendet.</string>
+    <string name="folder_add_title">Spiel hinzufügen</string>
+    <string name="folder_add_android">Android-App</string>
+    <string name="folder_add_android_detail">Zeigt eine installierte App in diesem Ordner</string>
+    <string name="folder_add_file">Spieldatei</string>
+    <string name="folder_add_file_detail">Kopiert eine Datei in diesen Ordner</string>
+    <string name="folder_add_port">Port suchen</string>
+    <string name="folder_add_no_apps">Keine Apps zum Hinzufügen</string>
+    <string name="folder_add_app_done">%1$s ist jetzt in diesem Ordner</string>
+    <string name="folder_add_write_needed">Erlaube Elyndra, in diesen Ordner zu schreiben (wähle denselben Ordner)</string>
+    <string name="folder_add_wrong_folder">Das ist ein anderer Ordner. Wähle diesen, um das Spiel hineinzukopieren</string>
+    <string name="folder_add_write_denied">Elyndra kann nicht in diesen Ordner schreiben</string>
+    <string name="folder_add_copy_failed">Datei konnte nicht kopiert werden</string>
+    <string name="folder_add_exists">%1$s ist schon in diesem Ordner</string>
+    <string name="folder_add_copying">%1$s wird kopiert…</string>
+    <string name="folder_add_copied">%1$s kopiert</string>
+    <string name="folder_art_change">Ordnerbild ändern</string>
+    <string name="folder_art_reset">Auf automatisch zurücksetzen</string>
+    <string name="folder_move_none">Kein Ordner (Android-Apps)</string>
 </resources>
