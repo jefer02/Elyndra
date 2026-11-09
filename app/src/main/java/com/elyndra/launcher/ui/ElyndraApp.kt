@@ -58,6 +58,7 @@ import com.elyndra.launcher.ui.components.LocalScreenSize
 import com.elyndra.launcher.ui.components.LocalPadHints
 import com.elyndra.launcher.ui.components.LocalPadInput
 import com.elyndra.launcher.ui.components.ImeBridge
+import com.elyndra.launcher.ui.screens.UserFolderPickerScreen
 import com.elyndra.launcher.ui.components.SafeAreaInsets
 import com.elyndra.launcher.ui.components.PadFocusGroup
 import com.elyndra.launcher.ui.components.ToastView
@@ -251,7 +252,7 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                             Modifier.fillMaxSize().testTag(UiTags.screen(screen)),
                             blocked = overlayOpen,
                             // Biblioteca y Carpeta van con la selección del InputController.
-                            padFocus = screen != Screen.Library && screen != Screen.Folder,
+                            padFocus = screen != Screen.Library && screen != Screen.Folder && screen != Screen.UserFolderPicker,
                         ) {
                             when (screen) {
                                 Screen.Library -> LibraryScreen(vm)
@@ -262,6 +263,7 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                                 Screen.Licenses -> LicensesScreen(vm)
                                 Screen.VoiceSync -> VoiceSyncScreen(vm)
                                 Screen.Ports -> PortsScreen(vm)
+                                Screen.UserFolderPicker -> UserFolderPickerScreen(vm)
                             }
                         }
                     }

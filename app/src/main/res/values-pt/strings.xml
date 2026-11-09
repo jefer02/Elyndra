@@ -1133,4 +1133,40 @@ Feito pela comunidade, sem revisão. Confira o repositório antes de instalar.</
     <string name="store_shot_original">Original</string>
     <string name="store_choose_port">Escolha um port</string>
     <string name="store_release">Release</string>
+    <string name="store_back_to_library">Voltar à biblioteca</string>
+    <string name="user_folder_new">Nova pasta</string>
+    <string name="user_folder_new_ellipsis">Nova pasta…</string>
+    <string name="user_folder_chip">Pasta</string>
+    <string name="user_folder_name_msg">Dê o nome que quiser. Você pode mudá-lo depois.</string>
+    <string name="user_folder_name_hint">Nome da pasta</string>
+    <string name="user_folder_name_empty">A pasta precisa de um nome</string>
+    <string name="user_folder_rename">Renomear</string>
+    <string name="user_folder_description">Descrição</string>
+    <string name="user_folder_description_msg">Opcional. Deixe em branco para removê-la.</string>
+    <string name="user_folder_delete">Excluir pasta</string>
+    <string name="user_folder_delete_msg">“%1$s” será excluída. Os jogos dentro dela continuam na sua biblioteca.</string>
+    <string name="user_folder_add_to">Adicionar à pasta</string>
+    <string name="user_folder_remove_item">Remover desta pasta</string>
+    <string name="user_folder_added">Adicionado a %1$s</string>
+    <string name="user_folder_removed">Removido de %1$s</string>
+    <string name="user_folder_created">Pasta criada</string>
+    <string name="user_folder_empty">Esta pasta está vazia. Adicione alguns jogos.</string>
+    <plurals name="user_folder_games">
+        <item quantity="one">%1$d jogo</item>
+        <item quantity="other">%1$d jogos</item>
+    </plurals>
+    <plurals name="user_folder_games_summary">
+        <item quantity="one">%1$d jogo · %2$s</item>
+        <item quantity="other">%1$d jogos · %2$s</item>
+    </plurals>
+    <string name="user_folder_picker_title">Adicionar jogos a %1$s</string>
+    <string name="user_folder_picker_none">Tudo da sua biblioteca já está nesta pasta.</string>
+    <string name="user_folder_reorder">Reordenar</string>
+    <string name="user_folder_reorder_hint">Mova com o direcional ou toque onde deve ficar.</string>
+    <string name="user_folder_hint_drop">Soltar</string>
+    <string name="user_folder_hint_add">Adicionar</string>
+    <plurals name="user_folder_added_count">
+        <item quantity="one">%1$d jogo adicionado</item>
+        <item quantity="other">%1$d jogos adicionados</item>
+    </plurals>
 </resources>

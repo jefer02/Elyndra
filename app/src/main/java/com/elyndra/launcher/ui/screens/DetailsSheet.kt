@@ -315,6 +315,9 @@ private fun DetailsContent(
                             Spacer(Modifier.height(GAP))
                             CompactAction(move, accent, Modifier.fillMaxWidth()) { vm.pickPortFolder(app) }
                         }
+                        val addToFolder = remember { SheetAction(UiText.res(R.string.user_folder_add_to), icon = SheetIcon.Add) {} }
+                        Spacer(Modifier.height(GAP))
+                        CompactAction(addToFolder, accent, Modifier.fillMaxWidth()) { vm.userFolders.pickFolder(key, title) }
                     }
                 }
                 val memory: @Composable () -> Unit = {

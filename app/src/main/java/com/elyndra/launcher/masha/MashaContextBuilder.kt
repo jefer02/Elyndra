@@ -41,6 +41,8 @@ data class ContextInput(
     /** Por sistema: emulador de su carpeta y si está instalado. */
     val folderEmulators: Map<String, Pair<String, Boolean>>,
     val savedLists: List<String>,
+    /** Las carpetas creadas por el usuario, solo por su nombre. */
+    val userFolders: List<String> = emptyList(),
 )
 
 data class BuiltContext(val json: String, val fingerprint: String)
@@ -150,6 +152,7 @@ object MashaContextBuilder {
         b.put("games", games.size)
         b.put("roms", games.count { !it.isApp })
         b.put("android_games", games.count { it.isApp })
+        if (input.userFolders.isNotEmpty()) b.putJsonArray("user_folders") { input.userFolders.forEach { add(it) } }
         b.putJsonArray("systems") {
             games.groupBy { it.systemId ?: "android" }
                 .entries

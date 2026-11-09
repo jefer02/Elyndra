@@ -158,6 +158,7 @@ import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
+import com.elyndra.launcher.ui.components.ArtImage
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.metadata.ArtKind
 import com.elyndra.launcher.data.fmtMinutes
@@ -357,8 +358,9 @@ fun LibraryScreen(vm: ElyndraViewModel) {
         val titleSp = ClassicLayout.titleSp(frame.heroHeight, landscape)
         val logoH = ClassicLayout.logoHeight(frame.heroHeight, landscape)
         val logoMax = if (portrait) PortraitHero.logoMaxHeight(windowHeight, logoH) else logoH * HERO_LOGO_HEIGHT
+        val hasSynopsis = description != null || (sel as? LibraryItem.Folder)?.userFolder?.description != null
         val secondary = when {
-            description != null -> ClassicLayout.synopsisHeight(fontScale, landscape)
+            hasSynopsis -> ClassicLayout.synopsisHeight(fontScale, landscape)
             sel != null && showHint -> ClassicLayout.hintHeight(fontScale, landscape)
             else -> 0f
         }
@@ -368,8 +370,8 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                 if (sel != null) chips else 0f, merged, logoMax,
                 secondary = secondary,
                 // La sinopsis pierde líneas antes de irse; la pista es una sola.
-                secondaryLines = if (description != null) ClassicLayout.synopsisLines(landscape) else 1,
-                secondaryLine = if (description != null) ClassicLayout.synopsisLineHeight(fontScale) else 0f,
+                secondaryLines = if (hasSynopsis) ClassicLayout.synopsisLines(landscape) else 1,
+                secondaryLine = if (hasSynopsis) ClassicLayout.synopsisLineHeight(fontScale) else 0f,
             ),
         )
         val heroBlock = LibraryHero(plan, titleSp, showHint, baseBottomPad)
@@ -796,7 +798,13 @@ private fun HeroInfo(
             .padding(start = m.pad, end = m.pad, bottom = hero.bottomPad.dp + lift),
     ) {
         if (sel != null) {
-            val chip = stringResource(if (sel is LibraryItem.Folder) R.string.chip_emulator_folder else R.string.chip_android_app)
+            val chip = stringResource(
+                when {
+                    sel is LibraryItem.Folder && sel.userFolder != null -> R.string.user_folder_chip
+                    sel is LibraryItem.Folder -> R.string.chip_emulator_folder
+                    else -> R.string.chip_android_app
+                },
+            )
             if (plan.mergedChips) {
                 MergedChipLine(listOf(chip, heroSubline(sel)), m.landscape)
             } else {
@@ -840,13 +848,16 @@ private fun HeroInfo(
         } else {
             LandscapeTitle(sel.name, titleBase)
         }
-        // Solo las apps tienen sinopsis en el hero; las carpetas no.
+        // Tienen sinopsis en el hero las apps y las carpetas del usuario con descripción.
         val app = sel as? LibraryItem.App
         val description = rememberDescription(vm, app?.key, app?.app?.meta)
+        val folderNote = (sel as? LibraryItem.Folder)?.userFolder?.description
         if (!plan.showSecondary) {
             Unit
         } else if (description != null) {
             HeroSynopsis(heroDescription(description, vm.settings.lang), m.landscape, maxLines = plan.secondaryLines)
+        } else if (folderNote != null) {
+            HeroSynopsis(folderNote, m.landscape, maxLines = plan.secondaryLines)
         } else if (sel != null && hero.showHint) {
             // Con mando, las pistas de sus botones ya van al pie del estante.
             ElyText(
@@ -1010,7 +1021,7 @@ internal fun LandscapeTitle(name: String, base: Float) {
  */
 @Composable
 private fun EmptyHeroBlock(vm: ElyndraViewModel, m: Metrics, searching: Boolean, lift: Dp, onAdd: () -> Unit) {
-    val libraryEmpty = vm.library.apps.isEmpty() && vm.library.folders.isEmpty()
+    val libraryEmpty = vm.library.apps.isEmpty() && vm.library.folders.isEmpty() && vm.library.userFolders.isEmpty()
     val compact = m.iconHeroH < EMPTY_COMPACT_HERO
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val reserve = if (searching) EMPTY_RESERVE_SEARCH else if (compact) EMPTY_RESERVE_COMPACT else EMPTY_RESERVE
@@ -1060,12 +1071,16 @@ private const val EMPTY_TITLE_WIDE_FRACTION = 0.58f
 
 @Composable
 internal fun heroSubline(sel: LibraryItem): String = when (sel) {
-    is LibraryItem.Folder -> pluralStringResource(
-        R.plurals.roms_with_emulator,
-        sel.romCount,
-        sel.romCount,
-        sel.emulatorName ?: "—",
-    )
+    is LibraryItem.Folder -> if (sel.userFolder != null) {
+        pluralStringResource(R.plurals.user_folder_games, sel.romCount, sel.romCount)
+    } else {
+        pluralStringResource(
+            R.plurals.roms_with_emulator,
+            sel.romCount,
+            sel.romCount,
+            sel.emulatorName ?: "—",
+        )
+    }
     is LibraryItem.App -> when {
         !sel.installed -> stringResource(R.string.app_not_installed_badge)
         sel.app.stats.minutes > 0 -> stringResource(R.string.played_time, fmtMinutes(sel.app.stats.minutes))
@@ -1497,7 +1512,9 @@ private fun LibraryTile(
             val folderArt = (item as? LibraryItem.Folder)?.art
             // Contenedor e icono son cuadrados: el icono lo llena entero,
             // centrado, sin dejar huecos y sin deformarse.
-            if (item is LibraryItem.Folder && folderArt is FolderArt.System) {
+            if (item is LibraryItem.Folder && item.userFolder != null && item.coverPath != null) {
+                ArtImage(item.coverPath, fallback, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            } else if (item is LibraryItem.Folder && folderArt is FolderArt.System) {
                 SystemArtTile(folderArt.spec, item.system.short, Modifier.fillMaxSize())
             } else if (folderArt is FolderArt.Collage) {
                 FolderCollage(folderArt.covers, fallback, Modifier.fillMaxSize())

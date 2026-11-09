@@ -13,6 +13,7 @@ import com.elyndra.launcher.data.PlayStats
 import com.elyndra.launcher.data.RaInfo
 import com.elyndra.launcher.data.RomEntry
 import com.elyndra.launcher.data.RomFolder
+import com.elyndra.launcher.data.UserFolder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -86,7 +87,62 @@ class LibraryPersistenceTest {
         stats = changes.upsertStats,
         sessions = changes.upsertSessions,
         state = LibraryStateEntity(lastAutoScan = changes.lastAutoScan ?: 0, importedAt = 0),
+        userFolders = changes.upsertUserFolders,
+        userFolderItems = changes.upsertUserFolderItems,
     )
+
+    private val userFolder = UserFolder(
+        id = "u-1",
+        name = "Favoritos",
+        description = "Lo mejor",
+        position = 2,
+        createdAt = 11,
+        meta = GameMeta(cover = "media/f_u-1/cover_1.png", pinned = listOf("cover"), artOrigins = mapOf("cover" to ArtOrigin("local"))),
+        items = listOf("a:com.a", "r:r2", "r:r1"),
+    )
+
+    private val withUserFolder = library.copy(userFolders = listOf(userFolder))
+
+    @Test
+    fun userFoldersRoundTripWithTheirArtAndOrder() {
+        assertEquals(withUserFolder, persistAndReload(LibraryDiff.between(Library(), withUserFolder)))
+    }
+
+    @Test
+    fun reorderingWritesOnlyTheItemsThatMoved() {
+        val moved = withUserFolder.copy(userFolders = listOf(userFolder.copy(items = listOf("r:r2", "a:com.a", "r:r1"))))
+        val c = LibraryDiff.between(withUserFolder, moved)
+        assertEquals(setOf("r:r2", "a:com.a"), c.upsertUserFolderItems.map { it.gameKey }.toSet())
+        assertEquals(2, c.size)
+    }
+
+    @Test
+    fun deletingAUserFolderCleansItsItemsAndArtButNoGame() {
+        val c = LibraryDiff.between(withUserFolder, library)
+        assertEquals(listOf("u-1"), c.deleteUserFolders.map { it.id })
+        assertEquals(3, c.deleteUserFolderItems.size)
+        assertEquals(listOf("f:u-1"), c.deleteArtwork.map { it.gameKey })
+        assertTrue(c.deleteRoms.isEmpty() && c.deleteApps.isEmpty())
+    }
+
+    @Test
+    fun aGameThatLeavesIsRemovedFromUserFoldersEvenIfTheSnapshotStillListsIt() {
+        val c = LibraryDiff.between(withUserFolder, withUserFolder.copy(roms = withUserFolder.roms.filterNot { it.id == "r2" }))
+        assertEquals(listOf("r:r2"), c.deleteUserFolderItems.map { it.gameKey })
+        // r:r1 sube un puesto al irse el que tenía delante.
+        assertEquals(listOf("r:r1"), c.upsertUserFolderItems.map { it.gameKey })
+    }
+
+    @Test
+    fun itemsOfGamesThatNoLongerExistAreNotLoaded() {
+        val reloaded = LibraryMapper.assemble(
+            folders = emptyList(), exclusions = emptyList(), roms = emptyList(), apps = listOf(AppEntity("com.a", "A", 3)),
+            metadata = emptyList(), artwork = emptyList(), stats = emptyList(), sessions = emptyList(), state = null,
+            userFolders = listOf(UserFolderEntity("u-1", "x", null, 0, 0)),
+            userFolderItems = listOf(UserFolderItemEntity("u-1", "r:gone", 0), UserFolderItemEntity("u-1", "a:com.a", 1)),
+        )
+        assertEquals(listOf("a:com.a"), reloaded.userFolders.single().items)
+    }
 
     @Test
     fun whatIsSavedIsWhatIsRead() {

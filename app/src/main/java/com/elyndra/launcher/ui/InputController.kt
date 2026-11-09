@@ -238,6 +238,7 @@ class InputController(private val vm: ElyndraViewModel) {
             vm.sortMenuOpen -> sortMenu(pad)
             vm.screen == Screen.Library -> library(pad)
             vm.screen == Screen.Folder -> folder(pad)
+            vm.screen == Screen.UserFolderPicker -> picker(pad)
             else -> form(pad)
         }
     }
@@ -486,7 +487,7 @@ class InputController(private val vm: ElyndraViewModel) {
         Pad.Confirm -> vm.selected()?.let { if (vm.tryOpen()) vm.requestOpen(it); true } ?: false
         // Con la biblioteca vacía, X es la segunda acción del estado vacío: la tienda de ports.
         Pad.Details -> vm.selected()?.let { vm.showDetails(it.key); true }
-            ?: if (vm.library.apps.isEmpty() && vm.library.folders.isEmpty()) { vm.openPorts(); true } else false
+            ?: if (vm.library.apps.isEmpty() && vm.library.folders.isEmpty() && vm.library.userFolders.isEmpty()) { vm.openPorts(); true } else false
         Pad.Options -> vm.selected()?.let { vm.itemOptions(it); true } ?: false
         Pad.Menu -> { vm.go(Screen.Settings); true }
         Pad.Search -> { vm.toggleSearch(); true }
@@ -537,7 +538,27 @@ class InputController(private val vm: ElyndraViewModel) {
 
     /* ── dentro de una carpeta ────────────────────────────────── */
 
-    private fun folder(pad: Pad): Boolean = bar(pad, folderBar()) { p ->
+    /**
+     * Con un juego cogido, la cruceta lo mueve (en la dirección de la lista que
+     * se ve) y A o B lo sueltan. Nada más atraviesa este modo.
+     */
+    private fun grab(pad: Pad): Boolean {
+        val folders = vm.userFolders
+        barFocus = null
+        when (pad) {
+            Pad.Left -> if (!meridian) folders.moveGrabbed(-1)
+            Pad.Right -> if (!meridian) folders.moveGrabbed(1)
+            Pad.Up -> if (meridian) folders.moveGrabbed(-1)
+            Pad.Down -> if (meridian) folders.moveGrabbed(1)
+            Pad.PagePrev -> folders.moveGrabbed(-PAGE)
+            Pad.PageNext -> folders.moveGrabbed(PAGE)
+            Pad.Confirm, Pad.Back -> folders.drop()
+            else -> Unit
+        }
+        return true
+    }
+
+    private fun folder(pad: Pad): Boolean = if (vm.userFolders.grabKey != null) grab(pad) else bar(pad, folderBar()) { p ->
         val roms = vm.folderRoms(vm.folderId)
         val index = roms.indexOfFirst { it.key == vm.selectedRom()?.key }.coerceAtLeast(0)
         fun move(delta: Int): Boolean {
@@ -573,6 +594,51 @@ class InputController(private val vm: ElyndraViewModel) {
             Pad.Store -> { vm.openPorts(); true }
             Pad.Back -> { vm.back(); true }
         }
+    }
+
+    /* ── selector de juegos de una carpeta ────────────────────── */
+
+    /** Fila señalada en el selector; −1 nada (sin resultados o se usa el dedo). */
+    var pickerFocus by mutableIntStateOf(-1); private set
+
+    /** Filas que caben a la vista (lo publica la lista): lo que salta LB/RB. */
+    private var pickerPageRows = 1
+
+    /** Abre el teclado en el buscador del selector (lo pone el propio campo). */
+    var pickerKeyboard: (() -> Unit)? = null
+
+    fun bindPickerPage(rows: Int) {
+        pickerPageRows = rows.coerceAtLeast(1)
+    }
+
+    /** Cambian los resultados: con mando, a la primera fila. */
+    fun onPickerResults(count: Int) {
+        pickerFocus = if (active && count > 0) 0 else -1
+    }
+
+    /** Mantener la cruceta acelera, como en la rueda: la lista puede tener miles de filas. */
+    private fun picker(pad: Pad): Boolean {
+        val p = vm.userFolderPicker
+        val count = p.results.size
+        fun step(delta: Int) {
+            if (count == 0) return
+            pickerFocus = if (pickerFocus !in 0 until count) 0 else (pickerFocus + delta * MeridianInput.stepFor(repeats)).coerceIn(0, count - 1)
+        }
+        when (pad) {
+            Pad.Up -> step(-1)
+            Pad.Down -> step(1)
+            Pad.PagePrev, Pad.PageNext -> if (count > 0) pickerFocus = GridNav.page(pickerFocus, count, 1, pickerPageRows, if (pad == Pad.PagePrev) -1 else 1)
+            // Sin nada señalado, A solo coloca el foco: no marca un juego a ciegas.
+            Pad.Confirm -> {
+                val candidate = p.results.getOrNull(pickerFocus)
+                if (candidate != null) p.toggle(candidate.key) else if (count > 0) pickerFocus = 0
+            }
+            Pad.Options -> p.commit()
+            Pad.Search -> pickerKeyboard?.invoke()
+            Pad.Back -> vm.back()
+            else -> Unit
+        }
+        return true
     }
 
     /* ── menú de acciones ─────────────────────────────────────── */
@@ -788,6 +854,7 @@ class InputController(private val vm: ElyndraViewModel) {
         SheetAction(UiText.res(R.string.search_hint), icon = SheetIcon.Search) { vm.toggleSearch() },
         SheetAction(UiText.res(R.string.sort_by), icon = SheetIcon.Sort) { vm.openSortMenu() },
         SheetAction(UiText.res(R.string.add_title), icon = SheetIcon.App) { vm.go(Screen.Add) },
+        SheetAction(UiText.res(R.string.user_folder_new), icon = SheetIcon.Add) { vm.userFolders.promptCreate() },
         SheetAction(UiText.res(R.string.settings_title), icon = SheetIcon.Service) { vm.go(Screen.Settings) },
         SheetAction(UiText.res(R.string.masha), icon = SheetIcon.Details) { vm.go(Screen.Masha) },
     )

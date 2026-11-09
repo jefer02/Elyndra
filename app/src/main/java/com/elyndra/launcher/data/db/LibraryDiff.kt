@@ -22,24 +22,26 @@ class LibraryChanges {
     val deleteStats = ArrayList<PlayStatsEntity>()
     val upsertSessions = ArrayList<PlaySessionEntity>()
     val deleteSessions = ArrayList<PlaySessionEntity>()
+    val upsertUserFolders = ArrayList<UserFolderEntity>()
+    val deleteUserFolders = ArrayList<UserFolderEntity>()
+    val upsertUserFolderItems = ArrayList<UserFolderItemEntity>()
+    val deleteUserFolderItems = ArrayList<UserFolderItemEntity>()
 
     /** Nuevo valor de `lastAutoScan`, si cambió. */
     var lastAutoScan: Long? = null
 
-    val isEmpty: Boolean
-        get() = lastAutoScan == null && listOf(
-            upsertFolders, deleteFolders, upsertExclusions, deleteExclusions, upsertRoms, deleteRoms,
-            upsertApps, deleteApps, upsertMetadata, deleteMetadata, upsertArtwork, deleteArtwork,
-            upsertStats, deleteStats, upsertSessions, deleteSessions,
-        ).all { it.isEmpty() }
-
-    /** Total de filas afectadas (para registro y pruebas). */
-    val size: Int
+    private val all: List<List<Any>>
         get() = listOf(
             upsertFolders, deleteFolders, upsertExclusions, deleteExclusions, upsertRoms, deleteRoms,
             upsertApps, deleteApps, upsertMetadata, deleteMetadata, upsertArtwork, deleteArtwork,
             upsertStats, deleteStats, upsertSessions, deleteSessions,
-        ).sumOf { it.size }
+            upsertUserFolders, deleteUserFolders, upsertUserFolderItems, deleteUserFolderItems,
+        )
+
+    val isEmpty: Boolean get() = lastAutoScan == null && all.all { it.isEmpty() }
+
+    /** Total de filas afectadas (para registro y pruebas). */
+    val size: Int get() = all.sumOf { it.size }
 }
 
 /**
@@ -55,6 +57,8 @@ object LibraryDiff {
     fun between(old: Library, new: Library): LibraryChanges {
         val c = LibraryChanges()
         val folderIds = new.folders.mapTo(HashSet()) { it.id }
+        // Claves de los juegos que se van: salen también de las carpetas del usuario.
+        val gone = HashSet<String>()
 
         if (old.folders !== new.folders) {
             val before = old.folders.associateBy { it.id }
@@ -89,6 +93,7 @@ object LibraryDiff {
             }
             for (o in old.roms) {
                 if (o.id in after) continue
+                gone += o.key
                 c.deleteRoms += LibraryMapper.rom(o)
                 game(c, o.key, o.meta, null, o.stats, null)
             }
@@ -106,6 +111,7 @@ object LibraryDiff {
             }
             for (o in old.apps) {
                 if (o.packageName in after) continue
+                gone += o.key
                 c.deleteApps += LibraryMapper.app(o)
                 game(c, o.key, o.meta, null, o.stats, null)
             }
@@ -123,8 +129,36 @@ object LibraryDiff {
             for (o in old.sessions) if ((o.key to o.start) !in after) c.deleteSessions += LibraryMapper.session(o)
         }
 
+        userFolders(c, old, new, gone)
+
         if (old.lastAutoScan != new.lastAutoScan) c.lastAutoScan = new.lastAutoScan
         return c
+    }
+
+    private fun userFolders(c: LibraryChanges, old: Library, new: Library, gone: Set<String>) {
+        if (old.userFolders === new.userFolders && gone.isEmpty()) return
+        val before = old.userFolders.associateBy { it.id }
+        for (f in new.userFolders) {
+            val o = before[f.id]
+            if (o === f && f.items.none { it in gone }) continue
+            if (o !== f) {
+                val row = LibraryMapper.userFolder(f)
+                if (o == null || LibraryMapper.userFolder(o) != row) c.upsertUserFolders += row
+                game(c, f.key, o?.meta, f.meta, null, null)
+            }
+            val was = o?.items.orEmpty().withIndex().associate { it.value to it.index }
+            val now = f.items.filterNot { it in gone }
+            for (row in LibraryMapper.userFolderItems(f.id, now)) if (was[row.gameKey] != row.position) c.upsertUserFolderItems += row
+            val kept = now.toHashSet()
+            for ((key, position) in was) if (key !in kept) c.deleteUserFolderItems += UserFolderItemEntity(f.id, key, position)
+        }
+        val ids = new.userFolders.mapTo(HashSet()) { it.id }
+        for (o in old.userFolders) {
+            if (o.id in ids) continue
+            o.items.forEachIndexed { i, key -> c.deleteUserFolderItems += UserFolderItemEntity(o.id, key, i) }
+            c.deleteUserFolders += LibraryMapper.userFolder(o)
+            game(c, o.key, o.meta, null, null, null)
+        }
     }
 
     /** Metadatos, imágenes y contadores de un juego ([newMeta] null = el juego se fue). */

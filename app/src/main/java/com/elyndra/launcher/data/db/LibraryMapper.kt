@@ -13,6 +13,7 @@ import com.elyndra.launcher.data.PlayStats
 import com.elyndra.launcher.data.RaInfo
 import com.elyndra.launcher.data.RomEntry
 import com.elyndra.launcher.data.RomFolder
+import com.elyndra.launcher.data.UserFolder
 
 /**
  * Ida y vuelta entre la instantánea de la biblioteca y las filas de Room.
@@ -140,6 +141,11 @@ object LibraryMapper {
         earlyExit = s.earlyExit,
     )
 
+    fun userFolder(f: UserFolder) = UserFolderEntity(f.id, f.name, f.description, f.position, f.createdAt)
+
+    fun userFolderItems(folderId: String, keys: List<String>): List<UserFolderItemEntity> =
+        keys.mapIndexed { i, key -> UserFolderItemEntity(folderId, key, i) }
+
     /* ── filas → instantánea ──────────────────────────────────── */
 
     fun assemble(
@@ -152,6 +158,8 @@ object LibraryMapper {
         stats: List<PlayStatsEntity>,
         sessions: List<PlaySessionEntity>,
         state: LibraryStateEntity?,
+        userFolders: List<UserFolderEntity> = emptyList(),
+        userFolderItems: List<UserFolderItemEntity> = emptyList(),
     ): Library {
         val excluded = exclusions.groupBy({ it.folderId }, { it.docId })
         val metaByKey = metadata.associateBy { it.gameKey }
@@ -161,6 +169,12 @@ object LibraryMapper {
 
         fun meta(key: String) = gameMeta(metaByKey[key], artByKey[key].orEmpty())
         fun playStats(key: String) = statsByKey[key]?.let { PlayStats(it.minutes, it.lastPlayed, it.launches) } ?: PlayStats()
+
+        val validRoms = roms.filter { it.folderId in folderIds }
+        val liveKeys = HashSet<String>((validRoms.size + apps.size) * 2)
+        validRoms.mapTo(liveKeys) { "r:${it.id}" }
+        apps.mapTo(liveKeys) { "a:${it.packageName}" }
+        val itemsByFolder = userFolderItems.filter { it.gameKey in liveKeys }.groupBy { it.folderId }
 
         return Library(
             folders = folders.map { f ->
@@ -182,7 +196,7 @@ object LibraryMapper {
                 )
             },
             // Una ROM sin carpeta no se puede enseñar ni lanzar: no entra.
-            roms = roms.filter { it.folderId in folderIds }.map { r ->
+            roms = validRoms.map { r ->
                 val key = "r:${r.id}"
                 RomEntry(
                     id = r.id,
@@ -222,6 +236,17 @@ object LibraryMapper {
                 )
             },
             lastAutoScan = state?.lastAutoScan ?: 0,
+            userFolders = userFolders.sortedWith(compareBy({ it.position }, { it.createdAt }, { it.id })).map { f ->
+                UserFolder(
+                    id = f.id,
+                    name = f.name,
+                    description = f.description,
+                    position = f.position,
+                    createdAt = f.createdAt,
+                    meta = meta("f:${f.id}"),
+                    items = itemsByFolder[f.id].orEmpty().sortedBy { it.position }.map { it.gameKey },
+                )
+            },
         )
     }
 

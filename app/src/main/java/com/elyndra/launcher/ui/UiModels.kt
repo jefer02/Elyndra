@@ -6,7 +6,10 @@ import androidx.annotation.StringRes
 import com.elyndra.launcher.R
 import com.elyndra.launcher.data.AppEntry
 import com.elyndra.launcher.data.GameSystem
+import com.elyndra.launcher.data.RomEntry
 import com.elyndra.launcher.data.RomFolder
+import com.elyndra.launcher.data.Systems
+import com.elyndra.launcher.data.UserFolder
 import com.elyndra.launcher.domain.library.FolderArt
 import com.elyndra.launcher.library.RomScanner
 import com.elyndra.launcher.masha.MashaAttachment
@@ -20,6 +23,9 @@ enum class Screen {
 
     /** La tienda de ports nativos (ver PortsController): el destino del final del dock. */
     Ports,
+
+    /** Elegir juegos para una carpeta del usuario: "atrás" vuelve a la carpeta. */
+    UserFolderPicker,
 
     /** Subpantallas de Ajustes: "atrás" vuelve a Ajustes. */
     Licenses, VoiceSync;
@@ -77,9 +83,15 @@ sealed interface LibraryItem {
         val emulatorPackage: String? = null,
         /** Lo que se pinta en su card (ver FolderArtResolver). */
         val art: FolderArt = FolderArt.Gradient,
+        /** Es una carpeta del usuario: [folder] y [system] solo existen para reutilizar la vista. */
+        val userFolder: UserFolder? = null,
     ) : LibraryItem {
         override val key: String get() = folder.key
         override val name: String get() = system.name
+
+        /** La plataforma que se enseña: la de la carpeta o, en una del usuario, la del juego (null = Android). */
+        fun platformOf(rom: RomEntry?): String? =
+            if (userFolder == null || rom == null) system.short else Systems.byId(rom.systemId)?.short
     }
 
     data class App(val app: AppEntry, val installed: Boolean) : LibraryItem {

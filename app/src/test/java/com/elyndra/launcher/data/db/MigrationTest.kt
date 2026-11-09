@@ -159,6 +159,26 @@ class MigrationTest {
     }
 
     @Test
+    fun migration8to9AddsOnlyTheUserFolderTables() {
+        val v8 = schema(8)
+        val v9 = schema(9)
+        val sql = sqlOf(ElyndraDatabase.MIGRATION_8_9)
+        val added = setOf("user_folders", "user_folder_items")
+        for (name in added) {
+            val create = v9.getValue(name)["createSql"]!!.jsonPrimitive.content.replace("\${TABLE_NAME}", name)
+            assertTrue(create, sql.contains(create))
+        }
+        val items = v9.getValue("user_folder_items")
+        val index = items["indices"]!!.jsonArray.single().jsonObject["createSql"]!!.jsonPrimitive.content.replace("\${TABLE_NAME}", "user_folder_items")
+        assertTrue(index, sql.contains(index))
+        assertEquals(3, sql.size)
+        assertEquals(v8.keys + added, v9.keys)
+        for (name in v8.keys) assertEquals(name, columns(v8.getValue(name)), columns(v9.getValue(name)))
+        assertEquals(setOf("id", "name", "description", "position", "created_at"), columns(v9.getValue("user_folders")))
+        assertEquals(setOf("folder_id", "game_key", "position"), columns(items))
+    }
+
+    @Test
     fun portPlacementRoundTripsThroughTheMapper() {
         val folder = com.elyndra.launcher.data.RomFolder("v-switch", "switch", "", "", "", isVirtual = true)
         assertTrue(LibraryMapper.folder(folder).isVirtual)
@@ -181,7 +201,8 @@ class MigrationTest {
     @Test
     fun migrationsNeverDropOrDelete() {
         for (m in ElyndraDatabase.MIGRATIONS) for (s in sqlOf(m)) {
-            val upper = s.uppercase()
+            // Una clave ajena en cascada declara una regla: no borra nada al migrar.
+            val upper = s.uppercase().replace("ON DELETE CASCADE", "")
             assertTrue(s, "DROP " !in upper && "DELETE " !in upper)
         }
     }

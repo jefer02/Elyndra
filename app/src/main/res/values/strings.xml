@@ -1121,4 +1121,40 @@ Built by the community, not reviewed. Check the repository before installing.</s
     <string name="store_shot_original">Original</string>
     <string name="store_choose_port">Choose a port</string>
     <string name="store_release">Release</string>
+    <string name="store_back_to_library">Back to library</string>
+    <string name="user_folder_new">New folder</string>
+    <string name="user_folder_new_ellipsis">New folder…</string>
+    <string name="user_folder_chip">Folder</string>
+    <string name="user_folder_name_msg">Give it any name. You can change it later.</string>
+    <string name="user_folder_name_hint">Folder name</string>
+    <string name="user_folder_name_empty">The folder needs a name</string>
+    <string name="user_folder_rename">Rename</string>
+    <string name="user_folder_description">Description</string>
+    <string name="user_folder_description_msg">Optional. Leave it blank to remove it.</string>
+    <string name="user_folder_delete">Delete folder</string>
+    <string name="user_folder_delete_msg">“%1$s” will be deleted. The games inside stay in your library.</string>
+    <string name="user_folder_add_to">Add to folder</string>
+    <string name="user_folder_remove_item">Remove from this folder</string>
+    <string name="user_folder_added">Added to %1$s</string>
+    <string name="user_folder_removed">Removed from %1$s</string>
+    <string name="user_folder_created">Folder created</string>
+    <string name="user_folder_empty">This folder is empty. Add some games to it.</string>
+    <plurals name="user_folder_games">
+        <item quantity="one">%1$d game</item>
+        <item quantity="other">%1$d games</item>
+    </plurals>
+    <plurals name="user_folder_games_summary">
+        <item quantity="one">%1$d game · %2$s</item>
+        <item quantity="other">%1$d games · %2$s</item>
+    </plurals>
+    <string name="user_folder_picker_title">Add games to %1$s</string>
+    <string name="user_folder_picker_none">Everything in your library is already in this folder.</string>
+    <string name="user_folder_reorder">Reorder</string>
+    <string name="user_folder_reorder_hint">Move it with the D-pad or tap where it should go.</string>
+    <string name="user_folder_hint_drop">Drop</string>
+    <string name="user_folder_hint_add">Add</string>
+    <plurals name="user_folder_added_count">
+        <item quantity="one">%1$d game added</item>
+        <item quantity="other">%1$d games added</item>
+    </plurals>
 </resources>

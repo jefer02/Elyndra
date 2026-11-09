@@ -213,6 +213,36 @@ data class PlaySessionEntity(
     @ColumnInfo(name = "early_exit") val earlyExit: Boolean,
 )
 
+/** Carpeta creada por el usuario. Su arte va en `artwork` con la clave `f:<id>`. */
+@Entity(tableName = "user_folders")
+data class UserFolderEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val description: String?,
+    val position: Int,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+)
+
+/** Un juego dentro de una carpeta del usuario. Sin clave ajena al juego: puede ser ROM o app. */
+@Entity(
+    tableName = "user_folder_items",
+    primaryKeys = ["folder_id", "game_key"],
+    foreignKeys = [
+        ForeignKey(
+            entity = UserFolderEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["folder_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("game_key")],
+)
+data class UserFolderItemEntity(
+    @ColumnInfo(name = "folder_id") val folderId: String,
+    @ColumnInfo(name = "game_key") val gameKey: String,
+    val position: Int,
+)
+
 /** Estado suelto de la biblioteca: una sola fila (id 0). */
 @Entity(tableName = "library_state")
 data class LibraryStateEntity(

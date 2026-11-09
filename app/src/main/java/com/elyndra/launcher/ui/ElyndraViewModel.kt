@@ -4,6 +4,7 @@ import com.elyndra.launcher.domain.ports.PortPlacement
 import com.elyndra.launcher.domain.library.FolderAdd
 import com.elyndra.launcher.domain.library.FolderArt
 import com.elyndra.launcher.domain.library.FolderArtResolver
+import com.elyndra.launcher.domain.library.UserFolderLogic
 import com.elyndra.launcher.library.SafGuard
 import com.elyndra.launcher.library.RomScanner
 import com.elyndra.launcher.metadata.MediaFailure
@@ -34,12 +35,14 @@ import com.elyndra.launcher.bench.BenchmarkHooks
 import com.elyndra.launcher.data.AppEntry
 import com.elyndra.launcher.data.BannerHub
 import com.elyndra.launcher.data.Emulators
+import com.elyndra.launcher.data.GameSystem
 import com.elyndra.launcher.data.Library
 import com.elyndra.launcher.data.LibraryRepository
 import com.elyndra.launcher.data.PlaySession
 import com.elyndra.launcher.data.RomEntry
 import com.elyndra.launcher.data.RomFolder
 import com.elyndra.launcher.data.Systems
+import com.elyndra.launcher.data.UserFolder
 import com.elyndra.launcher.data.fmtMinutes
 import com.elyndra.launcher.ui.components.ArtFallback
 import com.elyndra.launcher.ports.GitHubClient
@@ -195,6 +198,9 @@ class ElyndraViewModel @Inject constructor(
     val portInstall = PortInstallController(this, portInstaller)
     /** "Añadir juego" dentro de una carpeta. */
     val folderAdd = FolderAddController(this)
+    /** Las carpetas que crea el usuario. */
+    val userFolders = UserFolderController(this)
+    val userFolderPicker = UserFolderPickerController(this)
 
     private var launchJob: Job? = null
     private var toastJob: Job? = null
@@ -233,11 +239,12 @@ class ElyndraViewModel @Inject constructor(
         derivedCache?.takeIf { it.lib === lib && it.installed === inst }?.let { return it }
         // Los ports instalados salen en la carpeta de su sistema como una entrada más (ver RomEntry.portPackage).
         val placed = lib.apps.filter { it.folderId != null && (inst.isEmpty() || it.packageName in inst) }
-            .map { a -> portEntry(a) }
+            .map { a -> portEntry(a, a.folderId!!) }
+        val userLists = userFolderEntries(lib, inst)
         val roms = (lib.roms + placed).groupBy { it.folderId }.mapValues { (_, list) ->
             list.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.displayTitle })
-        }
-        val folders = lib.folders.mapNotNull { f ->
+        } + userLists
+        val systemFolders = lib.folders.mapNotNull { f ->
             val system = Systems.byId(f.systemId) ?: return@mapNotNull null
             val list = roms[f.id].orEmpty()
             // El fondo elegido a mano para la carpeta manda sobre el heredado.
@@ -260,14 +267,60 @@ class ElyndraViewModel @Inject constructor(
                 art = FolderArtResolver.resolve(f.icon, f.systemId, FolderArtResolver.collageCovers(list.filter { !it.isPort })),
             )
         }
+        val folders = systemFolders + UserFolderLogic.sorted(lib.userFolders).map { userFolderItem(it, userLists[it.id].orEmpty()) }
         return Derived(lib, inst, folders, roms).also { derivedCache = it }
     }
 
-    /** Un port de [app] en su carpeta, visto como una entrada más (su clave es la de la app). */
-    private fun portEntry(app: AppEntry): RomEntry = RomEntry(
+    /** Lo que hay en cada carpeta del usuario, en su orden. Una app desinstalada no sale, pero sigue dentro. */
+    private fun userFolderEntries(lib: Library, inst: Set<String>): Map<String, List<RomEntry>> {
+        if (lib.userFolders.isEmpty()) return emptyMap()
+        val roms = lib.roms.associateBy { it.key }
+        val apps = lib.apps.associateBy { it.key }
+        return lib.userFolders.associate { f ->
+            f.id to f.items.mapNotNull { key ->
+                roms[key] ?: apps[key]?.takeIf { inst.isEmpty() || it.packageName in inst }?.let { portEntry(it, f.id) }
+            }
+        }
+    }
+
+    /** Una carpeta del usuario como una más: la misma card y la misma vista que las de emulador. */
+    private fun userFolderItem(f: UserFolder, list: List<RomEntry>): LibraryItem.Folder {
+        val covers = list.associate { it.key to (it.meta.cover ?: it.meta.icon) }
+        return LibraryItem.Folder(
+            folder = RomFolder(f.id, UserFolderLogic.SYSTEM_ID, treeUri = "", rootDocId = "", displayPath = "", addedAt = f.createdAt, isVirtual = true),
+            system = GameSystem(
+                id = UserFolderLogic.SYSTEM_ID,
+                name = f.name,
+                short = f.name,
+                abbr = UserFolderLogic.abbr(f.name),
+                extensions = emptySet(),
+                aliases = emptySet(),
+                ssId = null,
+                igdbIds = emptyList(),
+                raId = null,
+                pair = 0,
+                emulators = emptyList(),
+            ),
+            romCount = list.size,
+            emulatorName = null,
+            emulatorInstalled = false,
+            minutes = list.sumOf { it.stats.minutes },
+            heroPath = f.meta.hero ?: list.filter { it.meta.hero != null || it.meta.screenshot != null }
+                .maxByOrNull { it.stats.lastPlayed }
+                ?.let { it.meta.hero ?: it.meta.screenshot },
+            coverPath = f.meta.cover,
+            logoPath = f.meta.logo,
+            iconPath = f.meta.icon,
+            art = FolderArtResolver.resolve(f.meta.icon, UserFolderLogic.SYSTEM_ID, UserFolderLogic.collageCovers(f) { covers[it] }),
+            userFolder = f,
+        )
+    }
+
+    /** Un port de [app] en la carpeta [folderId], visto como una entrada más (su clave es la de la app). */
+    private fun portEntry(app: AppEntry, folderId: String): RomEntry = RomEntry(
         id = "port:" + app.packageName,
-        folderId = app.folderId!!,
-        systemId = library.folders.firstOrNull { it.id == app.folderId }?.systemId.orEmpty(),
+        folderId = folderId,
+        systemId = library.folders.firstOrNull { it.id == folderId }?.systemId.orEmpty(),
         docId = "",
         fileName = "",
         relPath = "",
@@ -278,7 +331,7 @@ class ElyndraViewModel @Inject constructor(
         portPackage = app.packageName,
         portName = portInstall.portNameFor(app.packageName),
         // Puesta a mano en la carpeta y sin ser un port instalado: una app Android más (ver FolderAdd).
-        androidApp = app.folderManual && ports.installed.values.none { it.packageName == app.packageName },
+        androidApp = (app.folderManual || UserFolderLogic.isUserKey("f:$folderId")) && ports.installed.values.none { it.packageName == app.packageName },
     )
 
     private class ItemsKey(
@@ -314,7 +367,7 @@ class ElyndraViewModel @Inject constructor(
             LibraryItem.App(it, installedPackages.isEmpty() || it.packageName in installedPackages)
         }
         list = sorted(list)
-        if (filter == LibraryFilter.Android) list = list.filterIsInstance<LibraryItem.App>()
+        if (filter == LibraryFilter.Android) list = list.filter { it is LibraryItem.App || (it as? LibraryItem.Folder)?.userFolder?.let(UserFolderLogic::isAndroidOnly) == true }
         if (filter == LibraryFilter.Consoles) list = list.filterIsInstance<LibraryItem.Folder>()
         if (filter == LibraryFilter.Unnamed) list = list.filter { item ->
             when (item) {
@@ -507,6 +560,7 @@ class ElyndraViewModel @Inject constructor(
     /* ── navegación ───────────────────────────────────────────── */
 
     fun go(target: Screen) {
+        userFolders.drop()
         if (target == Screen.Add) add.onOpen()
         if (target == Screen.Settings) settings.onOpen(fromPage = screen.isSettingsPage)
         sortMenuOpen = false
@@ -547,6 +601,11 @@ class ElyndraViewModel @Inject constructor(
     )
 
     fun back() {
+        // Con un juego cogido, atrás lo suelta antes de salir de la carpeta.
+        if (userFolders.grabKey != null && dialog == null && sheet == null) {
+            userFolders.drop()
+            return
+        }
         when (BackPriority.next(backState())) {
             BackPriority.Target.Intro -> intro.skip()
             // El de actualización se pinta encima del resto: se cierra primero.
@@ -562,7 +621,7 @@ class ElyndraViewModel @Inject constructor(
             BackPriority.Target.SettingsPage -> go(Screen.Settings)
             BackPriority.Target.PortDetail -> ports.closeDetail()
             BackPriority.Target.PortsSearch -> ports.clearFilters()
-            BackPriority.Target.Screen -> go(Screen.Library)
+            BackPriority.Target.Screen -> if (screen == Screen.UserFolderPicker) userFolderPicker.close() else go(Screen.Library)
             BackPriority.Target.Search -> toggleSearch()
             // El teclado lo cierra el mando (InputController) o el propio sistema.
             BackPriority.Target.Keyboard, BackPriority.Target.None -> Unit
@@ -1399,6 +1458,17 @@ class ElyndraViewModel @Inject constructor(
         )
     }
 
+    /** Borra la carpeta del usuario y su arte; los juegos de dentro no se tocan. */
+    fun deleteUserFolder(folder: UserFolder) {
+        val delete = {
+            app.media.deleteFor(folder.key)
+            repo.deleteUserFolder(folder.id)
+            if (folderId == folder.id) screen = Screen.Library
+        }
+        // Desde dentro no hay card que deshacer: la animación solo haría esperar.
+        if (screen == Screen.Folder && folderId == folder.id) delete() else vanishItem(folder.key, delete)
+    }
+
     /**
      * Quita un juego de la biblioteca.
      *
@@ -1486,7 +1556,9 @@ class ElyndraViewModel @Inject constructor(
     fun itemOptions(item: LibraryItem) {
         val groups = when (item) {
             // La carpeta virtual de unos ports: sin emulador, sin analizar ni quitar (se va sola cuando se vacía).
-            is LibraryItem.Folder -> if (item.folder.isVirtual) {
+            is LibraryItem.Folder -> if (item.userFolder != null) {
+                userFolders.groups(item)
+            } else if (item.folder.isVirtual) {
                 listOf(
                     SheetGroup(
                         UiText.res(R.string.sheet_group_play),
@@ -1549,7 +1621,7 @@ class ElyndraViewModel @Inject constructor(
                         // Un port: a qué carpeta va (por defecto, la de su sistema).
                         SheetAction(UiText.res(R.string.ports_move_to_folder), icon = SheetIcon.Rescan, opensSheet = true) { pickPortFolder(item.app) }
                             .takeIf { item.app.folderId != null },
-                    ),
+                    ) + userFolders.membershipActions(item.key, item.app.displayTitle),
                 ),
                 removalGroup(UiText.res(R.string.remove_from_library)) {
                     removeApp(item.app.packageName, item.app.displayTitle)
@@ -1557,13 +1629,14 @@ class ElyndraViewModel @Inject constructor(
             )
         }
         val subtitle = when (item) {
-            is LibraryItem.Folder -> UiText.Raw(item.folder.displayPath)
+            is LibraryItem.Folder -> item.userFolder?.let { userFolders.subtitle(it, item.romCount) } ?: UiText.Raw(item.folder.displayPath)
             is LibraryItem.App -> UiText.Raw(item.app.packageName)
         }
         showSheet(ActionSheetSpec(UiText.Raw(item.name), subtitle, groups, thumbOf(item), heroOf(item)), cardOrigin())
     }
 
     fun romOptions(rom: RomEntry) {
+        userFolders.drop()
         // Un port tiene las opciones de su app (y "Mover a carpeta…").
         if (rom.isPort) {
             repo.appByKey(rom.key)?.let { itemOptions(LibraryItem.App(it, installed = true)) }
@@ -1593,7 +1666,7 @@ class ElyndraViewModel @Inject constructor(
                         listOf(
                             SheetAction(UiText.res(R.string.identify_action), icon = SheetIcon.Search, opensSheet = true) { identify.open(rom.key) },
                             SheetAction(UiText.res(R.string.refresh_metadata), icon = SheetIcon.Refresh) { refreshMetadata(listOf(rom.key)) },
-                        ),
+                        ) + userFolders.membershipActions(rom.key, rom.displayTitle),
                     ),
                     removalGroup(UiText.res(R.string.remove_game)) { removeRom(rom) },
                 ),
@@ -1621,7 +1694,7 @@ class ElyndraViewModel @Inject constructor(
             packageName = item.emulatorPackage,
             fallback = fallbackOf(item),
             info = listOfNotNull(
-                UiText.Raw(item.system.name),
+                if (item.userFolder != null) UiText.plural(R.plurals.user_folder_games, item.romCount, item.romCount) else UiText.Raw(item.system.name),
                 item.emulatorName?.let { UiText.Raw(it) },
                 item.minutes.takeIf { it > 0 }?.let { UiText.Raw(fmtMinutes(it)) },
             ),
@@ -1700,7 +1773,7 @@ class ElyndraViewModel @Inject constructor(
     )
 
     /** El bloque destructivo va solo y al final, con su glifo de papelera. */
-    private fun removalGroup(label: UiText, action: () -> Unit) =
+    internal fun removalGroup(label: UiText, action: () -> Unit) =
         SheetGroup(null, listOf(SheetAction(label, destructive = true, icon = SheetIcon.Remove, action = action)))
 
     /* ── personalizar carátula / fondo / icono ────────────────── */
@@ -1717,7 +1790,7 @@ class ElyndraViewModel @Inject constructor(
      * volver a poner: una carátula guardada antes de este cambio se quedaría
      * si no sin manera de borrarse.
      */
-    private fun artworkGroup(key: String, title: String): SheetGroup {
+    internal fun artworkGroup(key: String, title: String): SheetGroup {
         val settable = artKindsFor(key)
         val set = mutableListOf<SheetAction>()
         val clear = mutableListOf<SheetAction>()
@@ -1756,9 +1829,11 @@ class ElyndraViewModel @Inject constructor(
      * Un juego Android y una carpeta de emulador se representan con logo o
      * icono, que es lo que se ve en su card.
      */
-    private fun artKindsFor(key: String): List<ArtKind> =
-        if (key.startsWith("r:")) listOf(ArtKind.Cover, ArtKind.Background, ArtKind.Logo)
-        else listOf(ArtKind.Background, ArtKind.Logo, ArtKind.Icon)
+    private fun artKindsFor(key: String): List<ArtKind> = when {
+        UserFolderLogic.isUserKey(key) -> ArtKind.entries
+        key.startsWith("r:") -> listOf(ArtKind.Cover, ArtKind.Background, ArtKind.Logo)
+        else -> listOf(ArtKind.Background, ArtKind.Logo, ArtKind.Icon)
+    }
 
     /**
      * Icono, logo y fondo automáticos de las carpetas de emulador.
@@ -2035,7 +2110,8 @@ class ElyndraViewModel @Inject constructor(
     fun resetArt(key: String, kind: ArtKind) {
         viewModelScope.launch {
             art.clear(key, kind)
-            if (key.startsWith("f:")) autoFolderArt(listOf(key)) else engine.refresh(key)
+            // Lo automático de una carpeta del usuario es su mosaico: no hay nada que descargar.
+            if (UserFolderLogic.isUserKey(key)) Unit else if (key.startsWith("f:")) autoFolderArt(listOf(key)) else engine.refresh(key)
             showToast(UiText.res(R.string.art_reset_done))
         }
     }

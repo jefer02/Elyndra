@@ -36,8 +36,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DescriptionTranslationEntity::class,
         InstalledPortEntity::class,
         PortAvailabilityEntity::class,
+        UserFolderEntity::class,
+        UserFolderItemEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class ElyndraDatabase : RoomDatabase() {
@@ -160,6 +162,22 @@ abstract class ElyndraDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+        /** Carpetas creadas por el usuario: dos tablas nuevas y nada más cambia. */
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `user_folders` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `description` TEXT, " +
+                        "`position` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `user_folder_items` (`folder_id` TEXT NOT NULL, `game_key` TEXT NOT NULL, " +
+                        "`position` INTEGER NOT NULL, PRIMARY KEY(`folder_id`, `game_key`), " +
+                        "FOREIGN KEY(`folder_id`) REFERENCES `user_folders`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_user_folder_items_game_key` ON `user_folder_items` (`game_key`)")
+            }
+        }
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
     }
 }

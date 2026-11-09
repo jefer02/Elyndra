@@ -1088,4 +1088,37 @@
     <string name="store_shot_original">オリジナル</string>
     <string name="store_choose_port">ポートを選択</string>
     <string name="store_release">リリース</string>
+    <string name="store_back_to_library">ライブラリに戻る</string>
+    <string name="user_folder_new">新しいフォルダ</string>
+    <string name="user_folder_new_ellipsis">新しいフォルダ…</string>
+    <string name="user_folder_chip">フォルダ</string>
+    <string name="user_folder_name_msg">好きな名前を付けられます。あとで変更できます。</string>
+    <string name="user_folder_name_hint">フォルダ名</string>
+    <string name="user_folder_name_empty">フォルダ名を入力してください</string>
+    <string name="user_folder_rename">名前を変更</string>
+    <string name="user_folder_description">説明</string>
+    <string name="user_folder_description_msg">任意です。空欄にすると削除されます。</string>
+    <string name="user_folder_delete">フォルダを削除</string>
+    <string name="user_folder_delete_msg">「%1$s」を削除します。中のゲームはライブラリに残ります。</string>
+    <string name="user_folder_add_to">フォルダに追加</string>
+    <string name="user_folder_remove_item">このフォルダから外す</string>
+    <string name="user_folder_added">%1$s に追加しました</string>
+    <string name="user_folder_removed">%1$s から外しました</string>
+    <string name="user_folder_created">フォルダを作成しました</string>
+    <string name="user_folder_empty">このフォルダは空です。ゲームを追加してください。</string>
+    <plurals name="user_folder_games">
+        <item quantity="other">%1$d 本のゲーム</item>
+    </plurals>
+    <plurals name="user_folder_games_summary">
+        <item quantity="other">%1$d 本のゲーム · %2$s</item>
+    </plurals>
+    <string name="user_folder_picker_title">%1$s にゲームを追加</string>
+    <string name="user_folder_picker_none">ライブラリのすべてがすでにこのフォルダにあります。</string>
+    <string name="user_folder_reorder">並べ替え</string>
+    <string name="user_folder_reorder_hint">十字キーで動かすか、置きたい場所をタップします。</string>
+    <string name="user_folder_hint_drop">置く</string>
+    <string name="user_folder_hint_add">追加</string>
+    <plurals name="user_folder_added_count">
+        <item quantity="other">%1$d 本のゲームを追加しました</item>
+    </plurals>
 </resources>

@@ -1115,4 +1115,40 @@ Von der Community erstellt, nicht geprüft. Sieh dir vor der Installation das Re
     <string name="store_shot_original">Original</string>
     <string name="store_choose_port">Port auswählen</string>
     <string name="store_release">Release</string>
+    <string name="store_back_to_library">Zurück zur Bibliothek</string>
+    <string name="user_folder_new">Neuer Ordner</string>
+    <string name="user_folder_new_ellipsis">Neuer Ordner…</string>
+    <string name="user_folder_chip">Ordner</string>
+    <string name="user_folder_name_msg">Gib ihm einen beliebigen Namen. Du kannst ihn später ändern.</string>
+    <string name="user_folder_name_hint">Ordnername</string>
+    <string name="user_folder_name_empty">Der Ordner braucht einen Namen</string>
+    <string name="user_folder_rename">Umbenennen</string>
+    <string name="user_folder_description">Beschreibung</string>
+    <string name="user_folder_description_msg">Optional. Leer lassen, um sie zu entfernen.</string>
+    <string name="user_folder_delete">Ordner löschen</string>
+    <string name="user_folder_delete_msg">„%1$s“ wird gelöscht. Die Spiele darin bleiben in deiner Bibliothek.</string>
+    <string name="user_folder_add_to">Zu Ordner hinzufügen</string>
+    <string name="user_folder_remove_item">Aus diesem Ordner entfernen</string>
+    <string name="user_folder_added">Zu %1$s hinzugefügt</string>
+    <string name="user_folder_removed">Aus %1$s entfernt</string>
+    <string name="user_folder_created">Ordner erstellt</string>
+    <string name="user_folder_empty">Dieser Ordner ist leer. Füge ein paar Spiele hinzu.</string>
+    <plurals name="user_folder_games">
+        <item quantity="one">%1$d Spiel</item>
+        <item quantity="other">%1$d Spiele</item>
+    </plurals>
+    <plurals name="user_folder_games_summary">
+        <item quantity="one">%1$d Spiel · %2$s</item>
+        <item quantity="other">%1$d Spiele · %2$s</item>
+    </plurals>
+    <string name="user_folder_picker_title">Spiele zu %1$s hinzufügen</string>
+    <string name="user_folder_picker_none">Deine ganze Bibliothek ist bereits in diesem Ordner.</string>
+    <string name="user_folder_reorder">Neu anordnen</string>
+    <string name="user_folder_reorder_hint">Mit dem Steuerkreuz bewegen oder auf die Zielposition tippen.</string>
+    <string name="user_folder_hint_drop">Ablegen</string>
+    <string name="user_folder_hint_add">Hinzufügen</string>
+    <plurals name="user_folder_added_count">
+        <item quantity="one">%1$d Spiel hinzugefügt</item>
+        <item quantity="other">%1$d Spiele hinzugefügt</item>
+    </plurals>
 </resources>

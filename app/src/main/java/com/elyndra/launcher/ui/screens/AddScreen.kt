@@ -150,7 +150,8 @@ fun AddScreen(vm: ElyndraViewModel) {
                         cornerRadius = 15.dp,
                     ) { BackChevron() }
                     Spacer(Modifier.width(12.dp))
-                    ElyText(stringResource(R.string.add_title), size = TypeScale.Headline, weight = FontWeight.SemiBold, color = P.ink)
+                    ElyText(stringResource(R.string.add_title), size = TypeScale.Headline, weight = FontWeight.SemiBold, color = P.ink, modifier = Modifier.weight(1f))
+                    GhostButton(stringResource(R.string.user_folder_new), { vm.userFolders.promptCreate() })
                 }
 
                 // Las dos pestañas viven dentro de una sola cápsula: lo que se

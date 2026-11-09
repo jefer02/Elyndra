@@ -12,6 +12,7 @@ import com.elyndra.launcher.data.RomFolder
 import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.domain.library.FolderAdd
 import com.elyndra.launcher.domain.library.FolderAddOption
+import com.elyndra.launcher.domain.library.UserFolderLogic
 import com.elyndra.launcher.library.InstalledApp
 import com.elyndra.launcher.library.SafGuard
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +49,10 @@ class FolderAddController(private val vm: ElyndraViewModel) {
 
     /** La hoja de "Añadir juego" de [folder]. */
     fun open(folder: RomFolder) {
+        if (UserFolderLogic.isUserKey(folder.key)) {
+            vm.userFolderPicker.open(folder.id)
+            return
+        }
         val system = Systems.byId(folder.systemId)?.name ?: folder.systemId
         val actions = FolderAdd.options(folder).map { option ->
             when (option) {

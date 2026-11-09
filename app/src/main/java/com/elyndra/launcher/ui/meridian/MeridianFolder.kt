@@ -3,6 +3,8 @@ package com.elyndra.launcher.ui.meridian
 import com.elyndra.launcher.ui.screens.AddGameButton
 
 import android.content.res.Resources
+import com.elyndra.launcher.ui.screens.GrabBadge
+import com.elyndra.launcher.ui.screens.folderChip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.text.TextStyle
@@ -115,7 +117,7 @@ internal fun MeridianFolder(vm: ElyndraViewModel, item: LibraryItem.Folder) {
         enterMs = { enter.value },
         art = MeridianArt(
             key = rom?.key ?: item.key,
-            imagePath = rom?.let { it.meta.hero ?: it.meta.screenshot },
+            imagePath = rom?.let { it.meta.hero ?: it.meta.screenshot } ?: item.heroPath.takeIf { item.userFolder != null },
             fallback = rom?.let { vm.romFallback(it) } ?: vm.fallbackOf(item),
             vanishing = rom?.let { vm.isVanishingArt(it.key, ArtKind.Background) } == true,
             onVanished = { vm.finishVanish() },
@@ -157,7 +159,7 @@ internal fun MeridianFolder(vm: ElyndraViewModel, item: LibraryItem.Folder) {
         tileAspect = COVER_RATIO,
         folderHeader = true,
         hints = {
-            PadHints(hints = FOLDER_WHEEL_HINTS, visible = vm.input.gamepadPresent, modifier = Modifier.padding(start = 12.dp, bottom = 4.dp))
+            PadHints(hints = if (vm.userFolders.grabKey != null) FOLDER_WHEEL_GRAB_HINTS else FOLDER_WHEEL_HINTS, visible = vm.input.gamepadPresent, modifier = Modifier.padding(start = 12.dp, bottom = 4.dp))
         },
         hero = { FolderHero(vm, item, rom, ink, openKey) },
         adaptive = vm.settings.meridianAdaptiveColor,
@@ -187,7 +189,7 @@ internal fun MeridianFolder(vm: ElyndraViewModel, item: LibraryItem.Folder) {
             },
             onTap = { row, at, moving ->
                 val key = roms.getOrNull(row)?.key
-                if (key != null) {
+                if (key != null && !vm.userFolders.dropAt(key)) {
                     val d = gate.tap(key, rom?.key, moving, vm.settings.tapOpensSelected, SystemClock.uptimeMillis(), at.x, at.y, slop)
                     when (d.action) {
                         TapAction.Select -> vm.selectRom(key)
@@ -207,7 +209,7 @@ internal fun MeridianFolder(vm: ElyndraViewModel, item: LibraryItem.Folder) {
                 val top = with(LocalDensity.current) { (focusY.toDp() - 60.dp).coerceAtLeast(0.dp) }
                 EmptyState(
                     title = null,
-                    message = stringResource(R.string.folder_empty),
+                    message = stringResource(if (item.userFolder != null) R.string.user_folder_empty else R.string.folder_empty),
                     actionLabel = stringResource(R.string.folder_add_title),
                     onAction = { vm.folderAdd.open(item.folder) },
                     modifier = Modifier.fillMaxWidth().padding(top = top, end = 24.dp),
@@ -253,7 +255,7 @@ private fun romEntry(res: Resources, rom: RomEntry, folder: LibraryItem.Folder):
         key = rom.key,
         title = rom.displayTitle,
         subline = "$played · $ext",
-        chips = listOf(folder.system.short, played),
+        chips = listOf(folder.platformOf(rom) ?: res.getString(R.string.filter_android), played),
         payload = rom,
         art = rom.meta.cover,
     )
@@ -278,6 +280,7 @@ private fun RomWheelTile(vm: ElyndraViewModel, rom: RomEntry) {
         }
         val unnamed = remember(rom.displayTitle) { !NameCheck.isNameUsable(rom.displayTitle) }
         if (unnamed) NeedsNameBadge(Modifier.align(Alignment.TopStart).padding(3.dp), onDark = true)
+        if (rom.key == vm.userFolders.grabKey) GrabBadge(Modifier.align(Alignment.Center))
         // Sin carátula, el título de la reserva va abajo a la izquierda: la extensión sube para no taparlo.
         Box(
             Modifier
@@ -298,12 +301,12 @@ private fun RomWheelTile(vm: ElyndraViewModel, rom: RomEntry) {
 private fun FolderHero(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: RomEntry?, ink: MeridianInk, openKey: (String?) -> Unit) {
     val description = rememberDescription(vm, rom?.key, rom?.meta)
     val content = if (rom == null) {
-        MeridianHeroContent(item.key, listOf(stringResource(R.string.rom_chip, item.system.short)), item.system.name, null)
+        MeridianHeroContent(item.key, listOf(folderChip(item, null)), item.system.name, null)
     } else {
         MeridianHeroContent(
             key = rom.key,
             chips = listOfNotNull(
-                stringResource(R.string.rom_chip, item.system.short),
+                folderChip(item, rom),
                 rom.meta.ra?.takeIf { it.achievements > 0 }?.let { "🏆 ${it.earned}/${it.achievements}" },
                 playedLabel(rom),
                 rom.subtitle.takeIf { it.isNotEmpty() },
@@ -333,6 +336,12 @@ private fun FolderHero(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: RomE
         }
     }
 }
+
+/** Con un juego cogido: moverlo y soltarlo. */
+private val FOLDER_WHEEL_GRAB_HINTS = listOf(
+    PadHint("↑↓", R.string.hint_move),
+    PadHint("A / B", R.string.user_folder_hint_drop),
+)
 
 /** Pistas del mando bajo la rueda de la carpeta (A, X e Y ya están en el hero). */
 private val FOLDER_WHEEL_HINTS = listOf(

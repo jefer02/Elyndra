@@ -27,6 +27,7 @@ import com.elyndra.launcher.ui.meridian.MeridianMode
 import com.elyndra.launcher.ui.meridian.WheelMath
 import androidx.compose.runtime.SideEffect
 import com.elyndra.launcher.ui.components.ConsoleGlyph
+import com.elyndra.launcher.ui.components.ConsoleGlyphIcon
 import com.elyndra.launcher.ui.components.EmptyState
 import com.elyndra.launcher.ui.components.Metrics
 import com.elyndra.launcher.ui.components.PAD_HINTS_HEIGHT
@@ -190,7 +191,8 @@ fun FolderScreen(vm: ElyndraViewModel) {
             vm.openRom(it)
         }
     }
-    val onRomTap: (RomEntry, Offset, Boolean) -> Unit = { r, at, moving ->
+    val onRomTap: (RomEntry, Offset, Boolean) -> Unit = tap@{ r, at, moving ->
+        if (vm.userFolders.dropAt(r.key)) return@tap
         val d = gate.tap(r.key, rom?.key, moving, vm.settings.tapOpensSelected, SystemClock.uptimeMillis(), at.x, at.y, slop)
         when (d.action) {
             TapAction.Select -> vm.selectRom(r.key)
@@ -257,7 +259,9 @@ fun FolderScreen(vm: ElyndraViewModel) {
         // animar (al nacer o al girar); después, con la animación de siempre.
         val density = LocalDensity.current
         val placed = remember { booleanArrayOf(false) }
-        LaunchedEffect(rom?.key, roms.size, frame.tileWidth, gap, rowLandscape) {
+        // Con un juego cogido cambia su puesto y no su clave: la fila también lo sigue.
+        val grabbedAt = if (vm.userFolders.grabKey != null) roms.indexOfFirst { it.key == rom?.key } else -1
+        LaunchedEffect(rom?.key, grabbedAt, roms.size, frame.tileWidth, gap, rowLandscape) {
             val index = roms.indexOfFirst { it.key == rom?.key }
             if (index < 0) return@LaunchedEffect
             val a = ClassicLayout.anchor(index, frame.tileWidth, gap, rowLandscape)
@@ -316,7 +320,7 @@ private fun FolderContent(
             onBackgroundVanished = { vm.finishVanish() },
             height = hero.frame.heroHeight.dp,
             extension = extension,
-            imagePath = rom?.let { it.meta.hero ?: it.meta.screenshot },
+            imagePath = rom?.let { it.meta.hero ?: it.meta.screenshot } ?: item.heroPath.takeIf { item.userFolder != null },
             topBar = {
                 BoxWithConstraints(
                     Modifier
@@ -385,7 +389,7 @@ private fun FolderContent(
             if (roms.isEmpty()) {
                 EmptyState(
                     title = null,
-                    message = stringResource(R.string.folder_empty),
+                    message = stringResource(if (item.userFolder != null) R.string.user_folder_empty else R.string.folder_empty),
                     actionLabel = stringResource(R.string.folder_add_title),
                     onAction = { vm.folderAdd.open(item.folder) },
                     modifier = Modifier.fillMaxSize().padding(bottom = if (vm.input.gamepadPresent) PAD_HINTS_HEIGHT else 0.dp),
@@ -424,6 +428,7 @@ private fun FolderContent(
                                 time = playedLabel(r),
                                 index = i,
                                 selected = selected,
+                                grabbed = r.key == vm.userFolders.grabKey,
                                 look = look,
                                 fallback = vm.romFallback(r),
                                 width = hero.frame.tileWidth.dp,
@@ -448,7 +453,7 @@ private fun FolderContent(
                 }
             }
             PadHints(
-                hints = FOLDER_HINTS,
+                hints = if (vm.userFolders.grabKey != null) FOLDER_GRAB_HINTS else FOLDER_HINTS,
                 visible = vm.input.gamepadPresent,
                 modifier = Modifier.align(Alignment.BottomStart).padding(start = m.pad - 10.dp, bottom = 2.dp),
             )
@@ -549,7 +554,12 @@ internal fun FolderChips(vm: ElyndraViewModel, item: LibraryItem.Folder, count: 
         ) {
             ElyText(
                 // Corta ("4 ROMs"), cuando en la cabecera de Meridian no cabe con el tiempo jugado (ver FolderBarLayout.Pill).
-                if (short) pluralStringResource(R.plurals.roms_count, count, count) else pluralStringResource(R.plurals.roms_summary, count, count, fmtMinutes(item.minutes)),
+                when {
+                    item.userFolder != null && short -> pluralStringResource(R.plurals.user_folder_games, count, count)
+                    item.userFolder != null -> pluralStringResource(R.plurals.user_folder_games_summary, count, count, fmtMinutes(item.minutes))
+                    short -> pluralStringResource(R.plurals.roms_count, count, count)
+                    else -> pluralStringResource(R.plurals.roms_summary, count, count, fmtMinutes(item.minutes))
+                },
                 size = 8.5f,
                 weight = FontWeight.SemiBold,
                 color = ink2,
@@ -596,6 +606,12 @@ internal fun FolderChips(vm: ElyndraViewModel, item: LibraryItem.Folder, count: 
     }
 }
 
+/** Con un juego cogido: moverlo y soltarlo. */
+private val FOLDER_GRAB_HINTS = listOf(
+    PadHint("←→", R.string.hint_move),
+    PadHint("A / B", R.string.user_folder_hint_drop),
+)
+
 /** Las pistas del mando al pie de la carpeta. */
 private val FOLDER_HINTS = listOf(
     PadHint("A", R.string.sheet_play),
@@ -625,7 +641,7 @@ private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: 
         if (plan.mergedChips) {
             MergedChipLine(
                 listOfNotNull(
-                    item.system.short,
+                    item.platformOf(rom) ?: stringResource(R.string.filter_android),
                     rom?.meta?.ra?.takeIf { it.achievements > 0 }?.let { "🏆 ${it.earned}/${it.achievements}" },
                     rom?.let { playedLabel(it) },
                     rom?.subtitle,
@@ -636,7 +652,7 @@ private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: 
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = if (m.landscape) 3.dp else 6.dp),
         ) {
-            HeroChip(stringResource(R.string.rom_chip, item.system.short))
+            HeroChip(folderChip(item, rom))
             rom?.meta?.ra?.takeIf { it.achievements > 0 }?.let { ra ->
                 Spacer(Modifier.width(6.dp))
                 Box(
@@ -743,10 +759,25 @@ private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: 
 /** Alto (dp) por debajo del cual el logo (o el titular) no se pinta: no se leería. */
 private const val LOGO_HIDE = 12f
 
+/** La ficha del hero: "ROM · PS2"; en una carpeta del usuario, también "Android" o, vacía, su nombre. */
+@Composable
+internal fun folderChip(item: LibraryItem.Folder, rom: RomEntry?): String {
+    val platform = item.platformOf(rom) ?: return stringResource(R.string.filter_android)
+    return if (item.userFolder != null && rom == null) platform else stringResource(R.string.rom_chip, platform)
+}
+
 @Composable
 internal fun playedLabel(rom: RomEntry): String =
     if (rom.stats.minutes > 0) stringResource(R.string.played_time, fmtMinutes(rom.stats.minutes))
     else stringResource(R.string.never_played)
+
+/** La marca de un juego cogido para cambiarlo de sitio. */
+@Composable
+internal fun GrabBadge(modifier: Modifier = Modifier) {
+    Box(modifier.darkGlass(RoundedCornerShape(12.dp)).padding(8.dp)) {
+        ConsoleGlyphIcon(ConsoleGlyph.Handle, Color.White, size = 22.dp)
+    }
+}
 
 /** Card de ROM: carátula vertical, etiqueta de extensión y título si no hay carátula. */
 @Composable
@@ -757,6 +788,8 @@ private fun RomTile(
     time: String,
     index: Int,
     selected: Boolean,
+    /** Cogido para cambiarlo de sitio (carpetas del usuario). */
+    grabbed: Boolean,
     look: SelectionLook,
     fallback: ArtFallback,
     width: Dp,
@@ -883,6 +916,7 @@ private fun RomTile(
             // Sin un nombre que sirva para buscarlo: se marca, sin más avisos.
             val unnamed = remember(rom.displayTitle) { !NameCheck.isNameUsable(rom.displayTitle) }
             if (unnamed) NeedsNameBadge(Modifier.align(Alignment.TopStart).padding(5.dp), onDark = true)
+            if (grabbed) GrabBadge(Modifier.align(Alignment.Center))
 
             if (curtain > 0f) {
                 Box(Modifier.fillMaxSize().alpha(curtain).background(P.paper))

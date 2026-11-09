@@ -24,9 +24,30 @@ data class Library(
     val apps: List<AppEntry> = emptyList(),
     val sessions: List<PlaySession> = emptyList(),
     val lastAutoScan: Long = 0,
+    val userFolders: List<UserFolder> = emptyList(),
 ) {
     /** Las carpetas con árbol SAF: las que se analizan y se leen (las virtuales de los ports no). */
     val realFolders: List<RomFolder> get() = folders.filter { !it.isVirtual }
+}
+
+/**
+ * Carpeta creada por el usuario: mezcla ROMs, ports y apps, y un juego puede
+ * estar en varias. Va aparte de [Library.folders] porque nada de SAF, análisis
+ * o colocación de ports debe verla. Su arte vive en [meta], con la clave `f:<id>`.
+ */
+@Serializable
+data class UserFolder(
+    /** `u-…` (ver UserFolderLogic): su clave no choca con la de un [RomFolder]. */
+    val id: String,
+    val name: String,
+    val description: String? = null,
+    val position: Int = 0,
+    val createdAt: Long = 0,
+    val meta: GameMeta = GameMeta(),
+    /** Claves de juego ("r:…", "a:…"), en el orden elegido. */
+    val items: List<String> = emptyList(),
+) {
+    val key: String get() = "f:$id"
 }
 
 /** Carpeta de ROMs dada de alta: un árbol SAF concedido + la subcarpeta raíz. */
