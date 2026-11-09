@@ -15,7 +15,8 @@ import com.elyndra.launcher.data.Systems
  * la virtual desaparece; una virtual vacía también. Lo que el usuario movió a
  * mano ([com.elyndra.launcher.data.AppEntry.folderManual]) se queda donde lo
  * puso mientras esa carpeta exista (salvo una virtual que ya tiene carpeta de
- * verdad).
+ * verdad). Lo mismo vale para una app que no es un port y que el usuario puso
+ * en una carpeta (ver FolderAdd); sin eso, una app no tiene carpeta.
  *
  * Nada de esto toca el almacenamiento: solo la instantánea de la biblioteca.
  */
@@ -58,6 +59,14 @@ object PortPlacement {
         val apps = library.apps.map { app ->
             val system = ports[app.packageName]?.let(::systemFor)
             if (system == null) {
+                // Una app que el usuario puso en una carpeta ("Añadir juego" → App Android) se queda
+                // mientras la carpeta exista; en una virtual, hasta que haya una de verdad de ese sistema.
+                val home = app.folderId?.let { folders[it] }?.takeIf { app.folderManual }
+                if (home != null) {
+                    val target = if (home.isVirtual) bestRealFolder(library, home.systemId) ?: home else home
+                    if (target.isVirtual) needed[target.id] = target
+                    return@map if (target.id == app.folderId) app else app.copy(folderId = target.id)
+                }
                 return@map if (app.folderId == null && !app.folderManual) app else app.copy(folderId = null, folderManual = false)
             }
             val manual = app.folderId?.let { folders[it] }?.takeIf { app.folderManual }
