@@ -1,6 +1,11 @@
 package com.elyndra.launcher.ui
 
 import android.os.Build
+import androidx.annotation.StringRes
+import com.elyndra.launcher.R
+import com.elyndra.launcher.domain.ports.GameGroup
+import com.elyndra.launcher.domain.ports.PortDisplay
+import com.elyndra.launcher.domain.ports.PortFirstSeen
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -118,6 +123,8 @@ class PortsController(
             source = loaded.source
             fallback = loaded.fallback
             loading = false
+            // Cuándo entró cada port (para NUEVO): solo con el catálogo de la red, que es el que crece.
+            if (loaded.source == PortCatalogRepository.Source.Remote) noteFirstSeen()
             // Los ports instalados con la primera versión no guardaban su sistema: con el catálogo ya se sabe.
             vm.portInstall.place()
             if (force) releases.clear()
@@ -270,7 +277,7 @@ class PortsController(
 
     fun toggleSearch() {
         searchOpen = !searchOpen
-        if (!searchOpen) filter = filter.copy(query = "")
+        if (!searchOpen) filter = filter.copy(query = "") else selectTab(StoreTab.Browse)
     }
 
     /** El chip "Todos": quita familias, géneros y "aún no en Android" (la búsqueda sigue). */
@@ -282,6 +289,7 @@ class PortsController(
     fun filterPlatform(systemId: String) {
         detailId = null
         filter = StoreFilter(sort = filter.sort, platform = systemId)
+        selectTab(StoreTab.Browse)
     }
 
     fun toggleGroup(group: PlatformGroup) {
@@ -300,9 +308,161 @@ class PortsController(
         filter = filter.copy(sort = sort)
     }
 
-    /** L1/R1 en la tienda: de familia en familia (Todos → Nintendo → … → PC → Todos). */
-    fun cycleGroup(delta: Int) {
-        filter = filter.copy(groups = StoreRows.cycleGroup(filter.groups, StoreRows.groupChips(catalog), delta))
+    /* ── pestañas ──────────────────────────────────────────────── */
+
+    /** La pestaña a la vista (Novedades, Colecciones, Actualizaciones, Instalados, Explorar o la lista de deseos). */
+    var tab by mutableStateOf(StoreTab.Latest); private set
+
+    /** Hacia dónde fue el último cambio de pestaña (+1 a la derecha): el contenido se desliza desde ahí. */
+    var tabDirection by mutableStateOf(1); private set
+
+    fun selectTab(next: StoreTab) {
+        if (next == tab) return
+        val from = StoreTab.ROW.indexOf(tab).takeIf { it >= 0 } ?: StoreTab.ROW.size
+        val to = StoreTab.ROW.indexOf(next).takeIf { it >= 0 } ?: StoreTab.ROW.size
+        tabDirection = if (to >= from) 1 else -1
+        tab = next
+    }
+
+    /** L1/R1 en la tienda: la pestaña de al lado, dando la vuelta. */
+    fun cycleTab(delta: Int) {
+        selectTab(StoreTab.cycle(tab, delta))
+    }
+
+    /** Una colección (familia de consolas): Explorar con ese filtro. */
+    fun openCollection(group: PlatformGroup) {
+        filter = StoreFilter(sort = filter.sort, groups = setOf(group))
+        selectTab(StoreTab.Browse)
+    }
+
+    /* ── lista de deseos ──────────────────────────────────────── */
+
+    var wishlist by mutableStateOf(vm.app.settings.portsWishlist); private set
+
+    fun toggleWishlist(id: String) {
+        wishlist = wishlist.toggled(id)
+        vm.app.settings.portsWishlist = wishlist
+    }
+
+    /* ── lo que pinta cada pestaña ────────────────────────────── */
+
+    private fun grouped(ports: List<PortEntry>): List<GameGroup> = PortGrouping.group(ports, installed.keys, published())
+
+    /** Explorar: todo lo que pasa el filtro, en el orden elegido. */
+    fun browseGroups(): List<GameGroup> = StoreRows.sorted(grouped(StoreRows.visible(catalog, filter)), filter.sort, published())
+
+    fun updateGroups(): List<GameGroup> {
+        val ids = updateIds()
+        return grouped(catalog.filter { it.id in ids && it.id in installed })
+    }
+
+    fun installedGroups(): List<GameGroup> = grouped(catalog.filter { it.id in installed })
+
+    /* ── NUEVO: cuándo entró cada port en el catálogo ─────────── */
+
+    private var firstSeen: Map<String, Long> = PortFirstSeen.decode(vm.app.settings.portsFirstSeen)
+
+    /** Cuándo apareció [id] en el catálogo (0: desde la primera lectura, o aún no se sabe). */
+    fun addedAt(id: String): Long = firstSeen[id] ?: 0L
+
+    private fun noteFirstSeen() {
+        val next = PortFirstSeen.update(firstSeen, catalog.map { it.id }, System.currentTimeMillis())
+        if (next != firstSeen) {
+            firstSeen = next
+            vm.app.settings.portsFirstSeen = PortFirstSeen.encode(next)
+        }
+    }
+
+    /** Colecciones: una por familia de consolas con algún port. */
+    fun collections(): List<Pair<PlatformGroup, List<GameGroup>>> =
+        StoreRows.groupChips(catalog).map { g -> g to grouped(catalog.filter { StoreRows.group(it.platform) == g }) }
+
+    /* ── hojas: orden y filtro, descargas, utilidades ─────────── */
+
+    /** El botón redondo de orden y filtro: una hoja que se recorre con el mando. */
+    fun openSortSheet() {
+        val sorts = StoreSort.entries.map { s ->
+            SheetAction(UiText.res(sortLabel(s)), selected = filter.sort == s) { setSort(s) }
+        }
+        val families = listOf(
+            SheetAction(UiText.res(R.string.ports_chip_all), selected = filter.groups.isEmpty() && filter.platform == null) { showAll() },
+        ) + StoreRows.groupChips(catalog).map { g ->
+            SheetAction(UiText.res(groupLabel(g)), selected = g in filter.groups) { toggleGroup(g) }
+        }
+        val more = StoreRows.genreChips(catalog).map { g ->
+            SheetAction(UiText.res(genreLabel(g)), selected = g in filter.genres) { toggleGenre(g) }
+        } + listOfNotNull(
+            SheetAction(UiText.res(R.string.ports_chip_not_on_android), selected = filter.notOnAndroid) { toggleNotOnAndroid() }
+                .takeIf { catalog.any { !it.installable } },
+        )
+        vm.showSheet(
+            ActionSheetSpec(
+                UiText.res(R.string.store_sort_filter),
+                null,
+                listOfNotNull(
+                    SheetGroup(UiText.res(R.string.store_sort_by_title), sorts),
+                    SheetGroup(UiText.res(R.string.store_filter_by_title), families),
+                    more.takeIf { it.isNotEmpty() }?.let { SheetGroup(null, it) },
+                ),
+            ),
+        )
+    }
+
+    /** La baldosa de descargas: lo que se baja o se instala, con "Cancelar" en cada uno. */
+    fun openDownloads() {
+        val tasks = vm.portInstall.tasks.values.toList()
+        val actions = if (tasks.isEmpty()) {
+            listOf(SheetAction(UiText.res(R.string.store_no_downloads), dimmed = true) {})
+        } else {
+            tasks.map { t ->
+                val port = when (t) {
+                    is PortInstallController.Task.Downloading -> t.port
+                    is PortInstallController.Task.Installing -> t.port
+                }
+                val detail = when (t) {
+                    is PortInstallController.Task.Downloading -> UiText.Raw("${(t.progress * 100).toInt()} %")
+                    is PortInstallController.Task.Installing -> UiText.res(R.string.ports_installing, PortDisplay.title(port))
+                }
+                SheetAction(UiText.Raw(PortDisplay.title(port)), detail = detail, icon = SheetIcon.Remove) {
+                    vm.portInstall.cancel(port.id)
+                }
+            }
+        }
+        vm.showSheet(ActionSheetSpec(UiText.res(R.string.ports_downloads), null, actions))
+    }
+
+    /**
+     * El corazón: la lista de deseos en una hoja (se recorre con el mando y
+     * se cierra con Atrás); cada entrada abre la ficha de su port.
+     */
+    fun openWishlist() {
+        val ports = catalog.filter { it.id in wishlist }.sortedBy { PortDisplay.title(it).lowercase() }
+        val actions = if (ports.isEmpty()) {
+            listOf(SheetAction(UiText.res(R.string.store_empty_wishlist), dimmed = true) {})
+        } else {
+            ports.map { p ->
+                SheetAction(
+                    UiText.Raw(PortDisplay.title(p)),
+                    detail = UiText.Raw(p.name + " · " + (p.developer ?: p.releaseRepo.owner)),
+                    opensSheet = true,
+                ) { openDetail(p.id) }
+            }
+        }
+        vm.showSheet(ActionSheetSpec(UiText.res(R.string.store_wishlist), null, actions))
+    }
+
+    /** Y en la tienda (y "Más"): recargar el catálogo, actualizar todo, quitar los filtros, la lista de deseos. */
+    fun openUtilities() {
+        val updates = updateGroups().map { it.lead }
+        val actions = listOfNotNull(
+            SheetAction(UiText.res(R.string.store_refresh_catalog), icon = SheetIcon.Refresh) { load(force = true) },
+            SheetAction(UiText.res(R.string.ports_update_all), icon = SheetIcon.Refresh) { vm.portInstall.updateAll(updates) }
+                .takeIf { updates.isNotEmpty() },
+            SheetAction(UiText.res(R.string.store_clear_filters), icon = SheetIcon.Remove) { clearFilters() }
+                .takeIf { hasFilters },
+            SheetAction(UiText.res(R.string.store_wishlist), icon = SheetIcon.Details, opensSheet = true) { openWishlist() },
+        )
+        vm.showSheet(ActionSheetSpec(UiText.res(R.string.store_utilities), null, actions))
     }
 
     /** "Atrás" con la búsqueda o los filtros puestos: los quita (ver [BackPriority]). */
@@ -314,4 +474,32 @@ class PortsController(
     val hasFilters: Boolean get() = searchOpen || filter.active
 
     private fun <T> Set<T>.toggled(v: T): Set<T> = if (v in this) this - v else this + v
+
+    companion object {
+        @StringRes
+        fun sortLabel(s: StoreSort): Int = when (s) {
+            StoreSort.Name -> R.string.ports_sort_name
+            StoreSort.RecentlyUpdated -> R.string.ports_sort_recent
+            StoreSort.Trust -> R.string.ports_sort_trust
+            StoreSort.Stars -> R.string.ports_sort_stars
+        }
+
+        @StringRes
+        fun groupLabel(g: PlatformGroup): Int = when (g) {
+            PlatformGroup.Nintendo -> R.string.ports_row_nintendo
+            PlatformGroup.PlayStation -> R.string.ports_row_playstation
+            PlatformGroup.Sega -> R.string.ports_row_sega
+            PlatformGroup.Xbox -> R.string.ports_row_xbox
+            PlatformGroup.Pc -> R.string.ports_row_pc
+        }
+
+        @StringRes
+        fun genreLabel(g: String): Int = when (g) {
+            "racing" -> R.string.ports_genre_racing
+            "rpg" -> R.string.ports_genre_rpg
+            "shooter" -> R.string.ports_genre_shooter
+            "strategy" -> R.string.ports_genre_strategy
+            else -> R.string.ports_genre_platformer
+        }
+    }
 }
