@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
 import com.elyndra.launcher.masha.MashaAttachment
 import com.elyndra.launcher.ui.ChatMessage
+import com.elyndra.launcher.domain.ports.PortDisplay
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.MashaGameRef
 import com.elyndra.launcher.ui.components.ArtFallback
@@ -169,7 +170,7 @@ private fun DoneChips(done: List<String>, glow: Color) {
     }
 }
 
-/** Ports de la tienda: una ficha por port (nombre y juego original) que abre su página. */
+/** Ports de la tienda: una ficha por juego (el juego original y su port) que abre su página. */
 @Composable
 private fun PortsStrip(vm: ElyndraViewModel, a: MashaAttachment.Ports) {
     val ports = a.ids.mapNotNull { id -> vm.ports.catalog.firstOrNull { it.id == id } }
@@ -185,8 +186,8 @@ private fun PortsStrip(vm: ElyndraViewModel, a: MashaAttachment.Ports) {
                     .shapeClickable(shape) { vm.ports.openPort(port.id) }
                     .padding(horizontal = 10.dp, vertical = 8.dp),
             ) {
-                ElyText(port.name, size = 10.5f, weight = FontWeight.SemiBold, color = Holo.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                ElyText(port.original.title, size = 9f, color = Holo.dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                ElyText(PortDisplay.title(port), size = 10.5f, weight = FontWeight.SemiBold, color = Holo.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                ElyText(PortDisplay.platformBadge(port.platform) + " · " + port.name, size = 9f, color = Holo.dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }

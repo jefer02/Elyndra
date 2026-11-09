@@ -208,7 +208,9 @@ object MashaTools {
             tool(UNDO_LAST_ACTION, "Undo the last rename, add or emulator change made through you. Only when the user asks.") {},
             tool(
                 FIND_PORT,
-                "Native Android ports (decompilations/recompilations) from Elyndra's curated Ports store. Without a query: ports of games already in the library. " +
+                "Native Android ports (decompilations/recompilations/source ports) from Elyndra's Ports store, for console and PC games. " +
+                    "Search by the original game's name. One result per game: 'game' is its name, 'port' the best port of it, 'ports_available' how many exist. " +
+                    "Without a query: games already in the library that have a port. " +
                     "Each result says if it is installable on Android, installed, and which original game the user must own (never offer or link ROMs). " +
                     "open=true opens the store page of the first result.",
             ) {

@@ -3,6 +3,7 @@ package com.elyndra.launcher.ui
 import com.elyndra.launcher.masha.MashaWrites
 import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.library.Names
+import com.elyndra.launcher.domain.ports.PortDisplay
 import com.elyndra.launcher.domain.ports.StoreRows
 import com.elyndra.launcher.masha.MashaAttachment
 import com.elyndra.launcher.masha.MashaBrain
@@ -150,23 +151,27 @@ class MashaActions(
         if (ports.catalog.isEmpty()) onMain { ports.onOpen() }.also { ports.awaitCatalog() }
         val owned = onMain { ports.owned() }
         val found = StoreRows.find(ports.catalog, query, owned)
-        if (open) found.firstOrNull()?.let { first -> onMain { ports.openPort(first.id) } }
+        if (open) found.firstOrNull()?.let { first -> onMain { ports.openPort(first.lead.id) } }
         if (found.isEmpty()) return toolOk("no ports found", mutating = open)
-        return toolOk(attachment = MashaAttachment.Ports(query, found.map { it.id }), mutating = open) {
+        return toolOk(attachment = MashaAttachment.Ports(query, found.map { it.lead.id }), mutating = open) {
             put("count", found.size)
             putJsonArray("ports") {
-                found.forEach { p ->
+                found.forEach { g ->
+                    val p = g.lead
                     addJsonObject {
-                        put("name", p.name)
-                        put("original_game", p.original.title)
-                        put("original_platform", p.original.platform)
+                        put("game", PortDisplay.title(p))
+                        put("original_platform", p.platform)
+                        put("port", p.name)
+                        p.developer?.let { put("developer", it) }
+                        put("ports_available", g.ports.size)
                         put("kind", p.kind)
                         put("repo", p.releaseRepo.slug)
-                        put("installable_on_android", p.installable)
-                        put("installed", p.id in ports.installed)
-                        put("in_library", owned.any { it.port.id == p.id })
+                        put("installable_on_android", g.ports.any { it.installable })
+                        put("installed", g.ports.any { it.id in ports.installed })
+                        put("in_library", owned.any { it.port.id in g.ids })
                         put("needs_own_copy", p.requires.userRom)
                         put("verified", p.verified)
+                        if (p.trust.prerelease) put("prerelease", true)
                     }
                 }
             }
