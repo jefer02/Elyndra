@@ -13,7 +13,10 @@ import java.nio.channels.FileChannel
 /**
  * Lectura de documentos SAF: flujos para hashes y acceso aleatorio para discos.
  *
- * Solo lectura y permisos: Elyndra nunca escribe en las carpetas del usuario.
+ * Lectura y permisos. La única escritura es [copyInto] ("Añadir juego" →
+ * Archivo de juego): un archivo nuevo, directamente dentro de la carpeta de
+ * la biblioteca, y solo si el usuario dio permiso de escritura sobre ese mismo
+ * árbol. Nada se sobrescribe ni se borra, salvo la copia a medias de un fallo.
  * Cada entrada pasa antes por [SafGuard]: una carpeta virtual (sin árbol) no
  * llega nunca al ContentResolver.
  */
@@ -54,7 +57,41 @@ class SafFiles(private val resolver: ContentResolver) {
 
     fun releasePermission(treeUri: String) {
         if (!SafGuard.allows(treeUri, "releasePermission")) return
-        runCatching { resolver.releasePersistableUriPermission(Uri.parse(treeUri), Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        val write = if (canWrite(treeUri)) Intent.FLAG_GRANT_WRITE_URI_PERMISSION else 0
+        runCatching { resolver.releasePersistableUriPermission(Uri.parse(treeUri), Intent.FLAG_GRANT_READ_URI_PERMISSION or write) }
+    }
+
+    /** ¿Puede Elyndra escribir en el árbol? Al añadir una carpeta solo se guarda el permiso de lectura. */
+    fun canWrite(treeUri: String): Boolean {
+        if (!SafGuard.allows(treeUri, "canWrite")) return false
+        return resolver.persistedUriPermissions.any { it.uri.toString() == treeUri && it.isWritePermission }
+    }
+
+    /** Lectura y escritura sobre el árbol, tras volver a pedirlo con el selector del sistema. */
+    fun takeWritePermission(treeUri: Uri) {
+        if (!SafGuard.allows(treeUri, "takeWritePermission")) return
+        resolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+    }
+
+    /**
+     * Copia [source] a un documento nuevo [name] directamente dentro de
+     * [parentDocId] del árbol (la carpeta de la biblioteca). Devuelve su
+     * documentId, o null si no se pudo; lo creado a medias se borra.
+     */
+    fun copyInto(treeUri: String, parentDocId: String, source: Uri, name: String, mime: String): String? {
+        if (!SafGuard.allows(treeUri, "copyInto")) return null
+        val parent = docUri(treeUri, parentDocId) ?: return null
+        val created = runCatching { DocumentsContract.createDocument(resolver, parent, mime, name) }.getOrNull() ?: return null
+        val ok = runCatching {
+            resolver.openInputStream(source)!!.use { input ->
+                resolver.openOutputStream(created, "w")!!.use { output -> input.copyTo(output, 256 * 1024) }
+            }
+        }.isSuccess
+        if (!ok) {
+            runCatching { DocumentsContract.deleteDocument(resolver, created) }
+            return null
+        }
+        return DocumentsContract.getDocumentId(created)
     }
 
     companion object {
