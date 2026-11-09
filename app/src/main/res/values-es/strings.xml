@@ -548,6 +548,8 @@
     <string name="widget_play">Jugar</string>
     <string name="notif_channel_masha">Masha</string>
     <string name="notif_channel_masha_desc">Sugerencias ocasionales. Como mucho una cada pocos días.</string>
+    <string name="notif_channel_ports">Actualizaciones de ports</string>
+    <string name="notif_channel_ports_desc">Cuando un port instalado tiene una release nueva.</string>
 
     <!-- Mandos, pantalla y partículas de Masha -->
     <string name="gamepad_connected">Mando conectado: %1$s</string>
@@ -942,8 +944,7 @@
 
     <!-- Tienda de ports -->
     <string name="ports_title">Ports</string>
-    <string name="ports_dock_a11y">Tienda de ports nativos</string>
-    <string name="ports_subtitle">Ports nativos para Android de clásicos de consola. Pon tú el juego.</string>
+    <string name="ports_subtitle">Ports nativos para Android de clásicos de consola y PC. Tú pones el juego.</string>
     <string name="ports_search_hint">Buscar ports</string>
     <string name="ports_search">Buscar</string>
     <string name="ports_row_featured">Destacados</string>
@@ -953,14 +954,42 @@
     <string name="ports_row_recent">Actualizados hace poco</string>
     <string name="ports_row_installed">Instalados</string>
     <string name="ports_row_results">Resultados</string>
-    <string name="ports_filter_pc_only">Ver solo PC</string>
+    <string name="ports_row_playstation">PlayStation</string>
+    <string name="ports_row_sega">Sega</string>
+    <string name="ports_row_pc">PC</string>
+    <string name="ports_row_updates">Actualizaciones disponibles</string>
+    <string name="ports_update_all">Actualizar todo</string>
+    <string name="ports_badge_prerelease">Prerelease</string>
+    <string name="ports_badge_check_requirements">Revisa requisitos</string>
+    <string name="ports_prerelease_note">Versión de prueba publicada por el desarrollador: puede tener fallos.</string>
+    <string name="ports_check_requirements_note">No está claro qué necesita este port: lee el repositorio antes de instalar.</string>
+    <string name="ports_unverified_title">Port sin verificar</string>
+    <string name="ports_unverified_message">github.com/%1$s
+★ %2$s · Última release: %3$s
+
+Hecho por la comunidad, sin revisar. Mira el repositorio antes de instalar.</string>
+    <string name="ports_unverified_continue">Continuar</string>
+    <string name="ports_port_line">Port: %1$s · de %2$s</string>
+    <string name="ports_port_line_short">Port: %1$s</string>
+    <string name="ports_port_badge_named">PORT · %1$s</string>
+    <string name="ports_move_to_folder">Mover a carpeta…</string>
+    <string name="ports_picker_title">Ports de este juego</string>
+    <plurals name="ports_count">
+        <item quantity="one">%d port</item>
+        <item quantity="other">%d ports</item>
+    </plurals>
     <string name="ports_filter_clear">Quitar filtros</string>
     <string name="ports_action_free">Gratis</string>
     <string name="ports_action_install">Instalar</string>
     <string name="ports_action_update">Actualizar</string>
     <string name="ports_action_installed">Instalado</string>
-    <string name="ports_action_pc_only">Solo PC</string>
+    <string name="ports_action_pc_only">Aún no en Android</string>
     <string name="ports_action_unavailable">Sin APK</string>
+    <string name="ports_action_signature_changed">Clave cambiada</string>
+    <plurals name="ports_updates_notification">
+        <item quantity="one">Hay una actualización de %d port</item>
+        <item quantity="other">Hay actualizaciones de %d ports</item>
+    </plurals>
     <string name="ports_action_open">Abrir</string>
     <string name="ports_action_cancel">Cancelar descarga</string>
     <string name="ports_in_library">✓ En tu biblioteca</string>
@@ -991,7 +1020,7 @@
     <string name="ports_requirement_title">Requisitos</string>
     <string name="ports_changelog">Novedades</string>
     <string name="ports_about">Sobre este port</string>
-    <string name="ports_pc_only_note">Solo hay versiones de PC. Elyndra solo instala versiones de Android.</string>
+    <string name="ports_pc_only_note">Aún no hay APK de Android. Elyndra lo comprueba cada día y te deja instalarlo en cuanto se publique uno.</string>
     <string name="ports_unavailable_note">La última versión no trae un APK para este dispositivo.</string>
     <string name="ports_confirm_title">¿Instalar %1$s?</string>
     <string name="ports_confirm_message">De github.com/%1$s\nLicencia: %2$s · ★ %3$s · %4$s\n\n%5$s\n\nLa app es de terceros. Android te pedirá confirmación.</string>
@@ -1001,7 +1030,7 @@
     <string name="ports_install_failed">No se pudo instalar %1$s</string>
     <string name="ports_install_cancelled">Instalación cancelada</string>
     <string name="ports_checksum_failed">La descarga no coincidía con su suma de comprobación y se borró.</string>
-    <string name="ports_signature_mismatch">Hay otra versión de esta app instalada con otra firma. Desinstálala primero.</string>
+    <string name="ports_signature_mismatch">El desarrollador cambió la clave de firma de este port, así que Android no puede instalar la actualización encima. Reinstalarlo borraría los datos guardados del port, así que Elyndra no lo actualiza. Haz copia de tus partidas y reinstálalo tú si quieres la versión nueva.</string>
     <string name="ports_package_mismatch">El APK no es la app que espera el catálogo. No se instaló nada.</string>
     <string name="ports_download_failed">La descarga falló. Seguirá donde se quedó.</string>
     <string name="ports_permission_title">Permite a Elyndra instalar apps</string>
@@ -1010,17 +1039,43 @@
     <string name="ports_port_badge">PORT</string>
     <string name="ports_play_native">Jugar el port nativo</string>
     <string name="ports_add_card_title">Ports nativos</string>
-    <string name="ports_add_card_body">Explora ports para Android de clásicos de Nintendo y Xbox, reconstruidos desde su decompilación. Tú pones el juego.</string>
+    <string name="ports_add_card_body">Explora ports para Android de clásicos de consola y PC, reconstruidos a partir de sus decompilaciones y código fuente. Tú pones el juego.</string>
     <string name="ports_browse">Ver ports</string>
     <string name="ports_retry">Reintentar</string>
     <string name="ports_screenshots">Imágenes</string>
-    <string name="ports_view_repo">Ver en GitHub</string>
+    <string name="ports_view_repo">Ver el proyecto en GitHub</string>
     <string name="settings_github">GitHub (tienda de ports)</string>
     <string name="settings_github_desc">Opcional. Sin token la tienda puede hacer 60 peticiones por hora; con un token personal (sin permisos), 5000. El token solo se envía a api.github.com.</string>
     <string name="settings_github_token">Token de acceso personal</string>
     <string name="settings_ports_catalog">URL del catálogo</string>
+    <string name="settings_ports_auto_update">Actualizar ports automáticamente</string>
+    <string name="settings_ports_auto_update_desc">Desactivado: Elyndra solo te avisa. Activado: se instalan sin preguntar en Android 12+ los ports que instaló Elyndra; si no, Android pregunta como siempre.</string>
     <string name="masha_working_ports">Buscando ports nativos…</string>
     <string name="masha_off_ports">Estos ports nativos encajan con tu biblioteca. Toca uno para ver qué necesita.</string>
     <string name="masha_off_ports_none">Ninguno de tus juegos tiene aún un port nativo en el catálogo. Te abro la tienda para que eches un vistazo.</string>
     <string name="masha_ports_title">Ports nativos</string>
+    <string name="ports_chip_all">Todos</string>
+    <string name="ports_chip_not_on_android">Aún no en Android</string>
+    <string name="ports_genre_platformer">Plataformas</string>
+    <string name="ports_genre_racing">Carreras</string>
+    <string name="ports_genre_rpg">Rol</string>
+    <string name="ports_genre_shooter">Disparos</string>
+    <string name="ports_genre_strategy">Estrategia</string>
+    <string name="ports_sort_name">Nombre</string>
+    <string name="ports_sort_recent">Actualizados</string>
+    <string name="ports_sort_trust">Confianza</string>
+    <string name="ports_sort_stars">Estrellas</string>
+    <plurals name="ports_results_count">
+        <item quantity="one">%d juego</item>
+        <item quantity="other">%d juegos</item>
+    </plurals>
+    <string name="ports_row_coming">¿Llegará a Android?</string>
+    <string name="ports_hint_clear_filter">Quitar filtro</string>
+    <string name="ports_action_vr_only">Solo gafas de RV</string>
+    <string name="ports_badge_vr_only">Solo gafas de RV</string>
+    <string name="ports_vr_only_note">Esta versión solo funciona en unas gafas de RV autónomas (como Meta Quest), así que aquí no se puede instalar.</string>
+    <string name="ports_badge_debug">Versión de depuración</string>
+    <string name="ports_debug_note">Solo se publican versiones de depuración. Una actualización puede pedir reinstalar, y eso borra las partidas de este port.</string>
+    <string name="store_button">Tienda</string>
+    <string name="ports_builtin_catalog">Usando el catálogo incluido.</string>
 </resources>
