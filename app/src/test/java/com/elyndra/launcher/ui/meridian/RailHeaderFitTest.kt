@@ -301,6 +301,9 @@ class RailHeaderFitTest {
     /** "Abrir" en la barra (dp, SemiBold 11 sp) en cada idioma; la hora ("12:58") y "100%" miden 27,3 en los tres. */
     private val barLabels = mapOf("en" to 30.2f, "de" to 37.6f, "es" to 27.3f)
 
+    /** El rótulo de la tienda más largo ("Boutique", fr) en Poppins SemiBold 11 sp. */
+    private val STORE_LABEL = 48f
+
     /** La X del bocadillo de una línea (dp), en el sitio de "Ahora no". */
     private val close = 22f
 
@@ -320,12 +323,14 @@ class RailHeaderFitTest {
     /** La barra de la derecha como la monta MeridianScene: Masha la primera, compactada a lo que le deja la fila. */
     private fun topBar(s: Scene, lang: String, scale: Float, searchOpen: Boolean, status: Boolean): BubbleSlot.Area {
         val available = MeridianTopRow.barMaxWidth(s.width, s.rail)
-        val fixed = TopBarLayout.fixedWidth(TopBarLayout.searchWidth(searchOpen, landscape = true), masha = true, sort = true)
+        // Buscando, la tienda deja su sitio al campo (como en MeridianLibrary).
+        val fixed = TopBarLayout.fixedWidth(TopBarLayout.searchWidth(searchOpen, landscape = true), masha = true, sort = true, store = !searchOpen)
         val open = (barLabels.getValue(lang) * scale).takeIf { !searchOpen }
         val time = (27.3f * scale).takeIf { !searchOpen && status }
         val percent = (27.3f * scale).takeIf { !searchOpen && status }
-        val fit = TopBarLayout.fit(available, fixed, open, time, percent)
-        val width = TopBarLayout.width(fit, fixed, open, time, percent)
+        val store = (STORE_LABEL * scale).takeIf { !searchOpen }
+        val fit = TopBarLayout.fit(available, fixed, open, time, percent, store)
+        val width = TopBarLayout.width(fit, fixed, open, time, percent, store)
         assertTrue("la barra cabe entera (Ajustes no se corta)", width <= available + eps)
         val top = MeridianTopRow.top(s.compact)
         return BubbleSlot.Area(s.width - MeridianTopRow.END - width, top, s.width - MeridianTopRow.END, top + TopBarLayout.BAR_HEIGHT)
@@ -414,8 +419,8 @@ class RailHeaderFitTest {
             assertTrue(slot.clear)
             assertEquals(oneLineNatural(textW), slot.width, eps)
             assertEquals(1f, lines(textW, slot.width), 0f)
-            // Más ancho que el grupo: pegado a su canto derecho, y aun así bajo Masha.
-            assertEquals(bar.right, slot.x + slot.width, eps)
+            // Con la tienda el grupo es más ancho que la línea: cabe bajo él, empezando bajo Masha.
+            assertTrue(slot.x + slot.width <= bar.right + eps)
             assertTrue(slot.x <= masha.left)
             assertEquals(masha.bottom + 8f, slot.y, eps)
             val room = bar.right - (s.rail + 8f)

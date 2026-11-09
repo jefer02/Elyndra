@@ -72,6 +72,7 @@ import com.elyndra.launcher.ui.components.MaterializingContainer
 import com.elyndra.launcher.ui.components.Metrics
 import com.elyndra.launcher.ui.components.NeedsNameBadge
 import com.elyndra.launcher.ui.components.OpenButton
+import com.elyndra.launcher.ui.components.StoreButton
 import com.elyndra.launcher.ui.components.PadHint
 import com.elyndra.launcher.ui.components.PadHints
 import com.elyndra.launcher.ui.components.SettingsGlyph
@@ -422,7 +423,7 @@ internal fun RailHeaderRow(compact: Boolean, pills: FloatArray, dock: @Composabl
             }
         }?.copy(reach = 0f) // La curva sin la banda que pide la propia cabecera (si no, el dock se iría ensanchando con ella).
         val edge: ((Float) -> Float)? = if (fog == null || arc == null) null else { y -> arc.edgeAt(padTop.value + y, fog.axisX, fog.glass, dens) }
-        val plan = RailHeaderLayout.plan(rail, DotTabsLayout.HEIGHT, pills, edge, dest = true)
+        val plan = RailHeaderLayout.plan(rail, DotTabsLayout.HEIGHT, pills, edge)
         val dockP = measurables[0].measure(Constraints(maxWidth = ceil(plan.dockWidth * dens).toInt()))
         val height = plan.height.dp.roundToPx()
         layout(constraints.maxWidth, height) {
@@ -445,7 +446,7 @@ internal fun RailHeaderRow(compact: Boolean, pills: FloatArray, dock: @Composabl
  */
 @Composable
 private fun TopEnd(vm: ElyndraViewModel, m: Metrics, enabled: Boolean, onMasha: (Rect) -> Unit, onSort: (Rect) -> Unit, onBounds: (Rect) -> Unit, onOpen: () -> Unit) = BoxWithConstraints {
-    val fit = rememberTopBarFit(vm, available = if (constraints.hasBoundedWidth) maxWidth.value else Float.POSITIVE_INFINITY, landscape = m.landscape, masha = true, sort = true)
+    val fit = rememberTopBarFit(vm, available = if (constraints.hasBoundedWidth) maxWidth.value else Float.POSITIVE_INFINITY, landscape = m.landscape, masha = true, sort = true, store = !vm.searchOpen)
     Row(Modifier.onGloballyPositioned { onBounds(it.boundsInWindow()) }, verticalAlignment = Alignment.CenterVertically) {
         MashaButton(vm, grouped = true, onBounds = onMasha)
         Spacer(Modifier.width(8.dp))
@@ -462,6 +463,11 @@ private fun TopEnd(vm: ElyndraViewModel, m: Metrics, enabled: Boolean, onMasha: 
         Spacer(Modifier.width(8.dp))
         SearchField(vm, m)
         Spacer(Modifier.width(8.dp))
+        // Buscando, la tienda deja su sitio al campo ancho (como "Abrir"): la barra de Meridian no da para los dos.
+        if (!vm.searchOpen) {
+            StoreButton(focused = vm.input.isBarFocused(BarItem.Store), showLabel = fit.storeLabel, onClick = vm::openPorts)
+            Spacer(Modifier.width(8.dp))
+        }
         ConsoleIconButton(onClick = { vm.go(Screen.Settings) }, modifier = Modifier.testTag(UiTags.SETTINGS), focused = vm.input.isBarFocused(BarItem.Settings)) { glyph -> SettingsGlyph(glyph) }
     }
 }
@@ -593,4 +599,5 @@ private val MERIDIAN_BAR_HINTS = listOf(
 private val MERIDIAN_HINTS = listOf(
     PadHint("↑↓", R.string.hint_move),
     PadHint("LB / RB", R.string.hint_section),
+    PadHint("RT", R.string.store_button),
 )
