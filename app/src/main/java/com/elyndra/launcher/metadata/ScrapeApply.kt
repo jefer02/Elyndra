@@ -28,6 +28,21 @@ object ScrapeApply {
         val origins: Map<String, ArtOrigin> = emptyMap(),
     )
 
+    /**
+     * Una pasada solo de arte (ver ArtUpgrade): cambia las imágenes que trae
+     * [art] (salvo las fijadas) y su origen. Nada más: ni el nombre, ni la
+     * descripción y sus traducciones, ni el género, las fechas, los ids o la
+     * identificación.
+     */
+    fun applyArt(old: GameMeta, art: Art): GameMeta = old.copy(
+        cover = pick("cover", art.cover, old.cover, old.pinned),
+        hero = pick("hero", art.hero, old.hero, old.pinned),
+        logo = pick("logo", art.logo, old.logo, old.pinned),
+        screenshot = art.screenshot ?: old.screenshot,
+        icon = pick("icon", art.icon, old.icon, old.pinned),
+        artOrigins = old.artOrigins + art.origins.filterKeys { it !in old.pinned },
+    )
+
     /** [consulted]: las fuentes de descripción que respondieron (ver [GameDescriptionUpdate]). */
     fun apply(old: GameMeta, merged: MergedMetadata, lang: String, art: Art, now: Long, consulted: Set<String> = emptySet()): GameMeta {
         val described = GameDescriptionUpdate.apply(old, merged.descriptions, lang, consulted)
