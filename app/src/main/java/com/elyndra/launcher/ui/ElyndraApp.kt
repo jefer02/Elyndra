@@ -102,6 +102,12 @@ fun ElyndraApp(vm: ElyndraViewModel) {
     LaunchedEffect(request) {
         request?.let { mediaPicker.launch(it.mimeTypes.toTypedArray()) }
     }
+    // "Añadir juego" → archivo en una carpeta de solo lectura: el mismo árbol otra vez, ahora con escritura.
+    val treePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree(), vm.folderAdd::onTreeGranted)
+    val treeRequest = vm.folderAdd.treeRequest
+    LaunchedEffect(treeRequest) {
+        treeRequest?.let { treePicker.launch(it.initial) }
+    }
 
     // Menús, diálogos y pantallas que cambian suenan desde aquí (ver UiSoundEffects).
     UiSoundEffects(vm)
