@@ -1,5 +1,8 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.domain.library.FolderArt
+import com.elyndra.launcher.ui.components.FolderCollage
+import com.elyndra.launcher.ui.components.SystemArtTile
 import com.elyndra.launcher.ui.UiTags
 import androidx.compose.ui.platform.testTag
 import com.elyndra.launcher.ui.components.NeedsNameBadge
@@ -1489,9 +1492,16 @@ private fun LibraryTile(
                 is LibraryItem.App -> item.app.packageName
                 is LibraryItem.Folder -> item.emulatorPackage
             }
+            // Una carpeta sin icono elegido: el arte de serie de su sistema o el
+            // mosaico de sus carátulas (ver FolderArtResolver).
+            val folderArt = (item as? LibraryItem.Folder)?.art
             // Contenedor e icono son cuadrados: el icono lo llena entero,
             // centrado, sin dejar huecos y sin deformarse.
-            if (icon != null || autoIconPackage != null) {
+            if (item is LibraryItem.Folder && folderArt is FolderArt.System) {
+                SystemArtTile(folderArt.spec, item.system.short, Modifier.fillMaxSize())
+            } else if (folderArt is FolderArt.Collage) {
+                FolderCollage(folderArt.covers, fallback, Modifier.fillMaxSize())
+            } else if (icon != null || autoIconPackage != null) {
                 GameIcon(icon, autoIconPackage, Modifier.fillMaxSize(), ContentScale.Fit)
                 val unnamed = item is LibraryItem.App && remember(item.app.displayTitle) { !NameCheck.isNameUsable(item.app.displayTitle) }
                 if (unnamed) NeedsNameBadge(Modifier.align(Alignment.TopStart).padding(6.dp), onDark = true)

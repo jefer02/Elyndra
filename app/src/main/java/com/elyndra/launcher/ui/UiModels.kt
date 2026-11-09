@@ -7,6 +7,7 @@ import com.elyndra.launcher.R
 import com.elyndra.launcher.data.AppEntry
 import com.elyndra.launcher.data.GameSystem
 import com.elyndra.launcher.data.RomFolder
+import com.elyndra.launcher.domain.library.FolderArt
 import com.elyndra.launcher.library.RomScanner
 import com.elyndra.launcher.masha.MashaAttachment
 import com.elyndra.launcher.metadata.ArtCandidate
@@ -72,8 +73,10 @@ sealed interface LibraryItem {
         val coverPath: String? = null,
         val logoPath: String? = null,
         val iconPath: String? = null,
-        /** Paquete del emulador instalado: su icono es el automático de la carpeta. */
+        /** Paquete del emulador instalado: su icono va en la card si no hay otro arte. */
         val emulatorPackage: String? = null,
+        /** Lo que se pinta en su card (ver FolderArtResolver). */
+        val art: FolderArt = FolderArt.Gradient,
     ) : LibraryItem {
         override val key: String get() = folder.key
         override val name: String get() = system.name
@@ -231,6 +234,7 @@ enum class SheetIcon {
     Gallery,
     Service,
     App,
+    Add,
     Remove,
 }
 

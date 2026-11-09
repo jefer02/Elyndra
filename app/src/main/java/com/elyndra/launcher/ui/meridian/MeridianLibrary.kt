@@ -1,5 +1,8 @@
 package com.elyndra.launcher.ui.meridian
 
+import com.elyndra.launcher.domain.library.FolderArt
+import com.elyndra.launcher.ui.components.FolderCollage
+import com.elyndra.launcher.ui.components.SystemArtTile
 import com.elyndra.launcher.ui.UiTags
 import androidx.compose.ui.platform.testTag
 import android.content.res.Resources
@@ -342,8 +345,14 @@ private fun LibraryWheelTile(item: LibraryItem, fallback: ArtFallback) {
         is LibraryItem.App -> item.app.packageName
         is LibraryItem.Folder -> item.emulatorPackage
     }
+    val folderArt = (item as? LibraryItem.Folder)?.art
     Box(Modifier.fillMaxSize().liquidGlass(RectangleShape, P.hairline)) {
-        if (icon != null || pkg != null) {
+        // El arte automático de la carpeta (ver FolderArtResolver); el nombre ya va en la fila.
+        if (folderArt is FolderArt.System) {
+            SystemArtTile(folderArt.spec, "", Modifier.fillMaxSize(), showLabel = false)
+        } else if (folderArt is FolderArt.Collage) {
+            FolderCollage(folderArt.covers, fallback, Modifier.fillMaxSize())
+        } else if (icon != null || pkg != null) {
             GameIcon(icon, pkg, Modifier.fillMaxSize(), ContentScale.Fit)
             val unnamed = item is LibraryItem.App && remember(item.app.displayTitle) { !NameCheck.isNameUsable(item.app.displayTitle) }
             if (unnamed) NeedsNameBadge(Modifier.align(Alignment.TopStart).padding(4.dp), onDark = true)
