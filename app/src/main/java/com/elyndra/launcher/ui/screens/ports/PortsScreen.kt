@@ -61,6 +61,7 @@ import com.elyndra.launcher.domain.ports.PortAction
 import com.elyndra.launcher.domain.ports.PortDisplay
 import com.elyndra.launcher.domain.ports.PortEntry
 import com.elyndra.launcher.domain.ports.StoreFilter
+import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.domain.ports.StoreRow
 import com.elyndra.launcher.domain.ports.StoreRowKind
 import com.elyndra.launcher.domain.ports.StoreRows
@@ -316,8 +317,18 @@ private fun StoreFilters(state: StoreHome, actions: StoreHomeActions, pad: andro
         contentPadding = PaddingValues(horizontal = pad),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        // Desde una carpeta: su sistema, marcado; tocarlo (o "Todos") lo quita.
+        f.platform?.let { id ->
+            item(key = "platform") {
+                StoreChip(Systems.byId(id)?.name ?: id, selected = true, onClick = actions.showAll)
+            }
+        }
         item(key = "all") {
-            StoreChip(stringResource(R.string.ports_chip_all), selected = f.groups.isEmpty() && f.genres.isEmpty() && !f.notOnAndroid, onClick = actions.showAll)
+            StoreChip(
+                stringResource(R.string.ports_chip_all),
+                selected = f.groups.isEmpty() && f.genres.isEmpty() && !f.notOnAndroid && f.platform == null,
+                onClick = actions.showAll,
+            )
         }
         items(state.groups, key = { "g_" + it.name }) { g ->
             StoreChip(groupLabel(g), selected = g in f.groups, onClick = { actions.toggleGroup(g) })
