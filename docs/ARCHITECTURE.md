@@ -419,6 +419,14 @@ repositorios; nunca ROMs).
 - **La clave de DeepSeek va compilada** (`local.properties` → `BuildConfig`).
   Cualquier clave dentro de un APK se puede extraer: para publicar, la llamada
   debe pasar por un backend propio (basta con cambiar `masha.baseUrl`).
+- **Las claves de desarrollador de SteamGridDB e IGDB también van compiladas**
+  (`sgdb.apiKey`, `igdb.clientId`, `igdb.clientSecret` en `local.properties` →
+  `BuildConfig`), para que el arte venga de SteamGridDB e IGDB sin configurar
+  nada. Igual que la de DeepSeek, se pueden extraer del APK. Las que el usuario
+  pone en Ajustes → APIs mandan sobre ellas; sin clave, esa fuente no se usa.
+  Las comparten todas las instalaciones: cada dispositivo respeta los límites
+  de su lado (IGDB, 4 peticiones/s), pero muchos a la vez pueden agotar el
+  cupo de la cuenta. Para publicar a gran escala, mejor un proxy propio.
 
 ---
 

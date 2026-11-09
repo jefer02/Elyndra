@@ -58,6 +58,11 @@ android {
         buildConfigField("String", "SS_DEV_ID", quoted(localProp("screenscraper.devId")))
         buildConfigField("String", "SS_DEV_PASSWORD", quoted(localProp("screenscraper.devPassword")))
         buildConfigField("String", "SS_SOFTNAME", quoted(localProp("screenscraper.softname").ifEmpty { "Elyndra" }))
+        // Claves de desarrollador de SteamGridDB e IGDB (Twitch): arte de serie sin configurar nada.
+        // Las del usuario (Ajustes → APIs) mandan sobre estas. Vacías = esa fuente no se usa.
+        buildConfigField("String", "SGDB_API_KEY", quoted(localProp("sgdb.apiKey")))
+        buildConfigField("String", "IGDB_CLIENT_ID", quoted(localProp("igdb.clientId")))
+        buildConfigField("String", "IGDB_CLIENT_SECRET", quoted(localProp("igdb.clientSecret")))
         // Solo es true en las variantes del perfil base (ver buildTypes). En debug y release es una
         // constante false: R8 quita lo que cuelga de ella y la release se comporta igual que antes.
         buildConfigField("boolean", "BENCHMARK", "false")

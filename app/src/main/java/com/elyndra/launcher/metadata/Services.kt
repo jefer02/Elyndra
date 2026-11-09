@@ -45,12 +45,25 @@ class ServiceCredentials(
         password = secrets.get(SecretKeys.SS_PASSWORD),
     )
 
-    fun igdb(): IgdbCredentials = IgdbCredentials(
-        secrets.get(SecretKeys.IGDB_CLIENT_ID).trim(),
-        secrets.get(SecretKeys.IGDB_CLIENT_SECRET).trim(),
-    )
+    /** Las claves de desarrollador de SteamGridDB e IGDB vienen en el APK (local.properties → BuildConfig). */
+    val builtInSgdb: Boolean get() = BuildConfig.SGDB_API_KEY.isNotBlank()
+    val builtInIgdb: Boolean get() = BuildConfig.IGDB_CLIENT_ID.isNotBlank() && BuildConfig.IGDB_CLIENT_SECRET.isNotBlank()
 
-    fun sgdbKey(): String = secrets.get(SecretKeys.SGDB_KEY).trim()
+    /**
+     * Las del usuario si las puso (las dos, para no mezclar el id de una
+     * cuenta con el secreto de otra); si no, las de desarrollador.
+     */
+    fun igdb(): IgdbCredentials {
+        val id = secrets.get(SecretKeys.IGDB_CLIENT_ID).trim()
+        val secret = secrets.get(SecretKeys.IGDB_CLIENT_SECRET).trim()
+        return if (id.isNotEmpty() && secret.isNotEmpty()) {
+            IgdbCredentials(id, secret)
+        } else {
+            IgdbCredentials(BuildConfig.IGDB_CLIENT_ID.trim(), BuildConfig.IGDB_CLIENT_SECRET.trim())
+        }
+    }
+
+    fun sgdbKey(): String = secrets.get(SecretKeys.SGDB_KEY).trim().ifEmpty { BuildConfig.SGDB_API_KEY.trim() }
 
     fun ra(): RaCredentials = RaCredentials(secrets.get(SecretKeys.RA_USER).trim(), secrets.get(SecretKeys.RA_KEY).trim())
 
