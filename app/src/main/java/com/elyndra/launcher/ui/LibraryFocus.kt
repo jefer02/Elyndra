@@ -15,10 +15,10 @@ object LibraryFocus {
     fun rows(dockInBar: Boolean, searchOpen: Boolean): List<List<BarItem>> {
         val open = BarItem.Open.takeIf { !searchOpen }
         return if (dockInBar) {
-            listOf(listOfNotNull(BarItem.Masha, BarItem.Sections, BarItem.Sort, open, BarItem.Search, BarItem.Settings))
+            listOf(listOfNotNull(BarItem.Masha, BarItem.Sections, BarItem.Sort, open, BarItem.Search, BarItem.Store, BarItem.Settings))
         } else {
             listOf(
-                listOfNotNull(BarItem.Masha, open, BarItem.Search, BarItem.Settings),
+                listOfNotNull(BarItem.Masha, open, BarItem.Search, BarItem.Store, BarItem.Settings),
                 listOf(BarItem.Sections, BarItem.Sort),
             )
         }
@@ -27,12 +27,12 @@ object LibraryFocus {
     /**
      * Meridian: una sola fila en el orden en que se ve de izquierda a derecha.
      * El dock va solo en la cabecera de la rueda y la barra arriba a la
-     * derecha empieza por Masha: Masha, "Abrir", el orden, buscar y Ajustes
+     * derecha empieza por Masha: Masha, "Abrir", el orden, buscar, la tienda y Ajustes
      * (la píldora de hora no se enfoca). Antes Masha iba primero, encima del
      * dock; ahora que está en la barra, ir del dock a Masha es ir a la derecha.
      */
     fun meridianRows(searchOpen: Boolean): List<List<BarItem>> =
-        listOf(listOfNotNull(BarItem.Sections, BarItem.Masha, BarItem.Open.takeIf { !searchOpen }, BarItem.Sort, BarItem.Search, BarItem.Settings))
+        listOf(listOfNotNull(BarItem.Sections, BarItem.Masha, BarItem.Open.takeIf { !searchOpen }, BarItem.Sort, BarItem.Search, BarItem.Store.takeIf { !searchOpen }, BarItem.Settings))
 
     /** Meridian, derecha desde la rueda: la barra, por "Abrir" (buscando, el campo: es donde se escribe). */
     fun fromWheelRight(searchOpen: Boolean): BarItem = if (searchOpen) BarItem.Search else BarItem.Open
