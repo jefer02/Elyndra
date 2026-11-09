@@ -33,6 +33,19 @@ class StoreRowsTest {
     private val starship = port("starship", "n64", android = false, tags = listOf("shooter"))
     private val all = listOf(soh, nsmbw, unleashed, starship)
 
+    @Test fun `the platform filter from a folder keeps the ports that would go to that folder`() {
+        val filter = StoreFilter(platform = "n64")
+        assertTrue(filter.active)
+        assertEquals(listOf("soh", "starship"), StoreRows.visible(all, filter).map { it.id })
+        // PC also takes MS-DOS ports and platforms the library does not know.
+        val doom = port("doom", "dos")
+        val odd = port("odd", "amiga")
+        assertEquals(listOf("doom", "odd"), StoreRows.visible(listOf(soh, doom, odd), StoreFilter(platform = "pc")).map { it.id })
+        assertEquals(listOf("doom"), StoreRows.visible(listOf(doom, odd), StoreFilter(platform = "dos")).map { it.id })
+        // Back clears it with the rest of the filter.
+        assertEquals(null, filter.cleared().platform)
+    }
+
     @Test fun `ports not on android yet show in grids and search but only in their own home row`() {
         assertEquals(listOf("soh", "nsmbw", "unleashed", "starship"), StoreRows.visible(all, StoreFilter()).map { it.id })
         assertEquals(listOf("starship"), StoreRows.visible(all, StoreFilter(notOnAndroid = true)).map { it.id })

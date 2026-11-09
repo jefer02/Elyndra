@@ -275,7 +275,13 @@ class PortsController(
 
     /** El chip "Todos": quita familias, géneros y "aún no en Android" (la búsqueda sigue). */
     fun showAll() {
-        filter = filter.copy(groups = emptySet(), genres = emptySet(), notOnAndroid = false)
+        filter = filter.copy(groups = emptySet(), genres = emptySet(), notOnAndroid = false, platform = null)
+    }
+
+    /** Solo los ports que irían a una carpeta de [systemId] (desde "Añadir juego" en la carpeta). */
+    fun filterPlatform(systemId: String) {
+        detailId = null
+        filter = StoreFilter(sort = filter.sort, platform = systemId)
     }
 
     fun toggleGroup(group: PlatformGroup) {

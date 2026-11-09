@@ -27,8 +27,13 @@ data class StoreFilter(
     /** Solo los que aún no tienen APK de Android. */
     val notOnAndroid: Boolean = false,
     val sort: StoreSort = StoreSort.Name,
+    /**
+     * Solo los de un sistema de la biblioteca ("Añadir juego" → "Buscar un
+     * port" desde una carpeta): los que irían a una carpeta de [platform] (ver [inPlatform]).
+     */
+    val platform: String? = null,
 ) {
-    val active: Boolean get() = query.isNotBlank() || groups.isNotEmpty() || genres.isNotEmpty() || notOnAndroid
+    val active: Boolean get() = query.isNotBlank() || groups.isNotEmpty() || genres.isNotEmpty() || notOnAndroid || platform != null
 
     /** Lo que quita "Atrás" antes de salir de la tienda: todo el filtro, con el orden elegido. */
     fun cleared(): StoreFilter = StoreFilter(sort = sort)
@@ -133,6 +138,7 @@ object StoreRows {
         val words = PortLookup.normalizeWords(filter.query)
         return ports.filter { p ->
             (!filter.notOnAndroid || !p.installable) &&
+                (filter.platform == null || inPlatform(p, filter.platform)) &&
                 (filter.groups.isEmpty() || group(p.platform) in filter.groups) &&
                 (filter.genres.isEmpty() || genres(p).any { it in filter.genres }) &&
                 (words.isEmpty() || words.all { w -> haystack(p).contains(w) })
@@ -237,6 +243,16 @@ object StoreRows {
                 .sortedByDescending { g -> g.ports.any { it.installable } }
         }
         return found.take(limit)
+    }
+
+    /**
+     * ¿Va [p] a una carpeta de [systemId]? La plataforma del port como la
+     * coloca la biblioteca (las desconocidas, a PC; ver PortPlacement), y los
+     * de MS-DOS también en una de PC.
+     */
+    fun inPlatform(p: PortEntry, systemId: String): Boolean {
+        val system = PortPlacement.systemFor(p.platform)
+        return system == systemId || (systemId == "pc" && system == "dos")
     }
 
     /** Las plataformas originales presentes, Nintendo primero. */
