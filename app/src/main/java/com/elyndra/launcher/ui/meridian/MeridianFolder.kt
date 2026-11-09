@@ -142,7 +142,8 @@ internal fun MeridianFolder(vm: ElyndraViewModel, item: LibraryItem.Folder) {
                 title = item.system.name,
                 path = item.folder.displayPath,
                 emulatorLabel = emulatorLabel,
-                emulator = { iconOnly -> EmulatorSelector(vm, item, emulatorLabel, iconOnly = iconOnly) },
+                // Una carpeta virtual (ports) no tiene emulador.
+                emulator = if (item.folder.isVirtual) null else ({ iconOnly -> EmulatorSelector(vm, item, emulatorLabel, iconOnly = iconOnly) }),
                 // La ficha de la carpeta, con el sistema (antes bajo volver y "Abrir", quitándole alto a la rueda).
                 pill = { short -> FolderChips(vm, item, roms.size, short = short) },
             ) {
@@ -301,7 +302,7 @@ private fun FolderHero(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: RomE
                 stringResource(R.string.rom_chip, item.system.short),
                 rom.meta.ra?.takeIf { it.achievements > 0 }?.let { "🏆 ${it.earned}/${it.achievements}" },
                 playedLabel(rom),
-                rom.extension.takeIf { it.isNotEmpty() }?.uppercase(),
+                rom.subtitle.takeIf { it.isNotEmpty() },
             ),
             title = rom.displayTitle,
             description = description?.let { heroDescription(it, vm.settings.lang) },

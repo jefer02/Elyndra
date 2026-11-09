@@ -348,7 +348,8 @@ private fun FolderContent(
                             path = item.folder.displayPath,
                             modifier = Modifier.weight(1f),
                             emulatorLabel = emulatorLabel,
-                            emulator = { iconOnly -> EmulatorSelector(vm, item, emulatorLabel, iconOnly = iconOnly) },
+                            // Una carpeta virtual (ports) no tiene emulador.
+                            emulator = if (item.folder.isVirtual) null else ({ iconOnly -> EmulatorSelector(vm, item, emulatorLabel, iconOnly = iconOnly) }),
                             spread = true,
                             shadow = heroText.shadow(null),
                             // Último paso de compactación: la ficha de la carpeta sube aquí, junto al sistema (como en Meridian).
@@ -610,7 +611,7 @@ private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: 
                     item.system.short,
                     rom?.meta?.ra?.takeIf { it.achievements > 0 }?.let { "🏆 ${it.earned}/${it.achievements}" },
                     rom?.let { playedLabel(it) },
-                    rom?.extension,
+                    rom?.subtitle,
                 ),
                 m.landscape,
             )
@@ -631,7 +632,7 @@ private fun FolderHeroInfo(vm: ElyndraViewModel, item: LibraryItem.Folder, rom: 
             }
             Spacer(Modifier.width(8.dp))
             ElyText(
-                (rom?.let { playedLabel(it) } ?: "") + (rom?.let { " · " + it.extension } ?: ""),
+                (rom?.let { playedLabel(it) } ?: "") + (rom?.let { " · " + it.subtitle } ?: ""),
                 size = 9.5f,
                 weight = FontWeight.Medium,
                 color = heroText.secondary(0.85f),
