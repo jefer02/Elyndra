@@ -6,7 +6,7 @@ import org.junit.Test
 
 class PortStatusTest {
 
-    private val android = PortEntry("p", "P", repo = GhRepo("o", "r"), original = OriginalGame("G", "n64"), builds = listOf(PortBuild("android")))
+    private val android = PortEntry("p", "P", repo = GhRepo("o", "r"), game = PortGame("G", "n64"), builds = listOf(PortBuild("android")))
     private val pc = android.copy(builds = listOf(PortBuild("windows")))
 
     private fun latest(tag: String, at: Long = 100) =
@@ -24,7 +24,7 @@ class PortStatusTest {
     }
 
     @Test fun `pc only ports are never installable`() {
-        assertEquals(PortAction.PcOnly, PortStatus.action(pc, null, null, releasesKnown = true))
+        assertEquals(PortAction.NotOnAndroid, PortStatus.action(pc, null, null, releasesKnown = true))
     }
 
     @Test fun `installed ports offer an update only when the release is newer`() {
