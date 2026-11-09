@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui
 
+import com.elyndra.launcher.domain.ports.PortUpdateMode
 import com.elyndra.launcher.ui.meridian.WheelBackdrop
 import com.elyndra.launcher.core.device.StatusMode
 import android.net.Uri
@@ -723,6 +724,14 @@ class SettingsController(private val vm: ElyndraViewModel) {
         }
     }
 
+    private val portsAutoState by lazy { mutableStateOf(store.portsUpdateMode == PortUpdateMode.Automatic) }
+    val portsAutoUpdate: Boolean get() = portsAutoState.value
+
+    fun togglePortsAutoUpdate() {
+        portsAutoState.value = !portsAutoState.value
+        store.portsUpdateMode = if (portsAutoState.value) PortUpdateMode.Automatic else PortUpdateMode.NotifyOnly
+    }
+
     var showSsDev by mutableStateOf(false); private set
 
     fun toggleSsDev() { showSsDev = !showSsDev }
@@ -862,12 +871,12 @@ class SettingsController(private val vm: ElyndraViewModel) {
     }
 
     fun rescanAll() {
-        if (rescanning || vm.library.folders.isEmpty()) return
+        if (rescanning || vm.library.realFolders.isEmpty()) return
         rescanning = true
         vm.viewModelScope.launch {
             var added = 0
             var removed = 0
-            vm.library.folders.forEach { f ->
+            vm.library.realFolders.forEach { f ->
                 vm.rescan(f, silent = true)?.let {
                     added += it.added.size
                     removed += it.removed

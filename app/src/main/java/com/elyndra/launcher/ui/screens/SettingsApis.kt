@@ -136,6 +136,8 @@ private fun GithubPanel(vm: ElyndraViewModel) {
             CredentialField(stringResource(R.string.settings_github_token), s.githubToken, secret = true) { s.updateGithubToken(it) }
             Spacer(Modifier.height(8.dp))
             CredentialField(stringResource(R.string.settings_ports_catalog), s.portsCatalogUrl, secret = false, last = true) { s.updatePortsCatalogUrl(it) }
+            Spacer(Modifier.height(8.dp))
+            SwitchRow(stringResource(R.string.settings_ports_auto_update), stringResource(R.string.settings_ports_auto_update_desc), s.portsAutoUpdate, s::togglePortsAutoUpdate)
             Spacer(Modifier.height(10.dp))
         }
     }

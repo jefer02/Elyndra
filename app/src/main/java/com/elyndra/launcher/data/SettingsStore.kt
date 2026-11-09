@@ -105,6 +105,21 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
         get() = prefs.getString("meta.priority.art", null)
         set(v) = prefs.edit { if (v == null) remove("meta.priority.art") else putString("meta.priority.art", v) }
 
+    /** Hasta qué cambio de serie del orden de imágenes se ha pasado ya lo guardado (ver MetadataPriorityStore). */
+    var metaPriorityArtVersion: Int
+        get() = prefs.getInt("meta.priority.art.v", 0)
+        set(v) = prefs.edit { putInt("meta.priority.art.v", v) }
+
+    /** Por dónde va la comprobación diaria de los ports "aún no en Android" (ver PortAvailability.batch). */
+    var portsAvailabilityCursor: Int
+        get() = prefs.getInt("ports.availability.cursor", 0)
+        set(v) = prefs.edit { putInt("ports.availability.cursor", v) }
+
+    /** La pasada única que mejora el arte de la biblioteca con el orden nuevo ya terminó (ver ArtUpgradeWorker). */
+    var artUpgradeDone: Boolean
+        get() = prefs.getBoolean("art.upgrade.done", false)
+        set(v) = prefs.edit { putBoolean("art.upgrade.done", v) }
+
     /** Juego lanzado cuyo tiempo se mide al volver a Elyndra. */
     var pendingSessionKey: String?
         get() = prefs.getString("session.key", null)
@@ -449,10 +464,14 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
             if (v.isBlank() || v == PortCatalogRepository.DEFAULT_URL) remove("ports.catalogUrl") else putString("ports.catalogUrl", v.trim())
         }
 
-    /** Tienda de ports: enseñar también los que solo tienen versión de PC. */
-    var portsShowPcOnly: Boolean
-        get() = prefs.getBoolean("ports.showPcOnly", false)
-        set(v) = prefs.edit { putBoolean("ports.showPcOnly", v) }
+    /** Tienda de ports: solo avisar de las actualizaciones (por defecto) o instalarlas solas cuando Android lo deja. */
+    var portsUpdateMode: com.elyndra.launcher.domain.ports.PortUpdateMode
+        get() = if (prefs.getBoolean("ports.autoUpdate", false)) {
+            com.elyndra.launcher.domain.ports.PortUpdateMode.Automatic
+        } else {
+            com.elyndra.launcher.domain.ports.PortUpdateMode.NotifyOnly
+        }
+        set(v) = prefs.edit { putBoolean("ports.autoUpdate", v == com.elyndra.launcher.domain.ports.PortUpdateMode.Automatic) }
 
     /** Versión (etiqueta) que se canceló: la comprobación automática no vuelve a ofrecerla. */
     var updateSkippedTag: String?
