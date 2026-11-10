@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui.screens.ports
 
+import com.elyndra.launcher.ui.components.edgeBleed
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -124,6 +125,8 @@ class StoreHomeActions(
     val openUtilities: () -> Unit = {},
     /** El corazón: la lista de deseos, en una hoja. */
     val openWishlist: () -> Unit = {},
+    /** El botón de volver de la cabecera: a la biblioteca. */
+    val exit: () -> Unit = {},
     val openCollection: (PlatformGroup) -> Unit = {},
     val retry: () -> Unit = {},
     val updateAll: (List<PortEntry>) -> Unit = {},
@@ -135,7 +138,9 @@ fun PortsScreen(vm: ElyndraViewModel) {
     val ports = vm.ports
     val detail = ports.detail
     val reduced = LocalReducedMotion.current
-    Box(Modifier.fillMaxSize().storeBackground()) {
+    Box(Modifier.fillMaxSize()) {
+        // El fondo llega al filo de la pantalla (bajo el recorte de la cámara); el contenido, en el área segura.
+        Box(Modifier.fillMaxSize().edgeBleed().storeBackground())
         AnimatedContent(
             targetState = detail?.id,
             transitionSpec = { fadeIn(tween(if (reduced) 0 else 200)) togetherWith fadeOut(tween(if (reduced) 0 else 160)) },
@@ -202,6 +207,7 @@ private fun storeActions(vm: ElyndraViewModel) = StoreHomeActions(
     openDownloads = vm.ports::openDownloads,
     openUtilities = vm.ports::openUtilities,
     openWishlist = vm.ports::openWishlist,
+    exit = { vm.go(com.elyndra.launcher.ui.Screen.Library) },
     openCollection = vm.ports::openCollection,
     retry = { vm.ports.load(force = true) },
     updateAll = vm.portInstall::updateAll,
@@ -275,10 +281,15 @@ fun PortsHome(state: StoreHome, actions: StoreHomeActions, modifier: Modifier = 
 private fun StoreHeader(state: StoreHome, actions: StoreHomeActions, width: Float, modifier: Modifier) {
     val tile = StoreLayout.headerTile(width).dp
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        StoreHeaderTile(tile) {
-            Box(Modifier.size(tile * 0.42f).drawStoreGlyph())
+        // Lo primero, a la izquierda: volver a la biblioteca (como en Masha).
+        StoreBackButton(stringResource(R.string.store_back_to_library), actions.exit)
+        Spacer(Modifier.width(12.dp))
+        if (StoreLayout.headerTileVisible(width)) {
+            StoreHeaderTile(tile) {
+                Box(Modifier.size(tile * 0.42f).drawStoreGlyph())
+            }
+            Spacer(Modifier.width(16.dp))
         }
-        Spacer(Modifier.width(16.dp))
         ElyText(
             stringResource(R.string.ports_title),
             Modifier.weight(1f),

@@ -24,6 +24,12 @@ object StoreLayout {
 
     fun headerTile(width: Float): Float = if (width < 600f) HEADER_TILE_COMPACT else HEADER_TILE
 
+    /**
+     * ¿Cabe la baldosa de la tienda junto al botón de volver, el título y los
+     * iconos? En el móvil más estrecho no: el botón de volver hace de cabecera.
+     */
+    fun headerTileVisible(width: Float): Boolean = width >= 400f
+
     /** El título "Ports", en peso fino. */
     fun titleSize(width: Float): Float = if (width < 600f) 20f else 26f
 
