@@ -45,6 +45,12 @@ class StoreLayoutTest {
         assertFalse(StoreLayout.sortButtonInMargin(800f, 1280f))
     }
 
+    @Test fun `the store tile gives way to the back button on the narrowest phones`() {
+        assertTrue(StoreLayout.headerTileVisible(412f))
+        assertTrue(StoreLayout.headerTileVisible(1280f))
+        assertFalse(StoreLayout.headerTileVisible(360f))
+    }
+
     @Test fun `icons join the tab row only when wide`() {
         assertTrue(StoreLayout.iconsInTabRow(1280f))
         assertTrue(StoreLayout.iconsInTabRow(853f))

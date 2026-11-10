@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.components.edgeBleed
 import com.elyndra.launcher.ui.components.PadHints
 import com.elyndra.launcher.ui.components.PadHint
 import androidx.compose.foundation.background
@@ -103,7 +104,8 @@ fun VoiceSyncScreen(vm: ElyndraViewModel) {
             HoloFallback(presence, Modifier.fillMaxSize().padding(bottom = 220.dp))
         } else {
             // Primer plano: los labios se ven para juzgar la sincronía.
-            MashaStage(presence, quality, MashaShot.CloseUp, Modifier.fillMaxSize()) { stage = it }
+            // A sangre: bajo el recorte de la cámara también (los controles se quedan en el área segura).
+            MashaStage(presence, quality, MashaShot.CloseUp, Modifier.fillMaxSize().edgeBleed()) { stage = it }
         }
 
         Row(

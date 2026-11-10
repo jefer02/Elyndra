@@ -1103,6 +1103,9 @@
     <string name="user_folder_add_to">フォルダに追加</string>
     <string name="user_folder_remove_item">このフォルダから外す</string>
     <string name="user_folder_added">%1$s に追加しました</string>
+    <string name="user_folder_move_to">フォルダへ移動</string>
+    <string name="user_folder_move_here">ここへ移動</string>
+    <string name="user_folder_moved">%1$s へ移動しました</string>
     <string name="user_folder_removed">%1$s から外しました</string>
     <string name="user_folder_created">フォルダを作成しました</string>
     <string name="user_folder_empty">このフォルダは空です。ゲームを追加してください。</string>

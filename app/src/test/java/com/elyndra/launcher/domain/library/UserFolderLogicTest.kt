@@ -75,12 +75,115 @@ class UserFolderLogicTest {
         assertSame(b, UserFolderLogic.add(b, "nope", listOf("r:3")))
     }
 
+    private val twoFolders = UserFolderLogic.create(withFolder, "u-2", "Otra", now = 8)
+
+    private fun items(lib: Library, id: String) = lib.userFolders.first { it.id == id }.items
+
+    /** Una biblioteca de antes de la regla: r:1 en las dos, y u-2 es la primera aunque vaya detrás en la lista. */
+    private val legacy = base.copy(
+        userFolders = listOf(
+            UserFolder("u-1", "Nueva", items = listOf("r:1", "r:2"), position = 5, createdAt = 50),
+            UserFolder("u-2", "Vieja", items = listOf("r:3", "r:1"), position = 1, createdAt = 10),
+        ),
+    )
+
     @Test
-    fun aGameCanBeInSeveralFolders() {
-        var lib = UserFolderLogic.create(withFolder, "u-2", "Otra", now = 8)
-        lib = UserFolderLogic.add(lib, "u-1", listOf("r:1"))
-        lib = UserFolderLogic.add(lib, "u-2", listOf("r:1"))
-        assertEquals(listOf("u-1", "u-2"), UserFolderLogic.containing(lib, "r:1").map { it.id })
+    fun aFiledGameIsShownInItsFolderAndHiddenFromTheLibrary() {
+        val lib = UserFolderLogic.add(withFolder, "u-1", listOf("r:1", "a:com.a"))
+        val placement = UserFolderLogic.placement(lib, setOf("com.a"))
+        assertEquals(listOf("r:1", "a:com.a"), placement.shown["u-1"])
+        assertEquals(setOf("r:1", "a:com.a"), placement.hidden)
+    }
+
+    @Test
+    fun withoutFoldersNothingIsHidden() {
+        assertTrue(UserFolderLogic.placement(base, setOf("com.a")).hidden.isEmpty())
+    }
+
+    @Test
+    fun anUninstalledAppStaysInItsFolderAndKeepsItsNormalPlace() {
+        val lib = UserFolderLogic.add(withFolder, "u-1", listOf("a:com.a"))
+        val placement = UserFolderLogic.placement(lib, setOf("com.other"))
+        assertEquals(emptyList<String>(), placement.shown["u-1"])
+        assertFalse("a:com.a" in placement.hidden)
+        assertEquals(listOf("a:com.a"), items(lib, "u-1"))
+    }
+
+    @Test
+    fun anUnknownInstalledSetStillHidesApps() {
+        val lib = UserFolderLogic.add(withFolder, "u-1", listOf("a:com.a"))
+        assertTrue("a:com.a" in UserFolderLogic.placement(lib, emptySet()).hidden)
+    }
+
+    @Test
+    fun addingToAnotherFolderMovesTheGame() {
+        val first = UserFolderLogic.add(twoFolders, "u-1", listOf("r:1", "r:2"))
+        val moved = UserFolderLogic.add(first, "u-2", listOf("r:1"))
+        assertEquals(listOf("r:2"), items(moved, "u-1"))
+        assertEquals(listOf("r:1"), items(moved, "u-2"))
+        assertEquals("u-2", UserFolderLogic.owner(moved, "r:1")?.id)
+    }
+
+    @Test
+    fun aMoveLeavesTheGamesAlone() {
+        val first = UserFolderLogic.add(twoFolders, "u-1", listOf("r:1"))
+        val moved = UserFolderLogic.add(first, "u-2", listOf("r:1"))
+        assertSame(first.roms, moved.roms)
+        assertSame(first.apps, moved.apps)
+    }
+
+    @Test
+    fun removingMakesTheGameReappear() {
+        val lib = UserFolderLogic.add(withFolder, "u-1", listOf("r:1", "r:2"))
+        val out = UserFolderLogic.remove(lib, "u-1", listOf("r:1"))
+        assertEquals(setOf("r:2"), UserFolderLogic.placement(out, setOf("com.a")).hidden)
+        assertNull(UserFolderLogic.owner(out, "r:1"))
+    }
+
+    @Test
+    fun deletingMakesItsGamesReappear() {
+        val lib = UserFolderLogic.add(withFolder, "u-1", listOf("r:1", "a:com.a"))
+        val out = UserFolderLogic.delete(lib, "u-1")
+        assertTrue(UserFolderLogic.placement(out, setOf("com.a")).hidden.isEmpty())
+    }
+
+    @Test
+    fun aLegacyGameInTwoFoldersShowsOnlyInTheFirstWithoutLosingRows() {
+        val placement = UserFolderLogic.placement(legacy, setOf("com.a"))
+        assertEquals(listOf("r:3", "r:1"), placement.shown["u-2"])
+        assertEquals(listOf("r:2"), placement.shown["u-1"])
+        assertEquals(setOf("r:1", "r:2", "r:3"), placement.hidden)
+        assertEquals("u-2", UserFolderLogic.owner(legacy, "r:1")?.id)
+        assertEquals(listOf("r:1", "r:2"), items(legacy, "u-1"))
+    }
+
+    @Test
+    fun movingALegacyGameLeavesItOnlyInTheChosenFolder() {
+        val out = UserFolderLogic.add(legacy, "u-1", listOf("r:1"))
+        assertEquals(listOf("r:1", "r:2"), items(out, "u-1"))
+        assertEquals(listOf("r:3"), items(out, "u-2"))
+        assertEquals("u-1", UserFolderLogic.owner(out, "r:1")?.id)
+    }
+
+    @Test
+    fun removingALegacyGameTakesItOutOfEveryFolder() {
+        val out = UserFolderLogic.remove(legacy, "u-2", listOf("r:1"))
+        assertNull(UserFolderLogic.owner(out, "r:1"))
+        assertFalse("r:1" in UserFolderLogic.placement(out, setOf("com.a")).hidden)
+    }
+
+    @Test
+    fun deletingTheFolderThatShowsALegacyGameReleasesIt() {
+        val out = UserFolderLogic.delete(legacy, "u-2")
+        assertNull(UserFolderLogic.owner(out, "r:1"))
+        assertEquals(listOf("r:2"), items(out, "u-1"))
+    }
+
+    @Test
+    fun deletingTheFolderThatDoesNotShowALegacyGameKeepsItWhereItIs() {
+        val out = UserFolderLogic.delete(legacy, "u-1")
+        assertEquals("u-2", UserFolderLogic.owner(out, "r:1")?.id)
+        assertEquals(listOf("r:3", "r:1"), items(out, "u-2"))
     }
 
     @Test

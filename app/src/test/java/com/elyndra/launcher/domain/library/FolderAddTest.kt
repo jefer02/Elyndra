@@ -1,6 +1,7 @@
 package com.elyndra.launcher.domain.library
 
 import com.elyndra.launcher.data.Library
+import com.elyndra.launcher.data.UserFolder
 import com.elyndra.launcher.domain.Fixtures
 import com.elyndra.launcher.domain.ports.PortPlacement
 import com.elyndra.launcher.library.InstalledApp
@@ -57,6 +58,15 @@ class FolderAddTest {
             InstalledApp("com.alpha", "alpha", isGame = true, installedAt = 0),
         )
         assertEquals(listOf("com.alpha", "com.zeta", "com.notes"), FolderAdd.appChoices(installed, lib, "wii1").map { it.packageName })
+    }
+
+    @Test fun `app choices skip what lives in a user folder`() {
+        val lib = Library(folders = listOf(wii), userFolders = listOf(UserFolder("u-1", "Mine", items = listOf("a:com.filed"))))
+        val installed = listOf(
+            InstalledApp("com.filed", "Filed", isGame = true, installedAt = 0),
+            InstalledApp("com.free", "Free", isGame = true, installedAt = 0),
+        )
+        assertEquals(listOf("com.free"), FolderAdd.appChoices(installed, lib, "wii1").map { it.packageName })
     }
 
     @Test fun `placing a new app adds it straight into the folder`() {

@@ -1136,6 +1136,9 @@ Built by the community, not reviewed. Check the repository before installing.</s
     <string name="user_folder_add_to">Add to folder</string>
     <string name="user_folder_remove_item">Remove from this folder</string>
     <string name="user_folder_added">Added to %1$s</string>
+    <string name="user_folder_move_to">Move to folder</string>
+    <string name="user_folder_move_here">Move here</string>
+    <string name="user_folder_moved">Moved to %1$s</string>
     <string name="user_folder_removed">Removed from %1$s</string>
     <string name="user_folder_created">Folder created</string>
     <string name="user_folder_empty">This folder is empty. Add some games to it.</string>

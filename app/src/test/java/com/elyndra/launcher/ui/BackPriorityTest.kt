@@ -10,6 +10,17 @@ class BackPriorityTest {
     private fun next(s: State) = BackPriority.next(s)
 
     @Test
+    fun `from the store top level back returns to the library, after sheets and the port page`() {
+        // Top level (any tab, no filter): straight back to the library.
+        assertEquals(Target.Screen, next(State(screen = Screen.Ports)))
+        // A sheet over the port page closes first, then the page, then the store.
+        var s = State(screen = Screen.Ports, portDetail = true, sheet = true)
+        assertEquals(Target.Sheet, next(s)); s = s.copy(sheet = false)
+        assertEquals(Target.PortDetail, next(s)); s = s.copy(portDetail = false)
+        assertEquals(Target.Screen, next(s))
+    }
+
+    @Test
     fun `el teclado se cierra antes que cualquier capa`() {
         val all = State(keyboard = true, intro = true, dialog = true, sheet = true, identify = true, details = true, screen = Screen.Settings)
         assertEquals(Target.Keyboard, next(all))

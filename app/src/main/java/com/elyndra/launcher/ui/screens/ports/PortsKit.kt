@@ -1,5 +1,7 @@
 package com.elyndra.launcher.ui.screens.ports
 
+import com.elyndra.launcher.ui.components.BackChevron
+import com.elyndra.launcher.ui.components.touchTarget
 import androidx.annotation.StringRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -610,6 +612,30 @@ fun StoreIconButton(
                     .border(1.5.dp, Store.bg, CircleShape),
             )
         }
+    }
+}
+
+/**
+ * Volver a la biblioteca: el botón redondeado de la cabecera, el mismo que el
+ * de Masha (38 dp, cristal oscuro con un canto claro, el galón blanco) y que
+ * se toca en 48 dp. Con el mando lleva el marco blanco de la tienda.
+ */
+@Composable
+fun StoreBackButton(description: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(12.dp)
+    var focused by remember { mutableStateOf(false) }
+    Box(
+        modifier
+            .touchTarget(Modifier.semantics { contentDescription = description }.storeClickable(onClick = onClick))
+            .size(38.dp)
+            .storeFocusRing(focused, 12.dp)
+            .onFocusChanged { focused = it.isFocused }
+            .clip(shape)
+            .background(if (focused) Store.tileHigh else Store.tile.copy(alpha = 0.6f))
+            .border(1.dp, Store.pillBorder, shape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.size(16.dp)) { BackChevron(color = Color.White) }
     }
 }
 

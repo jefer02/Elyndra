@@ -1148,6 +1148,9 @@ Hecho por la comunidad, sin revisar. Mira el repositorio antes de instalar.</str
     <string name="user_folder_add_to">Añadir a carpeta</string>
     <string name="user_folder_remove_item">Quitar de esta carpeta</string>
     <string name="user_folder_added">Añadido a %1$s</string>
+    <string name="user_folder_move_to">Mover a carpeta</string>
+    <string name="user_folder_move_here">Mover aquí</string>
+    <string name="user_folder_moved">Movido a %1$s</string>
     <string name="user_folder_removed">Quitado de %1$s</string>
     <string name="user_folder_created">Carpeta creada</string>
     <string name="user_folder_empty">Esta carpeta está vacía. Añádele algunos juegos.</string>

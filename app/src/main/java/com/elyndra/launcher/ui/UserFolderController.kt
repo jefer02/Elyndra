@@ -54,10 +54,7 @@ class UserFolderController(private val vm: ElyndraViewModel) {
             val id = repo.createUserFolder(typed)
             when {
                 id == null -> vm.showToast(UiText.res(R.string.user_folder_name_empty))
-                addKey != null -> {
-                    repo.addToUserFolder(id, listOf(addKey))
-                    repo.userFolder(id)?.let { vm.showToast(UiText.res(R.string.user_folder_added, it.name)) }
-                }
+                addKey != null -> repo.userFolder(id)?.let { place(it, addKey) }
                 else -> {
                     if (vm.screen == Screen.Add) vm.go(Screen.Library)
                     val key = "f:$id"
@@ -148,11 +145,15 @@ class UserFolderController(private val vm: ElyndraViewModel) {
     fun subtitle(folder: UserFolder, count: Int): UiText =
         folder.description?.let { UiText.Raw(it) } ?: UiText.plural(R.plurals.user_folder_games, count, count)
 
-    /** "Añadir a carpeta" y, dentro de una carpeta del usuario que lo tiene, "Quitar de esta carpeta". */
+    /** "Añadir a carpeta" o, si ya está en una, "Mover a carpeta". */
+    fun pickLabel(key: String): UiText =
+        UiText.res(if (UserFolderLogic.owner(vm.library, key) != null) R.string.user_folder_move_to else R.string.user_folder_add_to)
+
+    /** Elegir carpeta y, dentro de una carpeta del usuario que lo tiene, "Quitar de esta carpeta". */
     fun membershipActions(key: String, title: String): List<SheetAction> {
         val here = vm.currentFolder()?.userFolder?.takeIf { vm.screen == Screen.Folder && key in it.items }
         return listOfNotNull(
-            SheetAction(UiText.res(R.string.user_folder_add_to), icon = SheetIcon.Add, opensSheet = true) { pickFolder(key, title) },
+            SheetAction(pickLabel(key), icon = SheetIcon.Add, opensSheet = true) { pickFolder(key, title) },
             here?.let { folder ->
                 SheetAction(UiText.res(R.string.user_folder_remove_item), icon = SheetIcon.Remove) { toggle(folder, key) }
             },
@@ -162,26 +163,35 @@ class UserFolderController(private val vm: ElyndraViewModel) {
         )
     }
 
-    /** La lista de carpetas de un juego: elegir una lo mete o lo saca; arriba, crear otra. */
+    /** La lista de carpetas de un juego: la suya, marcada, lo saca; otra lo mueve; arriba, crear otra. */
     fun pickFolder(key: String, title: String) {
         val create = SheetAction(UiText.res(R.string.user_folder_new_ellipsis), icon = SheetIcon.Add, opensSheet = true) { promptCreate(addKey = key) }
+        val owner = UserFolderLogic.owner(vm.library, key)
         val folders = UserFolderLogic.sorted(vm.library.userFolders).map { folder ->
+            val count = vm.userFolderCount(folder.id)
             SheetAction(
                 UiText.Raw(folder.name),
-                detail = UiText.plural(R.plurals.user_folder_games, folder.items.size, folder.items.size),
-                selected = key in folder.items,
+                detail = if (owner != null && owner.id != folder.id) UiText.res(R.string.user_folder_move_here) else UiText.plural(R.plurals.user_folder_games, count, count),
+                selected = owner?.id == folder.id,
             ) { toggle(folder, key) }
         }
-        vm.showSheet(ActionSheetSpec(UiText.res(R.string.user_folder_add_to), UiText.Raw(title), listOf(create) + folders))
+        vm.showSheet(ActionSheetSpec(pickLabel(key), UiText.Raw(title), listOf(create) + folders))
     }
 
     private fun toggle(folder: UserFolder, key: String) {
-        if (key in folder.items) {
+        if (UserFolderLogic.owner(repo.current, key)?.id == folder.id) {
+            vm.stepSelectionOff(key)
             repo.removeFromUserFolder(folder.id, listOf(key))
             vm.showToast(UiText.res(R.string.user_folder_removed, folder.name))
         } else {
-            repo.addToUserFolder(folder.id, listOf(key))
-            vm.showToast(UiText.res(R.string.user_folder_added, folder.name))
+            place(folder, key)
         }
+    }
+
+    private fun place(folder: UserFolder, key: String) {
+        val moved = UserFolderLogic.owner(repo.current, key) != null
+        vm.stepSelectionOff(key)
+        repo.addToUserFolder(folder.id, listOf(key))
+        vm.showToast(UiText.res(if (moved) R.string.user_folder_moved else R.string.user_folder_added, folder.name))
     }
 }

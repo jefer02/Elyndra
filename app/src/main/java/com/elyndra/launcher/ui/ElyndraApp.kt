@@ -161,9 +161,15 @@ fun ElyndraApp(vm: ElyndraViewModel) {
         // insets) quedaría clara junto a ellas. Las demás llevan su arte hasta
         // el filo (ver EdgeBleed); lo que no, se queda sobre el papel.
         val holoScreen = vm.screen == Screen.Masha || vm.screen == Screen.VoiceSync
+        // La tienda también es oscura: su fondo llega al filo (edgeBleed) y, debajo, la raíz es del mismo tono.
+        val rootBg = when {
+            holoScreen -> Holo.bg
+            vm.screen == Screen.Ports -> com.elyndra.launcher.ui.theme.Store.bg
+            else -> P.paper
+        }
         // Los testTag salen como resource-id para UiAutomator (perfil base y
         // pruebas de rendimiento, ver :baselineprofile). No cambia nada visible.
-        Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }.background(if (holoScreen) Holo.bg else P.paper)) {
+        Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }.background(rootBg)) {
             // Las barras van ocultas (pantalla completa), así que sus insets son 0;
             // se mantiene el del recorte de pantalla para que en un móvil con muesca
             // el contenido no quede debajo. Los fondos de cada pantalla sí pasan

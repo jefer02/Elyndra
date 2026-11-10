@@ -1148,6 +1148,9 @@ Fait par la communauté, non vérifié. Consultez le dépôt avant d\'installer.
     <string name="user_folder_add_to">Ajouter au dossier</string>
     <string name="user_folder_remove_item">Retirer de ce dossier</string>
     <string name="user_folder_added">Ajouté à %1$s</string>
+    <string name="user_folder_move_to">Déplacer vers un dossier</string>
+    <string name="user_folder_move_here">Déplacer ici</string>
+    <string name="user_folder_moved">Déplacé vers %1$s</string>
     <string name="user_folder_removed">Retiré de %1$s</string>
     <string name="user_folder_created">Dossier créé</string>
     <string name="user_folder_empty">Ce dossier est vide. Ajoutez-y quelques jeux.</string>

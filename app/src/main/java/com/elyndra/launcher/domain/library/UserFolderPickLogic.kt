@@ -28,17 +28,16 @@ object UserFolderPickLogic {
     )
 
     /**
-     * Todo lo de la biblioteca que aún no está en [folderId], por título. Las
+     * Lo de la biblioteca que aún no está en ninguna carpeta, por título. Las
      * apps no instaladas no salen ([installed] vacío = aún sin saberlo: salen).
      */
     fun candidates(
         library: Library,
-        folderId: String,
         installed: Set<String>,
         ports: Set<String>,
         platformOf: (String) -> String?,
     ): List<Candidate> {
-        val taken = library.userFolders.firstOrNull { it.id == folderId }?.items.orEmpty().toHashSet()
+        val taken = UserFolderLogic.owners(library).keys
         val platforms = HashMap<String, String?>()
         val out = ArrayList<Candidate>(library.roms.size + library.apps.size)
         for (r in library.roms) {

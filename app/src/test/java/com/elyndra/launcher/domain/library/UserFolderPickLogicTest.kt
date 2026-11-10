@@ -24,13 +24,20 @@ class UserFolderPickLogicTest {
 
     private val installed = setOf("com.port", "com.app")
 
-    private fun all() = UserFolderPickLogic.candidates(library, "u-1", installed, setOf("com.port")) { it.uppercase() }
+    private fun all() = UserFolderPickLogic.candidates(library, installed, setOf("com.port")) { it.uppercase() }
 
     private fun titles(list: List<UserFolderPickLogic.Candidate>) = list.map { it.title }
 
     @Test
     fun offersWhatIsNotInTheFolderSortedByTitle() {
         assertEquals(listOf("Alto", "Pokémon Azul", "Ship of Harkinian", "Zelda"), titles(all()))
+    }
+
+    @Test
+    fun leavesOutWhatIsInAnyFolder() {
+        val two = library.copy(userFolders = library.userFolders + UserFolder("u-2", "Other", items = listOf("r:1", "a:com.app")))
+        val list = UserFolderPickLogic.candidates(two, installed, setOf("com.port")) { it.uppercase() }
+        assertEquals(listOf("Pokémon Azul", "Ship of Harkinian"), titles(list))
     }
 
     @Test
@@ -43,7 +50,7 @@ class UserFolderPickLogicTest {
 
     @Test
     fun unknownInstalledSetKeepsEveryApp() {
-        val list = UserFolderPickLogic.candidates(library, "u-1", emptySet(), emptySet()) { null }
+        val list = UserFolderPickLogic.candidates(library, emptySet(), emptySet()) { null }
         assertTrue("Gone" in titles(list))
     }
 
@@ -84,7 +91,7 @@ class UserFolderPickLogicTest {
     fun indexesAndFindsAcrossTenThousandGames() {
         val many = (0 until 10_000).map { rom("$it", "Game número $it") }
         val big = Library(roms = many, userFolders = listOf(UserFolder("u-1", "Mine")))
-        val index = UserFolderPickLogic.candidates(big, "u-1", emptySet(), emptySet()) { "PSX" }
+        val index = UserFolderPickLogic.candidates(big, emptySet(), emptySet()) { "PSX" }
         assertEquals(10_000, index.size)
         assertEquals(1, UserFolderPickLogic.search(index, "numero 9999", "", emptyList()).size)
     }

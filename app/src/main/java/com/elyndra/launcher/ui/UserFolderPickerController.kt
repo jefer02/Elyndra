@@ -55,7 +55,7 @@ class UserFolderPickerController(private val vm: ElyndraViewModel) {
         val ports = vm.ports.installed.values.mapTo(HashSet()) { it.packageName }
         job = vm.viewModelScope.launch {
             index = withContext(Dispatchers.Default) {
-                UserFolderPickLogic.candidates(library, id, installed, ports) { Systems.byId(it)?.short }
+                UserFolderPickLogic.candidates(library, installed, ports) { Systems.byId(it)?.short }
             }
             loading = false
             applySearch()
