@@ -3,6 +3,8 @@
     <!-- Copia de BrandTokens para lo que no puede leer Kotlin (tema de la ventana,
          splash del sistema). Si cambia allí, cambia aquí. -->
     <color name="paper">#F3F4F8</color>
+    <!-- Fondo de la ventana (detrás de Compose): oscuro en los dos temas. -->
+    <color name="window_bg">#0B0B0F</color>
     <color name="intro_pearl">#F8F4EC</color>
     <color name="intro_smoke">#0C0906</color>
     <!-- Splash sin preferencia guardada (o antes de Android 13): el del tema del sistema. -->

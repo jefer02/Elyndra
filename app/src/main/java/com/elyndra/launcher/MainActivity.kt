@@ -18,6 +18,7 @@ import android.view.MotionEvent
 import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import android.view.WindowManager
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -134,6 +135,7 @@ class MainActivity : ComponentActivity() {
         // Borde a borde: el fondo "papel" y el hero llegan hasta el filo de la
         // pantalla, como en el diseño. Los insets se aplican en ElyndraApp.
         enableEdgeToEdge(barStyle(dark), barStyle(dark))
+        applyCutoutMode()
         super.onCreate(savedInstanceState)
         // Solo en las variantes del perfil base: el modo de rendimiento que pide la prueba, antes de
         // la primera composición. En debug y release no hace nada.
@@ -188,6 +190,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Al volver (de un juego, de los ajustes del sistema) las barras pueden haber vuelto.
+        hideSystemBars()
         // En Auto, el ahorro de batería cuenta: se pudo encender fuera de la app.
         DevicePerformance.refresh(this)
         // En Auto y en Calidad, el último recurso: tirones sostenidos en la biblioteca → Rendimiento.
@@ -241,14 +245,23 @@ class MainActivity : ComponentActivity() {
     private fun applyTheme(dark: Boolean, intro: Boolean) {
         window.setBackgroundDrawable(ColorDrawable(windowColor(dark, intro)))
         enableEdgeToEdge(barStyle(dark), barStyle(dark))
+        // enableEdgeToEdge vuelve a poner su modo de recorte: el nuestro, otra vez.
+        applyCutoutMode()
+        hideSystemBars()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             splashScreen.setSplashScreenTheme(if (dark) R.style.Theme_Elyndra_Starting_Dark else R.style.Theme_Elyndra_Starting_Light)
         }
     }
 
+    /**
+     * El fondo de la ventana, detrás de Compose: el de la intro mientras se
+     * ve (empalma con el splash) y, si no, oscuro en los dos temas. Compose
+     * pinta encima de borde a borde; si algo de la ventana asoma (bajo el
+     * recorte de la cámara, al girar), es oscuro y no una franja clara.
+     */
     private fun windowColor(dark: Boolean, intro: Boolean): Int = when {
         intro -> if (dark) BrandTokens.INTRO_SMOKE else BrandTokens.INTRO_PEARL
-        else -> if (dark) BrandTokens.DARK.paper else BrandTokens.LIGHT.paper
+        else -> BrandTokens.DARK.paper
     }
 
     /** Iconos claros sobre el tema oscuro y oscuros sobre el claro. */
@@ -299,10 +312,31 @@ class MainActivity : ComponentActivity() {
      * deslizar desde el borde y las vuelve a esconder solas.
      */
     private fun hideSystemBars() {
+        applyCutoutMode()
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.systemBars())
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
+    /**
+     * La ventana llega bajo el recorte de la cámara, en cualquier orientación:
+     * ALWAYS desde Android 11, SHORT_EDGES en 9 y 10; antes no hay recorte que
+     * pedir. (Lo mismo va en el tema, para el primer fotograma.) Compose deja
+     * el contenido fuera de él con los insets (ver ElyndraApp / SafeAreaInsets).
+     */
+    private fun applyCutoutMode() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
+        val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+        } else {
+            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
+        val attrs = window.attributes
+        if (attrs.layoutInDisplayCutoutMode != mode) {
+            attrs.layoutInDisplayCutoutMode = mode
+            window.attributes = attrs
         }
     }
 

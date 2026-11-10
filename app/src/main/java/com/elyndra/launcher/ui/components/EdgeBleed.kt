@@ -1,5 +1,7 @@
 package com.elyndra.launcher.ui.components
 
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.systemBars
@@ -86,6 +88,15 @@ fun Modifier.edgeMirror(left: Boolean = true, right: Boolean = true, top: Boolea
         }
     }
 }
+
+/**
+ * Dentro de una capa que ya llega al filo ([edgeBleed] sobre la pantalla
+ * entera), devuelve el contenido al área segura: el mismo margen que la raíz,
+ * leído en crudo (la raíz ya lo consumió, así que `windowInsetsPadding` aquí
+ * daría 0). Una vez por pantalla, no por pieza.
+ */
+@Composable
+fun Modifier.safeAreaPadding(): Modifier = padding(SafeAreaInsets.asPaddingValues())
 
 private fun Constraints.grow(dx: Int, dy: Int): Constraints = Constraints(
     minWidth = minWidth + dx,

@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui.screens.ports
 
+import com.elyndra.launcher.ui.components.edgeBleed
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.core.Animatable
@@ -173,15 +174,17 @@ fun PortDetail(state: PortDetailState, actions: PortDetailActions, modifier: Mod
             verticalArrangement = Arrangement.spacedBy(22.dp),
         ) {
             Box(Modifier.fillMaxWidth()) {
-                StoreImage(state.hero ?: state.port.image, "", Modifier.fillMaxWidth().height(heroH))
-                // Oscuro a la izquierda (donde va el panel) y fundido abajo con el fondo.
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(heroH)
-                        .background(Brush.horizontalGradient(0f to Store.bg.copy(alpha = if (wide) 0.92f else 0.3f), 0.55f to Color.Transparent)),
-                )
-                Box(Modifier.fillMaxWidth().height(heroH).background(Brush.verticalGradient(0.55f to Color.Transparent, 1f to Store.bg)))
+                // El arte a sangre llega al filo (bajo el recorte de la cámara y arriba); el panel, no.
+                Box(Modifier.fillMaxWidth().height(heroH).edgeBleed(bottom = false)) {
+                    StoreImage(state.hero ?: state.port.image, "", Modifier.fillMaxSize())
+                    // Oscuro a la izquierda (donde va el panel) y fundido abajo con el fondo.
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(Brush.horizontalGradient(0f to Store.bg.copy(alpha = if (wide) 0.92f else 0.3f), 0.55f to Color.Transparent)),
+                    )
+                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.55f to Color.Transparent, 1f to Store.bg)))
+                }
                 DetailPanel(
                     state,
                     actions,

@@ -1,5 +1,7 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.ui.components.edgeBleed
+import com.elyndra.launcher.ui.components.safeAreaPadding
 import com.elyndra.launcher.ui.components.PadHints
 import com.elyndra.launcher.ui.components.PadHint
 import android.Manifest
@@ -232,7 +234,10 @@ fun MashaScreen(vm: ElyndraViewModel) {
 
     val glow = Color(presence.visibleMood.glow)
 
-    Box(Modifier.fillMaxSize().background(Holo.bg)) {
+    // El escenario 3D, la luz, la atmósfera y el velo llegan al filo de la pantalla
+    // (bajo el recorte de la cámara); la barra, la conversación y los paneles vuelven
+    // al área segura con safeAreaPadding (una vez, aquí).
+    Box(Modifier.fillMaxSize().edgeBleed().background(Holo.bg)) {
         if (stage == StageStatus.Failed) {
             // En horizontal, en su columna (la de la izquierda): a pantalla
             // completa con 180 dp abajo, en 360 dp de alto el núcleo de 230 dp
@@ -300,7 +305,7 @@ fun MashaScreen(vm: ElyndraViewModel) {
             )
         }
 
-        Column(Modifier.fillMaxSize().imePadding()) {
+        Column(Modifier.fillMaxSize().safeAreaPadding().imePadding()) {
             TopBar(
                 vm = vm,
                 presence = presence,
@@ -338,7 +343,7 @@ fun MashaScreen(vm: ElyndraViewModel) {
             soundOpen,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = 64.dp, end = m.pad),
+            modifier = Modifier.align(Alignment.TopEnd).safeAreaPadding().padding(top = 64.dp, end = m.pad),
         ) {
             SoundPanel(vm, glow)
         }

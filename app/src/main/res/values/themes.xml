@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Fondo "papel" del diseño detrás de la ventana, para que no haya
-         destello blanco/negro entre el arranque y el primer frame de Compose. -->
+    <!-- Ventana oscura y a pantalla completa: Compose pinta de borde a borde,
+         también bajo el recorte de la cámara (shortEdges en Android 9 y 10;
+         en 11+ "always", en values-v30). Lo que asome de la ventana antes del
+         primer fotograma es oscuro, nunca una franja clara. -->
     <style name="Theme.Elyndra" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">@color/paper</item>
+        <item name="android:windowBackground">@color/window_bg</item>
+        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="28">shortEdges</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
