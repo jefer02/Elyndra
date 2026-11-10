@@ -1,0 +1,28 @@
+# Repositories that are never included, whatever the gates say (gate 4).
+# Add DMCA'd projects, their mirrors and anything you don't want in the catalog.
+# The match is case-insensitive on owner/name; a renamed repo matches by either name.
+
+repos:
+  # GTA III / Vice City reverse engineering: DMCA takedown by Take-Two (2021).
+  - repo: re3/re3
+    reason: DMCA (Take-Two, 2021)
+  - repo: re3/reVC
+    reason: DMCA (Take-Two, 2021)
+  - repo: GTAmodding/re3
+    reason: DMCA (Take-Two, 2021)
+  - repo: GTAmodding/reVC
+    reason: DMCA (Take-Two, 2021)
+  - repo: halpz/re3
+    reason: re3 mirror (DMCA)
+  - repo: halpz/reVC
+    reason: reVC mirror (DMCA)
+  - repo: codepdbh/revc-android-port-evolved
+    reason: reVC fork (DMCA)
+  - repo: td512/re3
+    reason: re3 mirror (DMCA)
+  # Original games, not ports of one.
+  - repo: tpcstld/2048
+    reason: original game (2048), not a port
+  # The APK ships the game itself.
+  - repo: Ronyzix/SuperBomberman4SNESRecomp
+    reason: APK contains the game data (says so in its description)

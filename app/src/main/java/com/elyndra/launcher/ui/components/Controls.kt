@@ -357,6 +357,59 @@ fun rememberOpenLabelWidth(): Float {
 }
 
 /**
+ * La tienda de ports en la barra, junto al buscador: la bolsa y "Tienda".
+ * Sin [showLabel] (barra justa, ver [TopBarLayout.fit]) se queda en su icono,
+ * como "Abrir"; nunca se quita.
+ */
+@Composable
+fun StoreButton(
+    modifier: Modifier = Modifier,
+    focused: Boolean = false,
+    showLabel: Boolean = true,
+    onClick: () -> Unit,
+) {
+    val glyph by animateFloatAsState(if (focused) 1.14f else 1f, motion(Springs.snappy()), label = "storeGlyph")
+    val interaction = remember { MutableInteractionSource() }
+    val label = stringResource(R.string.store_button)
+    Row(
+        modifier
+            .touchTarget(Modifier.clickable(interactionSource = interaction, indication = null, onClick = onClick))
+            .height(HeroBarHeight)
+            .then(if (showLabel) Modifier else Modifier.width(HeroBarHeight))
+            .semantics { contentDescription = label }
+            .darkGlass(RoundedCornerShape(Radii.s))
+            .consoleFocus(focused)
+            .indication(interaction, LocalIndication.current)
+            .then(if (showLabel) Modifier.padding(start = TopBarLayout.STORE_PAD_START.dp, end = TopBarLayout.STORE_PAD_END.dp) else Modifier),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        androidx.compose.foundation.Canvas(
+            Modifier
+                .size(TopBarLayout.STORE_GLYPH.dp)
+                .graphicsLayer { scaleX = glyph; scaleY = glyph },
+        ) { com.elyndra.launcher.ui.screens.ports.StoreGlyph(this, Color.White) }
+        if (showLabel) {
+            Spacer(Modifier.width(TopBarLayout.STORE_GLYPH_GAP.dp))
+            ElyText(label, size = OPEN_LABEL_SP, weight = FontWeight.SemiBold, color = Color.White, maxLines = 1)
+        }
+    }
+}
+
+/** Lo que mide el rótulo de la tienda (dp), como [rememberOpenLabelWidth]. */
+@Composable
+fun rememberStoreLabelWidth(): Float {
+    val label = stringResource(R.string.store_button)
+    val family = LocalPoppins.current
+    val measurer = rememberTextMeasurer()
+    val dens = LocalDensity.current
+    return remember(label, family, dens) {
+        val style = TextStyle(fontFamily = family, fontSize = OPEN_LABEL_SP.sp, fontWeight = FontWeight.SemiBold)
+        measurer.measure(label, style, maxLines = 1, density = dens).size.width / dens.density
+    }
+}
+
+/**
  * Botón cuadrado de icono de la barra del hero (buscar, Ajustes, volver…),
  * con el realce de consola cuando lo señala el mando y el icono que crece un
  * poco al recibirlo.

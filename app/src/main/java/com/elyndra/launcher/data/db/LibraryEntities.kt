@@ -32,6 +32,7 @@ data class FolderEntity(
     val hero: String?,
     val logo: String?,
     val icon: String?,
+    @ColumnInfo(name = "is_virtual", defaultValue = "0") val isVirtual: Boolean = false,
 )
 
 /** Juego quitado a mano de una carpeta: el siguiente análisis no lo devuelve. */
@@ -99,11 +100,19 @@ data class RomEntity(
 )
 
 /** Juego Android elegido para la biblioteca. */
-@Entity(tableName = "android_apps")
+/**
+ * Una app Android de la biblioteca. [folderId] la pone en una carpeta (los
+ * ports, en la de su sistema original). Sin clave ajena a propósito: borrar
+ * una carpeta no puede borrar la app ni su tiempo de juego; la limpieza va en
+ * el código (PortPlacement), no en cascada.
+ */
+@Entity(tableName = "android_apps", indices = [Index("folder_id")])
 data class AppEntity(
     @PrimaryKey @ColumnInfo(name = "package_name") val packageName: String,
     val label: String,
     @ColumnInfo(name = "added_at") val addedAt: Long,
+    @ColumnInfo(name = "folder_id") val folderId: String? = null,
+    @ColumnInfo(name = "folder_manual", defaultValue = "0") val folderManual: Boolean = false,
 )
 
 /**
@@ -202,6 +211,36 @@ data class PlaySessionEntity(
     @ColumnInfo(name = "emulator_id") val emulatorId: String?,
     val source: String,
     @ColumnInfo(name = "early_exit") val earlyExit: Boolean,
+)
+
+/** Carpeta creada por el usuario. Su arte va en `artwork` con la clave `f:<id>`. */
+@Entity(tableName = "user_folders")
+data class UserFolderEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val description: String?,
+    val position: Int,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+)
+
+/** Un juego dentro de una carpeta del usuario. Sin clave ajena al juego: puede ser ROM o app. */
+@Entity(
+    tableName = "user_folder_items",
+    primaryKeys = ["folder_id", "game_key"],
+    foreignKeys = [
+        ForeignKey(
+            entity = UserFolderEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["folder_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("game_key")],
+)
+data class UserFolderItemEntity(
+    @ColumnInfo(name = "folder_id") val folderId: String,
+    @ColumnInfo(name = "game_key") val gameKey: String,
+    val position: Int,
 )
 
 /** Estado suelto de la biblioteca: una sola fila (id 0). */

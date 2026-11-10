@@ -18,6 +18,8 @@ sealed interface OfflineIntent {
     data object AddInstalled : OfflineIntent
     /** "Llama a este juego X" / "ponle de nombre X": el juego que se está mirando. */
     data class Rename(val name: String) : OfflineIntent
+    /** "¿Hay algún port nativo?": la tienda de ports, con lo que encaja con la biblioteca. */
+    data object FindPort : OfflineIntent
     data object Unknown : OfflineIntent
 }
 
@@ -55,6 +57,7 @@ object OfflineIntents {
             if (!name.isNullOrBlank()) return OfflineIntent.Rename(name)
         }
         if (isAddInstalled(t)) return OfflineIntent.AddInstalled
+        if (isFindPort(t)) return OfflineIntent.FindPort
 
         // "Descarga las carátulas que faltan" es actualizar, aunque nombre una lista: manda el verbo.
         if (isMetadataUpdate(t)) return OfflineIntent.UpdateMetadata
@@ -83,6 +86,15 @@ object OfflineIntents {
         """^(?:ll[aá]malo|llama a este juego|ponle (?:de )?nombre|c[aá]mbiale el nombre a|renombra(?:lo)? (?:a|como)|rename (?:this game |it )?to|call (?:this game|it)|name (?:this game|it)|chame (?:este jogo |de )?|renomeie (?:para)?|appelle(?:-le)?(?: ce jeu)?|renomme(?:-le)? en|nenne (?:es|das spiel)|benenne (?:es )?um in)\s+(.+)$""",
         RegexOption.IGNORE_CASE,
     )
+
+    /**
+     * "port"/"ports"/"portage"/"Portierung" como palabra entera ("portrait",
+     * "importa" o "soporte" no cuentan), o recompilación, decompilación o
+     * "versión nativa".
+     */
+    private fun isFindPort(t: String): Boolean =
+        word(t, "port", "ports", "portage", "portages", "portierung", "portierungen") ||
+            has(t, "recompil", "decompil", "dekompil", "rekompil", "version nativa", "native version", "versao nativa", "version native", "native android")
 
     private fun isAddInstalled(t: String): Boolean =
         has(t, "anade", "agrega", "mete", "add", "adicion", "ajoute", "hinzufug") &&

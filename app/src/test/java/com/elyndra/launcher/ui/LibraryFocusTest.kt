@@ -6,6 +6,7 @@ import com.elyndra.launcher.ui.BarItem.Search
 import com.elyndra.launcher.ui.BarItem.Sections
 import com.elyndra.launcher.ui.BarItem.Settings
 import com.elyndra.launcher.ui.BarItem.Sort
+import com.elyndra.launcher.ui.BarItem.Store
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -14,15 +15,15 @@ class LibraryFocusTest {
 
     @Test
     fun `en la barra el orden es el que se ve`() {
-        assertEquals(listOf(listOf(Masha, Sections, Sort, Open, Search, Settings)), LibraryFocus.rows(dockInBar = true, searchOpen = false))
+        assertEquals(listOf(listOf(Masha, Sections, Sort, Open, Search, Store, Settings)), LibraryFocus.rows(dockInBar = true, searchOpen = false))
         // Con el buscador abierto "Abrir" se va.
-        assertEquals(listOf(listOf(Masha, Sections, Sort, Search, Settings)), LibraryFocus.rows(dockInBar = true, searchOpen = true))
+        assertEquals(listOf(listOf(Masha, Sections, Sort, Search, Store, Settings)), LibraryFocus.rows(dockInBar = true, searchOpen = true))
     }
 
     @Test
     fun `en la costura son dos filas, la barra encima del dock`() {
         assertEquals(
-            listOf(listOf(Masha, Open, Search, Settings), listOf(Sections, Sort)),
+            listOf(listOf(Masha, Open, Search, Store, Settings), listOf(Sections, Sort)),
             LibraryFocus.rows(dockInBar = false, searchOpen = false),
         )
     }
@@ -65,7 +66,7 @@ class LibraryFocusTest {
     @Test
     fun `en Meridian es una fila en el orden que se ve, con Masha la primera de la barra`() {
         // Cabecera de la rueda (el dock) y la barra de la derecha (Masha, Abrir, orden, buscar, Ajustes).
-        assertEquals(listOf(listOf(Sections, Masha, Open, Sort, Search, Settings)), LibraryFocus.meridianRows(searchOpen = false))
+        assertEquals(listOf(listOf(Sections, Masha, Open, Sort, Search, Store, Settings)), LibraryFocus.meridianRows(searchOpen = false))
         assertEquals(listOf(listOf(Sections, Masha, Sort, Search, Settings)), LibraryFocus.meridianRows(searchOpen = true))
         val rows = LibraryFocus.meridianRows(searchOpen = false)
         // Del dock a la derecha se llega a Masha, y de ella a "Abrir"; a la izquierda del dock, nada.

@@ -68,6 +68,18 @@ interface LibraryDao {
     @Upsert suspend fun upsertSessions(items: List<PlaySessionEntity>)
     @Delete suspend fun deleteSessions(items: List<PlaySessionEntity>)
 
+    @Query("SELECT * FROM user_folders")
+    suspend fun userFolders(): List<UserFolderEntity>
+
+    @Query("SELECT * FROM user_folder_items ORDER BY folder_id, position")
+    suspend fun userFolderItems(): List<UserFolderItemEntity>
+
+    @Upsert suspend fun upsertUserFolders(items: List<UserFolderEntity>)
+    @Delete suspend fun deleteUserFolders(items: List<UserFolderEntity>)
+
+    @Upsert suspend fun upsertUserFolderItems(items: List<UserFolderItemEntity>)
+    @Delete suspend fun deleteUserFolderItems(items: List<UserFolderItemEntity>)
+
     @Upsert suspend fun upsertState(state: LibraryStateEntity)
 
     @Query("UPDATE library_state SET last_auto_scan = :value WHERE id = 0")
@@ -76,11 +88,11 @@ interface LibraryDao {
     /* ── consultas para Masha (no pasan por la instantánea) ────── */
 
     /** Juegos con carátula (o icono, las apps) frente a los que no la tienen. */
-    @Query("SELECT COUNT(DISTINCT game_key) FROM artwork WHERE kind IN ('cover', 'icon') AND local_path IS NOT NULL")
+    @Query("SELECT COUNT(DISTINCT game_key) FROM artwork WHERE kind IN ('cover', 'icon') AND local_path IS NOT NULL AND game_key NOT LIKE 'f:%'")
     suspend fun gamesWithPrimaryArt(): Int
 
     /** Imágenes por servicio de origen, para contar de dónde sale el arte. */
-    @Query("SELECT source, COUNT(*) AS count FROM artwork WHERE local_path IS NOT NULL GROUP BY source")
+    @Query("SELECT source, COUNT(*) AS count FROM artwork WHERE local_path IS NOT NULL AND game_key NOT LIKE 'f:%' GROUP BY source")
     suspend fun artworkBySource(): List<SourceCount>
 }
 

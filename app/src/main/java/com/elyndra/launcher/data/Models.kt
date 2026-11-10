@@ -24,7 +24,31 @@ data class Library(
     val apps: List<AppEntry> = emptyList(),
     val sessions: List<PlaySession> = emptyList(),
     val lastAutoScan: Long = 0,
-)
+    val userFolders: List<UserFolder> = emptyList(),
+) {
+    /** Las carpetas con árbol SAF: las que se analizan y se leen (las virtuales de los ports no). */
+    val realFolders: List<RomFolder> get() = folders.filter { !it.isVirtual }
+}
+
+/**
+ * Carpeta creada por el usuario: mezcla ROMs, ports y apps, y un juego puede
+ * estar en varias. Va aparte de [Library.folders] porque nada de SAF, análisis
+ * o colocación de ports debe verla. Su arte vive en [meta], con la clave `f:<id>`.
+ */
+@Serializable
+data class UserFolder(
+    /** `u-…` (ver UserFolderLogic): su clave no choca con la de un [RomFolder]. */
+    val id: String,
+    val name: String,
+    val description: String? = null,
+    val position: Int = 0,
+    val createdAt: Long = 0,
+    val meta: GameMeta = GameMeta(),
+    /** Claves de juego ("r:…", "a:…"), en el orden elegido. */
+    val items: List<String> = emptyList(),
+) {
+    val key: String get() = "f:$id"
+}
 
 /** Carpeta de ROMs dada de alta: un árbol SAF concedido + la subcarpeta raíz. */
 @Serializable
@@ -56,6 +80,12 @@ data class RomFolder(
      * decir nada. Se vacía con "restaurar" (ver `LibraryRepository`).
      */
     val excluded: Set<String> = emptySet(),
+    /**
+     * Sin carpeta real detrás: la crea la tienda de ports para los de un
+     * sistema sin carpeta (id `v-<sistema>`). [treeUri], [rootDocId] y
+     * [displayPath] van vacíos y nada de SAF la toca nunca (ver SafGuard).
+     */
+    val isVirtual: Boolean = false,
 ) {
     val key: String get() = "f:$id"
 }
@@ -101,11 +131,30 @@ data class RomEntry(
     val serial: String? = null,
     /** Cuándo entró en la biblioteca (0 en las ROMs de antes de guardarlo: vale la fecha de su carpeta). */
     val addedAt: Long = 0,
+    /**
+     * Un port instalado que sale en esta carpeta: no es una ROM, es la app
+     * `a:<portPackage>` vista desde la carpeta de su sistema (ver
+     * ElyndraViewModel.derived). Nunca se guarda como ROM ni se analiza; su
+     * clave es la de la app, así que tiempo de juego, metadatos y arte son los
+     * suyos, y se lanza como app (nunca con un emulador).
+     */
+    val portPackage: String? = null,
+    /** El nombre del port ("Ship of Harkinian"), la línea secundaria en la carpeta. */
+    val portName: String? = null,
+    /** [portPackage] no es un port: una app Android que el usuario puso en esta carpeta (ver FolderAdd). */
+    val androidApp: Boolean = false,
 ) {
-    val key: String get() = "r:$id"
+    val key: String get() = portPackage?.let { "a:$it" } ?: "r:$id"
+    val isPort: Boolean get() = portPackage != null
     /** El nombre que se enseña: el que puso el usuario manda; luego el de los metadatos y el del archivo. */
     val displayTitle: String get() = meta.lockedName ?: meta.name?.takeIf { it.isNotBlank() } ?: title
-    val extension: String get() = fileName.substringAfterLast('.', "").uppercase()
+    val extension: String get() = when {
+        androidApp -> "ANDROID"
+        isPort -> "PORT"
+        else -> fileName.substringAfterLast('.', "").uppercase()
+    }
+    /** Lo que va junto a lo jugado: la extensión, o "PORT · <port>" (dos ports del mismo juego se distinguen así). */
+    val subtitle: String get() = portName?.let { "PORT · $it" } ?: extension
 }
 
 @Serializable
@@ -127,6 +176,13 @@ data class AppEntry(
     val addedAt: Long = 0,
     val meta: GameMeta = GameMeta(),
     val stats: PlayStats = PlayStats(),
+    /**
+     * La carpeta de la biblioteca donde sale (los ports, en la de su sistema
+     * original; ver PortPlacement). Null: una app más de la lista de Android.
+     */
+    val folderId: String? = null,
+    /** El usuario la movió a mano a [folderId]: la colocación automática no la cambia. */
+    val folderManual: Boolean = false,
 ) {
     val key: String get() = "a:$packageName"
     val displayTitle: String get() = meta.lockedName ?: meta.name?.takeIf { it.isNotBlank() } ?: label

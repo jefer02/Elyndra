@@ -3,7 +3,6 @@ package com.elyndra.launcher.update
 import com.elyndra.launcher.di.UpdateHttp
 import com.elyndra.launcher.di.UpdateReleasesUrl
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -16,7 +15,6 @@ import okhttp3.Request
 import okhttp3.Response
 import java.io.File
 import java.io.IOException
-import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.resume
@@ -153,62 +151,7 @@ class UpdateRepository @Inject constructor(
      * corrutina corta la descarga y borra lo bajado.
      */
     suspend fun download(asset: ReleaseAsset, dir: File, expectedSha256: String?, onProgress: (Float) -> Unit): File =
-        withContext(Dispatchers.IO) {
-            dir.mkdirs()
-            val out = File(dir, asset.name.replace(Regex("""[^A-Za-z0-9._-]"""), "_"))
-            val request = Request.Builder()
-                .url(asset.url)
-                .header("Accept", "application/octet-stream")
-                .header("User-Agent", USER_AGENT)
-                .build()
-            var ok = false
-            try {
-                val response = try {
-                    client.newCall(request).await()
-                } catch (e: IOException) {
-                    throw UpdateError.Network(e)
-                }
-                response.use { r ->
-                    if (!r.isSuccessful) throw UpdateError.Server(r.code)
-                    val body = r.body ?: throw UpdateError.BadResponse("empty body")
-                    val total = body.contentLength().takeIf { it > 0 } ?: asset.size
-                    val digest = MessageDigest.getInstance("SHA-256")
-                    try {
-                        body.byteStream().use { input ->
-                            out.outputStream().use { output ->
-                                val buffer = ByteArray(64 * 1024)
-                                var done = 0L
-                                var lastReported = -1
-                                while (true) {
-                                    ensureActive()
-                                    val n = input.read(buffer)
-                                    if (n < 0) break
-                                    output.write(buffer, 0, n)
-                                    digest.update(buffer, 0, n)
-                                    done += n
-                                    if (total > 0) {
-                                        // Un aviso por cada 1 %: más solo repintaría lo mismo.
-                                        val pct = (done * 100 / total).toInt()
-                                        if (pct != lastReported) {
-                                            lastReported = pct
-                                            onProgress((done.toFloat() / total).coerceIn(0f, 1f))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } catch (e: IOException) {
-                        throw UpdateError.Network(e)
-                    }
-                    val actual = digest.digest().joinToString("") { "%02x".format(it) }
-                    if (expectedSha256 != null && !actual.equals(expectedSha256, ignoreCase = true)) throw UpdateError.Checksum()
-                }
-                ok = true
-                out
-            } finally {
-                if (!ok) out.delete()
-            }
-        }
+        ApkDownloader(client, USER_AGENT).download(asset, dir, expectedSha256, onProgress)
 
     @Serializable
     private data class GhRelease(

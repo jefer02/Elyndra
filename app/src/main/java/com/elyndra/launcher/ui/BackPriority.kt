@@ -5,15 +5,16 @@ package com.elyndra.launcher.ui
  * solo orden para toda la app: lo de más arriba primero.
  *
  * Teclado → intro → diálogo → menú → selector de arte → editar nombre →
- * ficha → menú de orden → (en Ajustes) fuente cogida → página de Ajustes → pantalla →
- * buscador. Lógica pura: la usan [ElyndraViewModel.back] y el
- * [InputController], y se prueba en la JVM.
+ * ficha → menú de orden → (en Ajustes) fuente cogida → página de Ajustes →
+ * (en la tienda) ficha del port y su buscador → pantalla → buscador. Lógica
+ * pura: la usan [ElyndraViewModel.back] y el [InputController], y se prueba
+ * en la JVM.
  */
 object BackPriority {
 
     enum class Target {
         Keyboard, Intro, Dialog, Sheet, ArtPicker, Identify, Details, SortMenu,
-        PriorityGrab, SettingsCategory, SettingsPage, Screen, Search, None,
+        PriorityGrab, SettingsCategory, SettingsPage, PortDetail, PortsSearch, Screen, Search, None,
     }
 
     data class State(
@@ -31,6 +32,10 @@ object BackPriority {
         /** Ajustes en ventana estrecha con una categoría abierta. */
         val settingsPageOpen: Boolean = false,
         val searchOpen: Boolean = false,
+        /** La tienda de ports con la ficha de un port abierta. */
+        val portDetail: Boolean = false,
+        /** El buscador o los filtros de la tienda con algo escrito o elegido. */
+        val portsSearch: Boolean = false,
     )
 
     fun next(s: State): Target = when {
@@ -45,6 +50,8 @@ object BackPriority {
         s.screen == Screen.Settings && s.priorityGrab -> Target.PriorityGrab
         s.screen == Screen.Settings && s.settingsPageOpen -> Target.SettingsCategory
         s.screen.isSettingsPage -> Target.SettingsPage
+        s.screen == Screen.Ports && s.portDetail -> Target.PortDetail
+        s.screen == Screen.Ports && s.portsSearch -> Target.PortsSearch
         s.screen != Screen.Library -> Target.Screen
         s.searchOpen -> Target.Search
         else -> Target.None

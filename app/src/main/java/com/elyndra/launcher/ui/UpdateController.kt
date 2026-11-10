@@ -231,7 +231,7 @@ class UpdateController(
                         vm.showToast(UiText.res(R.string.update_cancelled))
                     }
                     InstallResult.SignatureMismatch -> show(Dialog.Failed(release, R.string.update_error_signature))
-                    is InstallResult.Failed -> show(Dialog.Failed(release, R.string.update_error_install))
+                    is InstallResult.Failed, InstallResult.NeedsUserAction -> show(Dialog.Failed(release, R.string.update_error_install))
                 }
             } catch (e: CancellationException) {
                 throw e

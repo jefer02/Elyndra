@@ -1,8 +1,12 @@
 package com.elyndra.launcher.ui.meridian
 
+import com.elyndra.launcher.domain.library.FolderArt
+import com.elyndra.launcher.ui.components.FolderCollage
+import com.elyndra.launcher.ui.components.SystemArtTile
 import com.elyndra.launcher.ui.UiTags
 import androidx.compose.ui.platform.testTag
 import android.content.res.Resources
+import com.elyndra.launcher.ui.components.ArtImage
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -72,6 +76,7 @@ import com.elyndra.launcher.ui.components.MaterializingContainer
 import com.elyndra.launcher.ui.components.Metrics
 import com.elyndra.launcher.ui.components.NeedsNameBadge
 import com.elyndra.launcher.ui.components.OpenButton
+import com.elyndra.launcher.ui.components.StoreButton
 import com.elyndra.launcher.ui.components.PadHint
 import com.elyndra.launcher.ui.components.PadHints
 import com.elyndra.launcher.ui.components.SettingsGlyph
@@ -303,11 +308,18 @@ private fun wheelEntry(res: Resources, item: LibraryItem): WheelEntry = when (it
     is LibraryItem.Folder -> WheelEntry(
         key = item.key,
         title = item.name,
-        subline = res.getQuantityString(R.plurals.roms_with_emulator, item.romCount, item.romCount, item.emulatorName ?: "—"),
+        subline = if (item.userFolder != null) {
+            res.getQuantityString(R.plurals.user_folder_games, item.romCount, item.romCount)
+        } else {
+            res.getQuantityString(R.plurals.roms_with_emulator, item.romCount, item.romCount, item.emulatorName ?: "—")
+        },
         // Plataforma y cantidad; el emulador va en el hero.
-        chips = listOf(item.system.short, res.getQuantityString(R.plurals.meridian_roms, item.romCount, item.romCount)),
+        chips = listOf(
+            item.system.short,
+            res.getQuantityString(if (item.userFolder != null) R.plurals.user_folder_games else R.plurals.meridian_roms, item.romCount, item.romCount),
+        ),
         payload = item,
-        art = item.iconPath,
+        art = item.coverPath?.takeIf { item.userFolder != null } ?: item.iconPath,
         pkg = item.emulatorPackage,
     )
     is LibraryItem.App -> {
@@ -341,8 +353,16 @@ private fun LibraryWheelTile(item: LibraryItem, fallback: ArtFallback) {
         is LibraryItem.App -> item.app.packageName
         is LibraryItem.Folder -> item.emulatorPackage
     }
+    val folderArt = (item as? LibraryItem.Folder)?.art
     Box(Modifier.fillMaxSize().liquidGlass(RectangleShape, P.hairline)) {
-        if (icon != null || pkg != null) {
+        // El arte automático de la carpeta (ver FolderArtResolver); el nombre ya va en la fila.
+        if (item is LibraryItem.Folder && item.userFolder != null && item.coverPath != null) {
+            ArtImage(item.coverPath, fallback, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        } else if (folderArt is FolderArt.System) {
+            SystemArtTile(folderArt.spec, "", Modifier.fillMaxSize(), showLabel = false)
+        } else if (folderArt is FolderArt.Collage) {
+            FolderCollage(folderArt.covers, fallback, Modifier.fillMaxSize())
+        } else if (icon != null || pkg != null) {
             GameIcon(icon, pkg, Modifier.fillMaxSize(), ContentScale.Fit)
             val unnamed = item is LibraryItem.App && remember(item.app.displayTitle) { !NameCheck.isNameUsable(item.app.displayTitle) }
             if (unnamed) NeedsNameBadge(Modifier.align(Alignment.TopStart).padding(4.dp), onDark = true)
@@ -445,7 +465,7 @@ internal fun RailHeaderRow(compact: Boolean, pills: FloatArray, dock: @Composabl
  */
 @Composable
 private fun TopEnd(vm: ElyndraViewModel, m: Metrics, enabled: Boolean, onMasha: (Rect) -> Unit, onSort: (Rect) -> Unit, onBounds: (Rect) -> Unit, onOpen: () -> Unit) = BoxWithConstraints {
-    val fit = rememberTopBarFit(vm, available = if (constraints.hasBoundedWidth) maxWidth.value else Float.POSITIVE_INFINITY, landscape = m.landscape, masha = true, sort = true)
+    val fit = rememberTopBarFit(vm, available = if (constraints.hasBoundedWidth) maxWidth.value else Float.POSITIVE_INFINITY, landscape = m.landscape, masha = true, sort = true, store = !vm.searchOpen)
     Row(Modifier.onGloballyPositioned { onBounds(it.boundsInWindow()) }, verticalAlignment = Alignment.CenterVertically) {
         MashaButton(vm, grouped = true, onBounds = onMasha)
         Spacer(Modifier.width(8.dp))
@@ -462,6 +482,11 @@ private fun TopEnd(vm: ElyndraViewModel, m: Metrics, enabled: Boolean, onMasha: 
         Spacer(Modifier.width(8.dp))
         SearchField(vm, m)
         Spacer(Modifier.width(8.dp))
+        // Buscando, la tienda deja su sitio al campo ancho (como "Abrir"): la barra de Meridian no da para los dos.
+        if (!vm.searchOpen) {
+            StoreButton(focused = vm.input.isBarFocused(BarItem.Store), showLabel = fit.storeLabel, onClick = vm::openPorts)
+            Spacer(Modifier.width(8.dp))
+        }
         ConsoleIconButton(onClick = { vm.go(Screen.Settings) }, modifier = Modifier.testTag(UiTags.SETTINGS), focused = vm.input.isBarFocused(BarItem.Settings)) { glyph -> SettingsGlyph(glyph) }
     }
 }
@@ -471,7 +496,7 @@ private fun TopEnd(vm: ElyndraViewModel, m: Metrics, enabled: Boolean, onMasha: 
 private fun LibraryHero(vm: ElyndraViewModel, item: LibraryItem?, onAdd: Boolean, searchEmpty: Boolean, empty: Boolean, ink: MeridianInk, openKey: (String?) -> Unit) {
     val app = item as? LibraryItem.App
     val description = rememberDescription(vm, app?.key, app?.app?.meta)
-    val libraryEmpty = vm.library.apps.isEmpty() && vm.library.folders.isEmpty()
+    val libraryEmpty = vm.library.apps.isEmpty() && vm.library.folders.isEmpty() && vm.library.userFolders.isEmpty()
     if (empty && vm.loaded && !searchEmpty) {
         // El estado vacío compartido con el diseño clásico, sobre el escenario de la escena.
         val frame = LocalMeridianFrame.current
@@ -486,6 +511,9 @@ private fun LibraryHero(vm: ElyndraViewModel, item: LibraryItem?, onAdd: Boolean
                 titleBox = LogoFit.box(frame.heroWidth, maxWidth.value, screen.height.value, frame.compact, density = density),
                 padGlyphs = vm.input.gamepadPresent,
                 compact = frame.compact,
+                // Biblioteca vacía: también la tienda de ports nativos.
+                secondary = if (libraryEmpty) stringResource(R.string.ports_browse) else null,
+                onSecondary = vm::openPorts,
             )
         }
         return
@@ -498,7 +526,7 @@ private fun LibraryHero(vm: ElyndraViewModel, item: LibraryItem?, onAdd: Boolean
             key = item.key,
             chips = heroChips(item),
             title = item.name,
-            description = description?.let { heroDescription(it, vm.settings.lang) },
+            description = description?.let { heroDescription(it, vm.settings.lang) } ?: (item as? LibraryItem.Folder)?.userFolder?.description,
             logo = when (item) {
                 is LibraryItem.App -> item.app.meta.logo
                 is LibraryItem.Folder -> item.logoPath
@@ -532,8 +560,12 @@ private fun LibraryHero(vm: ElyndraViewModel, item: LibraryItem?, onAdd: Boolean
 @Composable
 private fun heroChips(item: LibraryItem): List<String> = when (item) {
     is LibraryItem.Folder -> listOfNotNull(
-        stringResource(R.string.chip_emulator_folder),
-        pluralStringResource(R.plurals.roms_with_emulator, item.romCount, item.romCount, item.emulatorName ?: "—"),
+        stringResource(if (item.userFolder != null) R.string.user_folder_chip else R.string.chip_emulator_folder),
+        if (item.userFolder != null) {
+            pluralStringResource(R.plurals.user_folder_games, item.romCount, item.romCount)
+        } else {
+            pluralStringResource(R.plurals.roms_with_emulator, item.romCount, item.romCount, item.emulatorName ?: "—")
+        },
         if (item.minutes > 0) stringResource(R.string.played_time, fmtMinutes(item.minutes)) else null,
     )
     is LibraryItem.App -> listOfNotNull(
@@ -590,4 +622,5 @@ private val MERIDIAN_BAR_HINTS = listOf(
 private val MERIDIAN_HINTS = listOf(
     PadHint("↑↓", R.string.hint_move),
     PadHint("LB / RB", R.string.hint_section),
+    PadHint("RT", R.string.store_button),
 )

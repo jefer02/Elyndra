@@ -54,19 +54,45 @@ data class MetadataPriority(val text: List<Service>, val art: List<Service>) {
 
     companion object {
         /**
-         * El orden de siempre: es el que seguía el motor antes de que se pudiera
-         * elegir (ScreenScraper → IGDB → SteamGridDB → RetroAchievements), así
-         * que quien no toque nada no nota ningún cambio.
+         * El orden de serie.
+         *
+         * Textos: el de siempre (ScreenScraper → IGDB → …). Las fuentes sin
+         * clave, detrás: rellenan huecos y mandan cuando no hay ninguna con
+         * cuenta. (La descripción va además por idioma: ver DescriptionMerge.)
+         * Google Play va delante de todo: solo se le pregunta por juegos
+         * Android, y por paquete, que no se equivoca; Steam queda de reserva
+         * cuando Play no tiene la ficha.
+         *
+         * Imágenes: SteamGridDB e IGDB primero (tienen el arte más cuidado y
+         * en más tamaños), luego ScreenScraper, RetroAchievements, las
+         * miniaturas de libretro y, al final, Steam y Google Play sin clave.
+         * Cada clase de imagen (carátula, fondo, logo, icono, captura) se
+         * resuelve por separado: si la primera no la tiene, la siguiente. Con
+         * las claves de desarrollador de serie (BuildConfig) SteamGridDB e IGDB
+         * funcionan sin configurar nada.
          */
         val DEFAULT = MetadataPriority(
-            // Las fuentes sin clave, detrás: rellenan huecos y mandan cuando no
-            // hay ninguna con cuenta. (La descripción va además por idioma: ver
-            // DescriptionMerge.) Google Play va delante de todo: solo se le
-            // pregunta por juegos Android, y por paquete, que no se equivoca;
-            // Steam queda de reserva cuando Play no tiene la ficha.
             text = listOf(Service.GooglePlay, Service.ScreenScraper, Service.Igdb, Service.Steam, Service.RetroAchievements, Service.SteamGridDb, Service.Libretro),
-            art = listOf(Service.GooglePlay, Service.ScreenScraper, Service.Igdb, Service.SteamGridDb, Service.Steam, Service.Libretro, Service.RetroAchievements),
+            art = listOf(Service.SteamGridDb, Service.Igdb, Service.ScreenScraper, Service.RetroAchievements, Service.Libretro, Service.Steam, Service.GooglePlay),
         )
+
+        /**
+         * El orden de imágenes de serie de antes (Google Play → ScreenScraper →
+         * IGDB → SteamGridDB → …). Guardado tal cual no dice que el usuario lo
+         * eligiera (Ajustes guarda los dos órdenes aunque solo se toque el de
+         * textos): ver [migrateArt].
+         */
+        val LEGACY_DEFAULT_ART = listOf(Service.GooglePlay, Service.ScreenScraper, Service.Igdb, Service.SteamGridDb, Service.Steam, Service.Libretro, Service.RetroAchievements)
+
+        /**
+         * El orden de imágenes guardado tras el cambio de serie: si es el de
+         * serie de antes ([LEGACY_DEFAULT_ART]), null (= el nuevo de serie); si
+         * el usuario lo cambió, se queda como está.
+         */
+        fun migrateArt(stored: String?): String? {
+            if (stored == null) return null
+            return if (parse(stored, LEGACY_DEFAULT_ART) == LEGACY_DEFAULT_ART) null else stored
+        }
 
         /**
          * Lista guardada ("ss,igdb,…") a orden completo; lo repetido se ignora.
@@ -93,10 +119,22 @@ data class MetadataPriority(val text: List<Service>, val art: List<Service>) {
 /** La prioridad guardada en Ajustes. */
 class MetadataPriorityStore(private val settings: SettingsStore) {
 
-    fun get(): MetadataPriority = MetadataPriority(
+    fun get(): MetadataPriority {
+        migrate()
+        return read()
+    }
+
+    private fun read(): MetadataPriority = MetadataPriority(
         text = MetadataPriority.parse(settings.metaPriorityText, MetadataPriority.DEFAULT.text),
         art = MetadataPriority.parse(settings.metaPriorityArt, MetadataPriority.DEFAULT.art),
     )
+
+    /** Una vez: quien tenía guardado el orden de imágenes de serie de antes recibe el nuevo (ver [MetadataPriority.migrateArt]). */
+    private fun migrate() {
+        if (settings.metaPriorityArtVersion >= ART_VERSION) return
+        settings.metaPriorityArt = MetadataPriority.migrateArt(settings.metaPriorityArt)
+        settings.metaPriorityArtVersion = ART_VERSION
+    }
 
     fun set(priority: MetadataPriority) {
         settings.metaPriorityText = MetadataPriority.format(priority.text)
@@ -106,6 +144,11 @@ class MetadataPriorityStore(private val settings: SettingsStore) {
     fun reset() {
         settings.metaPriorityText = null
         settings.metaPriorityArt = null
+    }
+
+    companion object {
+        /** 1 = SteamGridDB e IGDB primero en las imágenes. */
+        const val ART_VERSION = 1
     }
 }
 

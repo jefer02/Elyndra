@@ -1,7 +1,9 @@
 package com.elyndra.launcher.metadata
 
+import com.elyndra.launcher.library.SafGuard
 import android.content.Context
 import com.elyndra.launcher.data.AppEntry
+import com.elyndra.launcher.domain.ports.PortArt
 import com.elyndra.launcher.data.AppLocale
 import com.elyndra.launcher.data.ArtOrigin
 import com.elyndra.launcher.data.FileHashes
@@ -80,6 +82,14 @@ class MetadataEngine(
     /** Sin clave: arte de consolas (libretro) y ficha de la tienda de Steam. */
     val libretro = LibretroClient(context.cacheDir)
     val steam = SteamStoreClient(context.cacheDir)
+
+    /**
+     * El sistema original de un port instalado (por paquete), o null si la app
+     * no es un port. Lo pone el ViewModel; un port se busca como el juego
+     * original (nada de Google Play, IGDB en su plataforma), no como una app.
+     */
+    @Volatile
+    var portSystem: (packageName: String) -> String? = { null }
     /** Sin clave: ficha de Google Play de los juegos Android, por paquete. */
     val googlePlay = GooglePlayClient(context.cacheDir)
     private val apps = AppCatalog(context)
@@ -130,11 +140,125 @@ class MetadataEngine(
         return true
     }
 
-    /** Lo mismo, esperando a que termine: es lo que usan las pasadas automáticas. */
-    suspend fun runAndWait(keys: List<String>?, force: Boolean): Progress {
+    /**
+     * Lo mismo, esperando a que termine: es lo que usan las pasadas automáticas.
+     * [artOnly]: solo imágenes (ver [ArtUpgrade]); [force] no cuenta.
+     */
+    suspend fun runAndWait(keys: List<String>?, force: Boolean = false, artOnly: Boolean = false): Progress {
+        if (artOnly) {
+            val launched = synchronized(this) {
+                if (job?.isActive == true || !credentials.anyConfigured()) {
+                    false
+                } else {
+                    job = scope.launch(Dispatchers.IO) { artPass(keys.orEmpty()) }
+                    true
+                }
+            }
+            if (launched) job?.join()
+            return progress.value
+        }
         if (!start(keys, force, foreground = false)) return progress.value
         job?.join()
         return progress.value
+    }
+
+    /** Las claves de la biblioteca a las que la pasada solo de arte mejoraría algo (ver [ArtUpgrade.kinds]). */
+    fun artUpgradeKeys(): List<String> {
+        val priority = priorityStore.get()
+        val configured = Service.entries.filterTo(HashSet()) { credentials.isConfigured(it) }
+        val lib = repo.current
+        val roms = lib.roms.filter { ArtUpgrade.kinds(it.meta, priority, configured, isApp = false).isNotEmpty() }.map { it.key }
+        // Los ports tienen su propia cadena de arte (catálogo primero): no entran.
+        val apps = lib.apps.filter { portSystem(it.packageName) == null && ArtUpgrade.kinds(it.meta, priority, configured, isApp = true).isNotEmpty() }
+            .map { it.key }
+        return roms + apps
+    }
+
+    /**
+     * La pasada solo de arte: por cada juego, las clases que [ArtUpgrade]
+     * marca, a SteamGridDB e IGDB por el nombre ya conocido. No lee el
+     * archivo del juego (ni hashes ni ScreenScraper), no toca los textos y no
+     * baja lo que no mejora lo que había ([ScrapeApply.applyArt]).
+     */
+    private suspend fun artPass(keys: List<String>) {
+        repo.awaitLoaded()
+        val failures = LinkedHashMap<Service, FailureKind>()
+        val priority = priorityStore.get()
+        val configured = Service.entries.filterTo(HashSet()) { credentials.isConfigured(it) }
+        _progress.value = Progress(running = true, total = keys.size)
+        var done = 0
+        try {
+            for (key in keys) {
+                coroutineContext.ensureActive()
+                val rom = repo.romByKey(key)
+                val app = if (rom == null) repo.appByKey(key) else null
+                val meta = rom?.meta ?: app?.meta ?: continue
+                val isApp = app != null
+                val kinds = ArtUpgrade.kinds(meta, priority, configured, isApp)
+                if (kinds.isNotEmpty()) {
+                    runCatching { upgradeArt(key, meta, kinds, rom?.let { Systems.byId(it.systemId) }, isApp, priority, failures) }
+                        .onFailure { if (it is CancellationException) throw it }
+                }
+                done++
+                _progress.update { it.copy(done = done, failures = failures.toMap()) }
+            }
+            _progress.update { it.copy(running = false, current = "", finishedAt = System.currentTimeMillis()) }
+        } catch (e: CancellationException) {
+            _progress.update { it.copy(running = false, current = "", cancelled = true, finishedAt = System.currentTimeMillis()) }
+            throw e
+        } finally {
+            withContext(NonCancellable) { repo.flush() }
+        }
+    }
+
+    private suspend fun upgradeArt(
+        key: String,
+        meta: GameMeta,
+        kinds: Set<MetaField>,
+        system: GameSystem?,
+        isApp: Boolean,
+        priority: MetadataPriority,
+        failures: MutableMap<Service, FailureKind>,
+    ) {
+        val name = meta.lockedName ?: meta.name ?: return
+        val results = LinkedHashMap<Service, SourceData>()
+        for (service in priority.art.filter { it in ArtUpgrade.SOURCES }) {
+            if (!usable(service, failures)) continue
+            when (service) {
+                Service.SteamGridDb -> sgdbInto(
+                    results, name, if (isApp) SteamGridDbClient.SQUARE + SteamGridDbClient.PORTRAIT else SteamGridDbClient.PORTRAIT, failures,
+                )
+                Service.Igdb -> igdbInto(results, name, if (isApp) listOf(ANDROID_IGDB) else system?.igdbIds?.ifEmpty { null }, failures, withDescription = false)
+                else -> Unit
+            }
+        }
+        if (results.isEmpty()) return
+        val merged = MetadataMerge.merge(results, priority)
+        val origins = LinkedHashMap<String, ArtOrigin>()
+        suspend fun fetch(field: MetaField): String? {
+            if (field !in kinds) return null
+            val kind = field.artKind ?: return null
+            // Se vuelve a mirar justo antes de bajar: el usuario puede haber fijado una mientras tanto.
+            if (kind in (repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta)?.pinned.orEmpty()) return null
+            for ((service, url) in merged.artChain[field].orEmpty()) {
+                if (!ArtUpgrade.improves(meta, field, service, priority)) continue
+                media.download(url, key, kind)?.let { path ->
+                    origins[kind] = ArtOrigin(service.id, url)
+                    return path
+                }
+            }
+            return null
+        }
+        val art = ScrapeApply.Art(
+            cover = fetch(MetaField.Cover),
+            hero = fetch(MetaField.Hero),
+            logo = fetch(MetaField.Logo),
+            screenshot = fetch(MetaField.Screenshot),
+            icon = fetch(MetaField.Icon),
+            origins = origins,
+        )
+        if (origins.isEmpty()) return
+        repo.updateMeta(key) { old -> ScrapeApply.applyArt(old, art) }
     }
 
     fun cancel() {
@@ -394,6 +518,8 @@ class MetadataEngine(
         //    descarga: la interfaz lo pinta siempre que no haya otro, así que
         //    aunque fallen todas las fuentes el juego nunca se queda sin imagen.
         val name = locked ?: apps.label(app.packageName)?.takeIf { it.isNotBlank() } ?: app.label
+        val port = portSystem(app.packageName)?.let { Systems.byId(it) }
+        if (port != null) return scrapePort(app, port, name, locked, priority, failures, lang, descriptionsOnly)
         // 2. Google Play por paquete: identifica sin adivinar y da el título
         //    oficial con el que se busca en los demás. Va primero sea cual sea
         //    la prioridad (como ScreenScraper con las ROMs); la prioridad decide
@@ -425,6 +551,41 @@ class MetadataEngine(
                 Service.GooglePlay -> Unit
                 // ScreenScraper, RetroAchievements y libretro no catalogan juegos Android.
                 Service.ScreenScraper, Service.RetroAchievements, Service.Libretro -> Unit
+            }
+        }
+        return results
+    }
+
+    /**
+     * Un port instalado: el juego original de [system]. No está en Google Play
+     * (su paquete es del port), así que se identifica por el nombre fijado en
+     * IGDB con la plataforma original, SteamGridDB y, para PC, Steam.
+     */
+    private suspend fun scrapePort(
+        app: AppEntry,
+        system: GameSystem,
+        name: String,
+        locked: String?,
+        priority: MetadataPriority,
+        failures: MutableMap<Service, FailureKind>,
+        lang: String,
+        descriptionsOnly: Boolean,
+    ): Map<Service, SourceData> {
+        val results = LinkedHashMap<Service, SourceData>()
+        // La descripción de un port es la del catálogo (fijada al instalar).
+        if (descriptionsOnly) return results
+        for (service in priority.queryOrder()) {
+            when (service) {
+                Service.Igdb -> if (usable(Service.Igdb, failures)) {
+                    igdbInto(results, bestName(results, name, locked), system.igdbIds.ifEmpty { null }, failures, withDescription = false)
+                }
+                Service.SteamGridDb -> if (usable(Service.SteamGridDb, failures) && MetadataMerge.wanted(Service.SteamGridDb, results, priority).isNotEmpty()) {
+                    sgdbInto(results, bestName(results, name, locked), SteamGridDbClient.SQUARE + SteamGridDbClient.PORTRAIT, failures)
+                }
+                Service.Steam -> if (system.id in PortArt.STEAM_PLATFORMS && usable(Service.Steam, failures) && wantsSteam(results, priority, lang)) {
+                    steamInto(results, bestName(results, name, locked), lang, app.meta.steamAppId, withDescription = false)
+                }
+                Service.GooglePlay, Service.ScreenScraper, Service.RetroAchievements, Service.Libretro -> Unit
             }
         }
         return results
@@ -751,6 +912,7 @@ class MetadataEngine(
         wantSs: Boolean,
         wantRa: Boolean,
     ): FileHashes? = withContext(Dispatchers.IO) {
+        if (!SafGuard.allows(folder, "hashes")) return@withContext rom.hashes
         var h = rom.hashes?.takeIf { it.size == rom.size && it.modified == rom.modified }
             ?: FileHashes(rom.size, rom.modified)
         val ctx = coroutineContext

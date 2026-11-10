@@ -25,6 +25,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import com.elyndra.launcher.R
 import com.elyndra.launcher.ui.theme.Space
 import com.elyndra.launcher.ui.theme.LocalSkin
@@ -32,6 +33,8 @@ import com.elyndra.launcher.ui.components.StatusStrip
 import com.elyndra.launcher.ui.components.SettingsGlyph
 import com.elyndra.launcher.ui.components.SearchGlyph
 import com.elyndra.launcher.ui.components.OpenButton
+import com.elyndra.launcher.ui.components.PreviewTheme
+import com.elyndra.launcher.ui.components.StoreButton
 import com.elyndra.launcher.ui.components.ConsoleIconButton
 import com.elyndra.launcher.ui.TopBarLayout
 import com.elyndra.launcher.ui.DotTabsLayout
@@ -156,6 +159,25 @@ internal fun PreviewHeroBar(modifier: Modifier, landscape: Boolean, masha: Boole
         }
         ConsoleIconButton(onClick = {}) { glyph -> SearchGlyph(glyph) }
         Spacer(Modifier.width(Space.s))
+        StoreButton(showLabel = fit.storeLabel, onClick = {})
+        Spacer(Modifier.width(Space.s))
         ConsoleIconButton(onClick = {}) { glyph -> SettingsGlyph(glyph) }
+    }
+}
+
+/**
+ * Solo la barra de arriba, con la tienda, en los tres anchos de los
+ * dispositivos de prueba: la tableta en apaisado (1280), el móvil en apaisado
+ * (800) y en vertical (360). En los tres caben la tienda y Ajustes; en 360 la
+ * tienda se queda en su icono.
+ */
+@Preview(name = "Barra con tienda · 1280 (tableta apaisada)", widthDp = 1280, heightDp = 80)
+@Preview(name = "Barra con tienda · 800 (móvil apaisado)", widthDp = 800, heightDp = 80)
+@Preview(name = "Barra con tienda · 360 (móvil vertical)", widthDp = 360, heightDp = 80)
+@Preview(name = "Barra con tienda · 360 · francés", widthDp = 360, heightDp = 80, locale = "fr")
+@Composable
+private fun TopBarWithStorePreview() = PreviewTheme {
+    BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xFF15171C)).padding(horizontal = 18.dp, vertical = 20.dp)) {
+        PreviewHeroBar(Modifier.fillMaxWidth(), landscape = maxWidth.value > 600f, masha = true, status = true)
     }
 }

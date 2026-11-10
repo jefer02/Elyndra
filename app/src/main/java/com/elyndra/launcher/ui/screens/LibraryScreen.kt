@@ -1,5 +1,8 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.domain.library.FolderArt
+import com.elyndra.launcher.ui.components.FolderCollage
+import com.elyndra.launcher.ui.components.SystemArtTile
 import com.elyndra.launcher.ui.UiTags
 import androidx.compose.ui.platform.testTag
 import com.elyndra.launcher.ui.components.NeedsNameBadge
@@ -22,7 +25,9 @@ import androidx.compose.ui.layout.positionInParent
 import com.elyndra.launcher.ui.components.PAD_HINTS_HEIGHT
 import com.elyndra.launcher.ui.components.PadHint
 import com.elyndra.launcher.ui.components.PadHints
+import com.elyndra.launcher.ui.components.DockDestination
 import com.elyndra.launcher.ui.components.DotTabs
+import com.elyndra.launcher.ui.screens.ports.StoreGlyph
 import com.elyndra.launcher.ui.components.SortButton
 import com.elyndra.launcher.ui.components.SortPopover
 import com.elyndra.launcher.ui.DockPlacement
@@ -153,6 +158,7 @@ import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
+import com.elyndra.launcher.ui.components.ArtImage
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.metadata.ArtKind
 import com.elyndra.launcher.data.fmtMinutes
@@ -172,6 +178,8 @@ import com.elyndra.launcher.ui.components.LocalScreenSize
 import com.elyndra.launcher.ui.components.MashaInsightBubble
 import com.elyndra.launcher.ui.components.LogoImage
 import com.elyndra.launcher.ui.components.OpenButton
+import com.elyndra.launcher.ui.components.StoreButton
+import com.elyndra.launcher.ui.components.rememberStoreLabelWidth
 import com.elyndra.launcher.ui.components.Metrics
 import com.elyndra.launcher.ui.resolve
 import com.elyndra.launcher.ui.components.MAGNETIC_PULL_MS
@@ -350,8 +358,9 @@ fun LibraryScreen(vm: ElyndraViewModel) {
         val titleSp = ClassicLayout.titleSp(frame.heroHeight, landscape)
         val logoH = ClassicLayout.logoHeight(frame.heroHeight, landscape)
         val logoMax = if (portrait) PortraitHero.logoMaxHeight(windowHeight, logoH) else logoH * HERO_LOGO_HEIGHT
+        val hasSynopsis = description != null || (sel as? LibraryItem.Folder)?.userFolder?.description != null
         val secondary = when {
-            description != null -> ClassicLayout.synopsisHeight(fontScale, landscape)
+            hasSynopsis -> ClassicLayout.synopsisHeight(fontScale, landscape)
             sel != null && showHint -> ClassicLayout.hintHeight(fontScale, landscape)
             else -> 0f
         }
@@ -361,8 +370,8 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                 if (sel != null) chips else 0f, merged, logoMax,
                 secondary = secondary,
                 // La sinopsis pierde líneas antes de irse; la pista es una sola.
-                secondaryLines = if (description != null) ClassicLayout.synopsisLines(landscape) else 1,
-                secondaryLine = if (description != null) ClassicLayout.synopsisLineHeight(fontScale) else 0f,
+                secondaryLines = if (hasSynopsis) ClassicLayout.synopsisLines(landscape) else 1,
+                secondaryLine = if (hasSynopsis) ClassicLayout.synopsisLineHeight(fontScale) else 0f,
             ),
         )
         val heroBlock = LibraryHero(plan, titleSp, showHint, baseBottomPad)
@@ -443,6 +452,9 @@ fun LibraryScreen(vm: ElyndraViewModel) {
                             Spacer(Modifier.width(8.dp))
                         }
                         SearchField(vm, m)
+                        Spacer(Modifier.width(8.dp))
+                        // La tienda de ports, junto al buscador: con su rótulo si cabe, si no su icono.
+                        StoreButton(focused = vm.input.isBarFocused(BarItem.Store), showLabel = barFit.storeLabel, onClick = vm::openPorts)
                         Spacer(Modifier.width(8.dp))
                         ConsoleIconButton(
                             onClick = { vm.go(Screen.Settings) },
@@ -725,12 +737,14 @@ private val LIBRARY_HINTS = listOf(
     PadHint("X", R.string.details),
     PadHint("Y", R.string.hint_options),
     PadHint("LB / RB", R.string.hint_section),
+    PadHint("RT", R.string.store_button),
 )
 
 /** Con la sección vacía no hay juego que abrir: A pulsa "Añadir" y LB/RB cambian de sección. */
 private val EMPTY_HINTS = listOf(
     PadHint("A", R.string.hint_select),
     PadHint("LB / RB", R.string.hint_section),
+    PadHint("RT", R.string.store_button),
 )
 
 /** En el dock: A elige la sección señalada. */
@@ -784,7 +798,13 @@ private fun HeroInfo(
             .padding(start = m.pad, end = m.pad, bottom = hero.bottomPad.dp + lift),
     ) {
         if (sel != null) {
-            val chip = stringResource(if (sel is LibraryItem.Folder) R.string.chip_emulator_folder else R.string.chip_android_app)
+            val chip = stringResource(
+                when {
+                    sel is LibraryItem.Folder && sel.userFolder != null -> R.string.user_folder_chip
+                    sel is LibraryItem.Folder -> R.string.chip_emulator_folder
+                    else -> R.string.chip_android_app
+                },
+            )
             if (plan.mergedChips) {
                 MergedChipLine(listOf(chip, heroSubline(sel)), m.landscape)
             } else {
@@ -828,13 +848,16 @@ private fun HeroInfo(
         } else {
             LandscapeTitle(sel.name, titleBase)
         }
-        // Solo las apps tienen sinopsis en el hero; las carpetas no.
+        // Tienen sinopsis en el hero las apps y las carpetas del usuario con descripción.
         val app = sel as? LibraryItem.App
         val description = rememberDescription(vm, app?.key, app?.app?.meta)
+        val folderNote = (sel as? LibraryItem.Folder)?.userFolder?.description
         if (!plan.showSecondary) {
             Unit
         } else if (description != null) {
             HeroSynopsis(heroDescription(description, vm.settings.lang), m.landscape, maxLines = plan.secondaryLines)
+        } else if (folderNote != null) {
+            HeroSynopsis(folderNote, m.landscape, maxLines = plan.secondaryLines)
         } else if (sel != null && hero.showHint) {
             // Con mando, las pistas de sus botones ya van al pie del estante.
             ElyText(
@@ -998,7 +1021,7 @@ internal fun LandscapeTitle(name: String, base: Float) {
  */
 @Composable
 private fun EmptyHeroBlock(vm: ElyndraViewModel, m: Metrics, searching: Boolean, lift: Dp, onAdd: () -> Unit) {
-    val libraryEmpty = vm.library.apps.isEmpty() && vm.library.folders.isEmpty()
+    val libraryEmpty = vm.library.apps.isEmpty() && vm.library.folders.isEmpty() && vm.library.userFolders.isEmpty()
     val compact = m.iconHeroH < EMPTY_COMPACT_HERO
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val reserve = if (searching) EMPTY_RESERVE_SEARCH else if (compact) EMPTY_RESERVE_COMPACT else EMPTY_RESERVE
@@ -1024,6 +1047,9 @@ private fun EmptyHeroBlock(vm: ElyndraViewModel, m: Metrics, searching: Boolean,
             padGlyphs = vm.input.gamepadPresent,
             compact = compact,
             titleMaxSp = m.titleSize,
+            // Biblioteca vacía: también la tienda de ports nativos (X del mando).
+            secondary = if (!searching && libraryEmpty) stringResource(R.string.ports_browse) else null,
+            onSecondary = vm::openPorts,
         )
     }
 }
@@ -1045,12 +1071,16 @@ private const val EMPTY_TITLE_WIDE_FRACTION = 0.58f
 
 @Composable
 internal fun heroSubline(sel: LibraryItem): String = when (sel) {
-    is LibraryItem.Folder -> pluralStringResource(
-        R.plurals.roms_with_emulator,
-        sel.romCount,
-        sel.romCount,
-        sel.emulatorName ?: "—",
-    )
+    is LibraryItem.Folder -> if (sel.userFolder != null) {
+        pluralStringResource(R.plurals.user_folder_games, sel.romCount, sel.romCount)
+    } else {
+        pluralStringResource(
+            R.plurals.roms_with_emulator,
+            sel.romCount,
+            sel.romCount,
+            sel.emulatorName ?: "—",
+        )
+    }
     is LibraryItem.App -> when {
         !sel.installed -> stringResource(R.string.app_not_installed_badge)
         sel.app.stats.minutes > 0 -> stringResource(R.string.played_time, fmtMinutes(sel.app.stats.minutes))
@@ -1153,11 +1183,20 @@ internal fun SearchField(vm: ElyndraViewModel, m: Metrics) {
  * con los rótulos medidos de verdad, el buscador como esté y, si va en la
  * barra, lo menos que mide el dock ([dockWidth]). [masha] = el emblema va en
  * esta fila (en Meridian va en la cabecera de la rueda); [sort] = el botón de
- * orden va suelto en esta fila (en Meridian, delante del buscador).
+ * orden va suelto en esta fila (en Meridian, delante del buscador); [store] =
+ * el botón de la tienda va en la barra.
  */
 @Composable
-internal fun rememberTopBarFit(vm: ElyndraViewModel, available: Float, landscape: Boolean, dockWidth: Float = 0f, masha: Boolean = true, sort: Boolean = false): TopBarLayout.Fit =
-    rememberTopBarFit(available, landscape, vm.settings.statusMode, vm.settings.statusVisible, vm.searchOpen, dockWidth, masha, sort)
+internal fun rememberTopBarFit(
+    vm: ElyndraViewModel,
+    available: Float,
+    landscape: Boolean,
+    dockWidth: Float = 0f,
+    masha: Boolean = true,
+    sort: Boolean = false,
+    store: Boolean = true,
+): TopBarLayout.Fit =
+    rememberTopBarFit(available, landscape, vm.settings.statusMode, vm.settings.statusVisible, vm.searchOpen, dockWidth, masha, sort, store)
 
 /** Lo mismo sin ViewModel (también para las vistas previas). */
 @Composable
@@ -1170,16 +1209,19 @@ internal fun rememberTopBarFit(
     dockWidth: Float = 0f,
     masha: Boolean = true,
     sort: Boolean = false,
+    store: Boolean = true,
 ): TopBarLayout.Fit {
     val openLabel = rememberOpenLabelWidth()
+    val storeLabel = rememberStoreLabelWidth()
     val (time, percent) = rememberStatusLabelWidths(statusMode)
     val status = statusVisible && !searchOpen
     return TopBarLayout.fit(
         available = available,
-        fixed = TopBarLayout.fixedWidth(TopBarLayout.searchWidth(searchOpen, landscape), extra = dockWidth, masha = masha, sort = sort),
+        fixed = TopBarLayout.fixedWidth(TopBarLayout.searchWidth(searchOpen, landscape), extra = dockWidth, masha = masha, sort = sort, store = store),
         openLabel = openLabel.takeIf { !searchOpen },
         time = time.takeIf { status },
         percent = percent.takeIf { status },
+        storeLabel = storeLabel.takeIf { store },
     )
 }
 
@@ -1465,9 +1507,18 @@ private fun LibraryTile(
                 is LibraryItem.App -> item.app.packageName
                 is LibraryItem.Folder -> item.emulatorPackage
             }
+            // Una carpeta sin icono elegido: el arte de serie de su sistema o el
+            // mosaico de sus carátulas (ver FolderArtResolver).
+            val folderArt = (item as? LibraryItem.Folder)?.art
             // Contenedor e icono son cuadrados: el icono lo llena entero,
             // centrado, sin dejar huecos y sin deformarse.
-            if (icon != null || autoIconPackage != null) {
+            if (item is LibraryItem.Folder && item.userFolder != null && item.coverPath != null) {
+                ArtImage(item.coverPath, fallback, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            } else if (item is LibraryItem.Folder && folderArt is FolderArt.System) {
+                SystemArtTile(folderArt.spec, item.system.short, Modifier.fillMaxSize())
+            } else if (folderArt is FolderArt.Collage) {
+                FolderCollage(folderArt.covers, fallback, Modifier.fillMaxSize())
+            } else if (icon != null || autoIconPackage != null) {
                 GameIcon(icon, autoIconPackage, Modifier.fillMaxSize(), ContentScale.Fit)
                 val unnamed = item is LibraryItem.App && remember(item.app.displayTitle) { !NameCheck.isNameUsable(item.app.displayTitle) }
                 if (unnamed) NeedsNameBadge(Modifier.align(Alignment.TopStart).padding(6.dp), onDark = true)

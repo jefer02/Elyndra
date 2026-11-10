@@ -54,9 +54,12 @@ enum class Pad {
     /** L3 / R3: el menú de la app (ordenar, añadir, Masha…). */
     AppMenu,
 
-    /** L1 / R1: saltar de sección (filtro, página del carrusel). */
+    /** L1 / R1 (y L2): saltar de sección (filtro, página del carrusel). */
     PagePrev,
     PageNext,
+
+    /** R2: la tienda de ports, desde la biblioteca. */
+    Store,
     ;
 
     val isDirection: Boolean get() = this == Up || this == Down || this == Left || this == Right
@@ -113,7 +116,9 @@ object Gamepad {
         -> Pad.AppMenu
 
         KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_L2 -> Pad.PagePrev
-        KeyEvent.KEYCODE_BUTTON_R1, KeyEvent.KEYCODE_BUTTON_R2 -> Pad.PageNext
+        KeyEvent.KEYCODE_BUTTON_R1 -> Pad.PageNext
+        // R2 era un segundo R1; ahora abre la tienda (L2 sigue siendo un segundo L1).
+        KeyEvent.KEYCODE_BUTTON_R2 -> Pad.Store
 
         else -> null
     }

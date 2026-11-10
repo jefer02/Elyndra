@@ -287,4 +287,105 @@ class DotTabsLayoutTest {
             assertTrue(lang, header.START + dock <= rail - header.END + eps)
         }
     }
+
+    /* ── Destino del final (tienda de ports) ── */
+
+    @Test
+    fun `el destino reserva su hueco y su raya en todas las medidas`() {
+        val reserve = DotTabsLayout.DIVIDER + DotTabsLayout.DEST_SLOT
+        assertEquals(reserve, DotTabsLayout.destReserve(true), eps)
+        assertEquals(0f, DotTabsLayout.destReserve(false), eps)
+        for (n in 1..4) assertEquals(DotTabsLayout.minWidth(n) + reserve, DotTabsLayout.minWidth(n, dest = true), eps)
+        val natural = pills(labels.getValue("es"))
+        assertEquals(DotTabsLayout.fullWidth(natural) + reserve, DotTabsLayout.fullWidth(natural, dest = true), eps)
+        assertEquals(DotTabsLayout.uniformWidth(natural, 1_000f) + reserve, DotTabsLayout.uniformWidth(natural, 1_000f, dest = true), eps)
+        assertEquals(SectionDockLayout.minWidth(3) + reserve, SectionDockLayout.minWidth(3, dest = true), eps)
+        // Sin sitio de sobra, el destino se reserva antes: las secciones se encajan en lo que queda.
+        val room = 260f
+        assertEquals(DotTabsLayout.fit(natural, room - reserve), DotTabsLayout.fit(natural, room, dest = true))
+    }
+
+    @Test
+    fun `con destino las zonas tactiles siguen cubriendo la capsula sin huecos`() {
+        val natural = pills(labels.getValue("en").copyOf(3))
+        val e = DotTabsLayout.rest(3, 1)
+        val o = DotTabsLayout.offsets(natural, e)
+        val spans = (0 until 3).map { DotTabsLayout.touchSpan(o, natural, e, it, dest = true) }
+        assertEquals(0f, spans.first().first, eps)
+        for (i in 1 until 3) assertEquals(spans[i - 1].second, spans[i].first, eps)
+        val (dl, dr) = DotTabsLayout.destTouch(o[3])
+        assertEquals("la última sección llega a la raya", spans.last().second, dl, eps)
+        assertEquals("el destino llega al canto", o[3] + DotTabsLayout.destReserve(true), dr, eps)
+        assertTrue("48 dp de zona táctil", dr - dl >= DotTabsLayout.DEST_SLOT)
+        assertEquals(DotTabsLayout.destLeft(o[3]) - DotTabsLayout.DIVIDER / 2f, DotTabsLayout.dividerX(o[3]), eps)
+    }
+
+    @Test
+    fun `con destino desde su minimo el dock nunca mide mas de lo que le dan`() {
+        for ((lang, widths) in labels) {
+            for (n in 2..widths.size) {
+                val natural = pills(widths.copyOf(n))
+                var w = DotTabsLayout.minWidth(n, dest = true)
+                while (w <= 460f) {
+                    val fit = DotTabsLayout.fit(natural, w, dest = true)
+                    val capped = FloatArray(n) { minOf(natural[it], fit.pillCap) }
+                    val width = capped.indices.maxOf { DotTabsLayout.totalWidth(capped, it, fit.dot) } + DotTabsLayout.destReserve(true)
+                    assertTrue("$lang n=$n en $w dp mide $width", width <= w + eps)
+                    w += 1f
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `en la barra el dock con destino y cuatro secciones en aleman sigue cabiendo`() {
+        val dock = DotTabsLayout.totalWidth(pills(labels.getValue("de")), 3) + DotTabsLayout.destReserve(true)
+        val needed = 44f + 70f + 92f + 86f + 34f + 34f + 4 * 8f + dock + 8f + 44f
+        assertTrue("hacen falta $needed dp", needed <= DockPlacement.BAR_MIN_WIDTH)
+    }
+
+    /** Móvil en vertical (~393 dp): con la tienda al final, el dock sigue entero en la costura. */
+    @Test
+    fun `movil vertical el dock con destino va entero en la costura`() {
+        val seam = 393f - 2 * 18f
+        for ((lang, widths) in labels) {
+            val fit = DotTabsLayout.fit(pills(widths), SectionDockLayout.tabsMaxWidth(seam), dest = true)
+            assertEquals(lang, DOT_SLOT, fit.dot, eps)
+            assertEquals(lang, DotTabsLayout.PILL_MAX, fit.pillCap, eps)
+        }
+    }
+
+    /** Móvil vertical estrecho (360 dp): puede apretarse, pero cabe y deja leer la píldora. */
+    @Test
+    fun `movil vertical estrecho el dock con destino cabe recortando antes que apretando`() {
+        val room = SectionDockLayout.tabsMaxWidth(360f - 2 * 18f)
+        for ((lang, widths) in labels) {
+            val natural = pills(widths)
+            assertTrue(lang, DotTabsLayout.minWidth(widths.size, dest = true) <= room)
+            val fit = DotTabsLayout.fit(natural, room, dest = true)
+            assertTrue(lang, fit.pillCap >= minOf(natural.max(), DotTabsLayout.PILL_FIT) - eps)
+        }
+    }
+
+    /**
+     * Móvil apaisado (~800 × 360, Meridian): con tres secciones y la tienda el
+     * dock cabe en la columna; con cuatro (la de "sin nombre") se corre hacia el
+     * filo, pero ni llega al bloque del hero ni sale del velo.
+     */
+    @Test
+    fun `movil apaisado el dock con destino no llega al hero`() {
+        val rail = com.elyndra.launcher.ui.meridian.MeridianGeometry.slimRailWidth(800f, 360f, 1f, compact = true)
+        val header = com.elyndra.launcher.ui.meridian.RailHeaderLayout
+        val heroLeft = rail + com.elyndra.launcher.ui.meridian.MeridianGeometry.HERO_GAP
+        val veilEnd = com.elyndra.launcher.ui.meridian.MeridianScrims.clearAt(rail, 800f)
+        for ((lang, widths) in labels) {
+            for (n in 2..widths.size) {
+                val plan = header.plan(rail, DotTabsLayout.HEIGHT, pills(widths.copyOf(n)), null, dest = true)
+                val right = plan.dockX + plan.dockWidth
+                assertTrue("$lang n=$n no llega al bloque del hero ($right)", right < heroLeft)
+                assertTrue("$lang n=$n tiene velo detrás", right + 16f <= veilEnd)
+                if (n <= 3) assertTrue("$lang n=$n cabe en la columna", plan.dockWidth <= header.dockMaxWidth(rail) + eps)
+            }
+        }
+    }
 }

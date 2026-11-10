@@ -1,6 +1,7 @@
 package com.elyndra.launcher.ui.components
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -8,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.selection.selectable
@@ -85,6 +87,19 @@ private const val DOT_TAB_ICON_GAP = 6f
 val CapsuleShape = RoundedCornerShape(50)
 
 /**
+ * El destino del final del dock: otra pantalla (la tienda de ports), no una
+ * sección más. Va tras una raya, como un icono suelto que nunca se abre en
+ * píldora (ver [DotTabsLayout.DEST_SLOT]); con [active], el icono va sobre
+ * el acento. [label] es lo que lee TalkBack y lo que asoma con el mando.
+ */
+class DockDestination(
+    val label: String,
+    val icon: DotTabIcon,
+    val active: Boolean = false,
+    val onSelect: () -> Unit,
+)
+
+/**
  * La lámina del dock, del botón de orden y de su menú: cristal con el color
  * del tema (perla en claro, tinta honda en oscuro), casi opaco para que lo de
  * encima se lea sobre cualquier arte (ver [DockPalettes]), con el filo de luz
@@ -145,6 +160,8 @@ fun Modifier.dockSurface(
  * @param feedback sonido de navegación y un toque háptico al cambiar.
  * @param light cristal claro (tema claro sobre el velo esmerilado): puntos y
  *   aro en tinta oscura; la píldora del acento no cambia.
+ * @param destination el destino del final ([DockDestination]); con el mando,
+ *   [focusIndex] = `labels.size` lo señala.
  */
 @Composable
 fun DotTabs(
@@ -159,12 +176,13 @@ fun DotTabs(
     /** Suelo de la tinta del cristal (ver [darkGlass]); más alto en la costura. */
     glassMinAlpha: Float = DARK_GLASS_MIN,
     light: Boolean = false,
+    destination: DockDestination? = null,
 ) {
     if (labels.isEmpty()) return
     BoxWithConstraints(modifier) {
         // Sin tope (una fila con scroll, una vista previa suelta), el dock entero.
         val room = if (constraints.hasBoundedWidth) maxWidth.value else Float.POSITIVE_INFINITY
-        DotTabsBody(labels, selected, onSelect, icons, focused, focusIndex, feedback, glassMinAlpha, light, room)
+        DotTabsBody(labels, selected, onSelect, icons, focused, focusIndex, feedback, glassMinAlpha, light, room, destination)
     }
 }
 
@@ -211,8 +229,12 @@ private fun DotTabsBody(
     light: Boolean,
     /** Ancho disponible (dp). */
     room: Float,
+    destination: DockDestination?,
 ) {
     val n = labels.size
+    val hasDest = destination != null
+    // Con el mando, el destino es el hueco n (detrás de la última sección).
+    val peekable = if (hasDest) n + 1 else n
     val sel = selected.coerceIn(0, n - 1)
     val dens = LocalDensity.current
     val reduced = LocalReducedMotion.current
@@ -231,7 +253,7 @@ private fun DotTabsBody(
     val naturalPills = remember(natural, hasIcon) {
         FloatArray(n) { i -> DotTabsLayout.pillWidth(natural[i].size.width / dens.density, iconWidth(i)) }
     }
-    val fit = remember(naturalPills, room) { DotTabsLayout.fit(naturalPills, room) }
+    val fit = remember(naturalPills, room, hasDest) { DotTabsLayout.fit(naturalPills, room, hasDest) }
     val dotSlot = fit.dot
     val texts = remember(natural, fit.pillCap) {
         if (fit.pillCap >= DotTabsLayout.PILL_MAX) natural else measureAll { DotTabsLayout.labelRoom(fit.pillCap, iconWidth(it)) }
@@ -240,6 +262,13 @@ private fun DotTabsBody(
     val pills = remember(naturalPills, fit) {
         val pill = DotTabsLayout.uniformPill(naturalPills, fit)
         FloatArray(n) { pill }
+    }
+    // El rótulo del destino solo se ve al asomar (con el mando).
+    val destText = remember(destination?.label, style, dens) {
+        destination?.let {
+            val maxPx = with(dens) { DotTabsLayout.LABEL_MAX.dp.roundToPx() }
+            measurer.measure(it.label, style, TextOverflow.Ellipsis, maxLines = 1, constraints = Constraints(maxWidth = maxPx), density = dens)
+        }
     }
 
     val expansion = remember(n) { List(n) { Animatable(if (it == sel) 1f else 0f) } }
@@ -300,7 +329,7 @@ private fun DotTabsBody(
 
     // El rótulo del punto señalado asoma un momento y se va.
     LaunchedEffect(focused, focusIndex, sel) {
-        if (focused && focusIndex in 0 until n && focusIndex != sel) {
+        if (focused && focusIndex in 0 until peekable && focusIndex != sel) {
             if (reduced) peek.snapTo(1f) else peek.animateTo(1f, tween(140, easing = Swift))
             delay(1_100)
             if (reduced) peek.snapTo(0f) else peek.animateTo(0f, tween(220))
@@ -312,6 +341,10 @@ private fun DotTabsBody(
     }
 
     val sources = remember(n) { List(n) { MutableInteractionSource() } }
+    val destSource = remember { MutableInteractionSource() }
+    val destPressed by destSource.collectIsPressedAsState()
+    val destScale by animateFloatAsState(if (destPressed && !reduced) 0.88f else 1f, spring(dampingRatio = 0.6f, stiffness = 700f), label = "destPress")
+    val selectDest by rememberUpdatedState(destination?.onSelect)
     sources.forEachIndexed { i, source ->
         LaunchedEffect(source, reduced) {
             source.interactions.collect { interaction ->
@@ -362,6 +395,19 @@ private fun DotTabsBody(
                         .semantics { contentDescription = labels[i] },
                 )
             }
+            if (destination != null) {
+                Box(
+                    Modifier
+                        .selectable(
+                            selected = destination.active,
+                            interactionSource = destSource,
+                            indication = null,
+                            role = Role.Tab,
+                            onClick = { selectDest?.invoke() },
+                        )
+                        .semantics { contentDescription = destination.label },
+                )
+            }
         },
         modifier = Modifier
             // El rótulo que asoma va por fuera de la cápsula: se dibuja antes del recorte.
@@ -372,6 +418,11 @@ private fun DotTabsBody(
                     for (i in 0 until n) e[i] = expansion[i].value
                     val cx = DotTabsLayout.slotCenter(pills, e, focusIndex, dotSlot).dp.toPx()
                     drawPeek(texts[focusIndex], cx, p, peekSurface, peekInk)
+                } else if (p > 0f && focusIndex == n && destText != null) {
+                    for (i in 0 until n) e[i] = expansion[i].value
+                    val end = DotTabsLayout.offsets(pills, e, scratch, dotSlot)[n]
+                    val cx = (DotTabsLayout.destLeft(end) + DotTabsLayout.DEST_SLOT / 2f).dp.toPx()
+                    drawPeek(destText, cx, p, peekSurface, peekInk)
                 }
             }
             .outerShadow(8.dp, CapsuleShape, ambientColor = shadow, spotColor = shadow)
@@ -393,6 +444,32 @@ private fun DotTabsBody(
                     drawCircle(dot, radius = DotTabsLayout.DOT / 2f * pxPerDp * s, center = Offset(cx, cy))
                     if (focused && i == focusIndex && i != sel) {
                         drawCircle(ring, radius = 7.dp.toPx(), center = Offset(cx, cy), style = Stroke(1.5.dp.toPx()))
+                    }
+                }
+
+                // Destino: la raya y su icono (sobre el acento si es la pantalla abierta).
+                if (destination != null) {
+                    val end = o[n]
+                    val dx = DotTabsLayout.dividerX(end) * pxPerDp
+                    val half = 8.dp.toPx()
+                    drawLine(dot.copy(alpha = dot.alpha * 0.45f), Offset(dx, cy - half), Offset(dx, cy + half), strokeWidth = 1.dp.toPx())
+                    val cx = (DotTabsLayout.destLeft(end) + DotTabsLayout.DEST_SLOT / 2f) * pxPerDp
+                    val disc = 13.dp.toPx() * destScale
+                    if (destination.active) {
+                        drawCircle(
+                            Brush.linearGradient(listOf(pillStart, pillEnd), start = Offset(cx - disc, cy - disc), end = Offset(cx + disc, cy + disc)),
+                            radius = disc,
+                            center = Offset(cx, cy),
+                        )
+                    }
+                    val box = DOT_TAB_ICON.dp.toPx() * destScale
+                    translate(cx - box / 2f, cy - box / 2f) {
+                        clipRect(0f, 0f, box, box) {
+                            destination.icon(this, if (destination.active) Color.White else dot)
+                        }
+                    }
+                    if (focused && focusIndex == n) {
+                        drawCircle(ring, radius = 15.dp.toPx(), center = Offset(cx, cy), style = Stroke(1.5.dp.toPx()))
                     }
                 }
 
@@ -501,20 +578,28 @@ private fun DotTabsBody(
         val o = DotTabsLayout.offsets(pills, e, scratch, dotSlot)
         val h = DotTabsLayout.HEIGHT.dp.roundToPx()
         val touch = DotTabsLayout.TOUCH.dp.roundToPx()
-        val width = (o[n] * dens.density).roundToInt()
+        val width = ((o[n] + DotTabsLayout.destReserve(hasDest)) * dens.density).roundToInt()
         val glass = measurables[0].measure(Constraints.fixed(width, h))
         val xs = IntArray(n)
         // Cada pestaña mide 48 dp de alto y sobresale de la cápsula: la zona
         // táctil es de 48 × 48 dp aunque la cápsula mida 34 de alto.
         val tabs = List(n) { i ->
-            val (l, r) = DotTabsLayout.touchSpan(o, pills, e, i, dotSlot)
+            val (l, r) = DotTabsLayout.touchSpan(o, pills, e, i, dotSlot, hasDest)
             val x0 = (l * dens.density).roundToInt()
             xs[i] = x0
             measurables[i + 1].measure(Constraints.fixed(((r * dens.density).roundToInt() - x0).coerceAtLeast(1), touch))
         }
+        val dest = if (hasDest) {
+            val (l, r) = DotTabsLayout.destTouch(o[n])
+            val x0 = (l * dens.density).roundToInt()
+            x0 to measurables[n + 1].measure(Constraints.fixed(((r * dens.density).roundToInt() - x0).coerceAtLeast(1), touch))
+        } else {
+            null
+        }
         layout(width, h) {
             glass.place(0, 0)
             tabs.forEachIndexed { i, p -> p.place(xs[i], (h - touch) / 2) }
+            dest?.let { (x, p) -> p.place(x, (h - touch) / 2) }
         }
     }
 }

@@ -244,6 +244,11 @@ private fun DetailsContent(
 
     val subtitle = buildList {
         add(system?.name ?: stringResource(R.string.chip_android_app))
+        // Un port instalado desde la tienda lo dice (es la "etiqueta" de port de la biblioteca).
+        if (app != null && vm.portInstall.isPortKey(key)) {
+            val port = vm.portInstall.portForKey(key)
+            add(if (port != null) stringResource(R.string.ports_port_badge_named, port.name) else stringResource(R.string.ports_port_badge))
+        }
         add(if (stats.minutes > 0) stringResource(R.string.played_time, fmtMinutes(stats.minutes)) else stringResource(R.string.never_played))
     }
 
@@ -292,6 +297,27 @@ private fun DetailsContent(
                                 vm.identify.open(key)
                             }
                         }
+                        // Si este juego tiene un port nativo en el catálogo: a su ficha de la tienda.
+                        val native = remember(rom, vm.ports.catalog) { rom?.let { vm.ports.portFor(it) } }
+                        if (native != null) {
+                            val play = remember(native.id) {
+                                SheetAction(UiText.res(R.string.ports_play_native), detail = UiText.Raw(native.name), icon = SheetIcon.Play) {}
+                            }
+                            Spacer(Modifier.height(GAP))
+                            CompactAction(play, accent, Modifier.fillMaxWidth()) {
+                                vm.closeDetails()
+                                vm.ports.openPort(native.id)
+                            }
+                        }
+                        // Un port instalado: la carpeta en la que sale (la de su sistema, o la que elija el usuario).
+                        if (app?.folderId != null) {
+                            val move = remember { SheetAction(UiText.res(R.string.ports_move_to_folder), icon = SheetIcon.Rescan) {} }
+                            Spacer(Modifier.height(GAP))
+                            CompactAction(move, accent, Modifier.fillMaxWidth()) { vm.pickPortFolder(app) }
+                        }
+                        val addToFolder = remember { SheetAction(UiText.res(R.string.user_folder_add_to), icon = SheetIcon.Add) {} }
+                        Spacer(Modifier.height(GAP))
+                        CompactAction(addToFolder, accent, Modifier.fillMaxWidth()) { vm.userFolders.pickFolder(key, title) }
                     }
                 }
                 val memory: @Composable () -> Unit = {

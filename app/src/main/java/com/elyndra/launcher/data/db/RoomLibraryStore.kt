@@ -38,6 +38,8 @@ class RoomLibraryStore(
             stats = dao.stats(),
             sessions = dao.sessions(),
             state = dao.state(),
+            userFolders = dao.userFolders(),
+            userFolderItems = dao.userFolderItems(),
         )
     }
 
@@ -73,7 +75,11 @@ class RoomLibraryStore(
         if (c.upsertArtwork.isNotEmpty()) dao.upsertArtwork(c.upsertArtwork)
         if (c.upsertStats.isNotEmpty()) dao.upsertStats(c.upsertStats)
         if (c.upsertSessions.isNotEmpty()) dao.upsertSessions(c.upsertSessions)
+        if (c.upsertUserFolders.isNotEmpty()) dao.upsertUserFolders(c.upsertUserFolders)
+        if (c.upsertUserFolderItems.isNotEmpty()) dao.upsertUserFolderItems(c.upsertUserFolderItems)
 
+        if (c.deleteUserFolderItems.isNotEmpty()) dao.deleteUserFolderItems(c.deleteUserFolderItems)
+        if (c.deleteUserFolders.isNotEmpty()) dao.deleteUserFolders(c.deleteUserFolders)
         if (c.deleteSessions.isNotEmpty()) dao.deleteSessions(c.deleteSessions)
         if (c.deleteStats.isNotEmpty()) dao.deleteStats(c.deleteStats)
         if (c.deleteArtwork.isNotEmpty()) dao.deleteArtwork(c.deleteArtwork)

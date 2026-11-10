@@ -66,6 +66,7 @@ flowchart TB
 | `work/` · `widget/` · `notify/` | WorkManager, widget Glance, avisos | Sí |
 | `di/` | Módulos Hilt | Sí |
 | `update/` | Actualizaciones desde GitHub Releases: `UpdateLogic` (semver, elección del APK, cadencia; puro), `UpdateRepository` (OkHttp + ETag + SHA-256), `UpdateInstaller` (`PackageInstaller`). La UI es `ui/UpdateController` + `ui/screens/UpdateDialog.kt` | Solo repositorio e instalador |
+| `ports/` · `domain/ports/` | Tienda de ports nativos: catálogo curado (JSON en GitHub + copia en `assets/ports/catalog.json`), releases con ETag (`GitHubClient`), descarga reanudable solo desde GitHub (`HostAllowlist`, `ApkDownloader`), instalación (`PortInstaller` → `UpdateInstaller`), arte del original (`PortArtResolver`). Lo puro (esquema, elección del APK, versiones, hashes de ROM, filas) en `domain/ports/`. La UI es `ui/PortsController` + `ui/PortInstallController` + `ui/screens/ports/` | Solo `ports/` |
 | `ui/` | Compose: pantallas, controladores, componentes | Sí |
 
 **Inyección:** Hilt. `ElyndraApplication` es `@HiltAndroidApp` y sigue exponiendo
@@ -192,6 +193,13 @@ erDiagram
     string title
     string theme
     string status
+  }
+  installed_ports {
+    string catalog_id PK
+    string package_name
+    string installed_tag
+    string asset_name
+    long installed_at
   }
   arc_steps {
     string arc_id PK
@@ -366,7 +374,11 @@ metadatos, revisión y arcos, y lo resuelve con **las mismas capacidades**
 `suggest_emulator`, `set_game_emulator`, `plan_session`, `create_list`,
 `open_list`, `create_arc`, `get_arcs`, `update_metadata`, `curation_report`,
 `get_stats`, `remember`, `forget`, `filter_library`, `set_art`, `add_game`,
-`remove_game`, `list_installed_apps`, `set_accent`, `set_dark_mode`.
+`remove_game`, `list_installed_apps`, `set_accent`, `set_dark_mode`,
+`list_unnamed_games`, `rename_game`, `list_addable_games`, `add_games`,
+`open_add_roms`, `list_emulators`, `set_preferred_emulator`, `undo_last_action`,
+`find_port` (ports nativos de la tienda: solo títulos, plataformas y
+repositorios; nunca ROMs).
 
 ---
 
@@ -380,7 +392,7 @@ metadatos, revisión y arcos, y lo resuelve con **las mismas capacidades**
 | `FOREGROUND_SERVICE_DATA_SYNC` | Pasada completa de metadatos | Declarado |
 | `PACKAGE_USAGE_STATS` | **Opcional**: tiempo de juego exacto | Solo desde Ajustes → Masha, en la pantalla del sistema |
 | `<queries>` | Ver emuladores y juegos instalados | Declarado; **sin** `QUERY_ALL_PACKAGES` |
-| `REQUEST_INSTALL_PACKAGES` | Instalar las actualizaciones de Elyndra | Declarado; Android pide al usuario "Instalar apps desconocidas" la primera vez que actualiza |
+| `REQUEST_INSTALL_PACKAGES` | Instalar las actualizaciones de Elyndra y los ports de la tienda | Declarado; Android pide al usuario "Instalar apps desconocidas" la primera vez, y confirma cada instalación |
 
 - **Sin root**, sin accesibilidad, sin superposición, sin leer otros archivos.
 - **A DeepSeek solo viaja**: títulos, sistemas, tiempo de juego, estado del
@@ -394,12 +406,27 @@ metadatos, revisión y arcos, y lo resuelve con **las mismas capacidades**
   del dispositivo (`UpdateRepositoryTest` comprueba que la petición no lleva
   cuerpo ni autorización). Como mucho una vez al día sola; se apaga en
   Ajustes → Acerca de → Actualizaciones. Publicar: [RELEASING.md](RELEASING.md).
+- **Tienda de ports:** catálogo curado (sin descubrimiento a ciegas), APK
+  solo de releases de GitHub (`github.com` → `release-assets` /
+  `objects.githubusercontent.com`, cada redirección comprobada), SHA-256 del
+  catálogo o del `digest` de la API, paquete leído del APK antes de instalar.
+  Nunca descarga ni enlaza ROMs: dice qué copia propia hace falta y si ya
+  está en la biblioteca (por hash). Nunca abre un port solo. Token de GitHub
+  opcional (Ajustes → APIs), que solo viaja a `api.github.com`.
 - "Olvidar todo lo que sabe Masha" borra recuerdos, hilo y caché.
 - Credenciales cifradas con AES-GCM y una clave del Android Keystore;
   `allowBackup=false`.
 - **La clave de DeepSeek va compilada** (`local.properties` → `BuildConfig`).
   Cualquier clave dentro de un APK se puede extraer: para publicar, la llamada
   debe pasar por un backend propio (basta con cambiar `masha.baseUrl`).
+- **Las claves de desarrollador de SteamGridDB e IGDB también van compiladas**
+  (`sgdb.apiKey`, `igdb.clientId`, `igdb.clientSecret` en `local.properties` →
+  `BuildConfig`), para que el arte venga de SteamGridDB e IGDB sin configurar
+  nada. Igual que la de DeepSeek, se pueden extraer del APK. Las que el usuario
+  pone en Ajustes → APIs mandan sobre ellas; sin clave, esa fuente no se usa.
+  Las comparten todas las instalaciones: cada dispositivo respeta los límites
+  de su lado (IGDB, 4 peticiones/s), pero muchos a la vez pueden agotar el
+  cupo de la cuenta. Para publicar a gran escala, mejor un proxy propio.
 
 ---
 

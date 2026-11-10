@@ -155,6 +155,9 @@ internal fun EmptyLibraryHero(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
     titleMaxSp: Float = TITLE_MAX_SP,
+    /** Segunda acción (la tienda de ports), con la X del mando. */
+    secondary: String? = null,
+    onSecondary: () -> Unit = {},
 ) {
     val ink = rememberMeridianInk()
     val reduced = LocalReducedMotion.current
@@ -182,7 +185,7 @@ internal fun EmptyLibraryHero(
         }
         if (action != null) {
             Spacer(Modifier.height(if (compact) 10.dp else 16.dp))
-            MeridianActionRow(MeridianActions(action, onAction, null, {}, null, {}), ink, padGlyphs, compact = compact)
+            MeridianActionRow(MeridianActions(action, onAction, secondary, onSecondary, null, {}), ink, padGlyphs, compact = compact)
         }
     }
 }

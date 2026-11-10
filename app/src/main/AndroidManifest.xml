@@ -17,6 +17,11 @@
          activar "Instalar apps desconocidas" para Elyndra la primera vez. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Actualizar sin preguntar los ports que instaló Elyndra (Android 12+), solo
+         con "Actualizar ports automáticamente" (Ajustes → APIs → GitHub). Es un
+         permiso normal: no se pide al usuario. -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+
     <!-- Hablar con Masha (reconocimiento de voz). Se pide solo al pulsar el
          micrófono, nunca al abrir la app. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />

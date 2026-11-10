@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import com.elyndra.launcher.core.device.StutterMemory
+import com.elyndra.launcher.ports.PortCatalogRepository
 import com.elyndra.launcher.ui.meridian.WheelBackdrop
 
 /** Ajustes no sensibles (aspecto, opciones de metadatos, sesión de juego en curso). */
@@ -103,6 +104,21 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
     var metaPriorityArt: String?
         get() = prefs.getString("meta.priority.art", null)
         set(v) = prefs.edit { if (v == null) remove("meta.priority.art") else putString("meta.priority.art", v) }
+
+    /** Hasta qué cambio de serie del orden de imágenes se ha pasado ya lo guardado (ver MetadataPriorityStore). */
+    var metaPriorityArtVersion: Int
+        get() = prefs.getInt("meta.priority.art.v", 0)
+        set(v) = prefs.edit { putInt("meta.priority.art.v", v) }
+
+    /** Por dónde va la comprobación diaria de los ports "aún no en Android" (ver PortAvailability.batch). */
+    var portsAvailabilityCursor: Int
+        get() = prefs.getInt("ports.availability.cursor", 0)
+        set(v) = prefs.edit { putInt("ports.availability.cursor", v) }
+
+    /** La pasada única que mejora el arte de la biblioteca con el orden nuevo ya terminó (ver ArtUpgradeWorker). */
+    var artUpgradeDone: Boolean
+        get() = prefs.getBoolean("art.upgrade.done", false)
+        set(v) = prefs.edit { putBoolean("art.upgrade.done", v) }
 
     /** Juego lanzado cuyo tiempo se mide al volver a Elyndra. */
     var pendingSessionKey: String?
@@ -440,6 +456,32 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
     var updateEtag: String?
         get() = prefs.getString("update.etag", null)
         set(v) = prefs.edit { if (v == null) remove("update.etag") else putString("update.etag", v) }
+
+    /** De dónde se lee el catálogo de la tienda de ports (vacío = el de siempre). */
+    var portsCatalogUrl: String
+        get() = prefs.getString("ports.catalogUrl", null)?.takeIf { it.isNotBlank() } ?: PortCatalogRepository.DEFAULT_URL
+        set(v) = prefs.edit {
+            if (v.isBlank() || v == PortCatalogRepository.DEFAULT_URL) remove("ports.catalogUrl") else putString("ports.catalogUrl", v.trim())
+        }
+
+    /** Tienda de ports: cuándo apareció cada port en el catálogo ("id=ms" por línea, ver PortFirstSeen). */
+    var portsFirstSeen: String
+        get() = prefs.getString("ports.firstSeen", "").orEmpty()
+        set(v) = prefs.edit { putString("ports.firstSeen", v) }
+
+    /** Tienda de ports: la lista de deseos (ids de port del catálogo). */
+    var portsWishlist: Set<String>
+        get() = prefs.getStringSet("ports.wishlist", emptySet()).orEmpty().toSet()
+        set(v) = prefs.edit { putStringSet("ports.wishlist", v) }
+
+    /** Tienda de ports: solo avisar de las actualizaciones (por defecto) o instalarlas solas cuando Android lo deja. */
+    var portsUpdateMode: com.elyndra.launcher.domain.ports.PortUpdateMode
+        get() = if (prefs.getBoolean("ports.autoUpdate", false)) {
+            com.elyndra.launcher.domain.ports.PortUpdateMode.Automatic
+        } else {
+            com.elyndra.launcher.domain.ports.PortUpdateMode.NotifyOnly
+        }
+        set(v) = prefs.edit { putBoolean("ports.autoUpdate", v == com.elyndra.launcher.domain.ports.PortUpdateMode.Automatic) }
 
     /** Versión (etiqueta) que se canceló: la comprobación automática no vuelve a ofrecerla. */
     var updateSkippedTag: String?

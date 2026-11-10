@@ -1,5 +1,6 @@
 package com.elyndra.launcher.launch
 
+import com.elyndra.launcher.library.SafGuard
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ComponentName
@@ -105,7 +106,8 @@ class GameLauncher(
         launcherId: String? = null,
         idIsAssigned: Boolean = false,
     ): RomRef {
-        val tree = Uri.parse(folder.treeUri)
+        // Nunca llega una carpeta virtual (openRom lanza los ports como apps); si llegara, falla aquí y no en SAF.
+        val tree = checkNotNull(SafGuard.tree(folder, "romRef")) { "romRef: folder ${folder.id} has no SAF tree" }
         val docId = rom.mainDocId ?: rom.docId
         val fileName = rom.mainFile?.substringAfterLast('/') ?: rom.fileName
         val saf = DocumentsContract.buildDocumentUriUsingTree(tree, docId).toString()

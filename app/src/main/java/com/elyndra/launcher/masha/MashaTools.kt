@@ -49,6 +49,7 @@ object MashaTools {
     const val LIST_EMULATORS = "list_emulators"
     const val SET_PREFERRED_EMULATOR = "set_preferred_emulator"
     const val UNDO_LAST_ACTION = "undo_last_action"
+    const val FIND_PORT = "find_port"
 
     /** Las que cambian algo: una respuesta que las usó nunca sale de caché. */
     val MUTATING = setOf(
@@ -205,6 +206,17 @@ object MashaTools {
                 required("system", "emulator")
             },
             tool(UNDO_LAST_ACTION, "Undo the last rename, add or emulator change made through you. Only when the user asks.") {},
+            tool(
+                FIND_PORT,
+                "Native Android ports (decompilations/recompilations/source ports) from Elyndra's Ports store, for console and PC games. " +
+                    "Search by the original game's name. One result per game: 'game' is its name, 'port' the best port of it, 'ports_available' how many exist. " +
+                    "Without a query: games already in the library that have a port. " +
+                    "Each result says if it is installable on Android, installed, and which original game the user must own (never offer or link ROMs). " +
+                    "open=true opens the store page of the first result.",
+            ) {
+                string("query", "Game or port name, e.g. 'Ocarina of Time', 'Mario', 'Xbox 360'.")
+                boolean("open", "Open the store on the first result.")
+            },
         )
     }
 

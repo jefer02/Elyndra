@@ -47,7 +47,7 @@ class PcGameIds(private val files: Files) {
 
     suspend fun resolve(folder: RomFolder, rom: RomEntry): Resolved {
         rom.pcGameId?.takeIf { it.isNotBlank() }?.let { return Resolved(it, assigned = true) }
-        if (folder.systemId != PcGames.SYSTEM_ID) return Resolved.None
+        if (folder.systemId != PcGames.SYSTEM_ID || !SafGuard.allows(folder, "pcGameIds")) return Resolved.None
         val tree = folder.treeUri
         return fromOwnFile(tree, rom) ?: fromSidecarFile(tree, rom) ?: Resolved.None
     }

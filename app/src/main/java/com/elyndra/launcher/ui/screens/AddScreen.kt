@@ -150,7 +150,8 @@ fun AddScreen(vm: ElyndraViewModel) {
                         cornerRadius = 15.dp,
                     ) { BackChevron() }
                     Spacer(Modifier.width(12.dp))
-                    ElyText(stringResource(R.string.add_title), size = TypeScale.Headline, weight = FontWeight.SemiBold, color = P.ink)
+                    ElyText(stringResource(R.string.add_title), size = TypeScale.Headline, weight = FontWeight.SemiBold, color = P.ink, modifier = Modifier.weight(1f))
+                    GhostButton(stringResource(R.string.user_folder_new), { vm.userFolders.promptCreate() })
                 }
 
                 // Las dos pestañas viven dentro de una sola cápsula: lo que se
@@ -227,6 +228,7 @@ private fun AndroidTab(vm: ElyndraViewModel, wide: Boolean) {
         verticalArrangement = Arrangement.spacedBy(Space.s),
     ) {
         item(key = "toolbar", span = { GridItemSpan(maxLineSpan) }) { AppsToolbar(vm, wide) }
+        item(key = "ports", span = { GridItemSpan(maxLineSpan) }) { PortsCard(vm) }
         if (!add.appsLoading && shown.isEmpty()) {
             item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
                 ElyText(
@@ -249,6 +251,25 @@ private fun AndroidTab(vm: ElyndraViewModel, wide: Boolean) {
                     .then(if (i == 0) Modifier.padInitialFocus() else Modifier),
                 onToggle = { add.togglePicked(app.packageName) },
             )
+        }
+    }
+}
+
+/**
+ * La tienda de ports, a mano desde "Añadir": un juego de consola también
+ * puede entrar como app nativa (el port), no solo como ROM.
+ */
+@Composable
+private fun PortsCard(vm: ElyndraViewModel) {
+    GlassCard(onClick = vm::openPorts, cornerRadius = 16.dp, padding = PaddingValues(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                ElyText(stringResource(R.string.ports_add_card_title), size = 12.5f, weight = FontWeight.SemiBold)
+                Spacer(Modifier.height(2.dp))
+                ElyText(stringResource(R.string.ports_add_card_body), size = 10f, color = P.ink2, lineHeightRatio = 1.4f, maxLines = 3)
+            }
+            Spacer(Modifier.width(Space.s))
+            ElyText(stringResource(R.string.ports_browse) + "  ›", size = 11f, weight = FontWeight.SemiBold, color = LocalSkin.current.a1)
         }
     }
 }
@@ -610,7 +631,7 @@ private fun SystemStep(vm: ElyndraViewModel) {
         placeholder = stringResource(R.string.add_search_systems),
         trailing = { ConsoleGlyphIcon(ConsoleGlyph.Search, P.ink2, size = 16.dp) },
     )
-    val groups = SystemGroups.group(Systems.ALL, add.systemQuery)
+    val groups = SystemGroups.group(Systems.ALL.filterNot { it.portsOnly }, add.systemQuery)
     if (groups.isEmpty()) {
         Spacer(Modifier.height(10.dp))
         ElyText(stringResource(R.string.add_no_system_match), size = 10.5f, color = P.ink2)

@@ -72,6 +72,27 @@ class MashaLocalTest {
     }
 
     @Test
+    fun nativePortsAreUnderstoodInEveryLanguage() {
+        listOf(
+            "¿hay algún port nativo?",
+            "is there a native port of Zelda?",
+            "tem algum port nativo?",
+            "y a-t-il un portage natif ?",
+            "gibt es eine native Portierung?",
+            "busca recompilaciones de Xbox 360",
+            "show me decompilations",
+        ).forEach { assertEquals(it, OfflineIntent.FindPort, OfflineIntents.detect(it)) }
+    }
+
+    @Test
+    fun portInsideOtherWordsDoesNotFool() {
+        assertTrue(OfflineIntents.detect("pon el modo portrait") !is OfflineIntent.FindPort)
+        assertTrue(OfflineIntents.detect("no importa, qué juego me recomiendas") !is OfflineIntent.FindPort)
+        assertTrue(OfflineIntents.detect("¿qué soporte tiene mi mando?") !is OfflineIntent.FindPort)
+        assertTrue(OfflineIntents.detect("ouvre les portes") !is OfflineIntent.FindPort)
+    }
+
+    @Test
     fun maintenanceIsUnderstood() {
         assertEquals(OfflineIntent.UpdateMetadata, OfflineIntents.detect("actualiza las carátulas"))
         assertEquals(OfflineIntent.UpdateMetadata, OfflineIntents.detect("download the missing covers"))
@@ -89,7 +110,7 @@ class MashaLocalTest {
         sessions = listOf(session("r:okami", 3.0, 50, "nethersx2"), session("r:okami", 2.0, 40, "nethersx2")),
     )
 
-    private fun build(device: DeviceState?, now: Long = NOW, memories: List<Memory> = emptyList()): BuiltContext {
+    private fun build(device: DeviceState?, now: Long = NOW, memories: List<Memory> = emptyList(), userFolders: List<String> = emptyList()): BuiltContext {
         val games = library.games()
         val snapshot = KnowledgeSnapshot(library, games, GameProfiles.buildAll(games, library.sessions, now = now), LibraryCurator.analyze(games), emptyList(), now)
         return MashaContextBuilder.build(
@@ -107,8 +128,17 @@ class MashaLocalTest {
                 installedEmulators = listOf("NetherSX2"),
                 folderEmulators = mapOf("ps2" to ("NetherSX2" to true)),
                 savedLists = listOf("RPG pendientes"),
+                userFolders = userFolders,
             ),
         )
+    }
+
+    @Test
+    fun userFoldersGoByNameOnlyAndOnlyWhenThereAreAny() {
+        val with = DeepSeekProtocolJson.parse(build(DeviceState(), userFolders = listOf("Favoritos")).json)
+        assertEquals("Favoritos", with["library"]!!.jsonObject["user_folders"]!!.jsonArray.single().jsonPrimitive.content)
+        val without = DeepSeekProtocolJson.parse(build(DeviceState()).json)
+        assertFalse("user_folders" in without["library"]!!.jsonObject)
     }
 
     @Test

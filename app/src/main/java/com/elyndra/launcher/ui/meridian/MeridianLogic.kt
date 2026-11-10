@@ -1357,15 +1357,18 @@ object RailHeaderLayout {
      * la niebla se corre hacia el filo, hasta [MIN_START]: con el dock de un
      * móvil (~180 dp) eso basta para que el cristal no se abombe arriba.
      */
-    fun plan(railWidth: Float, dockHeight: Float, pills: FloatArray, edge: ((Float) -> Float)?): Plan {
+    fun plan(railWidth: Float, dockHeight: Float, pills: FloatArray, edge: ((Float) -> Float)?): Plan = plan(railWidth, dockHeight, pills, edge, dest = false)
+
+    /** Como [plan], con el destino del final del dock ([DotTabsLayout.DEST_SLOT]) si [dest]. */
+    fun plan(railWidth: Float, dockHeight: Float, pills: FloatArray, edge: ((Float) -> Float)?, dest: Boolean): Plan {
         val top = 0f
         val column = START + dockMaxWidth(railWidth)
         val curve = edge?.let { minOf(it(top), it(top + dockHeight)) - FOG_MARGIN } ?: Float.POSITIVE_INFINITY
         val limit = minOf(column, curve)
         // Un poco más allá de la curva si así los rótulos se leen enteros (la niebla lo sigue).
         val stretch = minOf(column, curve + LABEL_STRETCH) - START
-        val room = maxOf(limit - START, minOf(DotTabsLayout.fullWidth(pills), stretch), DotTabsLayout.minWidth(pills.size))
-        val width = DotTabsLayout.uniformWidth(pills, room)
+        val room = maxOf(limit - START, minOf(DotTabsLayout.fullWidth(pills, dest), stretch), DotTabsLayout.minWidth(pills.size, dest))
+        val width = DotTabsLayout.uniformWidth(pills, room, dest)
         // En [START]; si así pasa de la curva, hacia el filo (hasta [MIN_START]) antes que hinchar la niebla.
         val x = minOf(START, limit - width).coerceAtLeast(MIN_START)
         return Plan(x, top, width, dockHeight, reach = if (edge == null) 0f else x + width + FOG_MARGIN)

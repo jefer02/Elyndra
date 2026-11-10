@@ -53,6 +53,7 @@ class RomScanner(private val resolver: ContentResolver) {
 
     /** Hijos directos de un documento del árbol. */
     fun children(treeUri: Uri, docId: String): List<Child> {
+        if (!SafGuard.allows(treeUri, "children")) return emptyList()
         val uri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, docId)
         val out = ArrayList<Child>()
         resolver.query(uri, PROJECTION, null, null, null)?.use { c ->
@@ -72,11 +73,13 @@ class RomScanner(private val resolver: ContentResolver) {
 
     /** Subcarpetas visibles de una carpeta (para detectar varios sistemas a la vez). */
     suspend fun subfolders(treeUri: Uri, docId: String): List<Child> = withContext(Dispatchers.IO) {
+        if (!SafGuard.allows(treeUri, "subfolders")) return@withContext emptyList()
         children(treeUri, docId).filter { it.isDir && !it.name.startsWith(".") }.sortedBy { it.name.lowercase() }
     }
 
     /** Contenido de un archivo de texto pequeño (hojas .cue/.m3u, .psvita). */
     fun readSmallText(treeUri: Uri, docId: String, maxBytes: Int = 256 * 1024): String? = runCatching {
+        if (!SafGuard.allows(treeUri, "readSmallText")) return@runCatching null
         val uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
         resolver.openInputStream(uri)?.use { input ->
             val buffer = ByteArray(maxBytes)
@@ -101,6 +104,7 @@ class RomScanner(private val resolver: ContentResolver) {
         system: GameSystem,
         onProgress: (Progress) -> Unit = {},
     ): List<Found> = withContext(Dispatchers.IO) {
+        if (!SafGuard.allows(treeUri, "scan")) return@withContext emptyList()
         // El PC no se analiza por extensión: una carpeta por juego (ver abajo).
         if (system.folderGames) return@withContext scanFolderGames(treeUri, rootDocId, system, onProgress)
         // PS4: juegos extraídos por Bachata, reconocidos por su contenido.
@@ -278,6 +282,7 @@ class RomScanner(private val resolver: ContentResolver) {
         rootDocId: String,
         onProgress: (Progress) -> Unit = {},
     ): Ps4Scan = withContext(Dispatchers.IO) {
+        if (!SafGuard.allows(treeUri, "scanPs4")) return@withContext Ps4Scan(emptyList(), emptyList())
         val dirs = ArrayList<Ps4.GameDir>()
         val pkgs = ArrayList<Ps4.PkgFile>()
         val queue = ArrayDeque<Triple<String, String, Int>>()
@@ -358,6 +363,7 @@ class RomScanner(private val resolver: ContentResolver) {
      * PS4 aunque su nombre no diga nada. Barato: solo lista carpetas.
      */
     suspend fun looksLikePs4(treeUri: Uri, docId: String, includeSelf: Boolean = true): Boolean = withContext(Dispatchers.IO) {
+        if (!SafGuard.allows(treeUri, "looksLikePs4")) return@withContext false
         fun isGame(id: String): Boolean {
             val kids = runCatching { children(treeUri, id) }.getOrDefault(emptyList())
             return Ps4.looksLikeGameDir(kids.map { it.name to it.isDir })
@@ -371,6 +377,7 @@ class RomScanner(private val resolver: ContentResolver) {
 
     /** Los primeros [bytes] de un archivo (cabecera de un .pkg, un PARAM.SFO entero). */
     fun readHead(treeUri: Uri, docId: String, bytes: Int): ByteArray? = runCatching {
+        if (!SafGuard.allows(treeUri, "readHead")) return@runCatching null
         val uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
         resolver.openInputStream(uri)?.use { input ->
             val buffer = ByteArray(bytes)
@@ -386,6 +393,7 @@ class RomScanner(private val resolver: ContentResolver) {
 
     /** Documento de `sce_sys/<nombre>` dentro de la carpeta de un juego de PS4, si está. */
     fun ps4SystemFile(treeUri: Uri, gameDocId: String, name: String): String? = runCatching {
+        if (!SafGuard.allows(treeUri, "ps4SystemFile")) return@runCatching null
         val sceSys = children(treeUri, gameDocId).firstOrNull { it.isDir && it.name.equals("sce_sys", ignoreCase = true) }
             ?: return@runCatching null
         children(treeUri, sceSys.docId).firstOrNull { !it.isDir && it.name.equals(name, ignoreCase = true) }?.docId

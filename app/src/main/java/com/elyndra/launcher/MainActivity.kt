@@ -272,6 +272,7 @@ class MainActivity : ComponentActivity() {
             ACTION_LAUNCH_GAME -> intent.getStringExtra(EXTRA_GAME_KEY)?.let { vm.launchFromShortcut(it) }
             ACTION_SHOW_GAME -> intent.getStringExtra(EXTRA_GAME_KEY)?.let { vm.showFromShortcut(it) }
             ACTION_OPEN_MASHA -> vm.go(Screen.Masha)
+            ACTION_OPEN_PORTS -> vm.openPorts()
         }
     }
 
@@ -478,9 +479,10 @@ class MainActivity : ComponentActivity() {
         const val ACTION_LAUNCH_GAME = "com.elyndra.launcher.LAUNCH_GAME"
         const val ACTION_SHOW_GAME = "com.elyndra.launcher.SHOW_GAME"
         const val ACTION_OPEN_MASHA = "com.elyndra.launcher.OPEN_MASHA"
+        const val ACTION_OPEN_PORTS = "com.elyndra.launcher.OPEN_PORTS"
         const val EXTRA_GAME_KEY = "gameKey"
 
-        private val SHORTCUT_ACTIONS = setOf(ACTION_LAUNCH_GAME, ACTION_SHOW_GAME, ACTION_OPEN_MASHA)
+        private val SHORTCUT_ACTIONS = setOf(ACTION_LAUNCH_GAME, ACTION_SHOW_GAME, ACTION_OPEN_MASHA, ACTION_OPEN_PORTS)
 
         /** Fuente de las direcciones que no traen tecla (stick, hat): un mando con cruceta. */
         private const val PAD_SOURCE = InputDevice.SOURCE_DPAD or InputDevice.SOURCE_GAMEPAD
@@ -505,5 +507,8 @@ class MainActivity : ComponentActivity() {
                 .setData(Uri.parse("elyndra://details/" + Uri.encode(gameKey)))
 
         fun openMashaIntent(context: Context): Intent = base(context, ACTION_OPEN_MASHA)
+
+        /** La tienda de ports (el aviso de actualizaciones). */
+        fun openPortsIntent(context: Context): Intent = base(context, ACTION_OPEN_PORTS)
     }
 }

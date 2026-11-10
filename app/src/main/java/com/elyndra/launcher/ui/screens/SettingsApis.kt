@@ -112,6 +112,34 @@ fun ApiPanels(vm: ElyndraViewModel) {
             Spacer(Modifier.height(8.dp))
             CredentialField(stringResource(R.string.field_web_api_key), s.value(Field.RaKey), secret = true, last = true) { s.update(Field.RaKey, it) }
         }
+        GithubPanel(vm)
+    }
+}
+
+/**
+ * La tienda de ports: el token de GitHub (opcional, sube el cupo de la API) y
+ * de dónde se lee el catálogo. No es un servicio de metadatos: no se prueba ni
+ * cuenta para "servicios configurados".
+ */
+@Composable
+private fun GithubPanel(vm: ElyndraViewModel) {
+    val s = vm.settings
+    var open by rememberSaveable { mutableStateOf(false) }
+    SettingsGroup(padding = 0.dp) {
+        AccordionHeader(
+            title = stringResource(R.string.settings_github),
+            expanded = open,
+            onToggle = { open = !open },
+            summary = stringResource(R.string.settings_github_desc),
+        )
+        Expandable(open) {
+            CredentialField(stringResource(R.string.settings_github_token), s.githubToken, secret = true) { s.updateGithubToken(it) }
+            Spacer(Modifier.height(8.dp))
+            CredentialField(stringResource(R.string.settings_ports_catalog), s.portsCatalogUrl, secret = false, last = true) { s.updatePortsCatalogUrl(it) }
+            Spacer(Modifier.height(8.dp))
+            SwitchRow(stringResource(R.string.settings_ports_auto_update), stringResource(R.string.settings_ports_auto_update_desc), s.portsAutoUpdate, s::togglePortsAutoUpdate)
+            Spacer(Modifier.height(10.dp))
+        }
     }
 }
 

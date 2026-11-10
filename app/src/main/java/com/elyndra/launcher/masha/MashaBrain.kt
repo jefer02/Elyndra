@@ -1,5 +1,6 @@
 package com.elyndra.launcher.masha
 
+import com.elyndra.launcher.domain.library.UserFolderLogic
 import com.elyndra.launcher.core.device.DeviceStateMonitor
 import com.elyndra.launcher.data.ArcRepository
 import com.elyndra.launcher.data.SettingsStore
@@ -65,6 +66,7 @@ class MashaBrain @Inject constructor(
                 installedEmulators = inventory.installed().map { it.label }.distinct(),
                 folderEmulators = folderEmulators,
                 savedLists = skills.savedListNames(),
+                userFolders = UserFolderLogic.sorted(snapshot.library.userFolders).map { it.name },
             ),
         )
     }
@@ -72,7 +74,8 @@ class MashaBrain @Inject constructor(
     /** Sugerencias ambientales, la más útil primero, sin las descartadas hoy. */
     suspend fun insights(): List<Insight> {
         val s = knowledge.snapshot()
-        val missing = s.library.folders.mapNotNull { f ->
+        // Las carpetas virtuales (ports) no tienen emulador: nada que echar en falta.
+        val missing = s.library.realFolders.mapNotNull { f ->
             val emulator = f.emulatorId ?: return@mapNotNull null
             if (orchestrator.isInstalled(emulator)) null else Triple(f.id, Systems.byId(f.systemId)?.name ?: f.systemId, emulator)
         }

@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui
 
+import com.elyndra.launcher.domain.ports.PortUpdateMode
 import com.elyndra.launcher.ui.meridian.WheelBackdrop
 import com.elyndra.launcher.core.device.StatusMode
 import android.net.Uri
@@ -699,6 +700,38 @@ class SettingsController(private val vm: ElyndraViewModel) {
         states[field.service] = idleState(field.service)
     }
 
+    /* ── tienda de ports: token de GitHub y catálogo ──────────── */
+
+    /** El token de GitHub, descifrado al enseñarlo (como las demás credenciales). */
+    private val githubTokenState by lazy { mutableStateOf(secrets.get(SecretKeys.GITHUB_TOKEN)) }
+    val githubToken: String get() = githubTokenState.value
+
+    fun updateGithubToken(value: String) {
+        githubTokenState.value = value
+        secrets.set(SecretKeys.GITHUB_TOKEN, value.trim())
+    }
+
+    private val catalogUrlState by lazy { mutableStateOf(store.portsCatalogUrl) }
+    val portsCatalogUrl: String get() = catalogUrlState.value
+
+    /** Solo https: un catálogo por http podría cambiarse por el camino. Al cambiarlo, se vuelve a leer. */
+    fun updatePortsCatalogUrl(value: String) {
+        catalogUrlState.value = value
+        val clean = value.trim()
+        if (clean.isEmpty() || clean.startsWith("https://")) {
+            store.portsCatalogUrl = clean
+            vm.ports.invalidate()
+        }
+    }
+
+    private val portsAutoState by lazy { mutableStateOf(store.portsUpdateMode == PortUpdateMode.Automatic) }
+    val portsAutoUpdate: Boolean get() = portsAutoState.value
+
+    fun togglePortsAutoUpdate() {
+        portsAutoState.value = !portsAutoState.value
+        store.portsUpdateMode = if (portsAutoState.value) PortUpdateMode.Automatic else PortUpdateMode.NotifyOnly
+    }
+
     var showSsDev by mutableStateOf(false); private set
 
     fun toggleSsDev() { showSsDev = !showSsDev }
@@ -838,12 +871,12 @@ class SettingsController(private val vm: ElyndraViewModel) {
     }
 
     fun rescanAll() {
-        if (rescanning || vm.library.folders.isEmpty()) return
+        if (rescanning || vm.library.realFolders.isEmpty()) return
         rescanning = true
         vm.viewModelScope.launch {
             var added = 0
             var removed = 0
-            vm.library.folders.forEach { f ->
+            vm.library.realFolders.forEach { f ->
                 vm.rescan(f, silent = true)?.let {
                     added += it.added.size
                     removed += it.removed

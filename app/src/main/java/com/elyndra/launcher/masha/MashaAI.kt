@@ -165,6 +165,11 @@ sealed interface MashaAttachment {
     @SerialName("arc")
     data class ArcCard(val arcId: String, val title: String, val keys: List<String>, val done: Int, val total: Int) : MashaAttachment
 
+    /** Ports nativos de la tienda (por id del catálogo): fichas que abren su página. */
+    @Serializable
+    @SerialName("ports")
+    data class Ports(val title: String? = null, val ids: List<String>) : MashaAttachment
+
     /** Algo que Masha hizo (lanzar, cambiar el tema…): una ficha pequeña de "hecho". */
     @Serializable
     @SerialName("done")

@@ -96,6 +96,99 @@ class MigrationTest {
     }
 
     @Test
+    fun migration5to6MatchesTheExportedSchema() {
+        val v5 = schema(5)
+        val v6 = schema(6)
+        val sql = sqlOf(ElyndraDatabase.MIGRATION_5_6)
+        // Una tabla nueva y su índice, creados igual que los declara Room; nada más cambia.
+        val table = v6.getValue("installed_ports")
+        val create = table["createSql"]!!.jsonPrimitive.content.replace("\${TABLE_NAME}", "installed_ports")
+        assertTrue(sql.contains(create))
+        table["indices"]!!.jsonArray.forEach { index ->
+            val createIndex = index.jsonObject["createSql"]!!.jsonPrimitive.content.replace("\${TABLE_NAME}", "installed_ports")
+            assertTrue(createIndex, sql.contains(createIndex))
+        }
+        assertEquals(2, sql.size)
+        assertEquals(v5.keys + "installed_ports", v6.keys)
+        for (name in v5.keys) assertEquals(name, columns(v5.getValue(name)), columns(v6.getValue(name)))
+        assertEquals(setOf("catalog_id", "package_name", "installed_tag", "asset_name", "installed_at"), columns(table))
+    }
+
+    @Test
+    fun migration6to7MatchesTheExportedSchema() {
+        val v6 = schema(6)
+        val v7 = schema(7)
+        val sql = sqlOf(ElyndraDatabase.MIGRATION_6_7)
+        val expected = mapOf(
+            "rom_folders" to setOf("is_virtual"),
+            "android_apps" to setOf("folder_id", "folder_manual"),
+            "installed_ports" to setOf("system_id", "latest_tag", "latest_published_at", "checked_at", "notified_tag", "blocked_tag"),
+        )
+        for ((table, cols) in expected) {
+            assertEquals(table, cols, addedColumns(sql, table))
+            assertEquals(table, columns(v7.getValue(table)), columns(v6.getValue(table)) + cols)
+        }
+        // Las NOT NULL nuevas llevan el mismo valor por defecto que declara Room (las filas que ya hay lo toman).
+        for ((table, col) in listOf("rom_folders" to "is_virtual", "android_apps" to "folder_manual", "installed_ports" to "checked_at")) {
+            val field = v7.getValue(table)["fields"]!!.jsonArray.map { it.jsonObject }.first { it["columnName"]!!.jsonPrimitive.content == col }
+            assertEquals("$table.$col", "0", field["defaultValue"]!!.jsonPrimitive.content)
+            assertTrue(sql.any { it.contains("`$col` INTEGER NOT NULL DEFAULT 0") })
+        }
+        // El índice de la carpeta de cada app, igual que lo crea Room; sin clave ajena (borrar una carpeta no borra apps).
+        val apps = v7.getValue("android_apps")
+        val index = apps["indices"]!!.jsonArray.single().jsonObject["createSql"]!!.jsonPrimitive.content.replace("\${TABLE_NAME}", "android_apps")
+        assertTrue(index, sql.contains(index))
+        assertTrue(apps["foreignKeys"]?.jsonArray.isNullOrEmpty())
+        // Ninguna tabla aparece ni desaparece; las demás no cambian.
+        assertEquals(v6.keys, v7.keys)
+        for (name in v6.keys - expected.keys) assertEquals(name, columns(v6.getValue(name)), columns(v7.getValue(name)))
+    }
+
+    @Test
+    fun migration7to8AddsOnlyThePortAvailabilityTable() {
+        val v7 = schema(7)
+        val v8 = schema(8)
+        val sql = sqlOf(ElyndraDatabase.MIGRATION_7_8)
+        val table = v8.getValue("port_availability")
+        val create = table["createSql"]!!.jsonPrimitive.content.replace("\${TABLE_NAME}", "port_availability")
+        assertTrue(create, sql.contains(create))
+        assertEquals(1, sql.size)
+        assertEquals(v7.keys + "port_availability", v8.keys)
+        for (name in v7.keys) assertEquals(name, columns(v7.getValue(name)), columns(v8.getValue(name)))
+        assertEquals(setOf("catalog_id", "tag", "asset_name", "found_at"), columns(table))
+    }
+
+    @Test
+    fun migration8to9AddsOnlyTheUserFolderTables() {
+        val v8 = schema(8)
+        val v9 = schema(9)
+        val sql = sqlOf(ElyndraDatabase.MIGRATION_8_9)
+        val added = setOf("user_folders", "user_folder_items")
+        for (name in added) {
+            val create = v9.getValue(name)["createSql"]!!.jsonPrimitive.content.replace("\${TABLE_NAME}", name)
+            assertTrue(create, sql.contains(create))
+        }
+        val items = v9.getValue("user_folder_items")
+        val index = items["indices"]!!.jsonArray.single().jsonObject["createSql"]!!.jsonPrimitive.content.replace("\${TABLE_NAME}", "user_folder_items")
+        assertTrue(index, sql.contains(index))
+        assertEquals(3, sql.size)
+        assertEquals(v8.keys + added, v9.keys)
+        for (name in v8.keys) assertEquals(name, columns(v8.getValue(name)), columns(v9.getValue(name)))
+        assertEquals(setOf("id", "name", "description", "position", "created_at"), columns(v9.getValue("user_folders")))
+        assertEquals(setOf("folder_id", "game_key", "position"), columns(items))
+    }
+
+    @Test
+    fun portPlacementRoundTripsThroughTheMapper() {
+        val folder = com.elyndra.launcher.data.RomFolder("v-switch", "switch", "", "", "", isVirtual = true)
+        assertTrue(LibraryMapper.folder(folder).isVirtual)
+        val app = com.elyndra.launcher.data.AppEntry("com.port", "Port", folderId = "v-switch", folderManual = true)
+        val row = LibraryMapper.app(app)
+        assertEquals("v-switch", row.folderId)
+        assertTrue(row.folderManual)
+    }
+
+    @Test
     fun androidDescriptionsNotFromPlayAreForgottenAndRomsAreUntouched() {
         val update = sqlOf(ElyndraDatabase.MIGRATION_4_5).single { it.startsWith("UPDATE") }
         assertTrue(update.contains("`game_key` LIKE 'a:%'"))
@@ -108,7 +201,8 @@ class MigrationTest {
     @Test
     fun migrationsNeverDropOrDelete() {
         for (m in ElyndraDatabase.MIGRATIONS) for (s in sqlOf(m)) {
-            val upper = s.uppercase()
+            // Una clave ajena en cascada declara una regla: no borra nada al migrar.
+            val upper = s.uppercase().replace("ON DELETE CASCADE", "")
             assertTrue(s, "DROP " !in upper && "DELETE " !in upper)
         }
     }

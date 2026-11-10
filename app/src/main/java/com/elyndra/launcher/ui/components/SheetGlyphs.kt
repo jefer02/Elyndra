@@ -199,6 +199,12 @@ private fun DrawScope.drawSheetGlyph(icon: SheetIcon, color: Color) {
         }
 
         // App instalada.
+        // Añadir: un más.
+        SheetIcon.Add -> {
+            line(0.50f, 0.18f, 0.50f, 0.82f)
+            line(0.18f, 0.50f, 0.82f, 0.50f)
+        }
+
         SheetIcon.App -> {
             box(0.14f, 0.14f, 0.72f, 0.72f, radius = 0.18f)
             line(0.36f, 0.50f, 0.64f, 0.50f)

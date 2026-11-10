@@ -226,7 +226,9 @@ class LaunchPlannerTest {
     fun everySystemEmulatorExistsAndIsUnique() {
         val ids = Emulators.ALL.map { it.id }
         assertEquals(ids.size, ids.toSet().size)
-        Systems.ALL.forEach { system ->
+        // Switch 2 es el único sistema solo de ports (sin emulador).
+        assertEquals(listOf("switch2"), Systems.ALL.filter { it.portsOnly }.map { it.id })
+        Systems.ALL.filterNot { it.portsOnly }.forEach { system ->
             assertTrue("${system.id} has no emulators", system.emulators.isNotEmpty())
             system.emulators.forEach { assertNotNull("${system.id} → $it", Emulators.byId(it)) }
         }

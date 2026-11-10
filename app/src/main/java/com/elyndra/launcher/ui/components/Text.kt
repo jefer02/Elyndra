@@ -40,6 +40,8 @@ fun ElyText(
     align: TextAlign? = null,
     /** [LineBreak.Heading] reparte las líneas de un titular (sin una palabra sola en la última). */
     lineBreak: LineBreak = LineBreak.Unspecified,
+    /** Tachado o subrayado (la versión vieja de un port, tachada). */
+    decoration: androidx.compose.ui.text.style.TextDecoration? = null,
 ) {
     val base = LocalTextStyle.current
     Text(
@@ -52,6 +54,7 @@ fun ElyText(
         letterSpacing = letterSpacing,
         lineHeight = lineHeightRatio?.let { (size * it).sp } ?: TextUnit.Unspecified,
         textAlign = align,
+        textDecoration = decoration,
         maxLines = maxLines,
         overflow = overflow,
         style = if (shadow != null || lineBreak != LineBreak.Unspecified) base.copy(shadow = shadow ?: base.shadow, lineBreak = lineBreak) else base,

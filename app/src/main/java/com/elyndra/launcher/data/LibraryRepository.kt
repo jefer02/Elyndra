@@ -1,5 +1,6 @@
 package com.elyndra.launcher.data
 
+import com.elyndra.launcher.domain.library.UserFolderLogic
 import com.elyndra.launcher.library.Names
 import com.elyndra.launcher.library.RomScanner
 import kotlinx.coroutines.CompletableDeferred
@@ -15,6 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.security.MessageDigest
+import java.util.UUID
 
 /**
  * Fuente única de la biblioteca.
@@ -72,7 +74,8 @@ class LibraryRepository(private val store: LibraryStore, private val scope: Coro
     suspend fun awaitLoaded() = loadedSignal.await()
 
     fun update(transform: (Library) -> Library) {
-        _state.update(transform)
+        // Aquí pasa todo cambio: un juego que se va no se queda en las carpetas del usuario.
+        _state.update { UserFolderLogic.prune(it, transform(it)) }
         saveRequests.trySend(Unit)
     }
 
@@ -257,12 +260,41 @@ class LibraryRepository(private val store: LibraryStore, private val scope: Coro
         lib.copy(apps = lib.apps.map { if (it.packageName == packageName) transform(it) else it })
     }
 
-    /* ── Metadatos y tiempo de juego por clave ("r:…" / "a:…") ── */
+    /* ── Carpetas del usuario ──────────────────────────────────── */
+
+    fun createUserFolder(name: String, now: Long = System.currentTimeMillis()): String? {
+        if (UserFolderLogic.cleanName(name) == null) return null
+        val id = UserFolderLogic.ID_PREFIX + UUID.randomUUID()
+        update { UserFolderLogic.create(it, id, name, now) }
+        return id
+    }
+
+    fun renameUserFolder(id: String, name: String) = update { UserFolderLogic.rename(it, id, name) }
+
+    fun describeUserFolder(id: String, description: String?) = update { UserFolderLogic.describe(it, id, description) }
+
+    fun deleteUserFolder(id: String) = update { UserFolderLogic.delete(it, id) }
+
+    fun addToUserFolder(id: String, keys: List<String>) = update { UserFolderLogic.add(it, id, keys) }
+
+    fun removeFromUserFolder(id: String, keys: Collection<String>) = update { UserFolderLogic.remove(it, id, keys) }
+
+    fun moveInUserFolder(id: String, key: String, delta: Int, visible: Set<String>) = update { UserFolderLogic.move(it, id, key, delta, visible) }
+
+    fun userFolder(id: String): UserFolder? = current.userFolders.firstOrNull { it.id == id }
+
+    fun userFolderByKey(key: String): UserFolder? =
+        if (UserFolderLogic.isUserKey(key)) userFolder(key.removePrefix("f:")) else null
+
+    /* ── Metadatos y tiempo de juego por clave ("r:…" / "a:…" / "f:u-…") ── */
 
     fun updateMeta(key: String, transform: (GameMeta) -> GameMeta) {
         when {
             key.startsWith("r:") -> updateRom(key.removePrefix("r:")) { it.copy(meta = transform(it.meta)) }
             key.startsWith("a:") -> updateApp(key.removePrefix("a:")) { it.copy(meta = transform(it.meta)) }
+            UserFolderLogic.isUserKey(key) -> update { lib ->
+                lib.copy(userFolders = lib.userFolders.map { if (it.key == key) it.copy(meta = transform(it.meta)) else it })
+            }
         }
     }
 

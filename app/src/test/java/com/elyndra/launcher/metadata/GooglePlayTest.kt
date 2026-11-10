@@ -219,14 +219,15 @@ class GooglePlayPriorityTest {
     fun playIsTheMainSourceAndSteamFillsTheRest() {
         val merged = MetadataMerge.merge(mapOf(Service.Steam to steam(), Service.GooglePlay to play()), MetadataPriority.DEFAULT)
         assertEquals("Clash Royale", merged.text[MetaField.Name])
+        // Los textos siguen siendo de Play; en imágenes, Play va la última de serie (tras Steam):
+        // el icono, que Steam no da, sigue siendo de Play.
         assertEquals(Service.GooglePlay to "play-icon", merged.art[MetaField.Icon])
-        assertEquals(Service.GooglePlay to "play-shot", merged.art[MetaField.Hero])
-        // Lo que Play no tiene lo pone Steam.
+        assertEquals(Service.Steam to "steam-hero", merged.art[MetaField.Hero])
         assertEquals(Service.Steam to "steam-cover", merged.art[MetaField.Cover])
         assertEquals(Service.Steam to "steam-logo", merged.art[MetaField.Logo])
         assertEquals(MatchMethod.PACKAGE, merged.matchedBy)
-        // Si la descarga del fondo de Play falla, el de Steam espera detrás.
-        assertEquals(listOf(Service.GooglePlay to "play-shot", Service.Steam to "steam-hero"), merged.artChain[MetaField.Hero])
+        // Si la descarga del fondo de Steam falla, el de Play espera detrás.
+        assertEquals(listOf(Service.Steam to "steam-hero", Service.GooglePlay to "play-shot"), merged.artChain[MetaField.Hero])
     }
 
     @Test

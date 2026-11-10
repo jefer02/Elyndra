@@ -34,8 +34,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ArcStepEntity::class,
         AiCacheEntity::class,
         DescriptionTranslationEntity::class,
+        InstalledPortEntity::class,
+        PortAvailabilityEntity::class,
+        UserFolderEntity::class,
+        UserFolderItemEntity::class,
     ],
-    version = 5,
+    version = 9,
     exportSchema = true,
 )
 abstract class ElyndraDatabase : RoomDatabase() {
@@ -46,6 +50,7 @@ abstract class ElyndraDatabase : RoomDatabase() {
     abstract fun arcDao(): ArcDao
     abstract fun aiCacheDao(): AiCacheDao
     abstract fun translationDao(): TranslationDao
+    abstract fun portDao(): PortDao
 
     companion object {
         const val NAME = "elyndra.db"
@@ -109,6 +114,70 @@ abstract class ElyndraDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+        /**
+         * 5 → 6: los ports instalados desde la tienda (`installed_ports`).
+         * Solo una tabla nueva: nada de lo que había cambia.
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `installed_ports` (`catalog_id` TEXT NOT NULL, `package_name` TEXT NOT NULL, " +
+                        "`installed_tag` TEXT NOT NULL, `asset_name` TEXT, `installed_at` INTEGER NOT NULL, PRIMARY KEY(`catalog_id`))",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_installed_ports_package_name` ON `installed_ports` (`package_name`)")
+            }
+        }
+
+        /**
+         * Tienda de ports, segunda versión: carpetas virtuales, la carpeta de
+         * cada app (los ports van a la de su sistema) y el seguimiento de
+         * actualizaciones. Todo columnas nuevas con valor por defecto: nada se
+         * pierde ni se recrea.
+         */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `rom_folders` ADD COLUMN `is_virtual` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `android_apps` ADD COLUMN `folder_id` TEXT")
+                db.execSQL("ALTER TABLE `android_apps` ADD COLUMN `folder_manual` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_android_apps_folder_id` ON `android_apps` (`folder_id`)")
+                db.execSQL("ALTER TABLE `installed_ports` ADD COLUMN `system_id` TEXT")
+                db.execSQL("ALTER TABLE `installed_ports` ADD COLUMN `latest_tag` TEXT")
+                db.execSQL("ALTER TABLE `installed_ports` ADD COLUMN `latest_published_at` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `installed_ports` ADD COLUMN `checked_at` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `installed_ports` ADD COLUMN `notified_tag` TEXT")
+                db.execSQL("ALTER TABLE `installed_ports` ADD COLUMN `blocked_tag` TEXT")
+            }
+        }
+
+        /**
+         * Tienda de ports, tercera versión: los ports "aún no en Android" a los
+         * que la comprobación diaria les encuentra un APK. Una tabla nueva.
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `port_availability` (`catalog_id` TEXT NOT NULL, `tag` TEXT NOT NULL, " +
+                        "`asset_name` TEXT NOT NULL, `found_at` INTEGER NOT NULL, PRIMARY KEY(`catalog_id`))",
+                )
+            }
+        }
+
+        /** Carpetas creadas por el usuario: dos tablas nuevas y nada más cambia. */
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `user_folders` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `description` TEXT, " +
+                        "`position` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `user_folder_items` (`folder_id` TEXT NOT NULL, `game_key` TEXT NOT NULL, " +
+                        "`position` INTEGER NOT NULL, PRIMARY KEY(`folder_id`, `game_key`), " +
+                        "FOREIGN KEY(`folder_id`) REFERENCES `user_folders`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_user_folder_items_game_key` ON `user_folder_items` (`game_key`)")
+            }
+        }
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
     }
 }

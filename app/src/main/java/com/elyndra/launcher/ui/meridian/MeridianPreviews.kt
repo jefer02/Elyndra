@@ -549,6 +549,45 @@ private fun SmallLogoPreview() = HeroBlockSample(96f to 40f, padGlyphs = true)
 @Composable
 private fun NoLogoLongTitlePreview() = HeroBlockSample(null, title = "The Legend of Heroes: Trails through Daybreak II — Deluxe Edition")
 
+/**
+ * La carpeta VIRTUAL de unos ports (Nintendo Switch sin carpeta de ROMs): sin
+ * ruta ni emulador, y dos ports del mismo juego que se distinguen por la línea
+ * "PORT · <port>". Sin red, el arte es el respaldo de la vista previa.
+ */
+@HeroBlockPreviews
+@Composable
+private fun VirtualPortsFolderPreview() = MeridianTheme {
+    val ink = rememberMeridianInk()
+    val brush = Colorful.brush ?: return@MeridianTheme
+    val wash = rememberWash(null, P.isDark, ink.primary, enabled = true, preset = Colorful.wash)
+    Box(Modifier.fillMaxSize().background(brush).meridianScrims(heroLeft = 0f, scrim = 0.62f, wash = wash, barHeight = 60f)) {
+        Column(Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 22.dp).width(300.dp)) {
+            FolderHeader(
+                title = "Nintendo Switch",
+                path = "",
+                pill = { short ->
+                    Box(Modifier.height(24.dp).dockSurface(CapsuleShape, elevation = 6.dp).padding(horizontal = 11.dp), contentAlignment = Alignment.Center) {
+                        ElyText(if (short) "2" else "2 · 3H 05M", size = 8.5f, weight = FontWeight.SemiBold, color = Color(DockPalettes.ink2(P.isDark)), maxLines = 1)
+                    }
+                },
+            ) {}
+        }
+        Box(Modifier.align(Alignment.BottomStart).padding(22.dp).width(420.dp)) {
+            MeridianHeroPanel(
+                content = MeridianHeroContent(
+                    "preview:virtual",
+                    listOf("SWITCH", "2h 40m jugado", "PORT · LASRecomp-Android-Plus"),
+                    "The Legend of Zelda: Link's Awakening",
+                    "Static recompilation of Link's Awakening running natively on Android. You bring the game.",
+                ),
+                actions = MeridianActions("Jugar", {}, "Ficha", {}, "Opciones", {}),
+                ink = ink,
+                padGlyphs = false,
+            )
+        }
+    }
+}
+
 /** La cabecera de una carpeta sobre arte muy claro, con su velo de arriba: el nombre, la ruta recortada por el centro y la píldora entera. */
 @HeroBlockPreviews
 @Composable

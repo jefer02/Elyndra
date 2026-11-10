@@ -21,6 +21,9 @@ class GamepadTest {
         assertEquals(Pad.AppMenu, Gamepad.actionFor(KeyEvent.KEYCODE_BUTTON_THUMBL))
         assertEquals(Pad.PagePrev, Gamepad.actionFor(KeyEvent.KEYCODE_BUTTON_L1))
         assertEquals(Pad.PageNext, Gamepad.actionFor(KeyEvent.KEYCODE_BUTTON_R1))
+        // R2 abre la tienda de ports; L2 sigue siendo un segundo L1.
+        assertEquals(Pad.Store, Gamepad.actionFor(KeyEvent.KEYCODE_BUTTON_R2))
+        assertEquals(Pad.PagePrev, Gamepad.actionFor(KeyEvent.KEYCODE_BUTTON_L2))
         // Mando clónico sin perfil: Android le numera los botones.
         assertEquals(Pad.Confirm, Gamepad.actionFor(KeyEvent.KEYCODE_BUTTON_1))
         assertEquals(Pad.Back, Gamepad.actionFor(KeyEvent.KEYCODE_BUTTON_2))

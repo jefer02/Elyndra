@@ -7,6 +7,7 @@ import com.elyndra.launcher.data.GameMeta
 import com.elyndra.launcher.data.GameSystem
 import com.elyndra.launcher.data.LibraryRepository
 import com.elyndra.launcher.data.Systems
+import com.elyndra.launcher.domain.library.UserFolderLogic
 import com.elyndra.launcher.library.Names
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -70,7 +71,7 @@ class ArtSources(
                 ArtKind.Icon -> f.icon
             }
         }
-        val meta = repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta ?: return null
+        val meta = metaOf(key) ?: return null
         return when (kind) {
             ArtKind.Cover -> meta.cover
             ArtKind.Background -> meta.hero
@@ -87,8 +88,7 @@ class ArtSources(
      */
     fun appliedUrl(key: String, kind: ArtKind): String? {
         if (repo.folderByKey(key) != null) return null
-        val meta = repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta ?: return null
-        return meta.artOrigins[kind.media]?.url
+        return metaOf(key)?.artOrigins?.get(kind.media)?.url
     }
 
     /** ¿Hay imagen de esta clase que se pueda quitar? */
@@ -101,13 +101,15 @@ class ArtSources(
         val rom = repo.romByKey(key)
         val app = repo.appByKey(key)
         val folder = repo.folderByKey(key)
-        if (rom == null && app == null && folder == null) return@withContext emptyList()
+        val userFolder = repo.userFolderByKey(key)
+        if (rom == null && app == null && folder == null && userFolder == null) return@withContext emptyList()
         // Una carpeta no tiene metadatos propios: se busca por el nombre del sistema.
         val meta = rom?.meta ?: app?.meta ?: GameMeta()
         val system = (rom?.systemId ?: folder?.systemId)?.let { Systems.byId(it) }
         val name = meta.name?.takeIf { it.isNotBlank() }
             ?: rom?.title
             ?: app?.label
+            ?: userFolder?.name
             ?: system?.name.orEmpty()
         if (name.isBlank()) return@withContext emptyList()
         val isApp = app != null
@@ -136,7 +138,7 @@ class ArtSources(
     /** ¿Esta imagen la eligió el usuario? (las pasadas no la tocan). */
     fun isPinned(key: String, kind: ArtKind): Boolean {
         repo.folderByKey(key)?.let { return false }
-        val meta = repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta ?: return false
+        val meta = metaOf(key) ?: return false
         return kind.media in meta.pinned
     }
 
@@ -193,8 +195,12 @@ class ArtSources(
         repo.flush()
     }
 
+    /** Las carpetas de `rom_folders`: las del usuario guardan su arte como un juego. */
     private fun folderIdOf(key: String): String? =
-        key.takeIf { it.startsWith("f:") }?.removePrefix("f:")
+        key.takeIf { it.startsWith("f:") && !UserFolderLogic.isUserKey(it) }?.removePrefix("f:")
+
+    private fun metaOf(key: String): GameMeta? =
+        repo.romByKey(key)?.meta ?: repo.appByKey(key)?.meta ?: repo.userFolderByKey(key)?.meta
 
     private suspend fun screenScraper(meta: GameMeta, name: String, system: GameSystem?, kind: ArtKind): List<ArtCandidate> {
         val ss = engine.screenScraper

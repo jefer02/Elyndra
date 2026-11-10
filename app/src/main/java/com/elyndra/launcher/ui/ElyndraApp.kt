@@ -7,6 +7,7 @@ import androidx.compose.ui.platform.testTag
 import com.elyndra.launcher.ui.components.rememberBackdropStack
 import com.elyndra.launcher.ui.components.LocalBackdropStack
 import com.elyndra.launcher.ui.components.OverlayHost
+import com.elyndra.launcher.ui.screens.ports.PortsScreen
 import com.elyndra.launcher.ui.screens.IdentifySheet
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
@@ -57,6 +58,7 @@ import com.elyndra.launcher.ui.components.LocalScreenSize
 import com.elyndra.launcher.ui.components.LocalPadHints
 import com.elyndra.launcher.ui.components.LocalPadInput
 import com.elyndra.launcher.ui.components.ImeBridge
+import com.elyndra.launcher.ui.screens.UserFolderPickerScreen
 import com.elyndra.launcher.ui.components.SafeAreaInsets
 import com.elyndra.launcher.ui.components.PadFocusGroup
 import com.elyndra.launcher.ui.components.ToastView
@@ -100,6 +102,12 @@ fun ElyndraApp(vm: ElyndraViewModel) {
     val request = vm.mediaRequest
     LaunchedEffect(request) {
         request?.let { mediaPicker.launch(it.mimeTypes.toTypedArray()) }
+    }
+    // "Añadir juego" → archivo en una carpeta de solo lectura: el mismo árbol otra vez, ahora con escritura.
+    val treePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree(), vm.folderAdd::onTreeGranted)
+    val treeRequest = vm.folderAdd.treeRequest
+    LaunchedEffect(treeRequest) {
+        treeRequest?.let { treePicker.launch(it.initial) }
     }
 
     // Menús, diálogos y pantallas que cambian suenan desde aquí (ver UiSoundEffects).
@@ -244,7 +252,7 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                             Modifier.fillMaxSize().testTag(UiTags.screen(screen)),
                             blocked = overlayOpen,
                             // Biblioteca y Carpeta van con la selección del InputController.
-                            padFocus = screen != Screen.Library && screen != Screen.Folder,
+                            padFocus = screen != Screen.Library && screen != Screen.Folder && screen != Screen.UserFolderPicker,
                         ) {
                             when (screen) {
                                 Screen.Library -> LibraryScreen(vm)
@@ -254,6 +262,8 @@ fun ElyndraApp(vm: ElyndraViewModel) {
                                 Screen.Masha -> MashaScreen(vm)
                                 Screen.Licenses -> LicensesScreen(vm)
                                 Screen.VoiceSync -> VoiceSyncScreen(vm)
+                                Screen.Ports -> PortsScreen(vm)
+                                Screen.UserFolderPicker -> UserFolderPickerScreen(vm)
                             }
                         }
                     }
