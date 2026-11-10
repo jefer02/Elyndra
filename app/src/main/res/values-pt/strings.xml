@@ -1148,6 +1148,9 @@ Feito pela comunidade, sem revisão. Confira o repositório antes de instalar.</
     <string name="user_folder_add_to">Adicionar à pasta</string>
     <string name="user_folder_remove_item">Remover desta pasta</string>
     <string name="user_folder_added">Adicionado a %1$s</string>
+    <string name="user_folder_move_to">Mover para a pasta</string>
+    <string name="user_folder_move_here">Mover para cá</string>
+    <string name="user_folder_moved">Movido para %1$s</string>
     <string name="user_folder_removed">Removido de %1$s</string>
     <string name="user_folder_created">Pasta criada</string>
     <string name="user_folder_empty">Esta pasta está vazia. Adicione alguns jogos.</string>

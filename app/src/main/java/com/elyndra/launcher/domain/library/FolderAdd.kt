@@ -57,7 +57,9 @@ object FolderAdd {
      */
     fun appChoices(installed: List<InstalledApp>, library: Library, folderId: String): List<InstalledApp> {
         val here = library.apps.filter { it.folderId == folderId }.mapTo(HashSet()) { it.packageName }
-        return installed.filter { it.packageName !in here }
+        // Lo que está en una carpeta del usuario sale solo ahí: aquí no se vería.
+        val filed = UserFolderLogic.owners(library)
+        return installed.filter { it.packageName !in here && "a:${it.packageName}" !in filed }
             .sortedWith(compareByDescending<InstalledApp> { it.isGame }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.label })
     }
 

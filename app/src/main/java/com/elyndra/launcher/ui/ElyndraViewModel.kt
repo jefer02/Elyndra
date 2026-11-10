@@ -229,7 +229,14 @@ class ElyndraViewModel @Inject constructor(
 
     /* ── proyección de la biblioteca ──────────────────────────── */
 
-    private class Derived(val lib: Library, val installed: Set<String>, val folders: List<LibraryItem.Folder>, val roms: Map<String, List<RomEntry>>)
+    private class Derived(
+        val lib: Library,
+        val installed: Set<String>,
+        val folders: List<LibraryItem.Folder>,
+        val roms: Map<String, List<RomEntry>>,
+        /** Lo que sale solo dentro de una carpeta del usuario. */
+        val hidden: Set<String>,
+    )
 
     private var derivedCache: Derived? = null
 
@@ -238,10 +245,11 @@ class ElyndraViewModel @Inject constructor(
         val inst = installedPackages
         derivedCache?.takeIf { it.lib === lib && it.installed === inst }?.let { return it }
         // Los ports instalados salen en la carpeta de su sistema como una entrada más (ver RomEntry.portPackage).
-        val placed = lib.apps.filter { it.folderId != null && (inst.isEmpty() || it.packageName in inst) }
+        val placement = UserFolderLogic.placement(lib, inst)
+        val placed = lib.apps.filter { it.folderId != null && (inst.isEmpty() || it.packageName in inst) && it.key !in placement.hidden }
             .map { a -> portEntry(a, a.folderId!!) }
-        val userLists = userFolderEntries(lib, inst)
-        val roms = (lib.roms + placed).groupBy { it.folderId }.mapValues { (_, list) ->
+        val userLists = userFolderEntries(lib, placement.shown)
+        val roms = (lib.roms.filter { it.key !in placement.hidden } + placed).groupBy { it.folderId }.mapValues { (_, list) ->
             list.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.displayTitle })
         } + userLists
         val systemFolders = lib.folders.mapNotNull { f ->
@@ -268,23 +276,22 @@ class ElyndraViewModel @Inject constructor(
             )
         }
         val folders = systemFolders + UserFolderLogic.sorted(lib.userFolders).map { userFolderItem(it, userLists[it.id].orEmpty()) }
-        return Derived(lib, inst, folders, roms).also { derivedCache = it }
+        return Derived(lib, inst, folders, roms, placement.hidden).also { derivedCache = it }
     }
 
-    /** Lo que hay en cada carpeta del usuario, en su orden. Una app desinstalada no sale, pero sigue dentro. */
-    private fun userFolderEntries(lib: Library, inst: Set<String>): Map<String, List<RomEntry>> {
-        if (lib.userFolders.isEmpty()) return emptyMap()
+    /** Lo que enseña cada carpeta del usuario, ya como entradas ([shown] sale de UserFolderLogic.placement). */
+    private fun userFolderEntries(lib: Library, shown: Map<String, List<String>>): Map<String, List<RomEntry>> {
+        if (shown.isEmpty()) return emptyMap()
         val roms = lib.roms.associateBy { it.key }
         val apps = lib.apps.associateBy { it.key }
-        return lib.userFolders.associate { f ->
-            f.id to f.items.mapNotNull { key ->
-                roms[key] ?: apps[key]?.takeIf { inst.isEmpty() || it.packageName in inst }?.let { portEntry(it, f.id) }
-            }
-        }
+        return shown.mapValues { (id, keys) -> keys.mapNotNull { key -> roms[key] ?: apps[key]?.let { portEntry(it, id) } } }
     }
 
     /** Una carpeta del usuario como una más: la misma card y la misma vista que las de emulador. */
-    private fun userFolderItem(f: UserFolder, list: List<RomEntry>): LibraryItem.Folder {
+    private fun userFolderItem(stored: UserFolder, list: List<RomEntry>): LibraryItem.Folder {
+        // Sus claves son las que enseña: contadores, mosaico y "solo Android" no ven nada oculto.
+        val shown = list.map { it.key }
+        val f = if (shown == stored.items) stored else stored.copy(items = shown)
         val covers = list.associate { it.key to (it.meta.cover ?: it.meta.icon) }
         return LibraryItem.Folder(
             folder = RomFolder(f.id, UserFolderLogic.SYSTEM_ID, treeUri = "", rootDocId = "", displayPath = "", addedAt = f.createdAt, isVirtual = true),
@@ -363,11 +370,18 @@ class ElyndraViewModel @Inject constructor(
     private fun buildItems(d: Derived): List<LibraryItem> {
         val q = query.trim().lowercase()
         // Los ports con carpeta salen en ella, no en la lista de apps (nada sale dos veces).
-        var list: List<LibraryItem> = d.folders + library.apps.filter { it.folderId == null }.map {
+        var list: List<LibraryItem> = d.folders + library.apps.filter { it.folderId == null && it.key !in d.hidden }.map {
             LibraryItem.App(it, installedPackages.isEmpty() || it.packageName in installedPackages)
         }
         list = sorted(list)
-        if (filter == LibraryFilter.Android) list = list.filter { it is LibraryItem.App || (it as? LibraryItem.Folder)?.userFolder?.let(UserFolderLogic::isAndroidOnly) == true }
+        if (filter == LibraryFilter.Android) {
+            // Buscando, también la carpeta mixta que guarda la app buscada: ya no sale suelta.
+            val holdsMatch = { id: String -> q.isNotEmpty() && d.roms[id].orEmpty().any { it.portPackage != null && it.displayTitle.lowercase().contains(q) } }
+            list = list.filter { item ->
+                val folder = (item as? LibraryItem.Folder)?.userFolder
+                item is LibraryItem.App || (folder != null && (UserFolderLogic.isAndroidOnly(folder) || holdsMatch(folder.id)))
+            }
+        }
         if (filter == LibraryFilter.Consoles) list = list.filterIsInstance<LibraryItem.Folder>()
         if (filter == LibraryFilter.Unnamed) list = list.filter { item ->
             when (item) {
@@ -462,6 +476,23 @@ class ElyndraViewModel @Inject constructor(
         val all = id?.let { derived().roms[it] }.orEmpty()
         // Con el filtro "Sin nombre", dentro de la carpeta solo salen esos.
         return if (filter == LibraryFilter.Unnamed) all.filter { needsName(it.displayTitle) }.ifEmpty { all } else all
+    }
+
+    /** Los juegos que enseña la carpeta del usuario [id]. */
+    fun userFolderCount(id: String): Int = derived().roms[id]?.size ?: 0
+
+    /** [key] va a salir de lo que se ve: la selección pasa a su vecino, no salta al principio. */
+    fun stepSelectionOff(key: String) {
+        when (screen) {
+            Screen.Library -> if (selected()?.key == key) selectedKey = neighbour(items().map { it.key }, key)
+            Screen.Folder -> if (selectedRom()?.key == key) selectedRomKey = neighbour(folderRoms(folderId).map { it.key }, key)
+            else -> Unit
+        }
+    }
+
+    private fun neighbour(keys: List<String>, key: String): String? {
+        val at = keys.indexOf(key)
+        return keys.getOrNull(at + 1) ?: keys.getOrNull(at - 1)
     }
 
     /** ¿A este juego le falta un nombre que sirva para buscarlo? (ver [NameCheck]). */
@@ -681,7 +712,9 @@ class ElyndraViewModel @Inject constructor(
         when (item) {
             is LibraryItem.Folder -> {
                 folderId = item.folder.id
-                selectedRomKey = null
+                // Llegando por la búsqueda, directo al juego que se buscaba.
+                val q = query.trim().lowercase()
+                selectedRomKey = if (q.isEmpty()) null else derived().roms[item.folder.id].orEmpty().firstOrNull { it.displayTitle.lowercase().contains(q) }?.key
                 screen = Screen.Folder
             }
             is LibraryItem.App -> launchApp(item)

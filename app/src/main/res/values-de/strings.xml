@@ -1130,6 +1130,9 @@ Von der Community erstellt, nicht geprüft. Sieh dir vor der Installation das Re
     <string name="user_folder_add_to">Zu Ordner hinzufügen</string>
     <string name="user_folder_remove_item">Aus diesem Ordner entfernen</string>
     <string name="user_folder_added">Zu %1$s hinzugefügt</string>
+    <string name="user_folder_move_to">In Ordner verschieben</string>
+    <string name="user_folder_move_here">Hierher verschieben</string>
+    <string name="user_folder_moved">Nach %1$s verschoben</string>
     <string name="user_folder_removed">Aus %1$s entfernt</string>
     <string name="user_folder_created">Ordner erstellt</string>
     <string name="user_folder_empty">Dieser Ordner ist leer. Füge ein paar Spiele hinzu.</string>

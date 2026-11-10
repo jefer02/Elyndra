@@ -6,9 +6,10 @@ import com.elyndra.launcher.data.UserFolder
 /**
  * Las carpetas que crea el usuario (Kotlin puro, UserFolderLogicTest).
  *
- * Una carpeta guarda claves de juego, no juegos: un juego puede estar en
- * varias y borrar una carpeta no toca lo que hay dentro. Si no cambia nada se
- * devuelve la misma [Library]: LibraryDiff compara por identidad.
+ * Una carpeta guarda claves de juego, no juegos: un juego está en una como
+ * mucho, sale solo ahí (ver [placement]) y borrar la carpeta no toca lo que hay
+ * dentro. Si no cambia nada se devuelve la misma [Library]: LibraryDiff compara
+ * por identidad.
  */
 object UserFolderLogic {
 
@@ -45,8 +46,32 @@ object UserFolderLogic {
 
     fun sorted(folders: List<UserFolder>): List<UserFolder> = folders.sortedWith(compareBy({ it.position }, { it.createdAt }, { it.id }))
 
-    /** Las carpetas en las que está [key]. */
-    fun containing(library: Library, key: String): List<UserFolder> = sorted(library.userFolders.filter { key in it.items })
+    /** La carpeta de [key]. Si quedó en varias (datos de antes de la regla de una sola), la primera. */
+    fun owner(library: Library, key: String): UserFolder? = sorted(library.userFolders).firstOrNull { key in it.items }
+
+    /** Cada juego con carpeta y el id de la suya (ver [owner]). */
+    fun owners(library: Library): Map<String, String> {
+        val out = HashMap<String, String>()
+        for (f in sorted(library.userFolders)) for (key in f.items) out.getOrPut(key) { f.id }
+        return out
+    }
+
+    /** [shown]: qué enseña cada carpeta, en su orden. [hidden]: todo eso, que ya no sale en la biblioteca ni en la carpeta de su sistema. */
+    class Placement(val shown: Map<String, List<String>>, val hidden: Set<String>)
+
+    /** Una app desinstalada no se enseña en su carpeta: sigue dentro, pero no se oculta de la lista normal. */
+    fun placement(library: Library, installed: Set<String>): Placement {
+        if (library.userFolders.isEmpty()) return Placement(emptyMap(), emptySet())
+        val owners = owners(library)
+        val live = HashSet<String>((library.roms.size + library.apps.size) * 2)
+        library.roms.mapTo(live) { it.key }
+        library.apps.filter { installed.isEmpty() || it.packageName in installed }.mapTo(live) { it.key }
+        val hidden = HashSet<String>()
+        val shown = library.userFolders.associate { f ->
+            f.id to f.items.filter { owners[it] == f.id && it in live }.also { hidden += it }
+        }
+        return Placement(shown, hidden)
+    }
 
     /** Solo apps y ports: también sale en la sección Android. Una carpeta vacía, no. */
     fun isAndroidOnly(folder: UserFolder): Boolean = folder.items.isNotEmpty() && folder.items.all { it.startsWith("a:") }
@@ -77,22 +102,39 @@ object UserFolderLogic {
         return change(library, id) { if (it.description == clean) it else it.copy(description = clean) }
     }
 
-    fun delete(library: Library, id: String): Library =
-        if (library.userFolders.none { it.id == id }) library else library.copy(userFolders = library.userFolders.filterNot { it.id == id })
+    /** Lo que enseñaba vuelve a su sitio, aunque hubiera quedado también en otra carpeta. */
+    fun delete(library: Library, id: String): Library {
+        val folder = library.userFolders.firstOrNull { it.id == id } ?: return library
+        val owners = owners(library)
+        val released = folder.items.filterTo(HashSet()) { owners[it] == id }
+        return library.copy(userFolders = library.userFolders.filterNot { it.id == id }.map { without(it, released) })
+    }
 
-    /** Añade al final lo que exista en la biblioteca y no esté ya. */
+    /** Añade al final lo que exista en la biblioteca y no esté ya; lo que estaba en otra carpeta se mueve. */
     fun add(library: Library, id: String, keys: List<String>): Library {
+        if (library.userFolders.none { it.id == id }) return library
         val live = liveKeys(library)
-        return change(library, id) { f ->
-            val fresh = keys.distinct().filter { it in live && it !in f.items }
-            if (fresh.isEmpty()) f else f.copy(items = f.items + fresh)
+        val moving = keys.distinct().filter { it in live }
+        val set = moving.toHashSet()
+        return changeAll(library) { f ->
+            if (f.id != id) {
+                without(f, set)
+            } else {
+                val fresh = moving.filter { it !in f.items }
+                if (fresh.isEmpty()) f else f.copy(items = f.items + fresh)
+            }
         }
     }
 
+    /** Lo que estaba en [id] vuelve a su sitio, aunque hubiera quedado también en otra carpeta. */
     fun remove(library: Library, id: String, keys: Collection<String>): Library {
-        val out = keys.toSet()
-        return change(library, id) { f -> if (f.items.none { it in out }) f else f.copy(items = f.items.filterNot { it in out }) }
+        val folder = library.userFolders.firstOrNull { it.id == id } ?: return library
+        val out = keys.filterTo(HashSet()) { it in folder.items }
+        return changeAll(library) { without(it, out) }
     }
+
+    private fun without(folder: UserFolder, keys: Set<String>): UserFolder =
+        if (folder.items.none { it in keys }) folder else folder.copy(items = folder.items.filterNot { it in keys })
 
     /**
      * [key] movido [delta] puestos entre los que se ven ([visible]), sin
@@ -168,6 +210,11 @@ object UserFolderLogic {
         val updated = transform(folder)
         if (updated === folder) return library
         return library.copy(userFolders = library.userFolders.map { if (it === folder) updated else it })
+    }
+
+    private inline fun changeAll(library: Library, transform: (UserFolder) -> UserFolder): Library {
+        val folders = library.userFolders.map(transform)
+        return if (folders.indices.all { folders[it] === library.userFolders[it] }) library else library.copy(userFolders = folders)
     }
 
     private val WHITESPACE = Regex("\\s+")
