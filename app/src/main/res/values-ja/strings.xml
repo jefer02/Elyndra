@@ -501,7 +501,7 @@
     <string name="settings_masha_usage_off">アクセスを許可</string>
     <string name="settings_masha_privacy">Lucy が DeepSeek に送るもの：タイトル、機種、プレイ時間、端末状態。パス、フォルダ、認証情報は送りません。</string>
     <string name="settings_masha_forget">Lucy の記憶をすべて消去</string>
-    <string name="settings_masha_forget_msg">Lucy の記憶、会話、キャッシュを削除します。ライブラリとプレイ時間は残ります。</string>
+    <string name="settings_masha_forget_msg">Lucy の記憶、会話、キャッシュ、Lucy との関係を削除します。ライブラリとプレイ時間は残ります。</string>
     <string name="toast_masha_forgot">完了。まっさらです。</string>
     <string name="settings_priority">取得元の優先順位</string>
     <string name="settings_priority_text">テキスト（名前・概要・日付）</string>
@@ -1148,4 +1148,10 @@
         <item>うん、忙しいのは分かってる。時間ができたら、ここにいるよ。</item>
         <item>あとで20分ある？ 何をかけるか、もう決めてるんだ。</item>
     </string-array>
+    <string name="lucy_level_distant">よそよそしい</string>
+    <string name="lucy_level_curious">興味しんしん</string>
+    <string name="lucy_level_friendly">打ち解けた</string>
+    <string name="lucy_level_close">親密</string>
+    <string name="lucy_level_devoted">夢中</string>
+    <string name="lucy_level_cd">ルーシーとの関係：%1$s</string>
 </resources>

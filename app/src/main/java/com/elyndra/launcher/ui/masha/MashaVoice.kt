@@ -1,6 +1,7 @@
 package com.elyndra.launcher.ui.masha
 
 import com.elyndra.launcher.BuildConfig
+import com.elyndra.launcher.masha.AffinityTag
 import android.content.Context
 import android.media.AudioFormat
 import android.os.Handler
@@ -517,9 +518,12 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
             return n
         }
 
-        /** Lo que se lee: sin enlaces, marcas de formato ni emojis. */
+        /**
+         * Lo que se lee: sin enlaces, marcas de formato ni emojis. Tampoco la marca de
+         * puntuación de la relación (AffinityTag): ya llega quitada, esto es la segunda red.
+         */
         fun speakable(s: String): String =
-            s.replace(URL, " ").replace(MARKUP, " ").replace(EMOJI, "").replace(SPACES, " ").trim()
+            AffinityTag.strip(s).text.replace(URL, " ").replace(MARKUP, " ").replace(EMOJI, "").replace(SPACES, " ").trim()
 
         private const val MIN_CHUNK = 18
     }

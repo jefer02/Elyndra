@@ -501,6 +501,7 @@ class SettingsController(private val vm: ElyndraViewModel) {
                     vm.viewModelScope.launch {
                         vm.brain.forgetEverything()
                         vm.masha.clearConversation(null)
+                        vm.masha.refreshAffinity()
                         vm.showToast(UiText.res(R.string.toast_masha_forgot))
                     }
                 },

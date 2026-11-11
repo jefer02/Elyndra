@@ -525,7 +525,7 @@
     <string name="settings_masha_usage_off">Grant access</string>
     <string name="settings_masha_privacy">What Lucy sends to DeepSeek: game titles, systems, playtime and device state. Never file paths, folders or credentials.</string>
     <string name="settings_masha_forget">Forget everything Lucy knows</string>
-    <string name="settings_masha_forget_msg">Deletes Lucy’s memories, the conversation and cached answers. Your library and playtime stay.</string>
+    <string name="settings_masha_forget_msg">Deletes Lucy’s memories, the conversation, cached answers and your bond with her. Your library and playtime stay.</string>
     <string name="toast_masha_forgot">Done. Clean slate.</string>
     <string name="settings_priority">Source priority</string>
     <string name="settings_priority_text">Text (names, synopsis, dates)</string>
@@ -1186,4 +1186,10 @@ Built by the community, not reviewed. Check the repository before installing.</s
         <item>Okay, I see you being busy. Whenever you’re free, I’m here.</item>
         <item>Got twenty minutes later? I know exactly what I’d put on.</item>
     </string-array>
+    <string name="lucy_level_distant">Distant</string>
+    <string name="lucy_level_curious">Curious</string>
+    <string name="lucy_level_friendly">Friendly</string>
+    <string name="lucy_level_close">Close</string>
+    <string name="lucy_level_devoted">Devoted</string>
+    <string name="lucy_level_cd">Your bond with Lucy: %1$s</string>
 </resources>

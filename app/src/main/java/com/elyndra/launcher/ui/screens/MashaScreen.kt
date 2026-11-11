@@ -8,6 +8,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import com.elyndra.launcher.BuildConfig
 import com.elyndra.launcher.ui.masha.MashaDebugSay
+import com.elyndra.launcher.ui.masha.AffinityHeart
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -226,6 +227,8 @@ fun MashaScreen(vm: ElyndraViewModel) {
     if (BuildConfig.DEBUG) MashaDebugSay(voice)
     // Gestos: saluda al materializarse; explica cuando trae una tarjeta.
     LaunchedEffect(stage) { if (stage == StageStatus.Ready) presence.play(MashaPresence.Cue.Wave) }
+    // Sube la relación de nivel: un gesto contento (el corazón late en la cabecera). Al bajar, nada.
+    LaunchedEffect(masha.levelUps) { if (masha.levelUps > 0) presence.play(MashaPresence.Cue.Happy) }
     LaunchedEffect(last?.id, last?.pending) {
         if (last != null && last.fromMasha && !last.pending && last.attachment != null && last.id != alreadyShown) {
             presence.play(MashaPresence.Cue.Explain)
@@ -386,7 +389,18 @@ private fun TopBar(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(6.dp).clip(CircleShape).background(glow))
                 Spacer(Modifier.width(6.dp))
-                ElyText(status, size = 9.5f, weight = FontWeight.Medium, color = Holo.dim, maxLines = 1, overflow = TextOverflow.Ellipsis, letterSpacing = tracking(0.06f))
+                ElyText(
+                    status,
+                    modifier = Modifier.weight(1f, fill = false),
+                    size = 9.5f,
+                    weight = FontWeight.Medium,
+                    color = Holo.dim,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    letterSpacing = tracking(0.06f),
+                )
+                Spacer(Modifier.width(10.dp))
+                AffinityHeart(masha.affinityLevel, masha.levelUps, glow, Holo.dim)
             }
         }
         HoloIcon(stringResource(if (chatOpen) R.string.masha_hide_chat else R.string.masha_show_chat), glow, onClick = onToggleChat) { ChatGlyph(chatOpen) }

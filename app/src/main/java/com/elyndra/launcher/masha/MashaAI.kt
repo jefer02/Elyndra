@@ -55,8 +55,17 @@ sealed interface MashaEvent {
 
     data class ToolFinished(val call: ToolCall, val result: ToolResult) : MashaEvent
 
-    /** Respuesta completa. */
-    data class Completed(val text: String, val usage: TokenUsage?, val fromCache: Boolean = false) : MashaEvent
+    /**
+     * Respuesta completa, ya sin la marca de puntuación. [affinityDelta]: lo que
+     * la IA puntuó el mensaje del usuario (ver AffinityTag); null si no lo hizo
+     * o si la respuesta sale de caché.
+     */
+    data class Completed(
+        val text: String,
+        val usage: TokenUsage?,
+        val fromCache: Boolean = false,
+        val affinityDelta: Int? = null,
+    ) : MashaEvent
 
     /** No se pudo terminar. [partial] es lo que llegó a escribirse. */
     data class Failed(val error: MashaError, val partial: String) : MashaEvent

@@ -534,7 +534,7 @@
     <string name="settings_masha_usage_off">Conceder acesso</string>
     <string name="settings_masha_privacy">O que a Lucy envia ao DeepSeek: títulos, sistemas, tempo de jogo e estado do aparelho. Nunca caminhos, pastas ou credenciais.</string>
     <string name="settings_masha_forget">Esquecer tudo o que a Lucy sabe</string>
-    <string name="settings_masha_forget_msg">Apaga as memórias da Lucy, a conversa e as respostas em cache. Sua biblioteca e seu tempo de jogo ficam.</string>
+    <string name="settings_masha_forget_msg">Apaga as memórias da Lucy, a conversa, as respostas em cache e o seu vínculo com ela. Sua biblioteca e seu tempo de jogo ficam.</string>
     <string name="toast_masha_forgot">Feito. Página em branco.</string>
     <string name="settings_priority">Prioridade das fontes</string>
     <string name="settings_priority_text">Textos (nomes, sinopse, datas)</string>
@@ -1198,4 +1198,10 @@ Feito pela comunidade, sem revisão. Confira o repositório antes de instalar.</
         <item>Tá, já vi que você está ocupado. Quando tiver um tempinho, estou aqui.</item>
         <item>Tem vinte minutos mais tarde? Eu sei exatamente o que colocaria.</item>
     </string-array>
+    <string name="lucy_level_distant">Distante</string>
+    <string name="lucy_level_curious">Curiosa</string>
+    <string name="lucy_level_friendly">Amigável</string>
+    <string name="lucy_level_close">Próxima</string>
+    <string name="lucy_level_devoted">Inseparável</string>
+    <string name="lucy_level_cd">Seu vínculo com a Lucy: %1$s</string>
 </resources>

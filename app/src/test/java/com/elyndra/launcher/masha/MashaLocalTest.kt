@@ -22,6 +22,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import com.elyndra.launcher.domain.relationship.AffinityLevel
 import org.junit.Test
 import java.time.ZoneId
 
@@ -150,7 +151,13 @@ class MashaLocalTest {
         sessions = listOf(session("r:okami", 3.0, 50, "nethersx2"), session("r:okami", 2.0, 40, "nethersx2")),
     )
 
-    private fun build(device: DeviceState?, now: Long = NOW, memories: List<Memory> = emptyList(), userFolders: List<String> = emptyList()): BuiltContext {
+    private fun build(
+        device: DeviceState?,
+        now: Long = NOW,
+        memories: List<Memory> = emptyList(),
+        userFolders: List<String> = emptyList(),
+        relationship: AffinityLevel? = null,
+    ): BuiltContext {
         val games = library.games()
         val snapshot = KnowledgeSnapshot(library, games, GameProfiles.buildAll(games, library.sessions, now = now), LibraryCurator.analyze(games), emptyList(), now)
         return MashaContextBuilder.build(
@@ -169,8 +176,18 @@ class MashaLocalTest {
                 folderEmulators = mapOf("ps2" to ("NetherSX2" to true)),
                 savedLists = listOf("RPG pendientes"),
                 userFolders = userFolders,
+                relationship = relationship,
             ),
         )
+    }
+
+    @Test
+    fun theRelationshipLevelGoesInTheContextAndChangesTheFingerprint() {
+        val curious = build(DeviceState(), relationship = AffinityLevel.Curious)
+        val close = build(DeviceState(), relationship = AffinityLevel.Close)
+        assertEquals("close", DeepSeekProtocolJson.parse(close.json)["RELATIONSHIP_LEVEL"]!!.jsonPrimitive.content)
+        assertNotEquals(curious.fingerprint, close.fingerprint)
+        assertFalse("RELATIONSHIP_LEVEL" in DeepSeekProtocolJson.parse(build(DeviceState()).json))
     }
 
     @Test

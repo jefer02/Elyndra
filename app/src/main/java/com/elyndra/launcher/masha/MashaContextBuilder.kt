@@ -5,6 +5,7 @@ import com.elyndra.launcher.domain.device.DeviceState
 import com.elyndra.launcher.domain.lists.SmartLists
 import com.elyndra.launcher.domain.profile.GameProfile
 import com.elyndra.launcher.domain.profile.PlayState
+import com.elyndra.launcher.domain.relationship.AffinityLevel
 import com.elyndra.launcher.domain.session.ArcProgress
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
@@ -43,6 +44,8 @@ data class ContextInput(
     val savedLists: List<String>,
     /** Las carpetas creadas por el usuario, solo por su nombre. */
     val userFolders: List<String> = emptyList(),
+    /** El nivel de la relación con Lucy (elige el tono); null = no se manda. */
+    val relationship: AffinityLevel? = null,
 )
 
 data class BuiltContext(val json: String, val fingerprint: String)
@@ -73,6 +76,8 @@ object MashaContextBuilder {
         val profiles = s.profiles
 
         val stable = buildJsonObject {
+            // En la parte estable: si cambia de nivel, cambia el tono y las respuestas guardadas ya no valen.
+            input.relationship?.let { put("RELATIONSHIP_LEVEL", it.id) }
             putJsonObject("library") { library(this, input) }
             putJsonObject("playtime") { playtime(this, input) }
             list("in_progress", games.filter { profiles[it.key]?.state == PlayState.InProgress }.sortedByDescending { profiles[it.key]?.lastPlayed ?: 0 }.take(8), input)
