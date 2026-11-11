@@ -20,7 +20,7 @@ sealed interface OfflineIntent {
     data class Rename(val name: String) : OfflineIntent
     /** "¿Hay algún port nativo?": la tienda de ports, con lo que encaja con la biblioteca. */
     data object FindPort : OfflineIntent
-    /** Solo un saludo o su nombre ("hola Lucy", "Masha?"): saluda y dice lo que puede hacer. */
+    /** Solo un saludo o su nombre ("hola Lucy", "Lucy?"): saluda y dice lo que puede hacer. */
     data object Hello : OfflineIntent
     data object Unknown : OfflineIntent
 }
@@ -31,9 +31,10 @@ sealed interface OfflineIntent {
  * horas, enseñar listas, actualizar metadatos, revisar la biblioteca y los
  * arcos. No conversa, pero hace — con los mismos datos que la IA.
  *
- * Si se le habla por su nombre ("Lucy, juega Zelda", "hey Masha, tengo media
- * hora", "play Zelda, Lucy"), el nombre se quita antes de buscar la intención:
- * vale el de ahora y el de antes, en cualquier idioma.
+ * Si se le habla por su nombre ("Lucy, juega Zelda", "hey Lucy, tengo media
+ * hora", "play Zelda, Lucy"), el nombre se quita antes de buscar la intención.
+ * Solo vale "Lucy" (con sus erratas habituales y en katakana): "Masha" es el
+ * nombre interno del código y ya no se reconoce como forma de llamarla.
  */
 object OfflineIntents {
 
@@ -44,8 +45,8 @@ object OfflineIntents {
     private val RANGE = Regex("""(\d{1,3})\s*(?:-|–|a|to|y|and|bis|ate)\s*(\d{1,3})\s*(min|minutos|minutes|minuten|m\b|h|horas?|hours?|heures?|stunden?)?""")
     private val SINGLE = Regex("""(\d{1,3})\s*(min|minutos|minutes|minuten|m\b|h\b|horas?|hours?|heures?|stunden?)""")
 
-    /** Su nombre en la UI y el de antes, también en katakana. */
-    private const val NAMES = """lucy|masha|ルーシー|マーシャ"""
+    /** Su nombre, con las erratas más comunes al escribirlo o dictarlo, y en katakana. */
+    private const val NAMES = """lucy|lucie|lucey|lucyy|luci|lusy|lusi|ルーシー|ルーシ|ルシー"""
     private const val GREETINGS = """hey|hi|hello|hola|oye|buenas|ola|olá|oi|salut|coucou|bonjour|hallo|servus|ねえ|やあ|こんにちは"""
     private val LEADING_NAME = Regex(
         """^[¡¿]?(?:(?:$GREETINGS)[\s,!、]*)?(?:$NAMES)(?![\p{L}\p{N}])[\s,:;.!?、。！？]*""",

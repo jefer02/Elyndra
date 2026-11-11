@@ -31,22 +31,39 @@ class MashaLocalTest {
     /* ── intenciones sin conexión ─────────────────────────────── */
 
     @Test
-    fun herNameIsIgnoredWhetherItIsLucyOrMasha() {
+    fun herNameIsIgnoredWhenItIsLucy() {
         assertEquals(OfflineIntent.Launch("Zelda"), OfflineIntents.detect("Lucy, juega Zelda"))
-        assertEquals(OfflineIntent.Launch("Zelda"), OfflineIntents.detect("Masha, play Zelda"))
         assertEquals(OfflineIntent.Launch("Zelda"), OfflineIntents.detect("hey Lucy play Zelda"))
         assertEquals(OfflineIntent.Launch("Zelda"), OfflineIntents.detect("play Zelda, Lucy"))
-        assertEquals(OfflineIntent.Plan(25, 35, SessionMood.Any), OfflineIntents.detect("Oye Masha, tengo media hora"))
+        assertEquals(OfflineIntent.Plan(25, 35, SessionMood.Any), OfflineIntents.detect("Oye Lucy, tengo media hora"))
         assertEquals(OfflineIntent.Plan(30, 40, SessionMood.Any), OfflineIntents.detect("Salut Lucy : j'ai 30-40 minutes"))
         assertEquals(OfflineIntent.Plan(25, 35, SessionMood.Any), OfflineIntents.detect("Hallo Lucy, halbe Stunde"))
         assertEquals(OfflineIntent.Recommend, OfflineIntents.detect("Olá Lucy, o que jogar?"))
         assertEquals("ゼルダを起動して", OfflineIntents.withoutName("ねえルーシー、ゼルダを起動して"))
-        assertEquals("ゼルダを起動して", OfflineIntents.withoutName("マーシャ、ゼルダを起動して"))
+        assertEquals("ゼルダを起動して", OfflineIntents.withoutName("ルーシー、ゼルダを起動して"))
+    }
+
+    @Test
+    fun commonMisspellingsOfLucyCount() {
+        listOf("Lucie", "lucey", "Luci", "Lusy", "LUCYY").forEach {
+            assertEquals(it, OfflineIntent.Launch("Zelda"), OfflineIntents.detect("$it, play Zelda"))
+        }
+        assertEquals("ゼルダを起動して", OfflineIntents.withoutName("ルシー、ゼルダを起動して"))
+        // Dentro de otra palabra no es su nombre.
+        assertEquals("Lucifer, play", OfflineIntents.withoutName("Lucifer, play"))
+    }
+
+    @Test
+    fun mashaIsNoLongerAFormOfAddress() {
+        assertEquals("Masha, play Zelda", OfflineIntents.withoutName("Masha, play Zelda"))
+        assertEquals("マーシャ、ゼルダを起動して", OfflineIntents.withoutName("マーシャ、ゼルダを起動して"))
+        assertEquals(OfflineIntent.Unknown, OfflineIntents.detect("Masha?"))
+        assertEquals(OfflineIntent.Unknown, OfflineIntents.detect("Hi, Masha!"))
     }
 
     @Test
     fun aGreetingOrJustHerNameIsAHello() {
-        listOf("Lucy", "Masha?", "hola Lucy", "Hi, Masha!", "Bonjour Lucy.", "ねえ、ルーシー", "hey").forEach {
+        listOf("Lucy", "Lucy?", "hola Lucy", "Hi, Lucy!", "Bonjour Lucy.", "ねえ、ルーシー", "hey").forEach {
             assertEquals(it, OfflineIntent.Hello, OfflineIntents.detect(it))
         }
         // Solo tras una coma cuenta como nombre al final: "play Lucy" podría ser un juego.

@@ -382,7 +382,7 @@ private fun TopBar(
         HoloIcon(stringResource(R.string.masha_back), glow, onClick = { vm.go(Screen.Library) }) { Box(Modifier.size(16.dp)) { BackChevron(color = Color.White) } }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            ElyText("MASHA", size = 17f, weight = FontWeight.Bold, color = Holo.text, letterSpacing = tracking(0.32f))
+            ElyText("LUCY", size = 17f, weight = FontWeight.Bold, color = Holo.text, letterSpacing = tracking(0.32f))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(6.dp).clip(CircleShape).background(glow))
                 Spacer(Modifier.width(6.dp))
