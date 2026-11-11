@@ -155,20 +155,14 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean("masha.ambient", true)
         set(v) = prefs.edit { putBoolean("masha.ambient", v) }
 
-    /** Avisos de Masha fuera de la app (como mucho uno cada pocos días, nunca de noche). */
+    /**
+     * Avisos de Lucy fuera de la app (nota diaria, calor, juegos nuevos,
+     * metadatos). Cada tipo tiene además su canal en Android; cuándo sale cada
+     * uno lo decide NotificationPolicy.
+     */
     var mashaNudges: Boolean
         get() = prefs.getBoolean("masha.nudges", true)
         set(v) = prefs.edit { putBoolean("masha.nudges", v) }
-
-    /** Último aviso enviado (epoch ms), para no repetirse. */
-    var mashaLastNudgeAt: Long
-        get() = prefs.getLong("masha.lastNudgeAt", 0L)
-        set(v) = prefs.edit { putLong("masha.lastNudgeAt", v) }
-
-    /** Huella del último aviso: el mismo consejo no se manda dos veces seguidas. */
-    var mashaLastNudgeId: String?
-        get() = prefs.getString("masha.lastNudgeId", null)
-        set(v) = prefs.edit { if (v == null) remove("masha.lastNudgeId") else putString("masha.lastNudgeId", v) }
 
     /** Sugerencias descartadas ("día|id"): solo valen las de hoy, las viejas se limpian solas. */
     var mashaDismissed: Set<String>
@@ -422,18 +416,6 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
     var sortMode: String
         get() = prefs.getString("sortMode", "name") ?: "name"
         set(v) = prefs.edit { putString("sortMode", v) }
-
-    /**
-     * Ya se ha pedido el permiso de notificaciones alguna vez.
-     *
-     * Android solo enseña el diálogo las primeras veces: si se vuelve a pedir
-     * después de dos negativas se deniega solo, sin que el usuario vea nada.
-     * Se pregunta una vez, al empezar, y a partir de ahí se ofrece desde
-     * Ajustes cuando hace falta de verdad.
-     */
-    var notificationsAsked: Boolean
-        get() = prefs.getBoolean("perm.notificationsAsked", false)
-        set(v) = prefs.edit { putBoolean("perm.notificationsAsked", v) }
 
     /* ── actualizaciones (releases de GitHub) ─────────────────── */
 

@@ -1,138 +1,70 @@
 package com.elyndra.launcher.notify
 
-import android.Manifest
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.pm.PackageManager
-import android.os.Build
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.elyndra.launcher.MainActivity
-import com.elyndra.launcher.R
-import com.elyndra.launcher.data.AppLocale
+import com.elyndra.launcher.data.LibraryRepository
 import com.elyndra.launcher.data.SettingsStore
-import com.elyndra.launcher.domain.insights.Insight
-import com.elyndra.launcher.masha.MashaBrain
-import com.elyndra.launcher.ui.gameKey
-import com.elyndra.launcher.ui.insightText
-import com.elyndra.launcher.ui.resolve
+import com.elyndra.launcher.domain.notify.InstalledGame
+import com.elyndra.launcher.domain.notify.NewGameDetector
+import com.elyndra.launcher.domain.notify.NoticeVerdict
+import com.elyndra.launcher.library.AppCatalog
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
-import java.time.Instant
-import java.time.ZoneId
 
 /**
- * Los avisos de Masha: casi nunca, y solo cuando valen la pena.
+ * La vuelta periódica de Lucy (Masha en el código) fuera de la app, cada
+ * pocas horas (ver ElyndraWork). Hace dos cosas baratas:
  *
- * Reglas, todas a la vez:
- *  · el usuario los tiene activados (Ajustes → Masha) y Android los permite;
- *  · como mucho uno cada [MIN_GAP_MS] (tres días);
- *  · nunca de noche (de 22:00 a 9:00, hora local);
- *  · nunca si Elyndra se abrió hace menos de [QUIET_AFTER_OPEN_MS]: quien
- *    acaba de estar dentro ya ha visto lo que Masha tenía que decir;
- *  · solo sugerencias que lo merecen fuera de la app ([Insight.notifiable]:
- *    el siguiente paso de un arco, un juego a medias de hace días…) y nunca
- *    la misma dos veces seguidas;
- *  · en un canal silencioso: se ve, no suena.
+ *  1. Juegos Android instalados con Elyndra cerrado que aún no están en la
+ *     biblioteca: un solo aviso con todos ("3 juegos nuevos…"). Una consulta
+ *     al PackageManager, sin leer carpetas.
+ *  2. La nota del día, de un repertorio corto en la voz de Lucy.
+ *
+ * Cuándo puede salir cada cosa (de día, una nota al día como mucho, nunca con
+ * la app delante, pausa tras tres notas sin abrirla…) lo decide
+ * NotificationPolicy a través de [LucyNotices]. Aquí solo se detecta.
  */
 @HiltWorker
 class MashaNudgeWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
-    private val brain: MashaBrain,
+    private val notices: LucyNotices,
+    private val library: LibraryRepository,
+    private val apps: AppCatalog,
     private val settings: SettingsStore,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val now = System.currentTimeMillis()
-        if (!shouldNudge(now)) return Result.success()
-        val insight = runCatching { brain.insights() }.getOrDefault(emptyList())
-            .firstOrNull { it.notifiable && it.id != settings.mashaLastNudgeId }
-            ?: return Result.success()
-        MashaNotifier.post(applicationContext, insight, insightText(insight, brain::emulatorName).resolve(AppLocale.wrap(applicationContext)))
-        settings.mashaLastNudgeAt = now
-        settings.mashaLastNudgeId = insight.id
+        if (!settings.mashaNudges) return Result.success()
+        runCatching { checkNewGames(System.currentTimeMillis()) }
+        // Va después: si acaba de salir el de juegos nuevos, hoy ya no toca nota.
+        notices.dailyNote()
         return Result.success()
     }
 
-    private fun shouldNudge(now: Long): Boolean {
-        if (!settings.mashaNudges || !MashaNotifier.canPost(applicationContext)) return false
-        if (now - settings.mashaLastNudgeAt < MIN_GAP_MS) return false
-        if (now - settings.lastOpenedAt < QUIET_AFTER_OPEN_MS) return false
-        val hour = Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).hour
-        return hour in DAY_START_HOUR until DAY_END_HOUR
-    }
-
-    companion object {
-        const val MIN_GAP_MS = 3L * 24 * 60 * 60 * 1000
-        const val QUIET_AFTER_OPEN_MS = 20L * 60 * 60 * 1000
-        const val DAY_START_HOUR = 9
-        const val DAY_END_HOUR = 22
-    }
-}
-
-/** El canal y la notificación de Masha. */
-object MashaNotifier {
-
-    private const val CHANNEL_ID = "masha"
-    private const val NOTIFICATION_ID = 77
-
-    fun canPost(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return false
-        }
-        return NotificationManagerCompat.from(context).areNotificationsEnabled()
-    }
-
-    fun post(context: Context, insight: Insight, text: String) {
-        // La comprobación va aquí mismo, junto a notify(): sin permiso (Android 13+) no se avisa.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
+    private suspend fun checkNewGames(now: Long) {
+        val store = notices.store
+        val since = store.newGamesSince
+        // La primera vuelta solo marca desde cuándo mirar: lo instalado antes no es "nuevo".
+        if (since <= 0L) {
+            store.newGamesSince = now
             return
         }
-        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
-        val localized = AppLocale.wrap(context)
-        ensureChannel(context, localized)
-        // Tocar el aviso lleva a lo que propone: la ficha del juego o, si no hay juego, a Masha.
-        val intent = insight.gameKey()?.let { MainActivity.showGameIntent(context, it) } ?: MainActivity.openMashaIntent(context)
-        val pending = PendingIntent.getActivity(
-            context,
-            insight.id.hashCode(),
-            intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_elyndra)
-            .setColor(com.elyndra.launcher.data.BrandTokens.PRIMARY)
-            .setContentTitle(localized.getString(R.string.masha))
-            .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
-            .setSilent(true)
-            .setAutoCancel(true)
-            .setContentIntent(pending)
-            .build()
-        runCatching { NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification) }
-    }
-
-    private fun ensureChannel(context: Context, localized: Context) {
-        val nm = context.getSystemService(NotificationManager::class.java) ?: return
-        if (nm.getNotificationChannel(CHANNEL_ID) != null) return
-        nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, localized.getString(R.string.notif_channel_masha), NotificationManager.IMPORTANCE_LOW).apply {
-                description = localized.getString(R.string.notif_channel_masha_desc)
-                setShowBadge(false)
-            },
-        )
+        library.awaitLoaded()
+        val inLibrary = library.current.apps.mapTo(HashSet()) { it.packageName }
+        val installed = apps.launchable().filter { it.isGame }.map { InstalledGame(it.packageName, it.label, it.installedAt) }
+        val fresh = NewGameDetector.fresh(installed, inLibrary, since)
+        if (fresh.isEmpty()) {
+            store.newGamesSince = now
+            return
+        }
+        when (notices.newGames(fresh.size, fresh.first().label)) {
+            // Dicho, visto en la app o apagado: la ventana avanza.
+            NoticeVerdict.Allowed, NoticeVerdict.Foreground, NoticeVerdict.Disabled -> store.newGamesSince = now
+            // De noche, en enfriamiento o sin cupo: se vuelve a mirar en la próxima vuelta.
+            else -> Unit
+        }
     }
 }

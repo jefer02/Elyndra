@@ -334,14 +334,14 @@ metadatos, revisión y arcos, y lo resuelve con **las mismas capacidades**
 
 | Punto | Qué hace Lucy | Dónde |
 |---|---|---|
-| Biblioteca | Bocadillo junto a su botón con la sugerencia del momento (seguir con un juego, siguiente paso del arco, nunca abiertos, carátulas que faltan, revisión, calor…) | `MashaInsights` → `MashaBubble` |
+| Biblioteca | Bocadillo junto a su botón: cada hecho (calor, juegos nuevos, paso de arco, metadatos, emulador que falta) una vez, y como mucho una sugerencia de rutina al día. Abrir la app no basta para que hable: el ritmo se guarda (`InsightPacingPrefs`) | `MashaInsights` → `InsightPacing` → `MashaBubble` |
 | Lanzamiento | Elige emulador, avisa de batería/temperatura, recuerda la última sesión, propone cambiar si uno falla | `LaunchOrchestrator` → velo |
 | Vuelta de jugar | Cierra pasos de arco, detecta salidas repetidas y lo dice en una línea | `ElyndraViewModel.afterSession` |
 | Ficha del juego | "Lucy recuerda": última sesión y emulador, duración típica, si el emulador va bien, cómo se identificó | `MashaMemoryBlock` |
 | Metadatos | Cuenta lo que falta, lo descarga si se lo piden, respeta la prioridad | `update_metadata`, sugerencias |
 | Chat | Conversa y actúa con 22 herramientas reales | `MashaScreen` |
 | Pantalla de inicio | Widget con su línea y uno o dos juegos para ahora | `widget/MashaWidget` |
-| Avisos | Como mucho uno cada 3 días, nunca de noche, silencioso | `notify/MashaNudgeWorker` |
+| Avisos | Fuera de la app y cada uno en su canal: calor en plena partida (≤ 1 cada 2 h), juegos instalados con la app cerrada, metadatos terminados en segundo plano y una nota diaria (≤ 1 al día, 9:00–22:00, solo si no se abrió en ~20 h, pausa tras 3 sin abrir). Nunca con la app delante | `domain/notify/NotificationPolicy` → `notify/LucyNotices` (`MashaNudgeWorker`, `HeatWatcher`) |
 
 ---
 
@@ -396,7 +396,7 @@ repositorios; nunca ROMs).
 |---|---|---|
 | Carpetas (SAF) | Leer ROMs | El usuario elige cada carpeta; sin permiso de almacenamiento |
 | `INTERNET`, `ACCESS_NETWORK_STATE` | Metadatos y Lucy | Declarado |
-| `POST_NOTIFICATIONS` | Progreso de metadatos y avisos de Lucy | Una vez, al empezar |
+| `POST_NOTIFICATIONS` | Progreso de metadatos y avisos de Lucy | Nunca al arrancar: al encender los avisos en Ajustes → Lucy o al lanzar la pasada completa de metadatos. Si se deniega, no se insiste |
 | `FOREGROUND_SERVICE_DATA_SYNC` | Pasada completa de metadatos | Declarado |
 | `PACKAGE_USAGE_STATS` | **Opcional**: tiempo de juego exacto | Solo desde Ajustes → Lucy, en la pantalla del sistema |
 | `<queries>` | Ver emuladores y juegos instalados | Declarado; **sin** `QUERY_ALL_PACKAGES` |

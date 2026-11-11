@@ -8,7 +8,7 @@ import com.elyndra.launcher.domain.profile.PlayState
 import com.elyndra.launcher.domain.session.ArcProgress
 
 /**
- * Algo que Masha puede decir sin que se lo pregunten.
+ * Algo que Lucy (Masha en el código) puede decir sin que se lo pregunten.
  *
  * [id] es una huella estable: con ella se descarta una sugerencia ("ahora no")
  * y se evita repetir el mismo aviso. [weight] ordena: gana lo más útil ahora.
@@ -17,8 +17,13 @@ sealed interface Insight {
     val id: String
     val weight: Int
 
-    /** Se puede mandar como notificación (lo demás solo se dice dentro de la app). */
-    val notifiable: Boolean get() = false
+    /**
+     * Un hecho que acaba de pasar (dispositivo caliente, juegos nuevos, un paso
+     * de arco, metadatos terminados, un emulador que falta): se cuenta una vez
+     * y no gasta el cupo diario. Lo demás son sugerencias de rutina: como
+     * mucho una al día. Ver [InsightPacing].
+     */
+    val isEvent: Boolean get() = false
 
     data object EmptyLibrary : Insight {
         override val id = "empty"
@@ -28,34 +33,42 @@ sealed interface Insight {
     data class DeviceHot(val tempC: Float?) : Insight {
         override val id = "hot"
         override val weight = 90
+        override val isEvent = true
+    }
+
+    /** Juegos que entraron en la biblioteca hace poco y aún no se han abierto. */
+    data class NewGames(val count: Int, val sampleKey: String, val sampleTitle: String, val newestAt: Long) : Insight {
+        override val id = "added:$newestAt"
+        override val weight = 85
+        override val isEvent = true
     }
 
     data class ArcNext(val arcId: String, val arcTitle: String, val gameKey: String, val gameTitle: String, val step: Int, val total: Int) : Insight {
         override val id = "arc:$arcId:$step"
         override val weight = 80
-        override val notifiable = true
+        override val isEvent = true
     }
 
     data class MetadataFinished(val matched: Int, val missed: Int, val finishedAt: Long) : Insight {
         override val id = "meta:$finishedAt"
         override val weight = 75
+        override val isEvent = true
     }
 
     data class ContinueGame(val gameKey: String, val title: String, val daysAgo: Int, val lastMinutes: Int, val emulatorId: String?) : Insight {
         override val id = "continue:$gameKey:$daysAgo"
         override val weight = 70 - daysAgo
-        override val notifiable = daysAgo >= 3
     }
 
     data class EmulatorMissing(val folderId: String, val systemName: String, val emulatorId: String) : Insight {
         override val id = "emu:$folderId:$emulatorId"
         override val weight = 65
+        override val isEvent = true
     }
 
     data class Abandoned(val gameKey: String, val title: String, val daysIdle: Int, val minutes: Int) : Insight {
         override val id = "abandoned:$gameKey"
         override val weight = 50
-        override val notifiable = minutes >= 60
     }
 
     data class ConfigureServices(val missingArt: Int) : Insight {
@@ -105,6 +118,9 @@ object MashaInsights {
     private const val DAY_MS = 24L * 60 * 60 * 1000
     private const val FRESH_PASS_MS = 2L * 60 * 60 * 1000
 
+    /** Cuánto tiempo cuenta un juego como "recién añadido". */
+    const val FRESH_ADDED_MS = 2L * DAY_MS
+
     fun compute(input: InsightInput): List<Insight> {
         val out = ArrayList<Insight>()
         val games = input.games
@@ -117,6 +133,16 @@ object MashaInsights {
             val step = p.current ?: return@let
             val game = games.firstOrNull { it.key == step.gameKey } ?: return@let
             out += Insight.ArcNext(p.arc.id, p.arc.title, game.key, game.title, p.doneSteps + 1, p.totalSteps)
+        }
+
+        // Juegos recién llegados que aún nadie ha abierto. La huella lleva el
+        // momento del más nuevo: si llegan más, es otra noticia.
+        val added = games.filter { it.addedAt > 0 && input.now - it.addedAt in 0 until FRESH_ADDED_MS }
+            .filter { input.profiles[it.key]?.state.let { s -> s == null || s == PlayState.New } }
+        if (added.isNotEmpty()) {
+            val newest = added.maxBy { it.addedAt }
+            val sample = added.filter { it.hasPrimaryArt }.maxByOrNull { it.addedAt } ?: newest
+            out += Insight.NewGames(added.size, sample.key, sample.title, newest.addedAt)
         }
 
         input.lastMetadataPass?.let { (matched, missed, at) ->

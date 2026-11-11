@@ -3,10 +3,12 @@ package com.elyndra.launcher.masha
 import com.elyndra.launcher.domain.library.UserFolderLogic
 import com.elyndra.launcher.core.device.DeviceStateMonitor
 import com.elyndra.launcher.data.ArcRepository
+import com.elyndra.launcher.data.InsightPacingPrefs
 import com.elyndra.launcher.data.SettingsStore
 import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.domain.insights.Insight
 import com.elyndra.launcher.domain.insights.InsightInput
+import com.elyndra.launcher.domain.insights.InsightPacing
 import com.elyndra.launcher.domain.insights.MashaInsights
 import com.elyndra.launcher.domain.session.ArcStep
 import com.elyndra.launcher.launch.EmulatorInventory
@@ -41,7 +43,14 @@ class MashaBrain @Inject constructor(
     private val credentials: ServiceCredentials,
     private val engine: MetadataEngine,
     private val settings: SettingsStore,
+    private val pacingStore: InsightPacingPrefs,
 ) {
+
+    /**
+     * Qué ha dicho ya el bocadillo y cuándo. Guardado: sobrevive a que Android
+     * cierre la app entre partidas, así que abrirla no basta para que hable.
+     */
+    val pacing = InsightPacing(pacingStore)
 
     /** Masha puede usar la IA ahora mismo (clave, permiso del usuario y red). */
     fun canGoOnline(): Boolean = ai.isAvailable && device.snapshot().isOnline
@@ -122,6 +131,7 @@ class MashaBrain @Inject constructor(
         memory.clearHistory()
         cache.clear()
         settings.mashaDismissed = emptySet()
+        pacingStore.clear()
     }
 
     fun emulatorName(id: String): String = orchestrator.name(id)

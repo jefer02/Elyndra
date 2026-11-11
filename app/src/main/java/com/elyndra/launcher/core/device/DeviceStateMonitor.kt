@@ -22,8 +22,9 @@ import javax.inject.Singleton
  *  · ahorro de energía: PowerManager.isPowerSaveMode;
  *  · red: ConnectivityManager (ACCESS_NETWORK_STATE, que ya se declaraba).
  *
- * Se consulta cuando hace falta (al lanzar, al hablar con Masha, al volver a
- * la app); no hay nada escuchando en segundo plano.
+ * Se consulta cuando hace falta (al lanzar, al hablar con Lucy, al volver a
+ * la app); no hay nada escuchando en segundo plano. Lo único que escucha es
+ * HeatWatcher, y solo durante una partida.
  */
 @Singleton
 class DeviceStateMonitor @Inject constructor(@ApplicationContext private val context: Context) {
@@ -49,16 +50,7 @@ class DeviceStateMonitor @Inject constructor(@ApplicationContext private val con
 
     private fun thermal(power: PowerManager?): DeviceState.Thermal {
         if (power == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return DeviceState.Thermal.Unknown
-        return when (runCatching { power.currentThermalStatus }.getOrNull()) {
-            PowerManager.THERMAL_STATUS_NONE -> DeviceState.Thermal.None
-            PowerManager.THERMAL_STATUS_LIGHT -> DeviceState.Thermal.Light
-            PowerManager.THERMAL_STATUS_MODERATE -> DeviceState.Thermal.Moderate
-            PowerManager.THERMAL_STATUS_SEVERE -> DeviceState.Thermal.Severe
-            PowerManager.THERMAL_STATUS_CRITICAL -> DeviceState.Thermal.Critical
-            PowerManager.THERMAL_STATUS_EMERGENCY -> DeviceState.Thermal.Emergency
-            PowerManager.THERMAL_STATUS_SHUTDOWN -> DeviceState.Thermal.Shutdown
-            else -> DeviceState.Thermal.Unknown
-        }
+        return thermalOf(runCatching { power.currentThermalStatus }.getOrNull())
     }
 
     private fun network(): DeviceState.Network {
@@ -68,5 +60,19 @@ class DeviceStateMonitor @Inject constructor(@ApplicationContext private val con
             if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return DeviceState.Network.Offline
             if (cm.isActiveNetworkMetered) DeviceState.Network.Metered else DeviceState.Network.Unmetered
         }.getOrDefault(DeviceState.Network.Unknown)
+    }
+
+    companion object {
+        /** PowerManager.THERMAL_STATUS_* → [DeviceState.Thermal] (también lo usa el vigilante del calor). */
+        fun thermalOf(status: Int?): DeviceState.Thermal = when (status) {
+            PowerManager.THERMAL_STATUS_NONE -> DeviceState.Thermal.None
+            PowerManager.THERMAL_STATUS_LIGHT -> DeviceState.Thermal.Light
+            PowerManager.THERMAL_STATUS_MODERATE -> DeviceState.Thermal.Moderate
+            PowerManager.THERMAL_STATUS_SEVERE -> DeviceState.Thermal.Severe
+            PowerManager.THERMAL_STATUS_CRITICAL -> DeviceState.Thermal.Critical
+            PowerManager.THERMAL_STATUS_EMERGENCY -> DeviceState.Thermal.Emergency
+            PowerManager.THERMAL_STATUS_SHUTDOWN -> DeviceState.Thermal.Shutdown
+            else -> DeviceState.Thermal.Unknown
+        }
     }
 }

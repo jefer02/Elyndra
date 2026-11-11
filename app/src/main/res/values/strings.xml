@@ -499,8 +499,8 @@
     <string name="settings_masha_status_checking">Checking…</string>
     <string name="settings_masha_status_none">No key: Lucy works offline</string>
     <string name="settings_masha_ambient">Suggestions on the carousel</string>
-    <string name="settings_masha_nudges">Occasional notifications</string>
-    <string name="settings_masha_nudges_desc">At most one every few days, never at night.</string>
+    <string name="settings_masha_nudges">Lucy’s notifications</string>
+    <string name="settings_masha_nudges_desc">A daily note at most, never at night, plus a heads-up if your phone overheats mid-game or new games show up while Elyndra is closed. You can turn each kind off in Android settings.</string>
     <string name="settings_masha_voice_natural">Natural voice</string>
     <string name="settings_masha_voice_natural_desc">A human-sounding voice generated on your device: no connection, no cost. If it isn\'t downloaded or your device can\'t keep up, Lucy uses the system voice.</string>
     <string name="settings_masha_voice_missing">Not downloaded (%1$d MB, once)</string>
@@ -537,8 +537,8 @@
     <string name="widget_masha_desc">Lucy’s pick for right now</string>
     <string name="widget_empty">Add games to Elyndra and I’ll have suggestions.</string>
     <string name="widget_play">Play</string>
-    <string name="notif_channel_masha">Lucy</string>
-    <string name="notif_channel_masha_desc">Occasional suggestions. At most one every few days.</string>
+    <string name="notif_channel_masha">Daily note from Lucy</string>
+    <string name="notif_channel_masha_desc">At most one a day, never at night, and only if you haven’t opened Elyndra.</string>
     <string name="notif_channel_ports">Port updates</string>
     <string name="notif_channel_ports_desc">When an installed port has a new release.</string>
 
@@ -1161,4 +1161,29 @@ Built by the community, not reviewed. Check the repository before installing.</s
         <item quantity="one">%1$d game added</item>
         <item quantity="other">%1$d games added</item>
     </plurals>
+    <string name="masha_insight_added_one">%1$s just landed in your library. Want to try it?</string>
+    <plurals name="masha_insight_added">
+        <item quantity="one">%1$d new game just landed: %2$s. Want a look?</item>
+        <item quantity="other">%1$d new games just landed, %2$s among them. Want a look?</item>
+    </plurals>
+    <string name="notif_channel_lucy_hot">Device too hot</string>
+    <string name="notif_channel_lucy_hot_desc">Lucy speaks up if your phone overheats during a game. At most once every two hours.</string>
+    <string name="notif_channel_lucy_new_games">New games</string>
+    <string name="notif_channel_lucy_new_games_desc">Games installed while Elyndra was closed, all in one notification.</string>
+    <string name="notif_channel_lucy_metadata">Metadata ready</string>
+    <string name="notif_channel_lucy_metadata_desc">When covers and game info finish downloading in the background.</string>
+    <string name="lucy_notif_hot">Your phone is getting really hot. Maybe a short break, or something lighter for a bit?</string>
+    <plurals name="lucy_notif_new_games">
+        <item quantity="one">%2$s just got installed. Want me to add it to your library?</item>
+        <item quantity="other">%1$d new games installed, %2$s among them. Want me to add them?</item>
+    </plurals>
+    <string name="lucy_notif_metadata">Covers and info are done: %1$d games matched, %2$d not found.</string>
+    <string-array name="lucy_daily_lines">
+        <item>Haven’t seen you today. Got a game in mind?</item>
+        <item>Hey you. I saved a spot for you, if you feel like playing later.</item>
+        <item>Quiet day? I could find you something short and sweet.</item>
+        <item>I was just thinking about your library. Want me to pick something?</item>
+        <item>Okay, I see you being busy. Whenever you’re free, I’m here.</item>
+        <item>Got twenty minutes later? I know exactly what I’d put on.</item>
+    </string-array>
 </resources>

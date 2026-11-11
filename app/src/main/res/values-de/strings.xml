@@ -493,8 +493,8 @@
     <string name="settings_masha_status_checking">Prüfe…</string>
     <string name="settings_masha_status_none">Kein Schlüssel: Lucy läuft offline</string>
     <string name="settings_masha_ambient">Vorschläge über dem Karussell</string>
-    <string name="settings_masha_nudges">Gelegentliche Hinweise</string>
-    <string name="settings_masha_nudges_desc">Höchstens einer alle paar Tage, nie nachts.</string>
+    <string name="settings_masha_nudges">Lucys Benachrichtigungen</string>
+    <string name="settings_masha_nudges_desc">Höchstens eine Notiz am Tag, nie nachts, dazu ein Hinweis, wenn dein Handy mitten im Spiel überhitzt oder neue Spiele auftauchen, während Elyndra zu ist. Jede Art lässt sich in den Android-Einstellungen abschalten.</string>
     <string name="settings_masha_voice_natural">Natürliche Stimme</string>
     <string name="settings_masha_voice_natural_desc">Eine menschlich klingende Stimme, direkt auf deinem Gerät erzeugt: ohne Verbindung, ohne Kosten. Ist sie nicht geladen oder schafft es das Gerät nicht, nutzt Lucy die Systemstimme.</string>
     <string name="settings_masha_voice_missing">Nicht heruntergeladen (%1$d MB, einmalig)</string>
@@ -531,8 +531,8 @@
     <string name="widget_masha_desc">Lucys Tipp für jetzt</string>
     <string name="widget_empty">Füg Spiele zu Elyndra hinzu, dann habe ich Vorschläge.</string>
     <string name="widget_play">Spielen</string>
-    <string name="notif_channel_masha">Lucy</string>
-    <string name="notif_channel_masha_desc">Gelegentliche Vorschläge. Höchstens einer alle paar Tage.</string>
+    <string name="notif_channel_masha">Lucys Tagesnotiz</string>
+    <string name="notif_channel_masha_desc">Höchstens eine am Tag, nie nachts und nur, wenn du Elyndra nicht geöffnet hast.</string>
     <string name="notif_channel_ports">Port-Updates</string>
     <string name="notif_channel_ports_desc">Wenn eine installierte Portierung eine neue Version hat.</string>
 
@@ -1155,4 +1155,29 @@ Von der Community erstellt, nicht geprüft. Sieh dir vor der Installation das Re
         <item quantity="one">%1$d Spiel hinzugefügt</item>
         <item quantity="other">%1$d Spiele hinzugefügt</item>
     </plurals>
+    <string name="masha_insight_added_one">%1$s ist gerade in deiner Bibliothek gelandet. Probierst du’s aus?</string>
+    <plurals name="masha_insight_added">
+        <item quantity="one">%1$d neues Spiel ist gerade gelandet: %2$s. Schaust du mal rein?</item>
+        <item quantity="other">%1$d neue Spiele sind gerade gelandet, darunter %2$s. Schaust du mal rein?</item>
+    </plurals>
+    <string name="notif_channel_lucy_hot">Gerät zu heiß</string>
+    <string name="notif_channel_lucy_hot_desc">Lucy meldet sich, wenn dein Handy beim Spielen überhitzt. Höchstens alle zwei Stunden.</string>
+    <string name="notif_channel_lucy_new_games">Neue Spiele</string>
+    <string name="notif_channel_lucy_new_games_desc">Spiele, die installiert wurden, während Elyndra zu war, in einer Benachrichtigung.</string>
+    <string name="notif_channel_lucy_metadata">Metadaten fertig</string>
+    <string name="notif_channel_lucy_metadata_desc">Wenn Cover und Spielinfos im Hintergrund fertig geladen sind.</string>
+    <string name="lucy_notif_hot">Dein Handy wird richtig heiß. Vielleicht eine kurze Pause oder eine Weile was Leichteres?</string>
+    <plurals name="lucy_notif_new_games">
+        <item quantity="one">%2$s wurde gerade installiert. Soll ich es zu deiner Bibliothek hinzufügen?</item>
+        <item quantity="other">%1$d neue Spiele installiert, darunter %2$s. Soll ich sie hinzufügen?</item>
+    </plurals>
+    <string name="lucy_notif_metadata">Cover und Infos sind fertig: %1$d Spiele erkannt, %2$d nicht gefunden.</string>
+    <string-array name="lucy_daily_lines">
+        <item>Heute hab ich dich noch nicht gesehen. Hast du ein Spiel im Kopf?</item>
+        <item>Hey, du. Ich halte dir einen Platz frei, falls du später spielen magst.</item>
+        <item>Ruhiger Tag? Ich such dir was Kurzes und Schönes raus.</item>
+        <item>Ich hab gerade an deine Bibliothek gedacht. Soll ich dir was aussuchen?</item>
+        <item>Okay, ich seh schon, du hast zu tun. Wenn du Zeit hast, bin ich da.</item>
+        <item>Hast du später zwanzig Minuten? Ich weiß genau, was ich anmachen würde.</item>
+    </string-array>
 </resources>

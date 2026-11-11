@@ -508,8 +508,8 @@
     <string name="settings_masha_status_checking">Verificando…</string>
     <string name="settings_masha_status_none">Sem chave: a Lucy funciona offline</string>
     <string name="settings_masha_ambient">Sugestões no carrossel</string>
-    <string name="settings_masha_nudges">Notificações ocasionais</string>
-    <string name="settings_masha_nudges_desc">No máximo uma a cada poucos dias, nunca à noite.</string>
+    <string name="settings_masha_nudges">Notificações da Lucy</string>
+    <string name="settings_masha_nudges_desc">No máximo uma nota por dia, nunca à noite, e um aviso se o celular esquentar no meio do jogo ou se aparecerem jogos novos com o Elyndra fechado. Você pode desligar cada tipo nas configurações do Android.</string>
     <string name="settings_masha_voice_natural">Voz natural</string>
     <string name="settings_masha_voice_natural_desc">Uma voz com som humano, gerada no seu dispositivo: sem conexão e sem custo. Se não estiver baixada ou o dispositivo não der conta, a Lucy usa a voz do sistema.</string>
     <string name="settings_masha_voice_missing">Não baixada (%1$d MB, uma única vez)</string>
@@ -546,8 +546,8 @@
     <string name="widget_masha_desc">A sugestão da Lucy para agora</string>
     <string name="widget_empty">Adicione jogos ao Elyndra e terei sugestões.</string>
     <string name="widget_play">Jogar</string>
-    <string name="notif_channel_masha">Lucy</string>
-    <string name="notif_channel_masha_desc">Sugestões ocasionais. No máximo uma a cada poucos dias.</string>
+    <string name="notif_channel_masha">Nota diária da Lucy</string>
+    <string name="notif_channel_masha_desc">No máximo uma por dia, nunca à noite, e só se você não abriu o Elyndra.</string>
     <string name="notif_channel_ports">Atualizações de ports</string>
     <string name="notif_channel_ports_desc">Quando um port instalado tem uma versão nova.</string>
 
@@ -1173,4 +1173,29 @@ Feito pela comunidade, sem revisão. Confira o repositório antes de instalar.</
         <item quantity="one">%1$d jogo adicionado</item>
         <item quantity="other">%1$d jogos adicionados</item>
     </plurals>
+    <string name="masha_insight_added_one">%1$s acabou de chegar à sua biblioteca. Quer experimentar?</string>
+    <plurals name="masha_insight_added">
+        <item quantity="one">%1$d jogo novo acabou de chegar: %2$s. Quer dar uma olhada?</item>
+        <item quantity="other">Chegaram %1$d jogos novos, entre eles %2$s. Quer dar uma olhada?</item>
+    </plurals>
+    <string name="notif_channel_lucy_hot">Aparelho quente demais</string>
+    <string name="notif_channel_lucy_hot_desc">A Lucy avisa se o celular esquentar demais durante um jogo. No máximo uma vez a cada duas horas.</string>
+    <string name="notif_channel_lucy_new_games">Jogos novos</string>
+    <string name="notif_channel_lucy_new_games_desc">Jogos instalados com o Elyndra fechado, todos numa só notificação.</string>
+    <string name="notif_channel_lucy_metadata">Metadados prontos</string>
+    <string name="notif_channel_lucy_metadata_desc">Quando as capas e as informações terminam de baixar em segundo plano.</string>
+    <string name="lucy_notif_hot">Seu celular está esquentando muito. Que tal uma pausa curtinha, ou algo mais leve por um tempo?</string>
+    <plurals name="lucy_notif_new_games">
+        <item quantity="one">%2$s acabou de ser instalado. Quer que eu adicione à sua biblioteca?</item>
+        <item quantity="other">%1$d jogos novos instalados, entre eles %2$s. Quer que eu adicione?</item>
+    </plurals>
+    <string name="lucy_notif_metadata">Capas e informações prontas: %1$d jogos identificados, %2$d não encontrados.</string>
+    <string-array name="lucy_daily_lines">
+        <item>Não te vi hoje. Tem algum jogo em mente?</item>
+        <item>Oi, você. Guardei um lugar pra você, se quiser jogar mais tarde.</item>
+        <item>Dia tranquilo? Posso achar algo curtinho e gostoso.</item>
+        <item>Eu estava pensando na sua biblioteca. Quer que eu escolha algo?</item>
+        <item>Tá, já vi que você está ocupado. Quando tiver um tempinho, estou aqui.</item>
+        <item>Tem vinte minutos mais tarde? Eu sei exatamente o que colocaria.</item>
+    </string-array>
 </resources>

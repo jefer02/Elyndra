@@ -475,8 +475,8 @@
     <string name="settings_masha_status_checking">確認中…</string>
     <string name="settings_masha_status_none">キーなし：Lucy はオフラインで動作</string>
     <string name="settings_masha_ambient">カルーセル上の提案</string>
-    <string name="settings_masha_nudges">ときどき通知</string>
-    <string name="settings_masha_nudges_desc">数日に一度まで。夜間は送りません。</string>
+    <string name="settings_masha_nudges">ルーシーの通知</string>
+    <string name="settings_masha_nudges_desc">ノートは1日1回まで、夜は送りません。ゲーム中にスマホが熱くなりすぎたときや、Elyndra を閉じている間に新しいゲームが見つかったときもお知らせします。種類ごとに Android の設定でオフにできます。</string>
     <string name="settings_masha_voice_natural">自然な音声</string>
     <string name="settings_masha_voice_natural_desc">端末上で生成される人間らしい声です。通信も費用も不要。未ダウンロードの場合や端末の処理が追いつかない場合は、システムの音声で話します。</string>
     <string name="settings_masha_voice_missing">未ダウンロード（%1$d MB・初回のみ）</string>
@@ -513,8 +513,8 @@
     <string name="widget_masha_desc">Lucy の今のおすすめ</string>
     <string name="widget_empty">Elyndra にゲームを追加すれば提案します。</string>
     <string name="widget_play">プレイ</string>
-    <string name="notif_channel_masha">Lucy</string>
-    <string name="notif_channel_masha_desc">ときどきの提案。数日に一度まで。</string>
+    <string name="notif_channel_masha">ルーシーの今日のひとこと</string>
+    <string name="notif_channel_masha_desc">1日1回まで。夜は送らず、Elyndra を開いていない日だけ。</string>
     <string name="notif_channel_ports">ポートのアップデート</string>
     <string name="notif_channel_ports_desc">インストール済みのポートに新しいリリースがあるとき。</string>
 
@@ -1125,4 +1125,27 @@
     <plurals name="user_folder_added_count">
         <item quantity="other">%1$d 本のゲームを追加しました</item>
     </plurals>
+    <string name="masha_insight_added_one">%1$s がライブラリに来たよ。遊んでみる？</string>
+    <plurals name="masha_insight_added">
+        <item quantity="other">新しいゲームが %1$d 本来たよ。%2$s もあるよ。ちょっと見てみる？</item>
+    </plurals>
+    <string name="notif_channel_lucy_hot">端末が熱すぎる</string>
+    <string name="notif_channel_lucy_hot_desc">ゲーム中にスマホが熱くなりすぎたら、ルーシーが知らせます。2時間に1回まで。</string>
+    <string name="notif_channel_lucy_new_games">新しいゲーム</string>
+    <string name="notif_channel_lucy_new_games_desc">Elyndra を閉じている間にインストールされたゲームを、まとめて1件で。</string>
+    <string name="notif_channel_lucy_metadata">メタデータ完了</string>
+    <string name="notif_channel_lucy_metadata_desc">バックグラウンドでカバーと情報の取得が終わったとき。</string>
+    <string name="lucy_notif_hot">スマホがかなり熱くなってるよ。ちょっと休憩するか、しばらく軽めのゲームにしない？</string>
+    <plurals name="lucy_notif_new_games">
+        <item quantity="other">新しいゲームが %1$d 本インストールされたよ（%2$s など）。ライブラリに追加する？</item>
+    </plurals>
+    <string name="lucy_notif_metadata">カバーと情報がそろったよ：%1$d 本を認識、%2$d 本は見つからなかった。</string>
+    <string-array name="lucy_daily_lines">
+        <item>今日はまだ会ってないね。遊びたいゲームある？</item>
+        <item>ねえ。あとで遊びたくなったら、ちゃんと席を取っておくね。</item>
+        <item>のんびりした日？ 短くてかわいいの、探してあげる。</item>
+        <item>ちょうどあなたのライブラリのこと考えてた。何か選ぼうか？</item>
+        <item>うん、忙しいのは分かってる。時間ができたら、ここにいるよ。</item>
+        <item>あとで20分ある？ 何をかけるか、もう決めてるんだ。</item>
+    </string-array>
 </resources>

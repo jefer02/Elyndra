@@ -8,6 +8,7 @@ import com.elyndra.launcher.data.LibraryRepository
 import com.elyndra.launcher.data.SettingsStore
 import com.elyndra.launcher.metadata.MetadataEngine
 import com.elyndra.launcher.metadata.ServiceCredentials
+import com.elyndra.launcher.notify.LucyNotices
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CancellationException
@@ -30,6 +31,7 @@ class MetadataSyncWorker @AssistedInject constructor(
     private val library: LibraryRepository,
     private val settings: SettingsStore,
     private val credentials: ServiceCredentials,
+    private val notices: LucyNotices,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -44,6 +46,9 @@ class MetadataSyncWorker @AssistedInject constructor(
         if (keys.isEmpty()) return Result.success()
         return try {
             engine.runAndWait(keys, force = false)
+            // Si encontró algo, Lucy lo cuenta (solo con la app fuera de pantalla; ver NotificationPolicy).
+            val p = engine.progress.value
+            if (!p.cancelled && p.matched > 0) notices.metadataDone(p.matched, p.missed)
             Result.success()
         } catch (e: CancellationException) {
             // WorkManager nos para (se fue la wifi, poca batería…): la tanda
