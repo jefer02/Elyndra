@@ -745,7 +745,7 @@
     <string name="hint_options">オプション</string>
     <string name="hint_section">セクション</string>
     <string name="hint_category">カテゴリ</string>
-    <string name="hint_keyboard">キーボード</string>
+    <string name="hint_keyboard">入力</string>
     <string name="hint_move">移動</string>
     <string name="hint_apply">適用</string>
     <string name="hint_page">ページ</string>
@@ -1204,4 +1204,8 @@
     <string name="lucy_levelup_line_close">調子に乗らないでね。でも、一番話したいのはあなた。</string>
     <string name="lucy_levelup_line_devoted">もう離れられないよ。本気だからね。</string>
     <string name="settings_lucy_bond">Lucyとの関係</string>
+    <string name="settings_lucy_subtitles">字幕</string>
+    <string name="settings_lucy_subtitles_desc">チャットを隠しているとき、Lucyが話している内容を1行で表示します。</string>
+    <string name="hint_chat">チャット</string>
+    <string name="lucy_keyboard">メッセージを入力</string>
 </resources>

@@ -135,6 +135,35 @@ internal fun HoloMessage(vm: ElyndraViewModel, msg: ChatMessage, glow: Color, la
     }
 }
 
+/**
+ * Solo las tarjetas de un mensaje de Lucy (juegos, plan, ports, confirmación,
+ * lo que hizo), sin la burbuja de texto: lo que se ve con el chat oculto.
+ * Sin nada que enseñar, no pinta nada.
+ */
+@Composable
+internal fun HoloCards(vm: ElyndraViewModel, msg: ChatMessage, glow: Color, modifier: Modifier = Modifier) {
+    val attachment = msg.attachment?.takeIf { it !is MashaAttachment.Done }
+    if (attachment == null && msg.done.isEmpty()) return
+    Column(
+        modifier
+            .fillMaxWidth()
+            .animMsgIn(delayMs = if (msg.restored) 0 else 60, key = "cards-${msg.id}")
+            .holoPanel(RoundedCornerShape(16.dp), glow)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        if (msg.done.isNotEmpty()) DoneChips(msg.done, glow)
+        when (attachment) {
+            is MashaAttachment.Games -> GamesStrip(vm, attachment)
+            is MashaAttachment.Plan -> PlanCard(vm, attachment, glow)
+            is MashaAttachment.ArcCard -> ArcStrip(vm, attachment)
+            is MashaAttachment.Confirm -> ConfirmCard(vm, attachment, glow)
+            is MashaAttachment.Ports -> PortsStrip(vm, attachment)
+            is MashaAttachment.Done, null -> Unit
+        }
+    }
+}
+
 /** Masha está pensando o usando una herramienta ("Buscando en tu biblioteca…"). */
 @Composable
 internal fun HoloWorking(label: String?, glow: Color) {

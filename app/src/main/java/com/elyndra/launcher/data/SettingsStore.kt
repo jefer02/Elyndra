@@ -401,6 +401,16 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean("lucy.voiceInterrupt", true)
         set(v) = prefs.edit { putBoolean("lucy.voiceInterrupt", v) }
 
+    /** La conversación con Lucy a la vista. Por defecto no: se la ve a ella, con subtítulos. */
+    var lucyChatVisible: Boolean
+        get() = prefs.getBoolean("lucy.chatVisible", false)
+        set(v) = prefs.edit { putBoolean("lucy.chatVisible", v) }
+
+    /** Con el chat oculto, una línea con lo que dice Lucy mientras habla. */
+    var lucySubtitles: Boolean
+        get() = prefs.getBoolean("lucy.subtitles", true)
+        set(v) = prefs.edit { putBoolean("lucy.subtitles", v) }
+
     /** El ambiente sonoro del holotanque (zumbido, pads, datos) en la pantalla de Masha. */
     var mashaSoundscape: Boolean
         get() = prefs.getBoolean("masha.soundscape", true)

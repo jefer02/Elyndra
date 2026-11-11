@@ -337,6 +337,20 @@ class SettingsController(private val vm: ElyndraViewModel) {
 
     var lucyVoiceInterrupt by mutableStateOf(store.lucyVoiceInterrupt); private set
 
+    var lucyChatVisible by mutableStateOf(store.lucyChatVisible); private set
+
+    fun toggleLucyChat() {
+        lucyChatVisible = !lucyChatVisible
+        store.lucyChatVisible = lucyChatVisible
+    }
+
+    var lucySubtitles by mutableStateOf(store.lucySubtitles); private set
+
+    fun toggleLucySubtitles() {
+        lucySubtitles = !lucySubtitles
+        store.lucySubtitles = lucySubtitles
+    }
+
     fun toggleLucyVoiceInterrupt() {
         lucyVoiceInterrupt = !lucyVoiceInterrupt
         store.lucyVoiceInterrupt = lucyVoiceInterrupt

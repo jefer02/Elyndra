@@ -771,7 +771,7 @@
     <string name="hint_options">Options</string>
     <string name="hint_section">Section</string>
     <string name="hint_category">Category</string>
-    <string name="hint_keyboard">Keyboard</string>
+    <string name="hint_keyboard">Type</string>
     <string name="hint_move">Move</string>
     <string name="hint_apply">Apply</string>
     <string name="hint_page">Page</string>
@@ -1242,4 +1242,8 @@ Built by the community, not reviewed. Check the repository before installing.</s
     <string name="lucy_levelup_line_close">Don’t let it go to your head, but you’re my favourite person to talk to.</string>
     <string name="lucy_levelup_line_devoted">You’re stuck with me now. I mean it.</string>
     <string name="settings_lucy_bond">Your bond with Lucy</string>
+    <string name="settings_lucy_subtitles">Subtitles</string>
+    <string name="settings_lucy_subtitles_desc">With the chat hidden, show what Lucy is saying in one line while she speaks.</string>
+    <string name="hint_chat">Chat</string>
+    <string name="lucy_keyboard">Type a message</string>
 </resources>

@@ -780,7 +780,7 @@
     <string name="hint_options">Options</string>
     <string name="hint_section">Section</string>
     <string name="hint_category">Catégorie</string>
-    <string name="hint_keyboard">Clavier</string>
+    <string name="hint_keyboard">Écrire</string>
     <string name="hint_move">Déplacer</string>
     <string name="hint_apply">Appliquer</string>
     <string name="hint_page">Page</string>
@@ -1254,4 +1254,8 @@ Fait par la communauté, non vérifié. Consultez le dépôt avant d\'installer.
     <string name="lucy_levelup_line_close">Ne prends pas la grosse tête, mais tu es la personne avec qui je préfère parler.</string>
     <string name="lucy_levelup_line_devoted">Tu ne te débarrasseras plus de moi. Je suis sérieuse.</string>
     <string name="settings_lucy_bond">Votre lien avec Lucy</string>
+    <string name="settings_lucy_subtitles">Sous-titres</string>
+    <string name="settings_lucy_subtitles_desc">Quand la conversation est masquée, affiche sur une ligne ce que dit Lucy pendant qu’elle parle.</string>
+    <string name="hint_chat">Discussion</string>
+    <string name="lucy_keyboard">Écrire un message</string>
 </resources>

@@ -28,6 +28,13 @@ import android.content.pm.PackageManager
 import com.elyndra.launcher.BuildConfig
 import com.elyndra.launcher.ui.masha.MashaDebugSay
 import com.elyndra.launcher.ui.masha.AffinityHeart
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.foundation.layout.heightIn
+import com.elyndra.launcher.ui.masha.HoloCards
+import com.elyndra.launcher.ui.masha.SubtitleLine
+import com.elyndra.launcher.ui.masha.captionMs
 import com.elyndra.launcher.ui.masha.AffinityPanel
 import com.elyndra.launcher.ui.masha.FloatingGain
 import com.elyndra.launcher.ui.masha.LevelUpCard
@@ -191,7 +198,10 @@ fun MashaScreen(vm: ElyndraViewModel) {
     val shot = MashaFraming.shotFor(m.landscape, alternate)
     // El hueco que deja libre la interfaz para su cara (coordenadas de la raíz).
     val area = remember { FaceAreaProbe() }
-    var chatOpen by rememberSaveable { mutableStateOf(true) }
+    // El chat a la vista (se recuerda; por defecto oculto: se la ve a ella, con subtítulos).
+    val chatOpen = settings.lucyChatVisible
+    // Con el chat oculto, el campo de texto se abre con el botón del teclado (o Select).
+    var typing by remember { mutableStateOf(false) }
     var soundOpen by remember { mutableStateOf(false) }
     // El panel "Lucy y tú" (el corazón de la cabecera o L1).
     var bondOpen by remember { mutableStateOf(false) }
@@ -378,6 +388,21 @@ fun MashaScreen(vm: ElyndraViewModel) {
         if (last == null || !last.fromMasha || last.restored || last.id == alreadyShown || !speakReplies) return@LaunchedEffect
         voice.feed(last.id, last.text, final = !last.pending)
     }
+    // Lo que se lee con el chat oculto: la frase que suena (subtítulo) o, sin voz, la respuesta un rato.
+    var caption by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(last?.id, last?.pending, speakReplies) {
+        caption = null
+        if (speakReplies || last == null || !last.fromMasha || last.pending || last.restored || last.id == alreadyShown) return@LaunchedEffect
+        val text = last.text.trim().takeIf { it.isNotEmpty() } ?: return@LaunchedEffect
+        caption = text
+        delay(captionMs(text))
+        caption = null
+    }
+    val subtitle = when {
+        chatOpen -> null
+        speakReplies -> voice.nowSaying?.takeIf { settings.lucySubtitles }
+        else -> caption
+    }
     // Solo en debug: `adb shell am broadcast` hace hablar a Masha con un texto fijo (QA del lip-sync).
     if (BuildConfig.DEBUG) MashaDebugSay(voice)
     // Gestos: saluda al materializarse; explica cuando trae una tarjeta.
@@ -395,7 +420,8 @@ fun MashaScreen(vm: ElyndraViewModel) {
             bondOpen && (pad == Pad.Back || pad == Pad.PagePrev) -> { bondOpen = false; true }
             vm.input.imeVisible -> false
             pad == Pad.PagePrev -> { bondOpen = true; true }
-            pad == Pad.Details -> { chatOpen = !chatOpen; true }
+            pad == Pad.Details -> { settings.toggleLucyChat(); true }
+            pad == Pad.Search -> { typing = true; true }
             else -> false
         }
     }
@@ -490,7 +516,7 @@ fun MashaScreen(vm: ElyndraViewModel) {
                 pad = m.pad,
                 landscape = m.landscape,
                 chatOpen = chatOpen,
-                onToggleChat = { chatOpen = !chatOpen },
+                onToggleChat = settings::toggleLucyChat,
                 onSound = { soundOpen = !soundOpen },
                 onRecenter = {
                     alternate = !alternate
@@ -507,12 +533,12 @@ fun MashaScreen(vm: ElyndraViewModel) {
                     // A la izquierda queda ella; la conversación, a la derecha.
                     Spacer(Modifier.weight(0.5f).fillMaxHeight().onGloballyPositioned { area.side = it.boundsInRoot() })
                     Column(Modifier.weight(0.5f).fillMaxHeight().padding(end = m.pad)) {
-                        Conversation(vm, presence, glow, chatOpen, landscape = true, mic = mic, area = area)
+                        Conversation(vm, presence, glow, chatOpen, landscape = true, mic = mic, area = area, subtitle = subtitle, typing = typing, onTyping = { typing = it })
                     }
                 }
             } else {
                 Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = m.pad)) {
-                    Conversation(vm, presence, glow, chatOpen, landscape = false, mic = mic, area = area)
+                    Conversation(vm, presence, glow, chatOpen, landscape = false, mic = mic, area = area, subtitle = subtitle, typing = typing, onTyping = { typing = it })
                 }
             }
         }
@@ -628,10 +654,14 @@ private fun ColumnScope.Conversation(
     landscape: Boolean,
     mic: MicActions,
     area: FaceAreaProbe,
+    subtitle: String?,
+    typing: Boolean,
+    onTyping: (Boolean) -> Unit,
 ) {
     val masha = vm.masha
     val lang = vm.settings.lang
-    Box(Modifier.onGloballyPositioned { area.statsBottom = it.boundsInRoot().bottom }) { StatsRow(vm, glow) }
+    // Con el chat oculto, ni las cifras: toda la pantalla es para ella.
+    Box(Modifier.onGloballyPositioned { area.statsBottom = it.boundsInRoot().bottom }) { if (open) StatsRow(vm, glow) }
     // En vertical, el hueco de arriba es para verla a ella; en horizontal ella
     // está a la izquierda y la conversación ocupa toda su columna.
     if (!landscape || !open) Spacer(Modifier.weight(1f))
@@ -662,13 +692,26 @@ private fun ColumnScope.Conversation(
                 }
             }
         }
+    } else {
+        // Chat oculto: su subtítulo y, si la última respuesta trae tarjetas, solo las tarjetas.
+        SubtitleLine(subtitle, maxLines = if (presence.speaking) 1 else 3)
+        val cards = masha.messages.lastOrNull()?.takeIf { it.fromMasha && !it.greeting }
+        if (cards != null) {
+            Box(Modifier.fillMaxWidth().heightIn(max = if (landscape) 220.dp else 300.dp).padding(top = 8.dp)) {
+                Box(Modifier.verticalScroll(rememberScrollState())) { HoloCards(vm, cards, glow) }
+            }
+        }
+        if (masha.busy && masha.working != null) {
+            Spacer(Modifier.height(8.dp))
+            HoloWorking(masha.working?.resolve(), glow)
+        }
     }
     Spacer(Modifier.height(8.dp))
     Box(Modifier.onGloballyPositioned { area.chipsTop = it.boundsInRoot().top }) {
         Suggestions(vm, glow) { masha.sendSuggestion(it, lang) }
     }
     Spacer(Modifier.height(8.dp))
-    Dock(vm, presence, glow, mic)
+    Dock(vm, presence, glow, mic, compact = !open && !typing, typing = typing, onTyping = onTyping)
     LiveStrip(mic, glow)
     PadHints(hints = MASHA_HINTS, visible = vm.input.gamepadPresent, modifier = Modifier.padding(top = 6.dp), onDark = true)
     Spacer(Modifier.height(if (landscape) 10.dp else 16.dp))
@@ -762,9 +805,49 @@ private fun Suggestions(vm: ElyndraViewModel, glow: Color, onPick: (String) -> U
 }
 
 @Composable
-private fun Dock(vm: ElyndraViewModel, presence: MashaPresence, glow: Color, mic: MicActions) {
+private fun Dock(
+    vm: ElyndraViewModel,
+    presence: MashaPresence,
+    glow: Color,
+    mic: MicActions,
+    compact: Boolean,
+    typing: Boolean,
+    onTyping: (Boolean) -> Unit,
+) {
     val masha = vm.masha
     val lang = vm.settings.lang
+    // Con el chat oculto se habla con la voz: el micrófono manda y escribir queda a un toque.
+    if (compact) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.CenterVertically) {
+            MicButton(presence, glow, mic)
+            HoloIcon(stringResource(R.string.lucy_keyboard), glow, onClick = { onTyping(true) }) { KeyboardGlyph() }
+            Spacer(Modifier.weight(1f))
+            if (masha.busy) {
+                Box(
+                    Modifier
+                        .size(46.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Brush.linearGradient(listOf(glow, P.primary)))
+                        .shapeClickable(RoundedCornerShape(16.dp)) { masha.stop() },
+                    contentAlignment = Alignment.Center,
+                ) { Box(Modifier.size(13.dp).clip(RoundedCornerShape(3.dp)).background(Color.White)) }
+            }
+        }
+        return
+    }
+    val focus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    // Abierto con el botón del teclado: el foco y el teclado, directamente.
+    LaunchedEffect(typing) {
+        if (typing) {
+            runCatching { focus.requestFocus() }
+            keyboard?.show()
+        }
+    }
+    fun send() {
+        masha.send(lang)
+        onTyping(false)
+    }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.CenterVertically) {
         MicButton(presence, glow, mic)
         Box(
@@ -785,8 +868,8 @@ private fun Dock(vm: ElyndraViewModel, presence: MashaPresence, glow: Color, mic
                 textStyle = inputStyle(12.5f, Holo.text),
                 cursorBrush = SolidColor(glow),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { masha.send(lang) }),
-                modifier = Modifier.fillMaxWidth().padTextField(field),
+                keyboardActions = KeyboardActions(onSend = { send() }),
+                modifier = Modifier.fillMaxWidth().focusRequester(focus).padTextField(field),
                 decorationBox = { inner ->
                     if (masha.draft.isEmpty()) {
                         ElyText(
@@ -806,7 +889,7 @@ private fun Dock(vm: ElyndraViewModel, presence: MashaPresence, glow: Color, mic
                 .size(46.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(Brush.linearGradient(listOf(glow, P.primary)))
-                .shapeClickable(RoundedCornerShape(16.dp)) { if (masha.busy) masha.stop() else masha.send(lang) },
+                .shapeClickable(RoundedCornerShape(16.dp)) { if (masha.busy) masha.stop() else send() },
             contentAlignment = Alignment.Center,
         ) {
             if (masha.busy) Box(Modifier.size(13.dp).clip(RoundedCornerShape(3.dp)).background(Color.White)) else SendArrow()
@@ -1054,6 +1137,31 @@ private fun PlusGlyph() {
 }
 
 /** Bocadillo: lleno con la conversación a la vista, en contorno si está oculta. */
+/** Un teclado: rectángulo con dos filas de teclas y la barra espaciadora. */
+@Composable
+private fun KeyboardGlyph() {
+    Box(
+        Modifier
+            .size(18.dp)
+            .drawBehind {
+                val w = size.width
+                val h = size.height
+                drawRoundRect(
+                    Color.White,
+                    topLeft = Offset(w * 0.04f, h * 0.2f),
+                    size = androidx.compose.ui.geometry.Size(w * 0.92f, h * 0.6f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),
+                    style = Stroke(1.4.dp.toPx()),
+                )
+                val key = androidx.compose.ui.geometry.Size(w * 0.07f, w * 0.07f)
+                for (row in 0..1) for (col in 0..4) {
+                    drawRect(Color.White, topLeft = Offset(w * (0.16f + col * 0.15f), h * (0.32f + row * 0.14f)), size = key)
+                }
+                drawRect(Color.White, topLeft = Offset(w * 0.3f, h * 0.62f), size = androidx.compose.ui.geometry.Size(w * 0.4f, w * 0.07f))
+            },
+    )
+}
+
 @Composable
 private fun ChatGlyph(open: Boolean) {
     Box(
@@ -1113,6 +1221,7 @@ private val LANDSCAPE_BAR = 54.dp
 private val MASHA_HINTS = listOf(
     PadHint("A", R.string.hint_select),
     PadHint("Y", R.string.hint_talk),
+    PadHint("X", R.string.hint_chat),
     PadHint("L1", R.string.hint_bond),
     PadHint("B", R.string.hint_back),
 )

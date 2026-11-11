@@ -780,7 +780,7 @@
     <string name="hint_options">Opciones</string>
     <string name="hint_section">Sección</string>
     <string name="hint_category">Categoría</string>
-    <string name="hint_keyboard">Teclado</string>
+    <string name="hint_keyboard">Escribir</string>
     <string name="hint_move">Mover</string>
     <string name="hint_apply">Aplicar</string>
     <string name="hint_page">Página</string>
@@ -1254,4 +1254,8 @@ Hecho por la comunidad, sin revisar. Mira el repositorio antes de instalar.</str
     <string name="lucy_levelup_line_close">Que no se te suba a la cabeza, pero eres con quien más me gusta hablar.</string>
     <string name="lucy_levelup_line_devoted">Ahora ya no te libras de mí. Lo digo en serio.</string>
     <string name="settings_lucy_bond">Tu vínculo con Lucy</string>
+    <string name="settings_lucy_subtitles">Subtítulos</string>
+    <string name="settings_lucy_subtitles_desc">Con el chat oculto, muestra en una línea lo que dice Lucy mientras habla.</string>
+    <string name="hint_chat">Chat</string>
+    <string name="lucy_keyboard">Escribir un mensaje</string>
 </resources>

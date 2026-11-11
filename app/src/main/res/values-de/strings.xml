@@ -765,7 +765,7 @@
     <string name="hint_options">Optionen</string>
     <string name="hint_section">Bereich</string>
     <string name="hint_category">Kategorie</string>
-    <string name="hint_keyboard">Tastatur</string>
+    <string name="hint_keyboard">Tippen</string>
     <string name="hint_move">Verschieben</string>
     <string name="hint_apply">Anwenden</string>
     <string name="hint_page">Seite</string>
@@ -1236,4 +1236,8 @@ Von der Community erstellt, nicht geprüft. Sieh dir vor der Installation das Re
     <string name="lucy_levelup_line_close">Bild dir nichts drauf ein, aber mit dir rede ich am liebsten.</string>
     <string name="lucy_levelup_line_devoted">Mich wirst du jetzt nicht mehr los. Ernsthaft.</string>
     <string name="settings_lucy_bond">Deine Bindung zu Lucy</string>
+    <string name="settings_lucy_subtitles">Untertitel</string>
+    <string name="settings_lucy_subtitles_desc">Bei ausgeblendetem Chat zeigt eine Zeile, was Lucy gerade sagt.</string>
+    <string name="hint_chat">Chat</string>
+    <string name="lucy_keyboard">Nachricht tippen</string>
 </resources>
