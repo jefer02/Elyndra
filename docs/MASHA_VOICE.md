@@ -1,6 +1,6 @@
-# Masha: voz
+# Lucy: voz
 
-Masha habla con una **voz natural generada en el propio dispositivo** (Supertonic 3, ONNX Runtime) y,
+Lucy habla con una **voz natural generada en el propio dispositivo** (Supertonic 3, ONNX Runtime) y,
 cuando no se puede, con la **voz del sistema** (Google TTS, Samsung…). Todo es gratis, sin red al hablar
 y sin GPL. La sincronía de labios ([MASHA_LIPSYNC.md](MASHA_LIPSYNC.md)) no cambia: recibe el PCM de
 cualquiera de las dos voces igual que antes.
@@ -63,7 +63,7 @@ MashaScreen ──feed(texto, final)──▶ MashaVoice ──▶ VoiceRouter �
   primera parte ≤ 70. Cada parte puede medir como mucho `0,7 / RTF` veces la anterior (entre 1,6 y 3;
   2,2 sin medida): así se sintetiza mientras suena la anterior sin huecos. Si no hay un corte así, la frase
   va entera (mejor tardar un poco más que cortarse a mitad).
-- El modelo se carga y se "calienta" al elegir idioma (al entrar en la pantalla de Masha); si ya espera una
+- El modelo se carga y se "calienta" al elegir idioma (al entrar en la pantalla de Lucy); si ya espera una
   frase de verdad, el calentamiento se salta (ella misma lo hace).
 
 ### Ánimo y prosodia
@@ -79,7 +79,7 @@ Supertonic no tiene control de tono ni estilo. Se usa lo que sí tiene:
 
 ## Voces e idiomas
 
-Una sola voz femenina para los seis idiomas (Masha suena igual en todos): Supertonic 3, hablante 0 (F1),
+Una sola voz femenina para los seis idiomas (Lucy suena igual en todos): Supertonic 3, hablante 0 (F1),
 elegida a ciegas. En Ajustes se puede cambiar entre las 5 voces femeninas (1–5 = sid 0–4) y la velocidad
 (80–125 %).
 
@@ -87,9 +87,9 @@ elegida a ciegas. En Ajustes se puede cambiar entre las 5 voces femeninas (1–5
 |---|---|---|---|---|
 | es | ✅ (es-MX para el G2P de labios: seseo) | completo (regiones ES/MX/AR…) | tramos en inglés | prioridad |
 | en | ✅ | completo (US/GB) | — | |
-| pt | ✅ (pt-BR) | números, fechas, horas, unidades | tramos en inglés | "Masha" → "Macha" para la voz |
-| fr | ✅ | números, fechas, horas, unidades | tramos en inglés | "Masha" se escribe "Macha" para la voz (se oía "Machin") |
-| de | ✅ | números, fechas, horas, unidades | tramos en inglés (conservador) | "Masha" → "Mascha" para la voz |
+| pt | ✅ (pt-BR) | números, fechas, horas, unidades | tramos en inglés | "Lucy" → "Macha" para la voz |
+| fr | ✅ | números, fechas, horas, unidades | tramos en inglés | "Lucy" se escribe "Macha" para la voz (se oía "Machin") |
+| de | ✅ | números, fechas, horas, unidades | tramos en inglés (conservador) | "Lucy" → "Mascha" para la voz |
 | ja | ✅ | numerales en kanji | — | labios solo por audio (como antes) |
 
 Calidad medida (Whisper, escritorio) en [QA](#qa).
@@ -117,7 +117,7 @@ la recreación de la actividad) no apague la voz:
 
 ## Cómo añadir o cambiar voces
 
-- **Otra de las 5 voces:** Ajustes → Masha → Voz (o `SettingsStore.mashaVoiceSpeaker`).
+- **Otra de las 5 voces:** Ajustes → Lucy → Voz (o `SettingsStore.mashaVoiceSpeaker`).
 - **Otro modelo Supertonic** (p. ej. una versión nueva): cambiar `VoicePack.BASE` (revisión fija) y la
   lista `FILES` (tamaño y SHA-256 de cada fichero: `sha256sum *`), y `VoicePack.NAME` para que no se mezcle
   con la carpeta anterior. Pasar `SupertonicModelTest` con `MASHA_SUPERTONIC_DIR=<carpeta>`.
@@ -171,7 +171,7 @@ escuchar en `Documents\Masha_Voice\qa\` (fuera del repo).
 | Labios: desfase mandíbula ↔ envolvente del audio | mediana -10 ms (correlación 0,49) | -7 ms (0,49) |
 | Parar a media frase | corta al momento, sin audio posterior | igual |
 | Memoria (PSS) con el modelo cargado / hablando | +~215 MB de heap nativo (460–500 MB la app) | — |
-| Memoria 105 s después de salir de Masha | liberada (192 MB la app) | — |
+| Memoria 105 s después de salir de Lucy | liberada (192 MB la app) | — |
 | CPU mientras habla | ~0,6 s de CPU por segundo de voz (RTF × 2 hilos) | — |
 | Gama baja (emulador con 2 GB) | no se usa: habla la voz del sistema; Ajustes lo explica | ✅ |
 
@@ -182,7 +182,7 @@ x86_64 34,6 MB, sin comprimir). Base sin la voz ≈ 79,8 MB. En un móvil arm64 
 **Errores encontrados por la QA y corregidos:** la medida de velocidad apagaba la voz para siempre tras un
 pico de carga (ahora `RtfGate`); huecos a mitad de frase por partes desequilibradas; el calentamiento
 retrasaba la primera frase real; pausas entre frases demasiado cortas (140 ms) con la boca sin cerrar;
-"Masha" en francés; región del normalizador; ONNX Runtime de 32 bits en el APK (-72 MB); estados de Ajustes;
+"Lucy" en francés; región del normalizador; ONNX Runtime de 32 bits en el APK (-72 MB); estados de Ajustes;
 Google TTS perdía PCM cuando se le encolaban varias frases ya en caché (ahora una síntesis a la vez).
 
 ## Pendiente en un móvil real

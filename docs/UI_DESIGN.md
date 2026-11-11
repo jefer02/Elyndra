@@ -23,7 +23,7 @@ Todo vive en `ui/theme/Console.kt` (tokens, superficies, movimiento) y en
 | Añadir → Carpeta de ROMs | Tres paneles en rejilla y una tarjeta vacía enorme | Pasos verticales con resumen, sistemas por fabricante y barra de acción fija. |
 | Diálogos, ficha, selector de arte | Correctos | Solo accesibilidad y pistas de mando. |
 | Ficha del juego | "Jugar" grande arriba y, en ancho, una columna llena y otra medio vacía | Sin "Jugar" (se juega desde la card): fila compacta de actualizar metadatos y editar nombre bajo la cabecera, y en ancho dos columnas equilibradas por lo que ocupa cada bloque (`DetailsLayout`). |
-| Pantalla de Masha, calibración de voz | Estética de holograma propia | Fuera de alcance: se dejan igual. |
+| Pantalla de Lucy, calibración de voz | Estética de holograma propia | Fuera de alcance: se dejan igual. |
 
 ## 2. Tokens
 
@@ -121,7 +121,7 @@ Plasma; nada guardado se pisa. El acento Plasma arranca su relleno en
 - Polvo estelar (encendido de serie, se puede apagar): partículas de 1,1–3 dp que
   nacen en el contorno y suben despacio con un rizo, de un atlas de sprites
   pintado una vez (`Stardust.kt`); 22–30 en calidad alta y 11–15 en la ligera,
-  con tope duro. La estela de Masha usa los mismos sprites.
+  con tope duro. La estela de Lucy usa los mismos sprites.
 - Con "reducir movimiento" el marco queda quieto: sin encendido, respiración,
   brillo ni partículas.
 - Barra de pistas (`PadHints`): solo con un mando conectado
@@ -131,9 +131,9 @@ Plasma; nada guardado se pisa. El acento Plasma arranca su relleno en
   orden y su menú (A Seleccionar · B Cerrar).
 - Biblioteca (`LibraryFocus`, `LibraryFocusTest`): arriba desde el carrusel va
   al dock (al buscador si está abierto). Con el dock en la barra todo es una
-  fila en el orden en que se ve (Masha, secciones, orden, Abrir, buscar,
+  fila en el orden en que se ve (Lucy, secciones, orden, Abrir, buscar,
   Ajustes); en la costura son dos (la barra y, debajo, secciones y orden).
-  En Meridian también es una fila en el orden en que se ve (secciones, Masha,
+  En Meridian también es una fila en el orden en que se ve (secciones, Lucy,
   Abrir, orden, buscar, Ajustes: `LibraryFocus.meridianRows`); desde la rueda,
   izquierda va al dock y derecha a "Abrir". En esa fila las pistas dicen
   A Seleccionar · ←→ Mover · B Atrás.
@@ -223,13 +223,13 @@ Vistas previas en claro y oscuro: `ConsolePreviews.kt` (anotación `@ConsolePrev
 
 | Categoría | Contenido |
 |---|---|
-| Pantalla y tema | Modo oscuro, intro, fotogramas por segundo, alta fluidez de Masha, rendimiento (Auto / Calidad / Rendimiento), hora y batería (apagada de serie), idioma |
+| Pantalla y tema | Modo oscuro, intro, fotogramas por segundo, alta fluidez de Lucy, rendimiento (Auto / Calidad / Rendimiento), hora y batería (apagada de serie), idioma |
 | Sonido | Sonidos de la interfaz, volumen, sonido al navegar, paquete, sonidos propios (plegados) |
 | Música y fondo | Música del menú, fondo de la interfaz |
 | Apariencia | Estilo de la lista (Meridian o Clásico, con miniaturas), color de fondo adaptable (Meridian), paleta de firma, color de acento, liquid glass, selección (halo y partículas, con su color) |
 | Biblioteca | Ordenar por, reescanear, imágenes descargadas, build de BannerHub |
 | Metadatos | Fuentes sin cuenta, servicios con cuenta, prioridad, traducción, descarga automática y manual |
-| Masha | IA, voz, presencia, color de su estela, tiempo de juego exacto, privacidad |
+| Lucy | IA, voz, presencia, color de su estela, tiempo de juego exacto, privacidad |
 | Acerca de | Actualizaciones (GitHub Releases), autor y enlaces, versión, licencia, licencias de terceros, opciones de desarrollador |
 
 Las claves de `SettingsStore` no cambian: solo cambia dónde se enseña cada opción.
@@ -245,7 +245,7 @@ La lógica pura (categorías, prioridad, grupos de sistemas, resúmenes) está e
 aparato). Se probaron tres sitios: en la barra del hero, flotando en la costura
 hero/estante y la fila de siempre. La fila se descarta (es lo que se quería
 quitar). Desde 760 dp de ancho (lo que pide un dock de cuatro secciones en
-alemán junto al grupo de la derecha sin llegar al botón de Masha) el dock y el
+alemán junto al grupo de la derecha sin llegar al botón de Lucy) el dock y el
 botón de orden van **en la barra del hero, abriendo el grupo de la derecha**,
 junto a la hora y "Abrir": en tableta quedan a mano del pulgar derecho y en el
 mismo recorrido del mando. Centrados en la barra quedaban lejos de todo y
@@ -340,25 +340,25 @@ Rendimiento; `PerformanceTier`, `SocCatalog`, `DevicePerformance`,
 Android 12; < 4 GB; ningún núcleo a 2,2 GHz o < 6 núcleos; o < 5,5 GB sin una
 CPU de 2,6 GHz. También con el ahorro de batería, y como último recurso si la
 biblioteca va a tirones sostenidos (`JankFallback`, `JankMonitor`: p90 > 25 ms
-en 4 ventanas seguidas de 5 s, sin contar arranque, intro, Masha ni
+en 4 ventanas seguidas de 5 s, sin contar arranque, intro, Lucy ni
 descargas); eso se guarda (`perf.stutter`), se avisa una vez y se deshace
 eligiendo Auto otra vez. Bajo Auto, Ajustes dice el motivo.
 Es la misma app: el cristal va por su camino teñido (el de Android 8–11), el
 fondo vivo se decodifica a 32 px y se amplía con bilineal en vez de
 desenfocarse con RenderEffect, la flotación de logos, la respiración de la
 pista y los acercamientos lentos se quedan quietos en su pose, la pantalla va a
-60 fps salvo un 120 elegido a mano, Masha usa `masha_lite.glb` y su voz se
+60 fps salvo un 120 elegido a mano, Lucy usa `masha_lite.glb` y su voz se
 suelta a los 10 s de salir de su pantalla.
 
-## 10. Masha en la biblioteca
+## 10. Lucy en la biblioteca
 
 **Emblema** (`res/drawable/masha.xml`, vectorial; fuente en
 `tools/masha_icon/`: `masha_emblem.svg`, la M calculada por `glyph.py` y
 `svg2vector.py`, que genera el XML). Un orbe de cristal con aurora dentro
 (índigo, cian y violeta, con un rescoldo champán abajo), reflejo arriba y canto
-de luz; dentro, la M de Masha en un corte de alto contraste —trazos gruesos y
+de luz; dentro, la M de Lucy en un corte de alto contraste —trazos gruesos y
 finos, terminales planos, como una Didot— y un destello de cuatro puntas. Se lee
-de 24 a 300 dp, en claro y en oscuro. Es el mismo en el botón, "Masha recuerda",
+de 24 a 300 dp, en claro y en oscuro. Es el mismo en el botón, "Lucy recuerda",
 la vista previa de su color, el widget y la sala del holograma.
 
 **Botón**: fijo, la primera pieza de la barra del hero, arriba a la izquierda
@@ -367,7 +367,7 @@ píldoras de 34— pero en la barra cuenta como 34 para no desalinearla, y se to
 en 48 × 48. Ya no flota ni se arrastra: va dentro del layout y no puede tapar
 el carrusel ni el hero. Alrededor flotan sus partículas (`mashaAura`): el
 polvo estelar de la selección —mismos sprites, sin desenfoque—, del color de
-Masha (Ajustes → Masha), 14 (8 en calidad ligera) que nacen en el canto del
+Lucy (Ajustes → Lucy), 14 (8 en calidad ligera) que nacen en el canto del
 orbe y suben con un rizo. Solo esa pieza tiene reloj; con "reducir
 movimiento" quedan quietas. Su línea ambiental sale debajo,
 alineada a su izquierda, sobre el arte del hero, y se recoge a los 14 s.
@@ -393,11 +393,11 @@ dock de secciones, en la misma fila que la barra de la derecha
 (`MeridianTopRow`: el mismo tope, 8 dp o 6 en ventana baja, el mismo alto de
 34 y la misma línea central). La barra es `[Masha] [hora · batería] [Abrir]
 [orden] [buscar] [Ajustes]` (la píldora de hora y batería viene apagada de
-serie y se enciende en Ajustes; sin ella la barra es más corta): Masha va ahí y no encima del dock (sola en la
+serie y se enciende en Ajustes; sin ella la barra es más corta): Lucy va ahí y no encima del dock (sola en la
 cabecera se veía apretada y sin alinear con nada, y su fila le quitaba 48 dp de
 alto a la rueda, que ahora los recupera). La barra compacta como en el Clásico
 (`TopBarLayout`: "Abrir" a su icono, la píldora sin el tanto por ciento, sin
-píldora); Masha y Ajustes nunca se van. Su ancho máximo
+píldora); Lucy y Ajustes nunca se van. Su ancho máximo
 (`MeridianTopRow.barMaxWidth`) deja al menos 8 dp hasta donde puede asomar el
 dock. A la derecha, el arte del
 juego a sangre (`HeroArtLayer`), ensanchado un 35 % y anclado a la izquierda
@@ -528,7 +528,7 @@ esmerilada), filo 0,30 (0,16 → 0,24 → 0,30) y halo 0,06. El ajuste
 "Desenfoque" lo escala desde ahí (18 px = 1×, como mucho 2×; a 0, sin
 desenfocar). `GlassPanelLayout.resolve` elige el camino: RenderEffect en
 Android 12+ en cualquier móvil (ya no depende de la RAM: la calidad ligera de
-Masha dejaba sin desenfoque a los móviles de menos de 5,5 GB), o, en Android
+Lucy dejaba sin desenfoque a los móviles de menos de 5,5 GB), o, en Android
 8–11, el arte nítido con tinte 0,18 y velo 0,14 (0,07 en oscuro). El cristal
 es el fondo de la rueda de serie en los dos temas: antes el oscuro llevaba el
 difuminado, y en un móvil en tema oscuro el cristal nuevo no aparecía nunca.
@@ -542,7 +542,7 @@ cabecera ancha lo abre, pero ya no lo endereza.
 
 En claro, el cristal curvo pasa 24 dp del eje
 (el dial con su nodo dentro; antes 84, para la cápsula del contador). Lo que va
-encima de la niebla (el dock de la cabecera, el bocadillo de Masha) se mide
+encima de la niebla (el dock de la cabecera, el bocadillo de Lucy) se mide
 contra su canto *visible* y curvo a su altura (`MeridianFog.visibleEdge`): el
 filo del cristal en claro y, en oscuro, donde el velo ya ha bajado a la mitad
 (~34 dp pasado el eje, `WASH_REACH`), no los 88 dp donde ya es transparente.
@@ -591,9 +591,9 @@ llevan en Meridian un suelo de tinta de 0,66 (`MeridianGlass`, `LocalGlassFloor`
 texto ≥ 4,5:1 e iconos ≥ 3:1 sobre cualquier fondo. Se tocan en 48 dp
 aunque se vean de 34 (`touchTarget`).
 
-**Bocadillo de Masha** (`BubbleSlot.underGroup`): debajo del grupo de arriba a
-la derecha, 8 dp bajo Masha, sobre el arte. Si es más ancho que lo que va de
-Masha al canto del grupo, pegado a ese canto; si no, alineado a Masha: siempre
+**Bocadillo de Lucy** (`BubbleSlot.underGroup`): debajo del grupo de arriba a
+la derecha, 8 dp bajo Lucy, sobre el arte. Si es más ancho que lo que va de
+Lucy al canto del grupo, pegado a ese canto; si no, alineado a Lucy: siempre
 queda debajo de ella. Una línea con una X al lado (22 dp, tocable en 48 × 48,
 descrita como "Ahora no"), hasta 560 dp: en un móvil apaisado (892 × 411) la
 línea entera cabe con ~200 dp de sobra en español. Si no cabe (640 dp con la
@@ -601,7 +601,7 @@ letra a 1,3), el texto se parte en dos líneas y "Ahora no" baja debajo, en vez
 de cortarse. Nunca tapa la barra, el dock (si asomara debajo, empieza pasado
 él) ni el bloque del hero (fichas, título, Jugar/Detalles/Opciones); si no hay
 sitio que no lo tape, no se enseña. La rueda ya no le deja sitio: no va sobre
-ella. En el Clásico, debajo de Masha y, si el dock queda justo debajo (sección
+ella. En el Clásico, debajo de Lucy y, si el dock queda justo debajo (sección
 vacía), por debajo del dock.
 
 **Bloque del hero**: fichas (saltan de línea), logo (o titular), sinopsis (dos
@@ -620,7 +620,7 @@ toques rápidos en el mismo sitio abren lo que seleccionó el primero. Un toque
 con la lista moviéndose solo la para. Tras abrir algo, 600 ms en los que no se
 abre nada más. Ajustes → Biblioteca → "Tocar lo seleccionado para abrir".
 
-**Calidad ligera** (la de Masha, `MashaQuality.Lite`): solo ±2 filas, sin
+**Calidad ligera** (la de Lucy, `MashaQuality.Lite`): solo ±2 filas, sin
 giro, sin niebla y sin grano; el arco sin su resplandor ancho.
 
 **Movimiento** (`MeridianMotion`): al entrar, el dial se enciende desde la

@@ -33,10 +33,9 @@ object BenchmarkFixtures {
 
     private fun applySettings(app: ElyndraApplication) {
         val s = app.settings
-        // La intro (animación con tiempo propio) y el diálogo del permiso de
-        // notificaciones taparían la biblioteca al arrancar.
+        // La intro (animación con tiempo propio) taparía la biblioteca al arrancar.
+        // El permiso de notificaciones ya no se pide al arrancar (solo desde Ajustes).
         s.introEnabled = false
-        s.notificationsAsked = true
         // Nada en segundo plano que dependa de la red o del reloj.
         s.autoMeta = false
         s.mashaNudges = false

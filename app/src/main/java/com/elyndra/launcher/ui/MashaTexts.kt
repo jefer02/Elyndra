@@ -5,13 +5,16 @@ import com.elyndra.launcher.R
 import com.elyndra.launcher.data.fmtMinutes
 import com.elyndra.launcher.domain.insights.Insight
 
-/* Cómo dice Masha cada cosa. Vive aparte del controlador porque lo mismo se
+/* Cómo dice Lucy (Masha en el código) cada cosa. Vive aparte del controlador porque lo mismo se
    dice en tres sitios —la burbuja sobre el carrusel, el widget y los avisos— y
    tiene que sonar igual en los tres. */
 
 fun insightText(i: Insight, emulatorName: (String) -> String): UiText = when (i) {
     Insight.EmptyLibrary -> UiText.res(R.string.masha_insight_empty)
     is Insight.DeviceHot -> UiText.res(R.string.masha_insight_hot)
+    is Insight.NewGames ->
+        if (i.count == 1) UiText.res(R.string.masha_insight_added_one, i.sampleTitle)
+        else UiText.plural(R.plurals.masha_insight_added, i.count, i.count, i.sampleTitle)
     is Insight.ArcNext -> UiText.res(R.string.masha_insight_arc, i.arcTitle, i.step, i.total, i.gameTitle)
     is Insight.MetadataFinished -> UiText.res(R.string.masha_insight_meta_done, i.matched, i.missed)
     is Insight.ContinueGame -> UiText.res(R.string.masha_insight_continue, i.title, i.lastMinutes, daysAgoText(i.daysAgo))
@@ -30,6 +33,7 @@ fun Insight.gameKey(): String? = when (this) {
     is Insight.ContinueGame -> gameKey
     is Insight.Abandoned -> gameKey
     is Insight.NeverOpened -> sampleKey
+    is Insight.NewGames -> sampleKey
     else -> null
 }
 

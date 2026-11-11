@@ -50,8 +50,12 @@ class ScrapeService : Service() {
         }
         if (observer == null) {
             observer = app.scope.launch(Dispatchers.Main) {
+                var sawRunning = false
                 engine.progress.collect { p ->
+                    if (p.running) sawRunning = true
                     if (!p.running) {
+                        // La pasada larga terminó con la app fuera de pantalla: Lucy lo cuenta (ver LucyNotices).
+                        if (sawRunning && !p.cancelled && p.total > 0) app.notices.metadataDone(p.matched, p.missed)
                         ServiceCompat.stopForeground(this@ScrapeService, ServiceCompat.STOP_FOREGROUND_REMOVE)
                         stopSelf()
                     } else {

@@ -23,6 +23,8 @@ import com.elyndra.launcher.metadata.MetadataEngine
 import com.elyndra.launcher.metadata.ServiceCredentials
 import com.elyndra.launcher.ui.masha.MashaQuality
 import com.elyndra.launcher.ui.intro.IntroGate
+import com.elyndra.launcher.notify.HeatWatcher
+import com.elyndra.launcher.notify.LucyNotices
 import com.elyndra.launcher.work.ElyndraWork
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -55,6 +57,10 @@ class ElyndraApplication : Application(), ImageLoaderFactory, Configuration.Prov
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var work: ElyndraWork
+
+    /** Los avisos de Lucy fuera de la app y el vigilante del calor durante las partidas. */
+    @Inject lateinit var notices: LucyNotices
+    @Inject lateinit var heat: HeatWatcher
 
     /** La intro se ve una vez por proceso (ver [IntroGate]). */
     val introGate = IntroGate()

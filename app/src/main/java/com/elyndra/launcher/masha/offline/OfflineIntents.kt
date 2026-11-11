@@ -4,7 +4,7 @@ import com.elyndra.launcher.domain.lists.DynamicList
 import com.elyndra.launcher.domain.session.SessionMood
 import java.text.Normalizer
 
-/** Lo que el usuario le pide a Masha, entendido sin IA. */
+/** Lo que el usuario le pide a Lucy (Masha en el código), entendido sin IA. */
 sealed interface OfflineIntent {
     data class Launch(val title: String) : OfflineIntent
     data class Plan(val minMinutes: Int, val maxMinutes: Int, val mood: SessionMood) : OfflineIntent
@@ -20,14 +20,20 @@ sealed interface OfflineIntent {
     data class Rename(val name: String) : OfflineIntent
     /** "¿Hay algún port nativo?": la tienda de ports, con lo que encaja con la biblioteca. */
     data object FindPort : OfflineIntent
+    /** Solo un saludo o su nombre ("hola Lucy", "Masha?"): saluda y dice lo que puede hacer. */
+    data object Hello : OfflineIntent
     data object Unknown : OfflineIntent
 }
 
 /**
- * Masha sin conexión (o sin clave) entiende lo esencial por palabras clave, en
+ * Lucy sin conexión (o sin clave) entiende lo esencial por palabras clave, en
  * los idiomas de la app: lanzar un juego, planear un rato, recomendar, contar
  * horas, enseñar listas, actualizar metadatos, revisar la biblioteca y los
  * arcos. No conversa, pero hace — con los mismos datos que la IA.
+ *
+ * Si se le habla por su nombre ("Lucy, juega Zelda", "hey Masha, tengo media
+ * hora", "play Zelda, Lucy"), el nombre se quita antes de buscar la intención:
+ * vale el de ahora y el de antes, en cualquier idioma.
  */
 object OfflineIntents {
 
@@ -38,9 +44,28 @@ object OfflineIntents {
     private val RANGE = Regex("""(\d{1,3})\s*(?:-|–|a|to|y|and|bis|ate)\s*(\d{1,3})\s*(min|minutos|minutes|minuten|m\b|h|horas?|hours?|heures?|stunden?)?""")
     private val SINGLE = Regex("""(\d{1,3})\s*(min|minutos|minutes|minuten|m\b|h\b|horas?|hours?|heures?|stunden?)""")
 
+    /** Su nombre en la UI y el de antes, también en katakana. */
+    private const val NAMES = """lucy|masha|ルーシー|マーシャ"""
+    private const val GREETINGS = """hey|hi|hello|hola|oye|buenas|ola|olá|oi|salut|coucou|bonjour|hallo|servus|ねえ|やあ|こんにちは"""
+    private val LEADING_NAME = Regex(
+        """^[¡¿]?(?:(?:$GREETINGS)[\s,!、]*)?(?:$NAMES)(?![\p{L}\p{N}])[\s,:;.!?、。！？]*""",
+        RegexOption.IGNORE_CASE,
+    )
+    /** Al final solo tras una coma: "play Lucy" podría ser un título. */
+    private val TRAILING_NAME = Regex("""\s*[,、]\s*(?:$NAMES)[\s.!?。！？]*$""", RegexOption.IGNORE_CASE)
+    private val GREETING_ONLY = Regex(
+        """^[¡¿]?(?:$GREETINGS)(?:[\s,!、]+(?:$GREETINGS))*[\s.!?。！？]*$""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /** [message] sin el nombre con el que se le habla (al principio o al final). */
+    fun withoutName(message: String): String =
+        message.trim().replace(LEADING_NAME, "").replace(TRAILING_NAME, "").trim()
+
     fun detect(message: String): OfflineIntent {
-        val raw = message.trim()
-        if (raw.isEmpty()) return OfflineIntent.Unknown
+        if (message.isBlank()) return OfflineIntent.Unknown
+        val raw = withoutName(message)
+        if (raw.isEmpty() || GREETING_ONLY.matches(raw)) return OfflineIntent.Hello
         val t = fold(raw)
 
         LAUNCH.matchEntire(raw)?.let { m ->

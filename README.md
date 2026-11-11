@@ -40,16 +40,16 @@ exact intent.
   language on demand.
 - **Real play time.** With optional usage access, the time the game was really
   in the foreground; otherwise, from launch until you come back.
-- **Masha, the built-in assistant.** A 3D holographic avatar with lip-sync and
+- **Lucy, the built-in assistant.** A 3D holographic avatar with lip-sync and
   facial expressions, an on-device natural voice (64-bit devices), chat and
   voice input. She picks the emulator that runs each game best on *this*
   device, remembers what and how you play, reviews the library (duplicates,
   missing discs, odd names) and plans short sessions ("I've got 30–40
-  minutes"). See [Masha and the AI key](#masha-and-the-ai-key).
+  minutes"). See [Lucy and the AI key](#lucy-and-the-ai-key).
 - **Look and feel.** Liquid-glass interface, signature color palettes, accent
   colors, selection glow and particles, an animated intro, optional video or
   image background, UI sounds and music.
-- **Home-screen widget** and occasional Masha reminders.
+- **Home-screen widget** and occasional Lucy reminders.
 - **Six languages:** English, Spanish, Portuguese, French, German and
   Japanese, switchable without restarting.
 - **In-app updates** from GitHub Releases (see below).
@@ -60,8 +60,8 @@ exact intent.
 |---|---|
 | ![Classic layout: hero with the game logo over a horizontal carousel of covers](docs/screenshots/classic-library.jpg) | ![Game details sheet with description, developer, rating and metadata sources](docs/screenshots/game-details.jpg) |
 | Classic layout | Game details |
-| ![Masha, the holographic 3D assistant, with play-time stats and chat suggestions](docs/screenshots/masha.jpg) | ![Add to library: three steps to add a ROM folder (folder, system, emulator)](docs/screenshots/add-rom-folder.jpg) |
-| Masha | Add a ROM folder |
+| ![Lucy, the holographic 3D assistant, with play-time stats and chat suggestions](docs/screenshots/masha.jpg) | ![Add to library: three steps to add a ROM folder (folder, system, emulator)](docs/screenshots/add-rom-folder.jpg) |
+| Lucy | Add a ROM folder |
 | ![Appearance settings: Meridian or Classic layout and adaptive background color](docs/screenshots/settings-appearance.jpg) | ![Settings, About: updates section with version, check button and toggles, and author credit](docs/screenshots/settings-updates-about.jpg) |
 | Appearance settings | Updates and About |
 
@@ -102,10 +102,10 @@ key, so builds you compile yourself (debug) can't be updated from Releases.
 ## Requirements
 
 - Android 8.0 (API 26) or later. Tested mostly on Android 15.
-- Masha's natural voice needs a 64-bit device and a one-time download of about
-  145 MB. Elsewhere, Masha uses the system text-to-speech voice.
+- Lucy's natural voice needs a 64-bit device and a one-time download of about
+  145 MB. Elsewhere, Lucy uses the system text-to-speech voice.
 - A gamepad is optional.
-- Internet is only needed for metadata, Masha's online AI, translations and
+- Internet is only needed for metadata, Lucy's online AI, translations and
   updates. Everything else works offline.
 
 ## Build from source
@@ -124,7 +124,7 @@ by git and must never be committed. Only the names are listed here:
 | Key | What for |
 |---|---|
 | `sdk.dir` | Android SDK path (Android Studio writes it) |
-| `masha.apiKey` | DeepSeek API key for Masha's online AI. Without it, Masha runs offline |
+| `masha.apiKey` | DeepSeek API key for Lucy's online AI. Without it, Lucy runs offline |
 | `masha.model` | Chat model (optional, defaults to `deepseek-chat`) |
 | `masha.baseUrl` | API base URL (optional, e.g. your own backend) |
 | `screenscraper.devId`, `screenscraper.devPassword` | ScreenScraper developer credentials |
@@ -145,10 +145,10 @@ WorkManager. The main packages are:
 | Package | What it holds |
 |---|---|
 | `data/` | Library repository, Room database, settings, encrypted secrets, emulator and system profiles |
-| `domain/` | Pure Kotlin logic (Masha's planning, emulator ranking, curation), tested on the JVM |
+| `domain/` | Pure Kotlin logic (Lucy's planning, emulator ranking, curation), tested on the JVM |
 | `launch/` · `library/` | Intent planning and launching, SAF scanning, installed apps |
 | `metadata/` | Metadata service clients, hashing, image cache, translation |
-| `masha/` · `ui/masha/` | Masha's AI, tools, memory and offline mode; 3D avatar, voice and lip-sync |
+| `masha/` · `ui/masha/` | Lucy's AI, tools, memory and offline mode; 3D avatar, voice and lip-sync (the code keeps her original internal name, Masha) |
 | `update/` | In-app updates from GitHub Releases |
 | `ui/` | Compose screens, controllers and the "Elyndra Console" design system |
 
@@ -161,22 +161,22 @@ More in [`docs/`](docs/):
 [RELEASING.md](docs/RELEASING.md) (publishing). Most of the internal docs are
 written in Spanish.
 
-## Masha and the AI key
+## Lucy and the AI key
 
-Masha's free-form conversation uses DeepSeek. The key comes from
+Lucy's free-form conversation uses DeepSeek. The key comes from
 `local.properties` (`masha.apiKey`) at build time, and each user can set their
-own in **Settings → Masha** (stored encrypted). With no key, no network or the
-AI turned off, Masha keeps working offline: plans, lists, launches and stats
+own in **Settings → Lucy** (stored encrypted). With no key, no network or the
+AI turned off, Lucy keeps working offline: plans, lists, launches and stats
 come from your local data; only free-form chat is lost.
 
-Only titles, systems, play time, device state, Masha's memories and the
+Only titles, systems, play time, device state, Lucy's memories and the
 conversation are sent to DeepSeek; never file paths, folders, account names
 or credentials. Any key compiled into an APK can be extracted, so a public
 build should route the AI through its own backend (`masha.baseUrl`).
 
 ## Roadmap
 
-- A shelf for Masha's lists and arcs right in the library (today they live in
+- A shelf for Lucy's lists and arcs right in the library (today they live in
   the chat).
 - AI-written ambient suggestions with daily caching.
 - Instrumented tests for Room migrations and Compose.

@@ -174,8 +174,8 @@ Android games and four ROM folders (PSP, Switch, PS2, GBA, 12–15 games each)
 with names, descriptions, genres, play time and sessions, and local artwork
 drawn on the phone itself (tall, square and wide covers, icons, transparent
 logos, low-res and full-HD backgrounds, some missing on purpose). No network,
-no folder picker, no API keys, no real ROMs. In these variants the intro, the
-notification prompt, music, video background, auto-metadata, Masha nudges and
+no folder picker, no API keys, no real ROMs. In these variants the intro,
+music, video background, auto-metadata, Lucy notifications and
 ambient tips, the updater and the background workers are off, and the art
 picker only shows the local fixture images. None of this code or data is in
 debug or release builds (`src/noBenchmark` has an empty stub).
@@ -221,7 +221,7 @@ times in **Performance** mode (the profile builds up across the three):
 9. the art picker of an Android game (local fixture images only), a few
    thumbnails with the D-pad.
 
-It never presses Play and never opens Masha (her 3D scene and voice are large
+It never presses Play and never opens Lucy (her 3D scene and voice are large
 and not part of everyday browsing). If any expected screen or test tag is
 missing, it fails with a message naming the tag. Expect about 25 minutes in
 total. At the end Gradle uninstalls "Elyndra Bench".

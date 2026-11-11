@@ -1,10 +1,8 @@
 package com.elyndra.launcher
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Color as AndroidColor
 import android.graphics.drawable.ColorDrawable
 import android.hardware.input.InputManager
@@ -21,11 +19,9 @@ import androidx.activity.compose.setContent
 import android.view.WindowManager
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -44,6 +40,7 @@ import com.elyndra.launcher.ui.UiText
 import com.elyndra.launcher.display.FrameRate
 import com.elyndra.launcher.perf.PerfProbe
 import com.elyndra.launcher.ui.theme.LocalPerformance
+import com.elyndra.launcher.notify.AppVisibility
 import com.elyndra.launcher.input.AxisGate
 import com.elyndra.launcher.input.DirectionalRepeater
 import com.elyndra.launcher.input.Gamepad
@@ -118,7 +115,6 @@ class MainActivity : ComponentActivity() {
      * persistente por carpeta) y la lista de apps y emuladores instalados sale
      * del bloque `<queries>` del manifiesto, que no se pide, se declara.
      */
-    private val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     /** Antes de Android 13 el idioma elegido en la app se aplica envolviendo el contexto. */
     override fun attachBaseContext(newBase: Context) {
@@ -152,14 +148,25 @@ class MainActivity : ComponentActivity() {
         window.setBackgroundDrawable(ColorDrawable(windowColor(dark, intro)))
 
         hideSystemBars()
-        askForNotifications()
+        // El permiso de notificaciones ya no se pide al arrancar: se pide al activar
+        // los avisos de Lucy en Ajustes o al lanzar una pasada completa de metadatos.
 
         // Al volver de un juego se cierra la sesión medida; al salir, se cancela un lanzamiento pendiente.
         lifecycle.addObserver(
             LifecycleEventObserver { _, event ->
                 when (event) {
-                    Lifecycle.Event.ON_START -> vm.onForeground()
-                    Lifecycle.Event.ON_STOP -> vm.onBackground()
+                    Lifecycle.Event.ON_START -> {
+                        // Con la app delante no sale ningún aviso de Lucy: lo cuenta el bocadillo.
+                        AppVisibility.foreground = true
+                        app.heat.onForeground()
+                        vm.onForeground()
+                    }
+                    Lifecycle.Event.ON_STOP -> {
+                        AppVisibility.foreground = false
+                        vm.onBackground()
+                        // Si se acaba de lanzar un juego, vigila el calor mientras se juega.
+                        app.heat.onBackground()
+                    }
                     else -> Unit
                 }
             },
@@ -287,23 +294,6 @@ class MainActivity : ComponentActivity() {
             ACTION_OPEN_MASHA -> vm.go(Screen.Masha)
             ACTION_OPEN_PORTS -> vm.openPorts()
         }
-    }
-
-    /**
-     * Permiso de notificaciones, una vez y al empezar.
-     *
-     * Sin él, "aplicar metadatos a toda la biblioteca" corre igual —es un
-     * servicio en primer plano— pero en silencio: ni progreso ni aviso al
-     * terminar. Se pide aquí para que la primera descarga larga ya se vea.
-     */
-    private fun askForNotifications() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        val settings = (application as ElyndraApplication).settings
-        if (settings.notificationsAsked) return
-        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
-        settings.notificationsAsked = true
-        if (!granted) notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     /**

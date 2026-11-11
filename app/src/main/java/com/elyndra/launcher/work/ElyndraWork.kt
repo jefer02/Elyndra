@@ -66,13 +66,16 @@ class ElyndraWork @Inject constructor(@ApplicationContext private val context: C
         )
         // El arte de antes, con SteamGridDB e IGDB primero: una sola vez.
         scheduleArtUpgrade()
-        // Masha mira si tiene algo que de verdad valga un aviso. Casi nunca lo tiene.
+        // Lucy: juegos instalados con la app cerrada y la nota del día (ver MashaNudgeWorker).
+        // Cada pocas horas para caer dentro de su franja (9:00–22:00); casi siempre no hace nada.
+        // UPDATE y no KEEP: con KEEP, el periodo nuevo nunca llegaría a quien ya tenía la app
+        // (seguiría con el de 12 h de antes). UPDATE conserva la cola y cambia solo la petición.
         work.enqueueUniquePeriodicWork(
             NUDGE,
-            ExistingPeriodicWorkPolicy.KEEP,
-            PeriodicWorkRequestBuilder<MashaNudgeWorker>(12, TimeUnit.HOURS)
+            ExistingPeriodicWorkPolicy.UPDATE,
+            PeriodicWorkRequestBuilder<MashaNudgeWorker>(NUDGE_PERIOD_HOURS, TimeUnit.HOURS)
                 .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(true).build())
-                .setInitialDelay(6, TimeUnit.HOURS)
+                .setInitialDelay(2, TimeUnit.HOURS)
                 .build(),
         )
     }
@@ -113,6 +116,7 @@ class ElyndraWork @Inject constructor(@ApplicationContext private val context: C
         const val WIDGET = "elyndra.widget.refresh"
         const val WIDGET_NOW = "elyndra.widget.refresh.now"
         const val NUDGE = "elyndra.masha.nudge"
+        const val NUDGE_PERIOD_HOURS = 4L
         const val PORT_UPDATES = "elyndra.ports.updates"
         const val ART_UPGRADE = "elyndra.art.upgrade"
     }

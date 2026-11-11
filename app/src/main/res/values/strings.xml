@@ -384,11 +384,11 @@
         <item quantity="other">%d removed games</item>
     </plurals>
 
-    <!-- Masha -->
-    <string name="masha">Masha</string>
+    <!-- Lucy -->
+    <string name="masha">Lucy</string>
     <string name="masha_offline_mode">Offline · local answers</string>
-    <string name="masha_placeholder">Ask Masha, or tell her what to do…</string>
-    <string name="masha_greeting">Masha here. I know your library, how you play and what your phone can handle. Ask me anything — or just tell me how much time you’ve got.</string>
+    <string name="masha_placeholder">Ask Lucy, or tell her what to do…</string>
+    <string name="masha_greeting">Hi, I’m Lucy. I know your library, how you play and what your phone can handle. Tell me how much time you’ve got and I’ll find you something.</string>
     <string name="masha_stat_week">This week</string>
     <string name="masha_stat_top">Most played</string>
     <string name="masha_stat_sessions">Sessions</string>
@@ -414,19 +414,19 @@
     <string name="masha_working_generic">On it…</string>
     <string name="masha_err_no_key">No DeepSeek key yet, so I’m answering locally.</string>
     <string name="masha_err_offline">Can’t reach DeepSeek right now — answering offline.</string>
-    <string name="masha_err_key">DeepSeek rejected the API key. Check it in Settings → Masha.</string>
+    <string name="masha_err_key">DeepSeek rejected the API key. Check it in Settings → Lucy.</string>
     <string name="masha_err_balance">The DeepSeek account has no balance left. Answering offline meanwhile.</string>
     <string name="masha_err_rate">DeepSeek says slow down. Give me a moment.</string>
     <string name="masha_err_unavailable">DeepSeek is overloaded or down. Answering offline.</string>
     <string name="masha_err_generic">That got tangled on my side. Try asking another way.</string>
-    <string name="masha_off_launch">Launching %1$s.</string>
-    <string name="masha_off_not_found">I can’t find “%1$s” in your library.</string>
-    <string name="masha_off_plan_continue">Picking up where you left off:</string>
-    <string name="masha_off_plan_light">Something light:</string>
-    <string name="masha_off_plan_new">Something new for you:</string>
-    <string name="masha_off_plan_any">Here’s the plan:</string>
-    <string name="masha_off_plan_empty">Nothing in your library fits that right now.</string>
-    <string name="masha_off_plan_device">I left the heavy consoles out — your battery or temperature isn’t up for it.</string>
+    <string name="masha_off_launch">%1$s, coming up. Have fun.</string>
+    <string name="masha_off_not_found">Hm. I can’t find “%1$s” in your library.</string>
+    <string name="masha_off_plan_continue">Let’s pick up where you left off:</string>
+    <string name="masha_off_plan_light">Something light, then:</string>
+    <string name="masha_off_plan_new">Something you haven’t touched yet:</string>
+    <string name="masha_off_plan_any">Okay, here’s what I’d play:</string>
+    <string name="masha_off_plan_empty">Hm. Nothing in your library fits that right now.</string>
+    <string name="masha_off_plan_device">I left the heavy consoles out. Your phone needs a breather.</string>
     <string name="masha_off_stats">This week: %1$s over %2$d sessions (last week: %3$s). Most played: %4$s.</string>
     <string name="masha_off_stats_empty">No sessions this week yet. Last week you played %1$s.</string>
     <plurals name="masha_off_list">
@@ -434,12 +434,12 @@
         <item quantity="other">%d games.</item>
     </plurals>
     <string name="masha_off_list_empty">None right now. Clean slate.</string>
-    <string name="masha_off_metadata">Fetching what’s missing in the background. Covers will show up as they arrive.</string>
+    <string name="masha_off_metadata">On it. Covers will show up as they arrive.</string>
     <string name="masha_off_cleanup">Library check: %1$d duplicate groups, %2$d incomplete sets, %3$d odd file names. I never touch your files — you decide.</string>
-    <string name="masha_off_no_arcs">No active arcs. Ask me for one when I’m online — something like “the whole Castlevania saga in order”.</string>
+    <string name="masha_off_no_arcs">No arcs going yet. Ask me for one when I’m back online, something like “the whole Castlevania saga in order”. I could get into that.</string>
     <string name="masha_off_arc">“%1$s”: step %2$d of %3$d — %4$s is up.</string>
-    <string name="masha_off_unknown">I’m offline, so no small talk — but I can still plan a session, show your lists, count your hours and launch games.</string>
-    <string name="masha_off_unknown_nokey">I don’t have a DeepSeek key yet, so no small talk — but I can plan a session, show your lists, count your hours and launch games. Add the key in Settings → Masha.</string>
+    <string name="masha_off_unknown">I’m offline, so I can’t really chat right now. I can still plan a session, show your lists, count your hours or launch something.</string>
+    <string name="masha_off_unknown_nokey">No DeepSeek key yet, so I can’t really chat. I can still plan a session, show your lists, count your hours or launch something. The key goes in Settings → Lucy.</string>
     <string name="masha_insight_empty">Empty shelves. Add a ROM folder or your Android games and I’ll take it from there.</string>
     <string name="masha_insight_hot">Your phone is running hot. Something light for a while?</string>
     <string name="masha_insight_arc">“%1$s”, step %2$d of %3$d: %4$s is next.</string>
@@ -467,14 +467,14 @@
     <string name="masha_note_proven">%1$s has run this one %2$d times without a hitch.</string>
     <string name="masha_note_best_system">First run. Going with %1$s — it’s what works best here for this system.</string>
     <string name="masha_dialog_missing_title">%1$s isn’t installed</string>
-    <string name="masha_dialog_missing_msg">Masha: %1$s isn’t on this device, but %2$s is and runs these games too. Use it?</string>
+    <string name="masha_dialog_missing_msg">Lucy: %1$s isn’t on this device, but %2$s is and runs these games too. Use it?</string>
     <string name="masha_use_emulator">Use %1$s</string>
     <string name="masha_keep_emulator">Keep %1$s</string>
-    <string name="masha_dialog_switch_title">Masha has a hunch</string>
+    <string name="masha_dialog_switch_title">Lucy has a hunch</string>
     <string name="masha_dialog_switch_msg">Your last %1$d tries with %2$s ended in seconds. %3$s has run this game fine. Switch for this game?</string>
     <string name="masha_toast_arc_step">“%1$s”: step done. On to the next one.</string>
     <string name="masha_toast_early_exit">Back already? If %1$s is misbehaving with %2$s, ask me for another emulator.</string>
-    <string name="masha_profile_title">Masha remembers</string>
+    <string name="masha_profile_title">Lucy remembers</string>
     <string name="masha_profile_last">Last session: %1$d min with %2$s, %3$s.</string>
     <string name="masha_profile_last_app">Last session: %1$d min, %2$s.</string>
     <string name="masha_profile_typical">Usually ~%1$d min per session · %2$d sessions</string>
@@ -487,9 +487,9 @@
     <string name="masha_match_name">name</string>
     <string name="masha_match_fuzzy">similar name</string>
     <string name="masha_match_manual">you</string>
-    <string name="settings_masha">Masha</string>
+    <string name="settings_masha">Lucy</string>
     <string name="settings_masha_ai">Online AI (DeepSeek)</string>
-    <string name="settings_masha_ai_desc">Conversation and actions through DeepSeek. Off: Masha answers locally with your data.</string>
+    <string name="settings_masha_ai_desc">Conversation and actions through DeepSeek. Off: Lucy answers locally with your data.</string>
     <string name="settings_masha_key">DeepSeek API key</string>
     <string name="settings_masha_key_builtin">Using the built-in key</string>
     <string name="settings_masha_key_hint">sk-… (optional, overrides the built-in one)</string>
@@ -497,19 +497,19 @@
     <string name="settings_masha_status_ok">Connected · balance %1$s</string>
     <string name="settings_masha_status_ok_plain">Connected</string>
     <string name="settings_masha_status_checking">Checking…</string>
-    <string name="settings_masha_status_none">No key: Masha works offline</string>
+    <string name="settings_masha_status_none">No key: Lucy works offline</string>
     <string name="settings_masha_ambient">Suggestions on the carousel</string>
-    <string name="settings_masha_nudges">Occasional notifications</string>
-    <string name="settings_masha_nudges_desc">At most one every few days, never at night.</string>
+    <string name="settings_masha_nudges">Lucy’s notifications</string>
+    <string name="settings_masha_nudges_desc">A daily note at most, never at night, plus a heads-up if your phone overheats mid-game or new games show up while Elyndra is closed. You can turn each kind off in Android settings.</string>
     <string name="settings_masha_voice_natural">Natural voice</string>
-    <string name="settings_masha_voice_natural_desc">A human-sounding voice generated on your device: no connection, no cost. If it isn\'t downloaded or your device can\'t keep up, Masha uses the system voice.</string>
+    <string name="settings_masha_voice_natural_desc">A human-sounding voice generated on your device: no connection, no cost. If it isn\'t downloaded or your device can\'t keep up, Lucy uses the system voice.</string>
     <string name="settings_masha_voice_missing">Not downloaded (%1$d MB, once)</string>
     <string name="settings_masha_voice_downloading">Downloading… %1$d%%</string>
-    <string name="settings_masha_voice_installed">Installed: Masha speaks with it</string>
+    <string name="settings_masha_voice_installed">Installed: Lucy speaks with it</string>
     <string name="settings_masha_voice_failed">Download failed: %1$s</string>
-    <string name="settings_masha_voice_unsupported">This device doesn\'t have enough memory for the natural voice: Masha uses the system voice.</string>
-    <string name="settings_masha_voice_slow">This device is too slow for the natural voice: Masha uses the system voice.</string>
-    <string name="settings_masha_voice_off">Downloaded but turned off: Masha uses the system voice.</string>
+    <string name="settings_masha_voice_unsupported">This device doesn\'t have enough memory for the natural voice: Lucy uses the system voice.</string>
+    <string name="settings_masha_voice_slow">This device is too slow for the natural voice: Lucy uses the system voice.</string>
+    <string name="settings_masha_voice_off">Downloaded but turned off: Lucy uses the system voice.</string>
     <string name="settings_masha_voice_retry">Retry</string>
     <string name="settings_masha_voice_download">Download</string>
     <string name="settings_masha_voice_delete">Delete</string>
@@ -517,15 +517,15 @@
     <string name="settings_masha_voice_n">Voice %1$d</string>
     <string name="settings_masha_voice_speed">Speed</string>
     <string name="settings_masha_voice_test">Try it</string>
-    <string name="settings_masha_voice_sample">Hi, I\'m Masha. What do you feel like playing today?</string>
+    <string name="settings_masha_voice_sample">Hi, I\'m Lucy. What do you feel like playing today?</string>
     <string name="settings_masha_voice_notice">The natural voice is synthetic (AI-generated), made on your device with the Supertonic 3 model (OpenRAIL-M license).</string>
     <string name="settings_masha_usage">Exact playtime</string>
     <string name="settings_masha_usage_desc">Lets Elyndra read how long each emulator was really open (Usage access). Optional.</string>
     <string name="settings_masha_usage_on">Enabled</string>
     <string name="settings_masha_usage_off">Grant access</string>
-    <string name="settings_masha_privacy">What Masha sends to DeepSeek: game titles, systems, playtime and device state. Never file paths, folders or credentials.</string>
-    <string name="settings_masha_forget">Forget everything Masha knows</string>
-    <string name="settings_masha_forget_msg">Deletes Masha’s memories, the conversation and cached answers. Your library and playtime stay.</string>
+    <string name="settings_masha_privacy">What Lucy sends to DeepSeek: game titles, systems, playtime and device state. Never file paths, folders or credentials.</string>
+    <string name="settings_masha_forget">Forget everything Lucy knows</string>
+    <string name="settings_masha_forget_msg">Deletes Lucy’s memories, the conversation and cached answers. Your library and playtime stay.</string>
     <string name="toast_masha_forgot">Done. Clean slate.</string>
     <string name="settings_priority">Source priority</string>
     <string name="settings_priority_text">Text (names, synopsis, dates)</string>
@@ -534,15 +534,15 @@
     <string name="settings_priority_reset">Reset order</string>
     <string name="move_up">Move up</string>
     <string name="move_down">Move down</string>
-    <string name="widget_masha_desc">Masha’s pick for right now</string>
+    <string name="widget_masha_desc">Lucy’s pick for right now</string>
     <string name="widget_empty">Add games to Elyndra and I’ll have suggestions.</string>
     <string name="widget_play">Play</string>
-    <string name="notif_channel_masha">Masha</string>
-    <string name="notif_channel_masha_desc">Occasional suggestions. At most one every few days.</string>
+    <string name="notif_channel_masha">Daily note from Lucy</string>
+    <string name="notif_channel_masha_desc">At most one a day, never at night, and only if you haven’t opened Elyndra.</string>
     <string name="notif_channel_ports">Port updates</string>
     <string name="notif_channel_ports_desc">When an installed port has a new release.</string>
 
-    <!-- Mandos, pantalla y partículas de Masha -->
+    <!-- Mandos, pantalla y partículas de Lucy -->
     <string name="gamepad_connected">Controller connected: %1$s</string>
     <string name="gamepad_disconnected">Controller disconnected</string>
     <string name="section_display">Display</string>
@@ -562,11 +562,11 @@
     <string name="perf_reason_battery_saver">Auto · Performance: battery saver is on.</string>
     <string name="perf_stutter_notice">The library was stuttering, so Elyndra switched to Performance mode (same look, lighter effects). To re-check, choose Auto in Settings → Display.</string>
     <string name="perf_mode_quality_desc">Live blur, ambient motion and full particles, even on modest devices.</string>
-    <string name="perf_mode_performance_desc">Same look with lighter effects: tinted glass instead of live blur, fewer particles, no ambient motion, 60 fps and the lite Masha.</string>
-    <string name="masha_high_refresh">Masha: high smoothness (120 Hz)</string>
-    <string name="masha_high_refresh_desc">Off, Masha runs at 60 fps: just as fluid for a hologram, with half the GPU work, less battery and less heat in long chats.</string>
+    <string name="perf_mode_performance_desc">Same look with lighter effects: tinted glass instead of live blur, fewer particles, no ambient motion, 60 fps and the lite Lucy.</string>
+    <string name="masha_high_refresh">Lucy: high smoothness (120 Hz)</string>
+    <string name="masha_high_refresh_desc">Off, Lucy runs at 60 fps: just as fluid for a hologram, with half the GPU work, less battery and less heat in long chats.</string>
     <string name="masha_particles_title">Particle color</string>
-    <string name="masha_particles_desc">The particles that float around Masha’s emblem in the library.</string>
+    <string name="masha_particles_desc">The particles that float around Lucy’s emblem in the library.</string>
     <string name="masha_particles_hue">Hue</string>
     <string name="masha_particles_preview">Preview</string>
     <string name="section_selection">Selection</string>
@@ -580,21 +580,21 @@
     <string name="masha_status_listening">Listening…</string>
     <string name="masha_status_speaking">Speaking</string>
     <string name="masha_status_thinking">Thinking…</string>
-    <string name="masha_mic">Talk to Masha</string>
+    <string name="masha_mic">Talk to Lucy</string>
     <string name="masha_mic_stop">Stop listening</string>
-    <string name="masha_mic_denied">Masha needs microphone access to hear you.</string>
+    <string name="masha_mic_denied">Lucy needs microphone access to hear you.</string>
     <string name="masha_mic_unavailable">Speech recognition isn’t available on this device.</string>
     <string name="masha_mic_no_match">I didn’t catch that. Try again?</string>
     <string name="masha_mic_network">Speech recognition needs a connection.</string>
     <string name="masha_sound">Sound</string>
     <string name="masha_sound_ambient">Ambient soundscape</string>
     <string name="masha_sound_volume">Ambient volume</string>
-    <string name="masha_sound_voice">Masha’s voice</string>
+    <string name="masha_sound_voice">Lucy’s voice</string>
     <string name="masha_show_chat">Show conversation</string>
     <string name="masha_hide_chat">Hide conversation</string>
     <string name="masha_recenter">Recenter view</string>
-    <string name="masha_loading">Materializing Masha…</string>
-    <string name="masha_stage_fallback">3D isn’t available on this device — Masha is still here.</string>
+    <string name="masha_loading">Materializing Lucy…</string>
+    <string name="masha_stage_fallback">3D isn’t available on this device — Lucy is still here.</string>
     <string name="masha_new_chat">New conversation</string>
     <string name="masha_back">Back</string>
     <string name="masha_listening_hint">Speak now…</string>
@@ -607,11 +607,11 @@
     <string name="licenses_components">Libraries and fonts</string>
     <string name="licenses_assets">3D assets</string>
     <string name="licenses_apache_notice">Components under the Apache License 2.0 are licensed under it; you may obtain a copy at https://www.apache.org/licenses/LICENSE-2.0. The SIL Open Font License 1.1 is at https://openfontlicense.org.</string>
-    <string name="licenses_mpfb_note">Masha’s 3D model (made with MPFB2 and the MakeHuman system assets)</string>
-    <string name="licenses_cmudict_use">Masha uses the CMU Pronouncing Dictionary to move her lips when she speaks English. Its notice, verbatim:</string>
+    <string name="licenses_mpfb_note">Lucy’s 3D model (made with MPFB2 and the MakeHuman system assets)</string>
+    <string name="licenses_cmudict_use">Lucy uses the CMU Pronouncing Dictionary to move her lips when she speaks English. Its notice, verbatim:</string>
     <string name="dev_section">Developer</string>
     <string name="dev_voice_sync">Calibrate voice sync</string>
-    <string name="dev_voice_sync_desc">Line up Masha’s lips with the sound for each audio output (Bluetooth headphones add delay).</string>
+    <string name="dev_voice_sync_desc">Line up Lucy’s lips with the sound for each audio output (Bluetooth headphones add delay).</string>
     <string name="dev_hide">Hide developer options</string>
     <string name="dev_unlocked">Developer options unlocked</string>
     <string name="dev_already">Developer options are already on</string>
@@ -633,7 +633,7 @@
     <!-- Sonidos de la interfaz -->
     <string name="section_sounds">Sounds</string>
     <string name="sound_enabled">Interface sounds</string>
-    <string name="sound_enabled_desc">Short, original console-style cues. They never pause your music and stay quiet in silent or vibrate mode and while Masha talks or listens.</string>
+    <string name="sound_enabled_desc">Short, original console-style cues. They never pause your music and stay quiet in silent or vibrate mode and while Lucy talks or listens.</string>
     <string name="sound_volume">Volume</string>
     <string name="sound_navigation">Navigation sound</string>
     <string name="sound_navigation_desc">A soft tick each time the selection moves.</string>
@@ -668,7 +668,7 @@
     <!-- Música de fondo -->
     <string name="section_music">Background music</string>
     <string name="music_enabled">Menu music</string>
-    <string name="music_enabled_desc">A calm, original console-menu ambience while you browse. It stops when a game starts, fades down while Masha talks and never plays over music from another app.</string>
+    <string name="music_enabled_desc">A calm, original console-menu ambience while you browse. It stops when a game starts, fades down while Lucy talks and never plays over music from another app.</string>
     <string name="music_volume">Music volume</string>
     <string name="music_source">Music</string>
     <string name="music_source_builtin">Elyndra ambience</string>
@@ -743,13 +743,13 @@
     <string name="art_failed_network">No connection. The previous image stays.</string>
     <string name="art_failed_image">That image could not be loaded, try another.</string>
 
-    <!-- Masha: nombres, añadir juegos y emuladores -->
+    <!-- Lucy: nombres, añadir juegos y emuladores -->
     <string name="masha_write_done">Done: %1$s</string>
     <string name="masha_write_failed">Couldn\'t do it: %1$s</string>
     <string name="masha_write_cancelled">Cancelled. I didn\'t change anything.</string>
     <string name="masha_off_nothing_to_add">There\'s nothing new to add: everything installed is already in your library.</string>
     <string name="masha_off_add_confirm">These installed games aren\'t in your library yet. Shall I add them?</string>
-    <string name="masha_off_rename_which">Which game? Open its details or select it first.</string>
+    <string name="masha_off_rename_which">Which one? Open its details or select it first.</string>
     <string name="masha_off_renamed">Done: «%1$s» is now called «%2$s».</string>
     <string name="masha_off_rename_bad">«%1$s» doesn\'t look like a game name.</string>
     <string name="masha_confirm_rename">Rename «%1$s» to «%2$s»</string>
@@ -786,7 +786,7 @@
     <string name="settings_cat_appearance">Appearance</string>
     <string name="settings_cat_library">Library</string>
     <string name="settings_cat_metadata">Metadata</string>
-    <string name="settings_cat_masha">Masha</string>
+    <string name="settings_cat_masha">Lucy</string>
     <string name="settings_cat_about">About</string>
     <string name="settings_cat_display_desc">Theme, intro, frame rate and language</string>
     <string name="settings_cat_sound_desc">Interface sounds and custom sounds</string>
@@ -904,8 +904,8 @@
     <string name="about_license_value">All rights reserved</string>
     <string name="licenses_app_copyright">Copyright © 2026 %1$s. All rights reserved.</string>
     <string name="licenses_app_terms">The source code is published on GitHub for reading only. You may install and use the official releases for personal, non-commercial use. Copying, modifying, redistributing or making derivative works requires written permission. The third-party components below keep their own licenses.</string>
-    <string name="licenses_voice_title">Masha’s natural voice</string>
-    <string name="licenses_voice_notice">Masha’s natural voice runs on your device with the Supertonic 3 model weights by Supertone Inc., licensed under the BigScience OpenRAIL-M license. The voice is synthetic (AI-generated). By using it you agree not to use it for the restricted uses in Attachment A of that license, among others: breaking the law, harming minors, impersonating people without their consent, spreading false information to harm others, harassment, or presenting the generated speech without disclosing that it is machine-generated.</string>
+    <string name="licenses_voice_title">Lucy’s natural voice</string>
+    <string name="licenses_voice_notice">Lucy’s natural voice runs on your device with the Supertonic 3 model weights by Supertone Inc., licensed under the BigScience OpenRAIL-M license. The voice is synthetic (AI-generated). By using it you agree not to use it for the restricted uses in Attachment A of that license, among others: breaking the law, harming minors, impersonating people without their consent, spreading false information to harm others, harassment, or presenting the generated speech without disclosing that it is machine-generated.</string>
     <string name="licenses_voice_open">Read the OpenRAIL-M license</string>
 
     <!-- Ajustes: nombres de las muestras de color (lector de pantalla y rótulos). -->
@@ -1041,6 +1041,7 @@ Built by the community, not reviewed. Check the repository before installing.</s
     <string name="masha_working_ports">Looking for native ports…</string>
     <string name="masha_off_ports">These native ports match your library. Tap one to see what it needs.</string>
     <string name="masha_off_ports_none">None of your games has a native port in the catalog yet. I\'ll open the store so you can browse.</string>
+    <string name="masha_off_hello">Hey, you. I’m offline right now, but I can still plan a session, show your lists or launch something.</string>
     <string name="masha_ports_title">Native ports</string>
     <string name="ports_chip_all">All</string>
     <string name="ports_chip_not_on_android">Not on Android yet</string>
@@ -1160,4 +1161,29 @@ Built by the community, not reviewed. Check the repository before installing.</s
         <item quantity="one">%1$d game added</item>
         <item quantity="other">%1$d games added</item>
     </plurals>
+    <string name="masha_insight_added_one">%1$s just landed in your library. Want to try it?</string>
+    <plurals name="masha_insight_added">
+        <item quantity="one">%1$d new game just landed: %2$s. Want a look?</item>
+        <item quantity="other">%1$d new games just landed, %2$s among them. Want a look?</item>
+    </plurals>
+    <string name="notif_channel_lucy_hot">Device too hot</string>
+    <string name="notif_channel_lucy_hot_desc">Lucy speaks up if your phone overheats during a game. At most once every two hours.</string>
+    <string name="notif_channel_lucy_new_games">New games</string>
+    <string name="notif_channel_lucy_new_games_desc">Games installed while Elyndra was closed, all in one notification.</string>
+    <string name="notif_channel_lucy_metadata">Metadata ready</string>
+    <string name="notif_channel_lucy_metadata_desc">When covers and game info finish downloading in the background.</string>
+    <string name="lucy_notif_hot">Your phone is getting really hot. Maybe a short break, or something lighter for a bit?</string>
+    <plurals name="lucy_notif_new_games">
+        <item quantity="one">%2$s just got installed. Want me to add it to your library?</item>
+        <item quantity="other">%1$d new games installed, %2$s among them. Want me to add them?</item>
+    </plurals>
+    <string name="lucy_notif_metadata">Covers and info are done: %1$d games matched, %2$d not found.</string>
+    <string-array name="lucy_daily_lines">
+        <item>Haven’t seen you today. Got a game in mind?</item>
+        <item>Hey you. I saved a spot for you, if you feel like playing later.</item>
+        <item>Quiet day? I could find you something short and sweet.</item>
+        <item>I was just thinking about your library. Want me to pick something?</item>
+        <item>Okay, I see you being busy. Whenever you’re free, I’m here.</item>
+        <item>Got twenty minutes later? I know exactly what I’d put on.</item>
+    </string-array>
 </resources>

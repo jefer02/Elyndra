@@ -39,6 +39,16 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
+import android.Manifest
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import com.elyndra.launcher.ElyndraApplication
+import com.elyndra.launcher.domain.notify.LucyNotice
+import com.elyndra.launcher.notify.LucyNoticeDebug
+import com.elyndra.launcher.notify.LucyNotifier
 import com.elyndra.launcher.data.P
 import com.elyndra.launcher.metadata.Service
 import com.elyndra.launcher.ui.ElyndraViewModel
@@ -116,12 +126,7 @@ internal fun MashaColumn(vm: ElyndraViewModel) {
                     onToggle = s::toggleMashaAmbient,
                 )
                 Spacer(Modifier.height(12.dp))
-                ToggleRow(
-                    title = stringResource(R.string.settings_masha_nudges),
-                    desc = stringResource(R.string.settings_masha_nudges_desc),
-                    checked = s.mashaNudges,
-                    onToggle = s::toggleMashaNudges,
-                )
+                LucyNotificationsRow(vm)
             }
         }
 
@@ -283,4 +288,68 @@ private fun KeyField(vm: ElyndraViewModel) {
             null
         },
     )
+}
+
+/**
+ * Los avisos de Lucy. El permiso de Android 13+ no se pide al arrancar la app:
+ * se pide aquí, al encenderlos. Si se deniega, el interruptor se queda apagado
+ * y no se insiste (los avisos simplemente no salen).
+ *
+ * En builds de depuración, debajo, un botón por tipo de aviso para lanzarlo a
+ * mano (ver LucyNoticeDebug; en release no existe).
+ */
+@Composable
+private fun LucyNotificationsRow(vm: ElyndraViewModel) {
+    val s = vm.settings
+    val context = LocalContext.current
+    var permitted by remember { mutableStateOf(LucyNotifier.permitted(context)) }
+    var pendingDebug by remember { mutableStateOf<LucyNotice?>(null) }
+    val notices = (context.applicationContext as ElyndraApplication).notices
+
+    fun simulate(kind: LucyNotice) {
+        val verdict = LucyNoticeDebug.simulate(notices, kind)
+        Toast.makeText(context, "${kind.name}: ${verdict.name}", Toast.LENGTH_SHORT).show()
+    }
+
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        permitted = granted
+        if (granted) s.changeMashaNudges(true)
+        pendingDebug?.let { if (granted) simulate(it) }
+        pendingDebug = null
+    }
+    val needsPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !permitted
+
+    ToggleRow(
+        title = stringResource(R.string.settings_masha_nudges),
+        desc = stringResource(R.string.settings_masha_nudges_desc),
+        checked = s.mashaNudges && !needsPermission,
+        onToggle = {
+            when {
+                s.mashaNudges && !needsPermission -> s.changeMashaNudges(false)
+                needsPermission -> ask.launch(Manifest.permission.POST_NOTIFICATIONS)
+                else -> s.changeMashaNudges(true)
+            }
+        },
+    )
+
+    LucyNoticeDebug.label?.let { label ->
+        Spacer(Modifier.height(12.dp))
+        ElyText(label, size = 10f, color = P.ink2)
+        Spacer(Modifier.height(6.dp))
+        // De dos en dos: cuatro botones seguidos no caben a lo ancho de un móvil.
+        LucyNotice.entries.chunked(2).forEach { pair ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 6.dp)) {
+                pair.forEach { kind ->
+                    GhostButton(kind.name, {
+                        if (needsPermission) {
+                            pendingDebug = kind
+                            ask.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            simulate(kind)
+                        }
+                    })
+                }
+            }
+        }
+    }
 }

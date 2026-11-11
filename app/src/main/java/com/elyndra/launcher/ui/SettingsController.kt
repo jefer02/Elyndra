@@ -447,9 +447,17 @@ class SettingsController(private val vm: ElyndraViewModel) {
         vm.masha.refreshInsight()
     }
 
-    fun toggleMashaNudges() {
-        mashaNudges = !mashaNudges
-        store.mashaNudges = mashaNudges
+    fun toggleMashaNudges() = changeMashaNudges(!mashaNudges)
+
+    /**
+     * Avisos de Lucy encendidos o apagados. Al encenderlos se crean ya sus
+     * canales, para que se puedan ajustar uno a uno en Android. El permiso
+     * (Android 13+) lo pide la pantalla antes de llamar aquí.
+     */
+    fun changeMashaNudges(on: Boolean) {
+        mashaNudges = on
+        store.mashaNudges = on
+        if (on) runCatching { com.elyndra.launcher.notify.LucyNotifier.ensureChannels(vm.app) }
     }
 
     fun updateMashaKey(value: String) {

@@ -15,7 +15,6 @@ import com.elyndra.launcher.data.AppLocale
 import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.data.fmtMinutes
 import com.elyndra.launcher.domain.insights.Insight
-import com.elyndra.launcher.domain.insights.InsightPacing
 import com.elyndra.launcher.domain.lists.DynamicList
 import com.elyndra.launcher.domain.lists.ListRule
 import com.elyndra.launcher.domain.lists.SmartLists
@@ -40,7 +39,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * Masha en la interfaz: la conversación (en streaming, con herramientas y
+ * Lucy (Masha en el código) en la interfaz: la conversación (en streaming, con herramientas y
  * con sus adjuntos), la sugerencia ambiental sobre el carrusel y las tarjetas
  * de la cabecera del chat.
  *
@@ -75,7 +74,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
      */
     var insightRevision by mutableIntStateOf(0); private set
 
-    private val pacing = InsightPacing()
+    private val pacing get() = brain.pacing
 
     /** Lo que Masha propone cambiar y espera confirmación, y la pila de deshacer. */
     val writes = MashaWrites()
@@ -369,6 +368,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                     ctx.getString(R.string.masha_off_ports_none)
                 }
             }
+            OfflineIntent.Hello -> ctx.getString(R.string.masha_off_hello)
             OfflineIntent.Unknown -> ctx.getString(if (brain.config.hasKey) R.string.masha_off_unknown else R.string.masha_off_unknown_nokey)
         }
         val prefix = failure?.let { ctx.getString(failureLine(it)) + "\n\n" }.orEmpty()
@@ -423,10 +423,14 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
             return
         }
         vm.viewModelScope.launch {
-            val next = runCatching { brain.insights().firstOrNull() }.getOrNull()
-            // Lo ya dicho no se repite cada vez que se vuelve a la app: ver InsightPacing.
-            if (next != null && next.id == insight?.id) return@launch
-            insight = next?.takeIf { pacing.admit(it, System.currentTimeMillis()) }
+            val all = runCatching { brain.insights() }.getOrDefault(emptyList())
+            // La que ya está en pantalla se queda tal cual (no vuelve a "asomar").
+            val current = insight
+            if (current != null && all.any { it.id == current.id }) return@launch
+            // Abrir la app no basta: solo sale un hecho nuevo o la sugerencia del día (ver InsightPacing).
+            val next = pacing.pick(all, System.currentTimeMillis())
+            if (next == null && current == null) return@launch
+            insight = next
             insightRevision++
         }
     }
@@ -448,6 +452,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
             is Insight.ContinueGame -> vm.showDetails(current.gameKey)
             is Insight.Abandoned -> vm.showDetails(current.gameKey)
             is Insight.NeverOpened -> vm.showDetails(current.sampleKey)
+            is Insight.NewGames -> vm.showDetails(current.sampleKey)
             is Insight.EmulatorMissing -> vm.library.folders.firstOrNull { it.id == current.folderId }?.let { vm.pickFolderEmulator(it) }
             is Insight.ConfigureServices -> vm.go(Screen.Settings)
             is Insight.MissingArt -> {
