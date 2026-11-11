@@ -50,6 +50,10 @@ object MashaTools {
     const val SET_PREFERRED_EMULATOR = "set_preferred_emulator"
     const val UNDO_LAST_ACTION = "undo_last_action"
     const val FIND_PORT = "find_port"
+    const val RECOMMEND = "show_recommendations"
+
+    /** Cuántas tarjetas como mucho en una recomendación. */
+    const val MAX_PICKS = 4
 
     /** Las que cambian algo: una respuesta que las usó nunca sale de caché. */
     val MUTATING = setOf(
@@ -205,6 +209,20 @@ object MashaTools {
                 string("emulator", "Emulator name or id.")
                 required("system", "emulator")
             },
+            tool(
+                RECOMMEND,
+                "Show what you recommend as cards: cover, system, playtime, state, emulator and Play/Open buttons. Use it EVERY time you recommend games " +
+                    "or ports, instead of describing them in text. Up to $MAX_PICKS items, best first, each with a one-line reason in the user's language. " +
+                    "Library games by title; ports by their id from the ports search.",
+            ) {
+                objectArray("items", "The recommendations, best first.") {
+                    string("title", "Library game title, exactly as in the data.")
+                    string("port_id", "For a port: its id from the ports search (leave title empty).")
+                    string("reason", "One short line: why this one, for them, now.")
+                    required("reason")
+                }
+                required("items")
+            },
             tool(UNDO_LAST_ACTION, "Undo the last rename, add or emulator change made through you. Only when the user asks.") {},
             tool(
                 FIND_PORT,
@@ -248,6 +266,19 @@ object MashaTools {
 
         fun required(vararg names: String) {
             required += names
+        }
+
+        fun objectArray(name: String, description: String, item: Params.() -> Unit) {
+            val p = Params().apply(item)
+            properties[name] = buildJsonObject {
+                put("type", "array")
+                put("description", description)
+                putJsonObject("items") {
+                    put("type", "object")
+                    putJsonObject("properties") { p.properties.forEach { (k, v) -> put(k, v) } }
+                    if (p.required.isNotEmpty()) putJsonArray("required") { p.required.forEach { add(it) } }
+                }
+            }
         }
 
         private fun prop(name: String, type: String, description: String) {

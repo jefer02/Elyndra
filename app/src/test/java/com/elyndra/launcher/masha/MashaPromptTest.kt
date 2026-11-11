@@ -112,7 +112,16 @@ class MashaPromptTest {
     }
 
     @Test
-    fun theVersionIsBumpedForLiveInterruptions() {
-        assertEquals(8, MashaPrompt.VERSION)
+    fun repliesWithCardsAreOneOrTwoSpokenSentences() {
+        assertTrue(prompt.contains("call show_recommendations with up to four items"))
+        val cards = prompt.lines().single { it.trim().startsWith("- CARDS:") }
+        assertTrue(cards.contains("one or two short spoken sentences"))
+        assertTrue(cards.contains("No list of titles"))
+        assertEquals(MashaTools.MAX_PICKS, 4)
+    }
+
+    @Test
+    fun theVersionIsBumpedForCards() {
+        assertEquals(9, MashaPrompt.VERSION)
     }
 }

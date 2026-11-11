@@ -13,12 +13,14 @@ import com.elyndra.launcher.masha.ToolCall
 import com.elyndra.launcher.masha.ToolResult
 import com.elyndra.launcher.masha.ToolSpec
 import com.elyndra.launcher.masha.bool
+import com.elyndra.launcher.masha.playStateName
 import com.elyndra.launcher.masha.str
 import com.elyndra.launcher.masha.toolFail
 import com.elyndra.launcher.masha.toolOk
 import com.elyndra.launcher.metadata.ArtKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.addJsonObject
@@ -82,6 +84,7 @@ class MashaActions(
             MashaTools.SET_PREFERRED_EMULATOR -> library.setPreferred(a)
             MashaTools.UNDO_LAST_ACTION -> library.undo()
             MashaTools.FIND_PORT -> findPort(a.str("query"), a.bool("open") == true)
+            MashaTools.RECOMMEND -> recommend(a)
             else -> toolFail("unknown tool ${call.name}")
         }
     }
@@ -146,6 +149,53 @@ class MashaActions(
      * Ports del catálogo de la tienda. Solo títulos, plataformas y repositorios:
      * nada de rutas ni de URLs de descarga, y nunca ROMs.
      */
+    /**
+     * Las tarjetas de una recomendación: cada juego (por título) o port (por
+     * id) que exista, con su motivo y los datos de ahora (minutos, estado,
+     * emulador). Lo que no se encuentra se dice al modelo y no sale.
+     */
+    private suspend fun recommend(a: JsonObject): ToolResult {
+        val items = (a["items"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.take(MashaTools.MAX_PICKS)
+        if (items.isEmpty()) return toolFail("nothing to show: pass items with a title or port_id and a reason")
+        val snapshot = brain.knowledge.snapshot()
+        val picks = ArrayList<MashaAttachment.Pick>()
+        val missing = ArrayList<String>()
+        for (item in items) {
+            val reason = item.str("reason")?.trim()?.take(MAX_REASON).orEmpty()
+            val portId = item.str("port_id")?.trim()?.takeIf { it.isNotEmpty() }
+            if (portId != null) {
+                val ports = vm.ports
+                if (ports.catalog.isEmpty()) onMain { ports.onOpen() }.also { ports.awaitCatalog() }
+                val port = ports.catalog.firstOrNull { it.id == portId }
+                    ?: StoreRows.find(ports.catalog, portId, emptyList(), limit = 1).firstOrNull()?.lead
+                if (port == null) missing += portId else picks += MashaAttachment.Pick(MashaAttachment.Pick.PORT, port.id, reason)
+                continue
+            }
+            val title = item.str("title")
+            val game = title?.let { snapshot.resolve(it) }
+            if (game == null) {
+                missing += title.orEmpty()
+                continue
+            }
+            val p = snapshot.profiles[game.key]
+            picks += MashaAttachment.Pick(
+                kind = MashaAttachment.Pick.GAME,
+                id = game.key,
+                reason = reason,
+                minutes = p?.totalMinutes ?: game.stats.minutes,
+                state = playStateName(p?.state),
+                emulator = if (game.isApp) null else p?.lastEmulator?.let { vm.orchestrator.name(it) },
+            )
+        }
+        val shown = picks.distinctBy { it.kind to it.id }
+        if (shown.isEmpty()) return toolFail("none of those are in the library or the Ports store: ${missing.joinToString()}")
+        return toolOk(attachment = MashaAttachment.Picks(shown)) {
+            put("shown", shown.size)
+            if (missing.isNotEmpty()) putJsonArray("not_found") { missing.forEach { add(it) } }
+            put("note", "The cards show the details: say one or two short spoken sentences, no titles list.")
+        }
+    }
+
     private suspend fun findPort(query: String?, open: Boolean): ToolResult {
         val ports = vm.ports
         if (ports.catalog.isEmpty()) onMain { ports.onOpen() }.also { ports.awaitCatalog() }
@@ -274,4 +324,9 @@ class MashaActions(
     private fun notFound(title: String?) = toolFail("'${title.orEmpty()}' is not in the user's library")
 
     private suspend fun <T> onMain(block: () -> T): T = withContext(Dispatchers.Main) { block() }
+
+    private companion object {
+        /** El motivo de una tarjeta: una línea. */
+        const val MAX_REASON = 140
+    }
 }

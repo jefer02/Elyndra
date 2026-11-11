@@ -498,13 +498,7 @@ class MashaSkills @Inject constructor(
 
     private fun notFound(title: String?) = toolFail("'${title.orEmpty()}' is not in the user's library (searched the full library)")
 
-    private fun stateName(state: PlayState?) = when (state ?: PlayState.New) {
-        PlayState.New -> "new"
-        PlayState.Tried -> "tried"
-        PlayState.InProgress -> "in_progress"
-        PlayState.Abandoned -> "abandoned"
-        PlayState.Dormant -> "dormant"
-    }
+    private fun stateName(state: PlayState?) = playStateName(state)
 
     private fun verdictName(v: Verdict) = when (v) {
         Verdict.Proven -> "runs well here"
@@ -518,4 +512,13 @@ class MashaSkills @Inject constructor(
         const val MAX_LIMIT = 40
         private const val DAY_MS = 24L * 60 * 60 * 1000
     }
+}
+
+/** El estado de un juego como lo leen el modelo y las tarjetas de recomendación. */
+internal fun playStateName(state: PlayState?): String = when (state ?: PlayState.New) {
+    PlayState.New -> "new"
+    PlayState.Tried -> "tried"
+    PlayState.InProgress -> "in_progress"
+    PlayState.Abandoned -> "abandoned"
+    PlayState.Dormant -> "dormant"
 }

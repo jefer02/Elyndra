@@ -184,6 +184,33 @@ sealed interface MashaAttachment {
     @SerialName("ports")
     data class Ports(val title: String? = null, val ids: List<String>) : MashaAttachment
 
+    /**
+     * Lo que Lucy recomienda (herramienta `show_recommendations`): una tarjeta por juego
+     * o port, con su motivo en una línea; los datos (minutos, estado,
+     * emulador) se guardan como estaban al recomendarlo.
+     */
+    @Serializable
+    @SerialName("picks")
+    data class Picks(val items: List<Pick>) : MashaAttachment
+
+    @Serializable
+    data class Pick(
+        /** game | port */
+        val kind: String,
+        /** Clave del juego en la biblioteca, o id del port en el catálogo. */
+        val id: String,
+        val reason: String,
+        val minutes: Int? = null,
+        /** new | tried | in_progress | abandoned | dormant (juegos). */
+        val state: String? = null,
+        val emulator: String? = null,
+    ) {
+        companion object {
+            const val GAME = "game"
+            const val PORT = "port"
+        }
+    }
+
     /** Algo que Masha hizo (lanzar, cambiar el tema…): una ficha pequeña de "hecho". */
     @Serializable
     @SerialName("done")

@@ -28,6 +28,7 @@ import android.content.pm.PackageManager
 import com.elyndra.launcher.BuildConfig
 import com.elyndra.launcher.ui.masha.MashaDebugSay
 import com.elyndra.launcher.ui.masha.AffinityHeart
+import com.elyndra.launcher.masha.ReplyShape
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -384,16 +385,18 @@ fun MashaScreen(vm: ElyndraViewModel) {
     LaunchedEffect(masha.busy) { if (masha.busy) voice.stop() }
     // Habla mientras llega el texto: frase a frase. En vivo habla siempre (aunque la voz esté apagada).
     val speakReplies = settings.mashaVoice || live.active
-    LaunchedEffect(last?.id, last?.text?.length, last?.pending, speakReplies) {
+    // Con tarjetas solo dice la frase corta (ReplyShape): los detalles se ven en ellas.
+    LaunchedEffect(last?.id, last?.text?.length, last?.pending, last?.attachment, speakReplies) {
         if (last == null || !last.fromMasha || last.restored || last.id == alreadyShown || !speakReplies) return@LaunchedEffect
-        voice.feed(last.id, last.text, final = !last.pending)
+        val spoken = if (ReplyShape.hasCards(last.attachment)) ReplyShape.spokenLine(last.text, ellipsis = false) else last.text
+        voice.feed(last.id, spoken, final = !last.pending)
     }
     // Lo que se lee con el chat oculto: la frase que suena (subtítulo) o, sin voz, la respuesta un rato.
     var caption by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(last?.id, last?.pending, speakReplies) {
         caption = null
         if (speakReplies || last == null || !last.fromMasha || last.pending || last.restored || last.id == alreadyShown) return@LaunchedEffect
-        val text = last.text.trim().takeIf { it.isNotEmpty() } ?: return@LaunchedEffect
+        val text = ReplyShape.display(last.text, last.attachment).trim().takeIf { it.isNotEmpty() } ?: return@LaunchedEffect
         caption = text
         delay(captionMs(text))
         caption = null

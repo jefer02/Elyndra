@@ -1258,4 +1258,16 @@ Feito pela comunidade, sem revisão. Confira o repositório antes de instalar.</
     <string name="settings_lucy_subtitles_desc">Com o chat oculto, mostra numa linha o que a Lucy diz enquanto fala.</string>
     <string name="hint_chat">Chat</string>
     <string name="lucy_keyboard">Escrever uma mensagem</string>
+    <string name="lucy_pick_hours">%1$d h jogadas</string>
+    <string name="lucy_pick_minutes">%1$d min jogados</string>
+    <string name="lucy_state_new">Nunca aberto</string>
+    <string name="lucy_state_tried">Mal testado</string>
+    <string name="lucy_state_in_progress">Em andamento</string>
+    <string name="lucy_state_abandoned">Parado no meio</string>
+    <string name="lucy_state_dormant">Em pausa</string>
+    <string name="lucy_port_installed">Instalado</string>
+    <string name="lucy_port_update">Atualização disponível</string>
+    <string name="lucy_port_available">Na loja</string>
+    <string name="lucy_port_not_android">Ainda não no Android</string>
+    <string name="lucy_port_needs_files">Precisa de arquivos da sua cópia de %1$s</string>
 </resources>

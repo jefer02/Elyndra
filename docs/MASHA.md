@@ -93,7 +93,7 @@ listas, limpieza, metadatos, emuladores, memoria…) y el modo sin conexión.
 
 Cambios de comportamiento:
 
-- `MashaPrompt` (VERSION 7): la personalidad de Lucy (alt, cariñosa, algo nerd; cálida
+- `MashaPrompt` (VERSION 9; v8 interrupciones en vivo, v9 tarjetas): la personalidad de Lucy (alt, cariñosa, algo nerd; cálida
   también al recomendar), sigue la conversación, ajusta el tono a `RELATIONSHIP_LEVEL`,
   retoma `LAST_CONVERSATION` y tiene celos teatrales con límites (sin insultos, sin
   culpabilizar, nunca bloquean una petición, nunca en avisos). Nada sexual. "Tus respuestas
@@ -105,6 +105,15 @@ Cambios de comportamiento:
   ausencia.
 - Última conversación (`ConversationRecall`): al salir o tras 10 min sin mensajes se guarda
   una frase con el tema; tras más de 30 min, Lucy saluda retomándolo.
+- Recomendaciones en tarjetas (`show_recommendations` → `MashaAttachment.Picks`): carátula,
+  sistema, tiempo jugado, estado, emulador y su motivo, con Jugar/Abrir (o la ficha del port).
+  Con tarjetas, el texto es una o dos frases que se dicen; `ReplyShape` recorta lo que sobre
+  en la burbuja, la voz y el subtítulo (el hilo guarda el texto entero).
+- Pantalla: Lucy a tamaño completo con el chat oculto por defecto (X o el botón lo enseñan, y
+  se recuerda), subtítulo de lo que dice (Ajustes → Lucy → Subtítulos), tarjetas a la vista y
+  un botón de teclado (Select). El corazón de la cabecera (o L1) abre "Lucy y tú": nivel,
+  barra al siguiente, qué cambia en cada nivel y las últimas subidas; cada subida enseña un
+  "+N" y la primera vez en un nivel, su tarjeta.
 - `MashaController.mood`: el ánimo se deduce en local de la respuesta y de las herramientas usadas.
 
 ## El modelo: cara y manos

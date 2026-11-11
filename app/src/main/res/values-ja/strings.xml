@@ -1208,4 +1208,16 @@
     <string name="settings_lucy_subtitles_desc">チャットを隠しているとき、Lucyが話している内容を1行で表示します。</string>
     <string name="hint_chat">チャット</string>
     <string name="lucy_keyboard">メッセージを入力</string>
+    <string name="lucy_pick_hours">%1$d時間プレイ</string>
+    <string name="lucy_pick_minutes">%1$d分プレイ</string>
+    <string name="lucy_state_new">未プレイ</string>
+    <string name="lucy_state_tried">少しだけ</string>
+    <string name="lucy_state_in_progress">プレイ中</string>
+    <string name="lucy_state_abandoned">途中で中断</string>
+    <string name="lucy_state_dormant">お休み中</string>
+    <string name="lucy_port_installed">インストール済み</string>
+    <string name="lucy_port_update">アップデートあり</string>
+    <string name="lucy_port_available">ストアにあり</string>
+    <string name="lucy_port_not_android">Android未対応</string>
+    <string name="lucy_port_needs_files">お持ちの『%1$s』のファイルが必要</string>
 </resources>
