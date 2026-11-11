@@ -1,4 +1,4 @@
-# Masha: sincronía de labios
+# Lucy: sincronía de labios
 
 ## Morph contract
 
@@ -182,7 +182,7 @@ _Sección del runtime de la app (`app/.../ui/masha/`). El contrato de arriba es 
 
 ### Resumen
 
-Masha habla con la voz del sistema (`TextToSpeech`, normalmente Google TTS local), pero **ya no
+Lucy habla con la voz del sistema (`TextToSpeech`, normalmente Google TTS local), pero **ya no
 deja que el motor reproduzca**: cada frase se sintetiza con `synthesizeToFile` y su PCM, que llega
 a trozos por `onAudioAvailable`, se escribe al momento en un `AudioTrack` propio. Con ese mismo
 PCM, el texto (fonemas) y los rangos de palabra del motor (`onRangeStart`, con su trama de audio)
@@ -377,7 +377,7 @@ apertura, dominancias) están en `Vis` (`lipsync/Phonemes.kt`).
 
 ### Rendimiento
 
-En dispositivo (Motorola edge 50 fusion, Android 16, pantalla a 120 Hz): Masha en reposo ~53 fps y
+En dispositivo (Motorola edge 50 fusion, Android 16, pantalla a 120 Hz): Lucy en reposo ~53 fps y
 hablando ~51 fps (ya estaba en ~53 en reposo antes del lip-sync); CPU del callback de fotograma
 ≈ 0,1 ms de lip-sync + ≈ 0,9 ms de cuerpo y cara (mediana). Primer sonido: 77–200 ms desde que llega
 una frase completa (el motor se precalienta con una palabra a un fichero desechable al elegir idioma;
@@ -387,7 +387,7 @@ Render: `LipSync.sample` ≈ 0,4 µs por fotograma (JVM de escritorio), sin obje
 propio): ≈ 5 ms por segundo de audio y ≈ 0,6 ms por reconstrucción de una frase de 3 s (máx. 25/s),
 en escritorio; en un móvil medio, del orden de 5× más.
 
-### Fluidez (fps) de la pantalla de Masha
+### Fluidez (fps) de la pantalla de Lucy
 
 Perfilado con Perfetto y A/B en un Motorola edge 50 fusion (pantalla de 120 Hz), 2026-09-27:
 
@@ -397,18 +397,18 @@ Perfilado con Perfetto y A/B en un Motorola edge 50 fusion (pantalla de 120 Hz),
   niebla, viñeta y lip-sync apenas influían (no se ha quitado nada).
 - **Arreglo:** la atmósfera avanza a `ATMOSPHERE_HZ` = 30 (64 → 119 fps en reposo, 59 → 119 hablando, a 120 Hz).
   Si se notan saltos, subirlo a 60 (medido: ~108 fps en reposo, ~91 hablando).
-- **Límite a 60 fps:** en pantallas de 120 Hz, la pantalla de Masha y la de calibración piden 60 Hz
+- **Límite a 60 fps:** en pantallas de 120 Hz, la pantalla de Lucy y la de calibración piden 60 Hz
   (`SettingsController.frameRateFor` → `FrameRate.apply`), salvo que se active Ajustes → Pantalla →
-  "Masha: alta fluidez (120 Hz)" (`masha.highRefresh`, apagado por defecto). Al salir vuelve el ajuste general.
+  "Lucy: alta fluidez (120 Hz)" (`masha.highRefresh`, apagado por defecto). Al salir vuelve el ajuste general.
 - **Pendiente:** prueba de estabilidad de 10 minutos (fps y temperatura) con el límite a 60, y confirmar en
-  el dispositivo que el modo de pantalla cambia a 60 Hz en la pantalla de Masha.
+  el dispositivo que el modo de pantalla cambia a 60 Hz en la pantalla de Lucy.
 
 #### Pendiente (tarea aparte)
 
 - **Partículas de la biblioteca** (`ui/selection/` (marco y polvo estelar), `MashaParticles`, `SettingsParticles`…): probablemente
   redibujan en cada vsync como hacía la atmósfera; medir y aplicar el mismo patrón (reloj a menos Hz).
 - **Ambiente sonoro** (`AmbientSoundscape`, ExoPlayer): ~11 % de un núcleo de CPU decodificando sin parar
-  (`doSomeWork` cada ~10 ms). No limita los fps de Masha, pero gasta batería.
+  (`doSomeWork` cada ~10 ms). No limita los fps de Lucy, pero gasta batería.
 
 ### Pruebas
 
@@ -459,11 +459,11 @@ Receptores de `adb` que no existen en release (`BuildConfig.DEBUG`):
     adb shell am broadcast -a com.elyndra.launcher.DEBUG_MOOD --es mood Curious                       # vista previa de un ánimo (o Listening; auto = el de la conversación)
     adb shell "run-as com.elyndra.launcher sh -c 'echo lite > cache/masha_quality'"                  # fuerza la calidad (lite/high; borrar = automática)
 
-Con Masha hablando (o `trace`), logcat `MashaFace` da por fotograma los pesos de boca y el tiempo de CPU
+Con Lucy hablando (o `trace`), logcat `MashaFace` da por fotograma los pesos de boca y el tiempo de CPU
 (`us_lip`, `us_body_face`); `MashaVoice` da el tiempo hasta el primer sonido y el modo de cada frase;
 `MashaPerf`, cada 2 s, el ritmo de los callbacks de fotograma, el tiempo de CPU de `HoloRig.frame` y
 los morphs activos (los fotogramas que de verdad se presentan, con `dumpsys SurfaceFlinger --latency`
-sobre la capa del SurfaceView). En la pantalla de Masha (debug) hay además un chip "FX" a la derecha
+sobre la capa del SurfaceView). En la pantalla de Lucy (debug) hay además un chip "FX" a la derecha
 que recorre los ánimos.
 Con el fichero `cache/noholo` (`adb shell run-as com.elyndra.launcher touch cache/noholo`) el escenario
 arranca sin HoloShader (materiales de gltfio), para aislar problemas del shader.

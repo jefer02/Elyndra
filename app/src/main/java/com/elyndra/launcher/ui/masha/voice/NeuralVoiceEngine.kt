@@ -175,7 +175,8 @@ class NeuralVoiceEngine(context: Context) : VoiceEngine {
     /** Una parte, con los tramos en inglés leídos en inglés (misma voz). */
     private fun synthPart(m: SupertonicModel, part: String, lang: String, rate: Float, cancelled: () -> Boolean): FloatArray? {
         val speed = (rate * SPEED).coerceIn(0.7f, 1.5f)
-        val text = NAME[lang]?.let { part.replace(MASHA, it) } ?: part
+        val text = (NAME[lang]?.let { part.replace(MASHA, it) } ?: part)
+            .let { t -> LUCY_NAME[lang]?.let { t.replace(LUCY, it) } ?: t }
         val spans = if (lang in SPAN_LANGS) {
             val dict = NeuralRuntime.englishDict(app)
             if (dict != null) LanguageSpans.split(text, lang) { w -> dict.lookup(w.lowercase()) != null } else null
@@ -192,7 +193,7 @@ class NeuralVoiceEngine(context: Context) : VoiceEngine {
         private const val TAG = "MashaVoice"
         const val DEFAULT_STEPS = 5
 
-        /** Velocidad base: Supertonic va algo deprisa para el tono tranquilo de Masha. */
+        /** Velocidad base: Supertonic va algo deprisa para el tono tranquilo de Lucy. */
         private const val SPEED = 1.0f
 
         /** Idiomas de la app que habla la voz natural. */
@@ -215,6 +216,15 @@ class NeuralVoiceEngine(context: Context) : VoiceEngine {
         /** "Masha" escrito como se pronuncia en cada idioma (en francés se oía "Machin"). */
         private val MASHA = Regex("\\bMasha\\b")
         private val NAME = mapOf("fr" to "Macha", "de" to "Mascha", "pt" to "Macha")
+
+        /**
+         * "Lucy" (el nombre en la UI; Masha en el código). En es/pt/fr/de el
+         * diccionario inglés ya lo lee como en inglés (ver [LanguageSpans]); el
+         * japonés lo necesita en katakana (y sin `\b`: para Java el kana también es
+         * letra, así que "Lucyに" no tendría límite de palabra).
+         */
+        private val LUCY = Regex("(?<![A-Za-z])Lucy(?![A-Za-z])")
+        private val LUCY_NAME = mapOf("ja" to "ルーシー")
 
         /**
          * Silencio que se deja tras cada parte: la pausa natural según la puntuación (la

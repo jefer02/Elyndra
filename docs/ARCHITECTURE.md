@@ -6,10 +6,15 @@ emulador externo que corresponda (Eden, NetherSX2/AetherSX2, DuckStation,
 PPSSPP, RetroArch, Redream, GameHub, Winlator…) con el intent exacto de ese
 emulador.
 
-**Masha** es la protagonista: la inteligencia que orquesta la experiencia. No
+**Lucy** es la protagonista: la inteligencia que orquesta la experiencia. No
 es un chat lateral; está en el lanzamiento, en la biblioteca, en los
 metadatos, en la pantalla de inicio y en los avisos. El chat existe, pero es
 una puerta más.
+
+> **Nombre:** en la app se llama **Lucy**. En el código conserva el nombre
+> interno Masha (clases y paquetes `Masha*`, tablas `masha_memories` y
+> `masha_messages`, claves de ajustes, `assets/masha/*.glb` y nodos `Masha_*` del
+> modelo): renombrarlos exigiría migraciones.
 
 ---
 
@@ -56,8 +61,8 @@ flowchart TB
 
 | Paquete | Qué hay | Depende de Android |
 |---|---|---|
-| `domain/` | Lógica de Masha: perfiles vivos, clasificación de emuladores, decisión de lanzamiento, revisión de la biblioteca, listas, minisesiones, arcos, sugerencias | **No** (se prueba en la JVM) |
-| `masha/` | Contrato `MashaAI`, implementación DeepSeek, prompt, herramientas, contexto, caché, memoria, Masha sin conexión | Solo `MashaConfig` (Keystore) |
+| `domain/` | Lógica de Lucy: perfiles vivos, clasificación de emuladores, decisión de lanzamiento, revisión de la biblioteca, listas, minisesiones, arcos, sugerencias | **No** (se prueba en la JVM) |
+| `masha/` | Contrato `MashaAI`, implementación DeepSeek, prompt, herramientas, contexto, caché, memoria, Lucy sin conexión | Solo `MashaConfig` (Keystore) |
 | `data/` | `LibraryRepository` (instantánea en memoria), Room (`data/db`), ajustes, secretos cifrados | Sí |
 | `launch/` | Perfiles de emuladores (~130), `LaunchPlanner` (puro), `GameLauncher` (intents), `LaunchOrchestrator`, inventario de emuladores | Sí |
 | `metadata/` | Clientes de servicios, hashes (rcheevos), `MetadataEngine`, prioridad de fuentes, caché de imágenes | Sí |
@@ -76,7 +81,7 @@ sus dependencias por constructor. `MashaAI` se enlaza a `DeepSeekMashaAI` en
 
 **Por qué un solo módulo (por ahora):** la app ya tenía ~20 000 líneas en
 `:app` y trabajo de interfaz en curso. Partirla en módulos a la vez que se
-introducían Room, Hilt y Masha habría mezclado dos cambios grandes. El paquete
+introducían Room, Hilt y Lucy habría mezclado dos cambios grandes. El paquete
 `domain/` ya no depende de Android, así que extraerlo a `:core:domain` es mover
 carpetas (fase 3).
 
@@ -244,9 +249,9 @@ sequenceDiagram
   LO->>LA: contexto (elección, instalados, uso por juego y sistema, dispositivo)
   LA-->>VM: Go(emulador, nota) · UseInstead · SuggestSwitch · NoneInstalled
   alt SuggestSwitch / UseInstead
-    VM->>U: diálogo de Masha ("tus 2 últimos intentos con X acabaron en segundos…")
+    VM->>U: diálogo de Lucy ("tus 2 últimos intentos con X acabaron en segundos…")
   end
-  VM->>U: velo de lanzamiento + línea de Masha
+  VM->>U: velo de lanzamiento + línea de Lucy
   VM->>GL: intent del emulador
   GL-->>VM: resultado
   VM->>LO: record(resultado) → launch_events
@@ -258,7 +263,7 @@ sequenceDiagram
 ```
 
 Reglas del orquestador (ver `LaunchAdvisor`): lo que elige el usuario
-**manda**; Masha nunca cambia de emulador por su cuenta. Si el elegido no está
+**manda**; Lucy nunca cambia de emulador por su cuenta. Si el elegido no está
 instalado y otro compatible sí, lo ofrece; si viene fallando con *ese* juego y
 otro le ha ido bien, lo propone antes de lanzar. Sin elección, lanza con el
 mejor clasificado.
@@ -293,12 +298,12 @@ flowchart LR
    fijado.
 4. **Automático**: al añadir juegos y, una vez al día, `MetadataSyncWorker`
    (wifi, batería no baja, tandas de 40 juegos). **Manual**: Ajustes, menú de
-   cada juego o pidiéndoselo a Masha.
+   cada juego o pidiéndoselo a Lucy.
 5. **Respaldo elegante**: un servicio que falla (credenciales, cupo, red) se
    deja de usar en esa pasada sin parar las demás; lo que no se encuentra se
-   queda con la carátula procedural del diseño; Masha cuenta qué falta.
+   queda con la carátula procedural del diseño; Lucy cuenta qué falta.
 
-### Conversación con Masha
+### Conversación con Lucy
 
 ```mermaid
 sequenceDiagram
@@ -325,14 +330,14 @@ metadatos, revisión y arcos, y lo resuelve con **las mismas capacidades**
 
 ---
 
-## 4. Masha en cada punto
+## 4. Lucy en cada punto
 
-| Punto | Qué hace Masha | Dónde |
+| Punto | Qué hace Lucy | Dónde |
 |---|---|---|
 | Biblioteca | Bocadillo junto a su botón con la sugerencia del momento (seguir con un juego, siguiente paso del arco, nunca abiertos, carátulas que faltan, revisión, calor…) | `MashaInsights` → `MashaBubble` |
 | Lanzamiento | Elige emulador, avisa de batería/temperatura, recuerda la última sesión, propone cambiar si uno falla | `LaunchOrchestrator` → velo |
 | Vuelta de jugar | Cierra pasos de arco, detecta salidas repetidas y lo dice en una línea | `ElyndraViewModel.afterSession` |
-| Ficha del juego | "Masha recuerda": última sesión y emulador, duración típica, si el emulador va bien, cómo se identificó | `MashaMemoryBlock` |
+| Ficha del juego | "Lucy recuerda": última sesión y emulador, duración típica, si el emulador va bien, cómo se identificó | `MashaMemoryBlock` |
 | Metadatos | Cuenta lo que falta, lo descarga si se lo piden, respeta la prioridad | `update_metadata`, sugerencias |
 | Chat | Conversa y actúa con 22 herramientas reales | `MashaScreen` |
 | Pantalla de inicio | Widget con su línea y uno o dos juegos para ahora | `widget/MashaWidget` |
@@ -387,10 +392,10 @@ repositorios; nunca ROMs).
 | Permiso | Para qué | Cómo se pide |
 |---|---|---|
 | Carpetas (SAF) | Leer ROMs | El usuario elige cada carpeta; sin permiso de almacenamiento |
-| `INTERNET`, `ACCESS_NETWORK_STATE` | Metadatos y Masha | Declarado |
-| `POST_NOTIFICATIONS` | Progreso de metadatos y avisos de Masha | Una vez, al empezar |
+| `INTERNET`, `ACCESS_NETWORK_STATE` | Metadatos y Lucy | Declarado |
+| `POST_NOTIFICATIONS` | Progreso de metadatos y avisos de Lucy | Una vez, al empezar |
 | `FOREGROUND_SERVICE_DATA_SYNC` | Pasada completa de metadatos | Declarado |
-| `PACKAGE_USAGE_STATS` | **Opcional**: tiempo de juego exacto | Solo desde Ajustes → Masha, en la pantalla del sistema |
+| `PACKAGE_USAGE_STATS` | **Opcional**: tiempo de juego exacto | Solo desde Ajustes → Lucy, en la pantalla del sistema |
 | `<queries>` | Ver emuladores y juegos instalados | Declarado; **sin** `QUERY_ALL_PACKAGES` |
 | `REQUEST_INSTALL_PACKAGES` | Instalar las actualizaciones de Elyndra y los ports de la tienda | Declarado; Android pide al usuario "Instalar apps desconocidas" la primera vez, y confirma cada instalación |
 
@@ -399,7 +404,7 @@ repositorios; nunca ROMs).
   dispositivo, recuerdos y la conversación. **Nunca** rutas, URIs, carpetas,
   nombres de cuenta ni credenciales (hay una prueba que lo comprueba:
   `MashaLocalTest.theContextNeverCarriesPathsOrUris`).
-- La IA se puede apagar (Ajustes → Masha): Masha sigue funcionando en local.
+- La IA se puede apagar (Ajustes → Lucy): Lucy sigue funcionando en local.
 - **Actualizaciones:** solo `GET` a la lista pública de releases de
   `jefer02/Elyndra` (sin token, User-Agent genérico `Elyndra-Updater`,
   condicional con ETag) y al APK elegido. No viaja ningún dato del usuario ni
@@ -413,7 +418,7 @@ repositorios; nunca ROMs).
   Nunca descarga ni enlaza ROMs: dice qué copia propia hace falta y si ya
   está en la biblioteca (por hash). Nunca abre un port solo. Token de GitHub
   opcional (Ajustes → APIs), que solo viaja a `api.github.com`.
-- "Olvidar todo lo que sabe Masha" borra recuerdos, hilo y caché.
+- "Olvidar todo lo que sabe Lucy" borra recuerdos, hilo y caché.
 - Credenciales cifradas con AES-GCM y una clave del Android Keystore;
   `allowBackup=false`.
 - **La clave de DeepSeek va compilada** (`local.properties` → `BuildConfig`).
@@ -432,18 +437,18 @@ repositorios; nunca ROMs).
 
 ## 7. Plan por fases
 
-**Fase 1 — MVP de Masha** ✅ *(hecho)*
-Room + Hilt + WorkManager; importación de `library.json`; Masha con DeepSeek
+**Fase 1 — MVP de Lucy** ✅ *(hecho)*
+Room + Hilt + WorkManager; importación de `library.json`; Lucy con DeepSeek
 (streaming, 22 herramientas, contexto, caché, memoria, modo sin conexión);
 orquestador de lanzamientos con aprendizaje por dispositivo; sesiones con
 UsageStats; revisión de la biblioteca, listas dinámicas, minisesiones y arcos;
 prioridad de fuentes y origen de cada imagen; sugerencias ambientales, línea en
-el velo, "Masha recuerda", widget y avisos; 180 pruebas unitarias.
+el velo, "Lucy recuerda", widget y avisos; 180 pruebas unitarias.
 
 **Fase 2 — Pulido**
 - Estantería de listas y arcos en el propio carrusel (hoy viven en el chat).
 - Identificar a mano un juego mal reconocido (elegir el resultado correcto).
-- Voz de Masha para las sugerencias ambientales generada por la IA (con caché
+- Voz de Lucy para las sugerencias ambientales generada por la IA (con caché
   por día) además de las plantillas.
 - Pruebas instrumentadas de Room (migraciones) y de Compose.
 - Backend propio para la clave de DeepSeek.
@@ -467,7 +472,7 @@ el velo, "Masha recuerda", widget y avisos; 180 pruebas unitarias.
 `local.properties` (no se versiona):
 
 ```
-masha.apiKey=sk-...            # DeepSeek; sin clave Masha funciona en local
+masha.apiKey=sk-...            # DeepSeek; sin clave Lucy funciona en local
 masha.model=deepseek-chat      # opcional
 masha.baseUrl=https://api.deepseek.com   # opcional (p. ej. tu backend)
 screenscraper.devId=...        # opcional

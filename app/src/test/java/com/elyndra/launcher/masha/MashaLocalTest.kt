@@ -31,6 +31,29 @@ class MashaLocalTest {
     /* ── intenciones sin conexión ─────────────────────────────── */
 
     @Test
+    fun herNameIsIgnoredWhetherItIsLucyOrMasha() {
+        assertEquals(OfflineIntent.Launch("Zelda"), OfflineIntents.detect("Lucy, juega Zelda"))
+        assertEquals(OfflineIntent.Launch("Zelda"), OfflineIntents.detect("Masha, play Zelda"))
+        assertEquals(OfflineIntent.Launch("Zelda"), OfflineIntents.detect("hey Lucy play Zelda"))
+        assertEquals(OfflineIntent.Launch("Zelda"), OfflineIntents.detect("play Zelda, Lucy"))
+        assertEquals(OfflineIntent.Plan(25, 35, SessionMood.Any), OfflineIntents.detect("Oye Masha, tengo media hora"))
+        assertEquals(OfflineIntent.Plan(30, 40, SessionMood.Any), OfflineIntents.detect("Salut Lucy : j'ai 30-40 minutes"))
+        assertEquals(OfflineIntent.Plan(25, 35, SessionMood.Any), OfflineIntents.detect("Hallo Lucy, halbe Stunde"))
+        assertEquals(OfflineIntent.Recommend, OfflineIntents.detect("Olá Lucy, o que jogar?"))
+        assertEquals("ゼルダを起動して", OfflineIntents.withoutName("ねえルーシー、ゼルダを起動して"))
+        assertEquals("ゼルダを起動して", OfflineIntents.withoutName("マーシャ、ゼルダを起動して"))
+    }
+
+    @Test
+    fun aGreetingOrJustHerNameIsAHello() {
+        listOf("Lucy", "Masha?", "hola Lucy", "Hi, Masha!", "Bonjour Lucy.", "ねえ、ルーシー", "hey").forEach {
+            assertEquals(it, OfflineIntent.Hello, OfflineIntents.detect(it))
+        }
+        // Solo tras una coma cuenta como nombre al final: "play Lucy" podría ser un juego.
+        assertEquals(OfflineIntent.Launch("Lucy"), OfflineIntents.detect("play Lucy"))
+    }
+
+    @Test
     fun timeBudgetsAreUnderstood() {
         assertEquals(OfflineIntent.Plan(30, 40, SessionMood.Any), OfflineIntents.detect("tengo 30-40 minutos"))
         assertEquals(OfflineIntent.Plan(30, 40, SessionMood.Any), OfflineIntents.detect("I have 30 to 40 min"))

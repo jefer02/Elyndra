@@ -362,11 +362,11 @@
         <item quantity="other">削除したゲーム %d 件</item>
     </plurals>
 
-    <!-- Masha -->
-    <string name="masha">Masha</string>
+    <!-- Lucy -->
+    <string name="masha">Lucy</string>
     <string name="masha_offline_mode">オフライン · ローカル応答</string>
-    <string name="masha_placeholder">Masha に質問、または指示…</string>
-    <string name="masha_greeting">Masha です。あなたのライブラリ、遊び方、端末の余力まで把握しています。何でも聞いてください。時間だけ教えてくれても大丈夫です。</string>
+    <string name="masha_placeholder">Lucy に質問、または指示…</string>
+    <string name="masha_greeting">Lucy です。あなたのライブラリ、遊び方、端末の余力まで把握しています。何でも聞いてください。時間だけ教えてくれても大丈夫です。</string>
     <string name="masha_stat_week">今週</string>
     <string name="masha_stat_top">最も遊んだ</string>
     <string name="masha_stat_sessions">セッション</string>
@@ -392,7 +392,7 @@
     <string name="masha_working_generic">対応中…</string>
     <string name="masha_err_no_key">DeepSeek のキーがないため、ローカルで回答します。</string>
     <string name="masha_err_offline">DeepSeek に接続できません。オフラインで回答します。</string>
-    <string name="masha_err_key">DeepSeek が API キーを拒否しました。設定 → Masha で確認してください。</string>
+    <string name="masha_err_key">DeepSeek が API キーを拒否しました。設定 → Lucy で確認してください。</string>
     <string name="masha_err_balance">DeepSeek の残高がありません。当面はオフラインで回答します。</string>
     <string name="masha_err_rate">DeepSeek のリクエスト制限です。少し待ってください。</string>
     <string name="masha_err_unavailable">DeepSeek が混雑または停止中です。オフラインで回答します。</string>
@@ -416,7 +416,7 @@
     <string name="masha_off_no_arcs">進行中のアークはありません。オンライン時に「キャッスルヴァニアを順番に全部」のように頼んでください。</string>
     <string name="masha_off_arc">「%1$s」：%3$d 中 %2$d 番目、次は %4$s。</string>
     <string name="masha_off_unknown">オフラインなので雑談はできませんが、セッション計画、リスト表示、時間集計、ゲーム起動はできます。</string>
-    <string name="masha_off_unknown_nokey">DeepSeek のキーがまだないので雑談はできませんが、計画・リスト・時間集計・起動はできます。設定 → Masha でキーを追加してください。</string>
+    <string name="masha_off_unknown_nokey">DeepSeek のキーがまだないので雑談はできませんが、計画・リスト・時間集計・起動はできます。設定 → Lucy でキーを追加してください。</string>
     <string name="masha_insight_empty">棚が空です。ROM フォルダか Android ゲームを追加すれば、あとは任せてください。</string>
     <string name="masha_insight_hot">端末が熱くなっています。しばらく軽めのものにしますか？</string>
     <string name="masha_insight_arc">「%1$s」%3$d 中 %2$d 番目：次は %4$s。</string>
@@ -443,14 +443,14 @@
     <string name="masha_note_proven">%1$s はこのゲームを %2$d 回問題なく動かしています。</string>
     <string name="masha_note_best_system">初回です。この機種で一番うまく動く %1$s にします。</string>
     <string name="masha_dialog_missing_title">%1$s がインストールされていません</string>
-    <string name="masha_dialog_missing_msg">Masha：%1$s はありませんが、%2$s があり、これらのゲームも動かせます。使いますか？</string>
+    <string name="masha_dialog_missing_msg">Lucy：%1$s はありませんが、%2$s があり、これらのゲームも動かせます。使いますか？</string>
     <string name="masha_use_emulator">%1$s を使う</string>
     <string name="masha_keep_emulator">%1$s のまま</string>
-    <string name="masha_dialog_switch_title">Masha の提案</string>
+    <string name="masha_dialog_switch_title">Lucy の提案</string>
     <string name="masha_dialog_switch_msg">%2$s での直近 %1$d 回は数秒で終了しました。%3$s ではうまく動いています。このゲームだけ切り替えますか？</string>
     <string name="masha_toast_arc_step">「%1$s」：ステップ完了。次へ進みましょう。</string>
     <string name="masha_toast_early_exit">もう戻りましたか？ %2$s で %1$s の調子が悪いなら、別のエミュレーターを聞いてください。</string>
-    <string name="masha_profile_title">Masha の記憶</string>
+    <string name="masha_profile_title">Lucy の記憶</string>
     <string name="masha_profile_last">前回：%3$s、%2$s で %1$d 分。</string>
     <string name="masha_profile_last_app">前回：%2$s、%1$d 分。</string>
     <string name="masha_profile_typical">1回あたり約 %1$d 分 · %2$d セッション</string>
@@ -463,7 +463,7 @@
     <string name="masha_match_name">名前</string>
     <string name="masha_match_fuzzy">類似名</string>
     <string name="masha_match_manual">あなた</string>
-    <string name="settings_masha">Masha</string>
+    <string name="settings_masha">Lucy</string>
     <string name="settings_masha_ai">オンライン AI（DeepSeek）</string>
     <string name="settings_masha_ai_desc">DeepSeek による会話と操作。オフ時は手元のデータでローカル応答します。</string>
     <string name="settings_masha_key">DeepSeek API キー</string>
@@ -473,7 +473,7 @@
     <string name="settings_masha_status_ok">接続済み · 残高 %1$s</string>
     <string name="settings_masha_status_ok_plain">接続済み</string>
     <string name="settings_masha_status_checking">確認中…</string>
-    <string name="settings_masha_status_none">キーなし：Masha はオフラインで動作</string>
+    <string name="settings_masha_status_none">キーなし：Lucy はオフラインで動作</string>
     <string name="settings_masha_ambient">カルーセル上の提案</string>
     <string name="settings_masha_nudges">ときどき通知</string>
     <string name="settings_masha_nudges_desc">数日に一度まで。夜間は送りません。</string>
@@ -493,15 +493,15 @@
     <string name="settings_masha_voice_n">声 %1$d</string>
     <string name="settings_masha_voice_speed">話す速さ</string>
     <string name="settings_masha_voice_test">試聴</string>
-    <string name="settings_masha_voice_sample">こんにちは、マーシャです。今日は何を遊びたい？</string>
+    <string name="settings_masha_voice_sample">こんにちは、ルーシーです。今日は何を遊びたい？</string>
     <string name="settings_masha_voice_notice">自然な音声は AI による合成音声で、Supertonic 3 モデル（OpenRAIL-M ライセンス）を使って端末上で生成されます。</string>
     <string name="settings_masha_usage">正確なプレイ時間</string>
     <string name="settings_masha_usage_desc">各エミュレーターが実際に開いていた時間を取得します（使用状況へのアクセス）。任意。</string>
     <string name="settings_masha_usage_on">有効</string>
     <string name="settings_masha_usage_off">アクセスを許可</string>
-    <string name="settings_masha_privacy">Masha が DeepSeek に送るもの：タイトル、機種、プレイ時間、端末状態。パス、フォルダ、認証情報は送りません。</string>
-    <string name="settings_masha_forget">Masha の記憶をすべて消去</string>
-    <string name="settings_masha_forget_msg">Masha の記憶、会話、キャッシュを削除します。ライブラリとプレイ時間は残ります。</string>
+    <string name="settings_masha_privacy">Lucy が DeepSeek に送るもの：タイトル、機種、プレイ時間、端末状態。パス、フォルダ、認証情報は送りません。</string>
+    <string name="settings_masha_forget">Lucy の記憶をすべて消去</string>
+    <string name="settings_masha_forget_msg">Lucy の記憶、会話、キャッシュを削除します。ライブラリとプレイ時間は残ります。</string>
     <string name="toast_masha_forgot">完了。まっさらです。</string>
     <string name="settings_priority">取得元の優先順位</string>
     <string name="settings_priority_text">テキスト（名前・概要・日付）</string>
@@ -510,15 +510,15 @@
     <string name="settings_priority_reset">順序をリセット</string>
     <string name="move_up">上へ</string>
     <string name="move_down">下へ</string>
-    <string name="widget_masha_desc">Masha の今のおすすめ</string>
+    <string name="widget_masha_desc">Lucy の今のおすすめ</string>
     <string name="widget_empty">Elyndra にゲームを追加すれば提案します。</string>
     <string name="widget_play">プレイ</string>
-    <string name="notif_channel_masha">Masha</string>
+    <string name="notif_channel_masha">Lucy</string>
     <string name="notif_channel_masha_desc">ときどきの提案。数日に一度まで。</string>
     <string name="notif_channel_ports">ポートのアップデート</string>
     <string name="notif_channel_ports_desc">インストール済みのポートに新しいリリースがあるとき。</string>
 
-    <!-- Mandos, pantalla y partículas de Masha -->
+    <!-- Mandos, pantalla y partículas de Lucy -->
     <string name="gamepad_connected">コントローラーを接続しました：%1$s</string>
     <string name="gamepad_disconnected">コントローラーが切断されました</string>
     <string name="section_display">ディスプレイ</string>
@@ -538,11 +538,11 @@
     <string name="perf_reason_battery_saver">自動・パフォーマンス：バッテリーセーバーがオンです。</string>
     <string name="perf_stutter_notice">ライブラリがカクついていたため、Elyndra はパフォーマンスモードに切り替えました（見た目はそのまま、効果は軽め）。再判定するには［設定］→［表示］で「自動」を選んでください。</string>
     <string name="perf_mode_quality_desc">控えめな端末でも、リアルタイムぼかし・環境モーション・すべてのパーティクルを使用します。</string>
-    <string name="perf_mode_performance_desc">見た目はそのままで効果を軽くします：リアルタイムぼかしの代わりに色付きガラス、パーティクルを減らし、環境モーションなし、60fps、軽量版の Masha。</string>
-    <string name="masha_high_refresh">マーシャ：高リフレッシュ（120Hz）</string>
-    <string name="masha_high_refresh_desc">オフの場合、マーシャは 60fps で動作します。ホログラムとしては十分滑らかで、GPU の負荷が半分になり、長い会話でもバッテリー消費と発熱を抑えます。</string>
+    <string name="perf_mode_performance_desc">見た目はそのままで効果を軽くします：リアルタイムぼかしの代わりに色付きガラス、パーティクルを減らし、環境モーションなし、60fps、軽量版の Lucy。</string>
+    <string name="masha_high_refresh">ルーシー：高リフレッシュ（120Hz）</string>
+    <string name="masha_high_refresh_desc">オフの場合、ルーシーは 60fps で動作します。ホログラムとしては十分滑らかで、GPU の負荷が半分になり、長い会話でもバッテリー消費と発熱を抑えます。</string>
     <string name="masha_particles_title">パーティクルの色</string>
-    <string name="masha_particles_desc">ライブラリで Masha のエンブレムの周りに漂う粒子です。</string>
+    <string name="masha_particles_desc">ライブラリで Lucy のエンブレムの周りに漂う粒子です。</string>
     <string name="masha_particles_hue">色相</string>
     <string name="masha_particles_preview">プレビュー</string>
     <string name="section_selection">選択</string>
@@ -556,21 +556,21 @@
     <string name="masha_status_listening">聞いています…</string>
     <string name="masha_status_speaking">話しています</string>
     <string name="masha_status_thinking">考え中…</string>
-    <string name="masha_mic">Mashaに話しかける</string>
+    <string name="masha_mic">Lucyに話しかける</string>
     <string name="masha_mic_stop">聞き取りを止める</string>
-    <string name="masha_mic_denied">声を聞くには、Mashaにマイクへのアクセスを許可してください。</string>
+    <string name="masha_mic_denied">声を聞くには、Lucyにマイクへのアクセスを許可してください。</string>
     <string name="masha_mic_unavailable">この端末では音声認識を利用できません。</string>
     <string name="masha_mic_no_match">聞き取れませんでした。もう一度どうぞ。</string>
     <string name="masha_mic_network">音声認識には接続が必要です。</string>
     <string name="masha_sound">サウンド</string>
     <string name="masha_sound_ambient">環境音</string>
     <string name="masha_sound_volume">環境音の音量</string>
-    <string name="masha_sound_voice">Mashaの声</string>
+    <string name="masha_sound_voice">Lucyの声</string>
     <string name="masha_show_chat">会話を表示</string>
     <string name="masha_hide_chat">会話を隠す</string>
     <string name="masha_recenter">視点をリセット</string>
-    <string name="masha_loading">Mashaを実体化しています…</string>
-    <string name="masha_stage_fallback">この端末では3Dを利用できませんが、Mashaはここにいます。</string>
+    <string name="masha_loading">Lucyを実体化しています…</string>
+    <string name="masha_stage_fallback">この端末では3Dを利用できませんが、Lucyはここにいます。</string>
     <string name="masha_new_chat">新しい会話</string>
     <string name="masha_back">戻る</string>
     <string name="masha_listening_hint">どうぞ話してください…</string>
@@ -583,11 +583,11 @@
     <string name="licenses_components">ライブラリとフォント</string>
     <string name="licenses_assets">3D アセット</string>
     <string name="licenses_apache_notice">Apache License 2.0 のコンポーネントは同ライセンスの下で提供されています。全文は https://www.apache.org/licenses/LICENSE-2.0 にあります。SIL Open Font License 1.1 は https://openfontlicense.org にあります。</string>
-    <string name="licenses_mpfb_note">Masha の 3D モデル(MPFB2 と MakeHuman システムアセットで作成)</string>
-    <string name="licenses_cmudict_use">Masha は英語を話すときの口の動きに CMU 発音辞書を使っています。その告知文(原文のまま):</string>
+    <string name="licenses_mpfb_note">Lucy の 3D モデル(MPFB2 と MakeHuman システムアセットで作成)</string>
+    <string name="licenses_cmudict_use">Lucy は英語を話すときの口の動きに CMU 発音辞書を使っています。その告知文(原文のまま):</string>
     <string name="dev_section">開発者</string>
     <string name="dev_voice_sync">音声同期のキャリブレーション</string>
-    <string name="dev_voice_sync_desc">オーディオ出力ごとに Masha の口の動きを音に合わせます(Bluetooth イヤホンは遅延が生じます)。</string>
+    <string name="dev_voice_sync_desc">オーディオ出力ごとに Lucy の口の動きを音に合わせます(Bluetooth イヤホンは遅延が生じます)。</string>
     <string name="dev_hide">開発者向けオプションを隠す</string>
     <string name="dev_unlocked">開発者向けオプションが有効になりました</string>
     <string name="dev_already">開発者向けオプションはすでに有効です</string>
@@ -608,7 +608,7 @@
     <!-- Sonidos de la interfaz -->
     <string name="section_sounds">サウンド</string>
     <string name="sound_enabled">インターフェースのサウンド</string>
-    <string name="sound_enabled_desc">コンソール風の短いオリジナル効果音。音楽を止めることはなく、サイレント・バイブ中や Masha が話している・聞いている間は鳴りません。</string>
+    <string name="sound_enabled_desc">コンソール風の短いオリジナル効果音。音楽を止めることはなく、サイレント・バイブ中や Lucy が話している・聞いている間は鳴りません。</string>
     <string name="sound_volume">音量</string>
     <string name="sound_navigation">移動音</string>
     <string name="sound_navigation_desc">選択が動くたびに小さく鳴ります。</string>
@@ -643,7 +643,7 @@
     <!-- Música de fondo -->
     <string name="section_music">BGM</string>
     <string name="music_enabled">メニュー BGM</string>
-    <string name="music_enabled_desc">閲覧中に流れる、落ち着いたオリジナルのコンソール風 BGM。ゲーム起動時に止まり、Masha が話す間は小さくなり、他のアプリの音楽の上では再生されません。</string>
+    <string name="music_enabled_desc">閲覧中に流れる、落ち着いたオリジナルのコンソール風 BGM。ゲーム起動時に止まり、Lucy が話す間は小さくなり、他のアプリの音楽の上では再生されません。</string>
     <string name="music_volume">BGM の音量</string>
     <string name="music_source">音楽</string>
     <string name="music_source_builtin">Elyndra アンビエント</string>
@@ -718,7 +718,7 @@
     <string name="art_failed_network">接続がありません。前の画像のままです。</string>
     <string name="art_failed_image">その画像を読み込めませんでした。別の画像を試してください。</string>
 
-    <!-- Masha: nombres, añadir juegos y emuladores -->
+    <!-- Lucy: nombres, añadir juegos y emuladores -->
     <string name="masha_write_done">完了：%1$s</string>
     <string name="masha_write_failed">できませんでした：%1$s</string>
     <string name="masha_write_cancelled">キャンセルしました。何も変更していません。</string>
@@ -760,7 +760,7 @@
     <string name="settings_cat_appearance">外観</string>
     <string name="settings_cat_library">ライブラリ</string>
     <string name="settings_cat_metadata">メタデータ</string>
-    <string name="settings_cat_masha">Masha</string>
+    <string name="settings_cat_masha">Lucy</string>
     <string name="settings_cat_about">情報</string>
     <string name="settings_cat_display_desc">テーマ、イントロ、フレームレート、言語</string>
     <string name="settings_cat_sound_desc">インターフェース音とカスタムサウンド</string>
@@ -874,8 +874,8 @@
     <string name="about_license_value">All rights reserved</string>
     <string name="licenses_app_copyright">Copyright © 2026 %1$s. All rights reserved.</string>
     <string name="licenses_app_terms">ソースコードは閲覧のみを目的として GitHub で公開されています。公式リリースは個人的・非商用の目的でインストールして使用できます。複製、改変、再配布、派生物の作成には書面による許可が必要です。以下のサードパーティ製コンポーネントはそれぞれのライセンスに従います。</string>
-    <string name="licenses_voice_title">Masha の自然な声</string>
-    <string name="licenses_voice_notice">Masha の自然な声は、Supertone Inc. の Supertonic 3 モデルの重み（BigScience OpenRAIL-M ライセンス）を使って端末上で生成されます。この声は合成音声（AI 生成）です。使用することで、同ライセンスの付属書 A にある制限された用途に使わないことに同意したものとみなされます。たとえば、法律違反、未成年者への危害、本人の同意のないなりすまし、他者を害する目的での虚偽情報の拡散、嫌がらせ、機械生成であることを明示せずに生成音声を提示することなどです。</string>
+    <string name="licenses_voice_title">Lucy の自然な声</string>
+    <string name="licenses_voice_notice">Lucy の自然な声は、Supertone Inc. の Supertonic 3 モデルの重み（BigScience OpenRAIL-M ライセンス）を使って端末上で生成されます。この声は合成音声（AI 生成）です。使用することで、同ライセンスの付属書 A にある制限された用途に使わないことに同意したものとみなされます。たとえば、法律違反、未成年者への危害、本人の同意のないなりすまし、他者を害する目的での虚偽情報の拡散、嫌がらせ、機械生成であることを明示せずに生成音声を提示することなどです。</string>
     <string name="licenses_voice_open">OpenRAIL-M ライセンスを読む</string>
 
     <!-- Ajustes: nombres de las muestras de color (lector de pantalla y rótulos). -->
@@ -1009,6 +1009,7 @@
     <string name="masha_working_ports">ネイティブポートを探しています…</string>
     <string name="masha_off_ports">ライブラリに合うネイティブポートです。タップすると必要なものを確認できます。</string>
     <string name="masha_off_ports_none">まだカタログにあなたのゲームのネイティブポートはありません。ストアを開くので見てみてください。</string>
+    <string name="masha_off_hello">あ、来てくれたんだ。今はオフラインだけど、プランを立てたり、リストを見せたり、ゲームを起動したりはできるよ。</string>
     <string name="masha_ports_title">ネイティブポート</string>
     <string name="ports_chip_all">すべて</string>
     <string name="ports_chip_not_on_android">Android未対応</string>

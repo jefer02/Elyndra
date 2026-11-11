@@ -19,7 +19,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Lo que hay detrás de Masha en cada punto de la app: junta la IA, lo que se
+ * Lo que hay detrás de Lucy (Masha en el código) en cada punto de la app: junta la IA, lo que se
  * sabe de la biblioteca, la memoria, el dispositivo y los arcos, y arma con
  * ello el contexto de cada pregunta y las sugerencias ambientales.
  *

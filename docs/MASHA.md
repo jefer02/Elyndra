@@ -1,7 +1,12 @@
-# Masha — holotanque 3D
+# Lucy — holotanque 3D
 
-La pantalla de Masha es un holograma 3D en tiempo real (SceneView 2.3 / Filament 1.56)
-con voz, oído, ánimo visible y un ambiente sonoro propio. **Lo que Masha sabe hacer no ha
+> **Nombre:** en la app se llama **Lucy**. En el código conserva el nombre
+> interno Masha (clases y paquetes `Masha*`, tablas `masha_memories` y
+> `masha_messages`, claves de ajustes, `assets/masha/*.glb` y nodos `Masha_*` del
+> modelo): renombrarlos exigiría migraciones.
+
+La pantalla de Lucy es un holograma 3D en tiempo real (SceneView 2.3 / Filament 1.56)
+con voz, oído, ánimo visible y un ambiente sonoro propio. **Lo que Lucy sabe hacer no ha
 cambiado de sitio**: la conversación, las herramientas, la memoria y DeepSeek siguen en
 `masha/` y `ui/MashaController.kt`; la pantalla nueva solo los presenta de otra manera.
 
@@ -81,7 +86,7 @@ Assets (ya generados y en el repo):
 ## DeepSeek y capacidades
 
 Nada cambia en cómo se llama a DeepSeek: la clave sigue leyéndose de `local.properties`
-(`masha.apiKey`) o de Ajustes → Masha (cifrada), `DeepSeekMashaAI` sigue siendo el proveedor
+(`masha.apiKey`) o de Ajustes → Lucy (cifrada), `DeepSeekMashaAI` sigue siendo el proveedor
 y `MashaController.send()` el único punto de entrada — también para lo que se dice por voz.
 Siguen todas las herramientas (juegos más jugados, recomendaciones, planes de sesión, arcos,
 listas, limpieza, metadatos, emuladores, memoria…) y el modo sin conexión.
@@ -298,7 +303,7 @@ CPU de `HoloRig.frame` ≈ 1,0–1,1 ms en los dos (+0–40 µs).
 
 ## Probar
 
-1. `./gradlew :app:assembleDebug` e instalar; abrir Masha (botón de la biblioteca o el
+1. `./gradlew :app:assembleDebug` e instalar; abrir Lucy (botón de la biblioteca o el
    intent `com.elyndra.launcher.OPEN_MASHA`).
 2. Debe materializarse y saludar (gesto Wave). Preguntar "¿qué he jugado más?" → piensa,
    habla (estado "Hablando"), mueve la boca y el ambiente baja.

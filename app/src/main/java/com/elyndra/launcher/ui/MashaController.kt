@@ -40,7 +40,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * Masha en la interfaz: la conversación (en streaming, con herramientas y
+ * Lucy (Masha en el código) en la interfaz: la conversación (en streaming, con herramientas y
  * con sus adjuntos), la sugerencia ambiental sobre el carrusel y las tarjetas
  * de la cabecera del chat.
  *
@@ -369,6 +369,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                     ctx.getString(R.string.masha_off_ports_none)
                 }
             }
+            OfflineIntent.Hello -> ctx.getString(R.string.masha_off_hello)
             OfflineIntent.Unknown -> ctx.getString(if (brain.config.hasKey) R.string.masha_off_unknown else R.string.masha_off_unknown_nokey)
         }
         val prefix = failure?.let { ctx.getString(failureLine(it)) + "\n\n" }.orEmpty()

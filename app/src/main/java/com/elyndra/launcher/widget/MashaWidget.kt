@@ -73,7 +73,7 @@ data class WidgetPick(val key: String, val title: String, val platform: String, 
 data class WidgetState(val line: String, val picks: List<WidgetPick>)
 
 /**
- * Masha en la pantalla de inicio: su línea del momento (la misma sugerencia
+ * Lucy (Masha en el código) en la pantalla de inicio: su línea del momento (la misma sugerencia
  * que sale sobre el carrusel) y uno o dos juegos para ahora mismo, con su
  * carátula. Tocar un juego lo lanza; tocar la cabecera abre la conversación.
  *
@@ -191,7 +191,7 @@ class MashaWidget : GlanceAppWidget() {
                     contentScale = ContentScale.Crop,
                 )
                 Spacer(GlanceModifier.width(8.dp))
-                Text("Masha", style = TextStyle(color = white, fontSize = 14.sp, fontWeight = FontWeight.Bold))
+                Text(AppLocale.wrap(context).getString(R.string.masha), style = TextStyle(color = white, fontSize = 14.sp, fontWeight = FontWeight.Bold))
             }
             Spacer(GlanceModifier.height(6.dp))
             Text(
