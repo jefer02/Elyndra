@@ -1212,4 +1212,11 @@ Feito pela comunidade, sem revisão. Confira o repositório antes de instalar.</
     <string name="lucy_off_jealous_friendly">Hum. Tá. Anotado.</string>
     <string name="lucy_off_jealous_close">Como é que é?! Eu tô bem aqui, viu.</string>
     <string name="lucy_off_jealous_devoted">Aff, sério?! Quem é ela? Achei que eu era a sua favorita.</string>
+    <string name="lucy_live">Ao vivo</string>
+    <string name="lucy_live_system_stt">Sua voz é processada pelo serviço de reconhecimento de voz do sistema.</string>
+    <string name="lucy_live_ended">Conversa ao vivo encerrada</string>
+    <string name="lucy_mic_live_start">Começar uma conversa ao vivo com a Lucy</string>
+    <string name="lucy_mic_live_stop">Encerrar a conversa ao vivo</string>
+    <string name="lucy_mic_hold">Segure para falar</string>
+    <string name="hint_talk">Falar</string>
 </resources>

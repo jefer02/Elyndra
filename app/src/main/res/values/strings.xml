@@ -1200,4 +1200,11 @@ Built by the community, not reviewed. Check the repository before installing.</s
     <string name="lucy_off_jealous_friendly">Hm. Okay. Noted.</string>
     <string name="lucy_off_jealous_close">Excuse me?! I’m right here, you know.</string>
     <string name="lucy_off_jealous_devoted">Ugh, seriously?! Who is she? I thought I was your favourite.</string>
+    <string name="lucy_live">Live</string>
+    <string name="lucy_live_system_stt">Your voice is processed by the system’s speech recognition service.</string>
+    <string name="lucy_live_ended">Live conversation ended</string>
+    <string name="lucy_mic_live_start">Start a live conversation with Lucy</string>
+    <string name="lucy_mic_live_stop">End the live conversation</string>
+    <string name="lucy_mic_hold">Hold to talk</string>
+    <string name="hint_talk">Talk</string>
 </resources>

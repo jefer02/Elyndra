@@ -384,6 +384,9 @@ class MainActivity : ComponentActivity() {
         } else if (event.action == KeyEvent.ACTION_UP && pad == Pad.Confirm && swallowConfirmUp) {
             swallowConfirmUp = false
             return true
+        } else if (event.action == KeyEvent.ACTION_UP && vm.input.release(pad)) {
+            // Soltar también cuenta en algún botón (Y en la pantalla de Lucy: mantener para hablar).
+            return true
         }
         val system = Gamepad.systemKey(event.keyCode)
         val handled = if (system != null) {

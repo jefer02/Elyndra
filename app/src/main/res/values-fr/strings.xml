@@ -1212,4 +1212,11 @@ Fait par la communauté, non vérifié. Consultez le dépôt avant d\'installer.
     <string name="lucy_off_jealous_friendly">Hm. D’accord. C’est noté.</string>
     <string name="lucy_off_jealous_close">Pardon ?! Je suis juste là, hein.</string>
     <string name="lucy_off_jealous_devoted">Pff, sérieux ?! C’est qui, elle ? Je croyais être ta préférée.</string>
+    <string name="lucy_live">En direct</string>
+    <string name="lucy_live_system_stt">Votre voix est traitée par le service de reconnaissance vocale du système.</string>
+    <string name="lucy_live_ended">Conversation en direct terminée</string>
+    <string name="lucy_mic_live_start">Démarrer une conversation en direct avec Lucy</string>
+    <string name="lucy_mic_live_stop">Terminer la conversation en direct</string>
+    <string name="lucy_mic_hold">Maintenir pour parler</string>
+    <string name="hint_talk">Parler</string>
 </resources>

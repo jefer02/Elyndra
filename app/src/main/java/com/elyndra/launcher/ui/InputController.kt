@@ -209,6 +209,25 @@ class InputController(private val vm: ElyndraViewModel) {
     /** Abre el teclado en el campo del diálogo abierto (lo pone el propio campo). */
     var dialogKeyboard: (() -> Unit)? = null
 
+    /** El micrófono de Lucy: Y pulsado y soltado en su pantalla (lo pone MashaScreen). */
+    interface MicHook {
+        fun press()
+        fun release()
+    }
+
+    var mashaMic: MicHook? = null
+
+    /**
+     * Un botón que se suelta. Solo cuenta Y en la pantalla de Lucy (mantener
+     * para hablar, tocar para la conversación en vivo); el resto se maneja al pulsar.
+     */
+    fun release(pad: Pad): Boolean {
+        val mic = mashaMic ?: return false
+        if (pad != Pad.Options || vm.screen != Screen.Masha) return false
+        mic.release()
+        return true
+    }
+
     fun handle(pad: Pad): Boolean {
         active = true
         // B con el teclado abierto lo cierra a él primero; la capa, a la siguiente.
@@ -287,6 +306,8 @@ class InputController(private val vm: ElyndraViewModel) {
         }
         // Y: al botón principal de la pantalla (en Añadir, "Añadir N juegos").
         Pad.Options -> when {
+            // En la de Lucy, el micrófono: tocar = conversación en vivo; mantener = hablar.
+            vm.screen == Screen.Masha && mashaMic != null -> { mashaMic?.press(); true }
             // En la tienda, Y abre las utilidades (recargar, actualizar todo, quitar filtros).
             vm.screen == Screen.Ports && vm.ports.detail == null -> { vm.ports.openUtilities(); true }
             else -> primaryAction?.let { runCatching { it.requestFocus() }; true } ?: false

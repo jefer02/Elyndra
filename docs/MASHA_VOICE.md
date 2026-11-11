@@ -66,6 +66,22 @@ MashaScreen ──feed(texto, final)──▶ MashaVoice ──▶ VoiceRouter �
 - El modelo se carga y se "calienta" al elegir idioma (al entrar en la pantalla de Lucy); si ya espera una
   frase de verdad, el calentamiento se salta (ella misma lo hace).
 
+### Conversación en vivo (`ui/masha/live/`)
+
+- **Tocar** el micrófono (o **Y** en el mando) enciende o apaga el modo en vivo; **mantener** es pulsar
+  para hablar (al soltar se manda). El permiso de micrófono se pide la primera vez.
+- Turnos en `LiveTurns` (puro): Idle → Listening → Thinking → Speaking → Listening. Dos escuchas seguidas
+  sin nada terminan la sesión; Stop o la app al fondo la terminan desde cualquier estado.
+- Oír: `MashaEars` usa el reconocedor **del dispositivo** (Android 12+) si lo hay y tiene el idioma; si
+  no, el servicio del sistema, y la pantalla avisa de que el audio lo procesa el sistema.
+- Contestar: la misma `MashaController.send()` del chat (herramientas, sin conexión incluidas); la voz habla
+  frase a frase según llega (`StreamChunker`), aunque la voz esté apagada en Ajustes.
+- Barge-in: mientras Lucy habla, `BargeInListener` graba con `VOICE_COMMUNICATION` + cancelación de eco y
+  `VoiceActivity` detecta voz sostenida (≈260 ms sobre el fondo). Solo con cancelación de eco o con
+  auriculares; si no, se interrumpe manteniendo el botón. Nunca a la vez que el reconocedor.
+- Fin de turno: respuesta completa y `MashaVoice.queued` en falso; si la voz no llega a sonar en 8 s
+  (sin motor), se vuelve a escuchar igual.
+
 ### Ánimo y prosodia
 
 Supertonic no tiene control de tono ni estilo. Se usa lo que sí tiene:
@@ -194,6 +210,8 @@ Google TTS perdía PCM cuando se le encolaban varias frases ya en caché (ahora 
 - Voces femeninas de Google en pt/fr/de/ja (`SystemTtsEngine.FEMALE`).
 - Sincronía de labios a ojo con la voz natural, altavoz y Bluetooth (los ajustes por salida no cambian).
 - Descarga del modelo con datos móviles / Wi-Fi lenta y reanudación.
+- Conversación en vivo: latencia de turno, falsos barge-in por el altavoz con y sin cancelación de eco, y
+  qué móviles tienen reconocedor en el dispositivo para cada idioma.
 
 ## Herramientas de QA (solo debug)
 

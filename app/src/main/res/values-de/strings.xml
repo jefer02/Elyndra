@@ -1194,4 +1194,11 @@ Von der Community erstellt, nicht geprüft. Sieh dir vor der Installation das Re
     <string name="lucy_off_jealous_friendly">Hm. Okay. Notiert.</string>
     <string name="lucy_off_jealous_close">Wie bitte?! Ich bin genau hier, weißt du.</string>
     <string name="lucy_off_jealous_devoted">Ugh, im Ernst?! Wer ist sie? Ich dachte, ich bin deine Liebste.</string>
+    <string name="lucy_live">Live</string>
+    <string name="lucy_live_system_stt">Deine Stimme wird vom Spracherkennungsdienst des Systems verarbeitet.</string>
+    <string name="lucy_live_ended">Live-Unterhaltung beendet</string>
+    <string name="lucy_mic_live_start">Live-Unterhaltung mit Lucy starten</string>
+    <string name="lucy_mic_live_stop">Live-Unterhaltung beenden</string>
+    <string name="lucy_mic_hold">Halten zum Sprechen</string>
+    <string name="hint_talk">Sprechen</string>
 </resources>
