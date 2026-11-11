@@ -13,7 +13,7 @@ import com.elyndra.launcher.input.HoldOrTap
 import com.elyndra.launcher.ui.InputController
 import com.elyndra.launcher.ui.masha.MashaMood
 import com.elyndra.launcher.ui.masha.lipsync.RouteKind
-import com.elyndra.launcher.ui.masha.live.BargeInListener
+import com.elyndra.launcher.ui.masha.live.LiveMic
 import com.elyndra.launcher.ui.masha.live.LiveTurns
 import com.elyndra.launcher.ui.masha.live.LiveVoice
 import com.elyndra.launcher.ui.theme.focusRing
@@ -31,6 +31,11 @@ import com.elyndra.launcher.ui.masha.AffinityHeart
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -189,13 +194,16 @@ fun MashaScreen(vm: ElyndraViewModel) {
         level = settings.mashaSoundscapeVolume / 100f,
         ducked = presence.speaking || presence.listening,
     )
-    // La conversación en vivo y el barge-in se crean abajo; los oídos les pasan lo que oyen.
+    // La conversación en vivo se crea abajo; los oídos y el micrófono le pasan lo que oyen.
     val liveRef = remember { arrayOfNulls<LiveVoice>(1) }
     // Pulsar para hablar (mantener el micrófono o Y): una frase que se manda sola.
     var pushToTalk by remember { mutableStateOf(false) }
     val ears = rememberMashaEars(
         presence,
-        onPartial = masha::updateDraft,
+        onPartial = { text ->
+            val live = liveRef[0]
+            if (live != null && live.active) live.onPartial(text) else masha.updateDraft(text)
+        },
         onFinal = { text ->
             pushToTalk = false
             val live = liveRef[0]
@@ -212,35 +220,45 @@ fun MashaScreen(vm: ElyndraViewModel) {
             val inLive = live != null && live.active
             live?.takeIf { inLive }?.onEarsFailure(failure)
             // En vivo, una escucha en silencio no es un error que contar: ya lo cuentan los turnos.
-            val quiet = inLive && (failure == MashaEars.Failure.NoMatch || failure == MashaEars.Failure.Busy)
+            val quiet = failure == MashaEars.Failure.StreamUnsupported ||
+                inLive && (failure == MashaEars.Failure.NoMatch || failure == MashaEars.Failure.Busy)
             if (!quiet) {
                 val res = when (failure) {
                     MashaEars.Failure.Unavailable -> R.string.masha_mic_unavailable
                     MashaEars.Failure.Permission -> R.string.masha_mic_denied
                     MashaEars.Failure.Network -> R.string.masha_mic_network
-                    MashaEars.Failure.NoMatch, MashaEars.Failure.Busy -> R.string.masha_mic_no_match
+                    MashaEars.Failure.NoMatch, MashaEars.Failure.Busy, MashaEars.Failure.StreamUnsupported -> R.string.masha_mic_no_match
                 }
                 vm.showToast(UiText.res(res))
             }
         },
     )
     val scope = rememberCoroutineScope()
-    val barge = remember { BargeInListener(context) { liveRef[0]?.bargeIn() } }
-    val live = remember(ears, voice) {
+    // El micrófono siempre abierto de la conversación en vivo: oye al usuario sin confundirlo con la voz de ella.
+    val liveMic = remember(voice) {
+        LiveMic(
+            context,
+            reference = voice::soundingLevelDb,
+            onSignal = { liveRef[0]?.onSignal(it) },
+            onLevel = { level -> presence.micLevel = level },
+        )
+    }
+    val live = remember(ears, voice, liveMic) {
         LiveVoice(
             ears = ears,
             voice = voice,
             presence = presence,
             masha = masha,
-            barge = barge,
+            mic = liveMic,
             scope = scope,
             language = { vm.settings.lang },
-            headphones = { voice.audioRoute.kind != RouteKind.Speaker },
+            // Con auriculares su voz no vuelve al micrófono: hablar encima la corta siempre.
+            voiceBargeIn = { vm.settings.lucyVoiceInterrupt || voice.audioRoute.kind != RouteKind.Speaker },
             onEnded = { reason -> if (reason == LiveTurns.EndReason.Silence) vm.showToast(UiText.res(R.string.lucy_live_ended)) },
         ).also { liveRef[0] = it }
     }
     DisposableEffect(live) { onDispose { live.release() } }
-    // La app al fondo: se suelta el micrófono (en vivo, al pulsar o el del barge-in).
+    // La app al fondo o la pantalla apagada (ON_STOP): se suelta el micrófono (en vivo o al pulsar).
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, live) {
         val observer = LifecycleEventObserver { _, event ->
@@ -289,6 +307,7 @@ fun MashaScreen(vm: ElyndraViewModel) {
     }
     val mic = MicActions(
         live = live.active,
+        liveState = live.state,
         systemStt = ears.processedBySystem && (live.active || presence.listening),
         onTap = ::tapMic,
         onHoldStart = ::holdMic,
@@ -337,7 +356,7 @@ fun MashaScreen(vm: ElyndraViewModel) {
         presence.thinking = masha.busy && (last == null || !last.fromMasha || (last.text.isEmpty() && last.attachment == null))
         // En vivo, el ánimo dice de quién es el turno: curiosa al escuchar, pensativa al pensar.
         presence.mood = when (live.state) {
-            LiveTurns.State.Listening -> MashaMood.Curious
+            LiveTurns.State.Waiting, LiveTurns.State.UserSpeaking, LiveTurns.State.Held -> MashaMood.Curious
             LiveTurns.State.Thinking -> MashaMood.Thinking
             else -> masha.mood
         }
@@ -743,6 +762,8 @@ private enum class MicAction { Live, Talk }
 private class MicActions(
     /** La conversación en vivo está encendida. */
     val live: Boolean,
+    /** De quién es el turno en vivo (para el indicador "escuchando"). */
+    val liveState: LiveTurns.State,
     /** Se está oyendo con el servicio del sistema (el audio puede salir del móvil): se avisa. */
     val systemStt: Boolean,
     val onTap: () -> Unit,
@@ -813,9 +834,14 @@ private fun LiveStrip(mic: MicActions, glow: Color) {
     AnimatedVisibility(mic.live || mic.systemStt, enter = fadeIn(), exit = fadeOut()) {
         Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             if (mic.live) {
-                Box(Modifier.size(6.dp).clip(CircleShape).background(glow))
+                // El micrófono está abierto toda la sesión: el punto late siempre, y el texto dice de quién es el turno.
+                val pulse = rememberInfiniteTransition(label = "live")
+                val alpha by pulse.animateFloat(0.35f, 1f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "liveDot")
+                Box(Modifier.size(7.dp).graphicsLayer { this.alpha = alpha }.clip(CircleShape).background(glow))
                 Spacer(Modifier.width(5.dp))
                 ElyText(stringResource(R.string.lucy_live), size = 8.5f, weight = FontWeight.Bold, color = glow, uppercase = true, letterSpacing = tracking(0.2f))
+                Spacer(Modifier.width(6.dp))
+                ElyText(stringResource(liveStateLabel(mic.liveState)), size = 8.5f, color = Holo.text)
                 Spacer(Modifier.width(10.dp))
             }
             if (mic.systemStt) {
@@ -823,6 +849,13 @@ private fun LiveStrip(mic: MicActions, glow: Color) {
             }
         }
     }
+}
+
+private fun liveStateLabel(state: LiveTurns.State): Int = when (state) {
+    LiveTurns.State.Speaking -> R.string.lucy_live_talking
+    LiveTurns.State.Thinking -> R.string.lucy_live_thinking
+    LiveTurns.State.UserSpeaking, LiveTurns.State.Held -> R.string.lucy_live_hearing
+    LiveTurns.State.Waiting, LiveTurns.State.Idle -> R.string.lucy_live_listening
 }
 
 /* ── panel de sonido ──────────────────────────────────────────── */

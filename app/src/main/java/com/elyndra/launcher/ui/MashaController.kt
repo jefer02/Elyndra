@@ -95,6 +95,10 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     val writes = MashaWrites()
     private val actions = MashaActions(vm, brain, writes)
     private var job: Job? = null
+    private var persistJob: Job? = null
+
+    /** La respuesta de la IA que ya se guardó entera (para marcarla si luego la cortan hablando). */
+    private var savedReplyId: Long? = null
     private var historyLoaded = false
 
     val hasKey: Boolean get() = brain.config.hasKey
@@ -127,6 +131,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                         game = m.gameKey?.let { gameRef(it) },
                         attachment = m.attachment,
                         restored = true,
+                        interrupted = m.interrupted,
                     )
                 }
             }
@@ -164,7 +169,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     private suspend fun summarize() {
         if (!ConversationRecall.needsSummary(recall)) return
         val turns = messages.filterNot { it.pending || it.greeting || it.text.isBlank() }
-            .map { MashaTurn(if (it.fromMasha) MashaTurn.Role.Masha else MashaTurn.Role.User, it.text) }
+            .map { MashaTurn(if (it.fromMasha) MashaTurn.Role.Masha else MashaTurn.Role.User, it.text, it.interrupted) }
         if (turns.isEmpty()) return
         val upTo = recall.lastActivityAt
         val titles = vm.library.roms.map { it.displayTitle } + vm.library.apps.map { it.displayTitle }
@@ -256,7 +261,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
         }
         // El hilo que ve el modelo es el de antes de este mensaje, sin el saludo de cortesía.
         val history = messages.filterNot { it.pending || it.greeting || it.text.isBlank() }
-            .map { MashaTurn(if (it.fromMasha) MashaTurn.Role.Masha else MashaTurn.Role.User, it.text) }
+            .map { MashaTurn(if (it.fromMasha) MashaTurn.Role.Masha else MashaTurn.Role.User, it.text, it.interrupted) }
         messages += ChatMessage(fromMasha = false, text = text)
         draft = ""
         busy = true
@@ -355,6 +360,36 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
         job = null
     }
 
+    /**
+     * El usuario le cortó hablando (conversación en vivo): se para la
+     * respuesta y en el hilo queda solo lo que llegó a decir ([spoken], las
+     * frases que sonaron), marcado como interrumpido, para que la próxima vez
+     * no lo repita. Sin nada dicho y sin tarjeta, la burbuja se quita.
+     */
+    fun interrupt(spoken: String) {
+        val lastUser = messages.indexOfLast { !it.fromMasha }
+        val i = messages.indexOfLast { it.fromMasha && !it.greeting }
+        stop()
+        if (i < 0 || i < lastUser) return
+        val m = messages[i]
+        val text = spoken.trim().takeIf { it.isNotEmpty() }?.let { it.trimEnd('.', '…', ' ') + "…" } ?: "…"
+        val saved = savedReplyId == m.id
+        if (!saved && spoken.isBlank() && m.attachment == null) {
+            messages.removeAt(i)
+            return
+        }
+        messages[i] = m.copy(text = text, pending = false, interrupted = true)
+        if (saved) {
+            val previous = persistJob
+            persistJob = vm.viewModelScope.launch {
+                previous?.join()
+                brain.memory.markLastInterrupted(text)
+            }
+        } else {
+            persist(StoredMessage(MashaTurn.Role.Masha, text, m.game?.key, m.attachment, System.currentTimeMillis(), interrupted = true))
+        }
+    }
+
     private suspend fun online(text: String, previous: String?, history: List<MashaTurn>, language: String, cacheable: Boolean) {
         val context = brain.context(language, vm.screenName(), vm.focusName())
         val index = messages.size
@@ -406,6 +441,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                     val game = if (attachment == null) findMentionedGame(event.text) else null
                     if (game != null && index in messages.indices) messages[index] = messages[index].copy(game = game)
                     persist(StoredMessage(MashaTurn.Role.Masha, event.text, game?.key, attachment, System.currentTimeMillis()))
+                    if (index in messages.indices) savedReplyId = messages[index].id
                 }
                 is MashaEvent.Failed -> {
                     if (event.partial.isBlank()) {
@@ -715,7 +751,12 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
 
     private fun persist(message: StoredMessage) {
         noteActivity(message.createdAt)
-        vm.viewModelScope.launch { brain.memory.saveMessage(message) }
+        // En orden: marcar una respuesta como interrumpida tiene que llegar después de guardarla.
+        val previous = persistJob
+        persistJob = vm.viewModelScope.launch {
+            previous?.join()
+            brain.memory.saveMessage(message)
+        }
     }
 
     /** Contexto con el idioma de la app, para componer respuestas fuera de Compose. */

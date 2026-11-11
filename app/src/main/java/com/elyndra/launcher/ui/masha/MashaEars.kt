@@ -2,11 +2,15 @@ package com.elyndra.launcher.ui.masha
 
 import android.content.Context
 import android.content.Intent
+import android.media.AudioFormat
 import android.os.Build
 import android.os.Bundle
+import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -29,6 +33,13 @@ import androidx.compose.ui.platform.LocalContext
  * (que suele mandar el audio a su servidor); [processedBySystem] lo dice para
  * que la interfaz lo avise.
  *
+ * Desde Android 13, [startStream] escucha **nuestro** audio (un pipe con PCM
+ * de 16 kHz) en vez de abrir el micrófono: la conversación en vivo graba sin
+ * parar y le pasa al reconocedor el último segundo antes de que el usuario
+ * empezara a hablar, así no se pierden sus primeras palabras. Si el
+ * reconocedor no acepta audio de fuera, falla enseguida con
+ * [Failure.StreamUnsupported] y quien llama vuelve a [start].
+ *
  * Tiene que usarse desde el hilo principal (lo exige SpeechRecognizer).
  */
 class MashaEars(
@@ -38,7 +49,7 @@ class MashaEars(
     private val onFinal: (String) -> Unit,
     private val onError: (Failure) -> Unit,
 ) {
-    enum class Failure { Unavailable, Permission, NoMatch, Network, Busy }
+    enum class Failure { Unavailable, Permission, NoMatch, Network, Busy, StreamUnsupported }
 
     private val appContext = context.applicationContext
     private var recognizer: SpeechRecognizer? = null
@@ -57,14 +68,24 @@ class MashaEars(
         private set
 
     private var language = ""
+    private var source: ParcelFileDescriptor? = null
+    private var startedAt = 0L
 
-    fun start(language: String) {
+    fun start(language: String) = listen(language, null)
+
+    /** Escucha el PCM (16 kHz, mono, 16 bits) que llega por [source] en vez del micrófono. Android 13+. */
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    fun startStream(language: String, source: ParcelFileDescriptor) = listen(language, source)
+
+    private fun listen(language: String, source: ParcelFileDescriptor?) {
         if (!available) {
             onError(Failure.Unavailable)
             return
         }
         stop()
         this.language = language
+        this.source = source
+        startedAt = SystemClock.elapsedRealtime()
         val onDevice = onDeviceAvailable && !onDeviceFailed
         val r = if (onDevice && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             SpeechRecognizer.createOnDeviceSpeechRecognizer(appContext)
@@ -84,6 +105,12 @@ class MashaEars(
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1200L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 900L)
             if (onDevice) putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            if (source != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, source)
+                putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, 1)
+                putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
+                putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, STREAM_RATE)
+            }
         }
         presence.listening = true
         r.startListening(intent)
@@ -101,6 +128,8 @@ class MashaEars(
             it.destroy()
         }
         recognizer = null
+        source?.let { runCatching { it.close() } }
+        source = null
         presence.listening = false
         presence.micLevel = 0f
     }
@@ -125,10 +154,20 @@ class MashaEars(
         }
 
         override fun onError(error: Int) {
+            // Audio de fuera rechazado nada más empezar: este reconocedor no lo acepta.
+            if (source != null && error in STREAM_ERRORS && SystemClock.elapsedRealtime() - startedAt < STREAM_PROBE_MS) {
+                stop()
+                onError(Failure.StreamUnsupported)
+                return
+            }
             // El del dispositivo no tiene este idioma (o no está descargado): se repite con el del sistema.
             if (onDevice && systemAvailable && error in LANGUAGE_ERRORS) {
                 onDeviceFailed = true
-                start(language)
+                val again = source
+                source = null // listen() no debe cerrar el pipe que va a reutilizar
+                recognizer?.destroy()
+                recognizer = null
+                listen(language, again)
                 return
             }
             val failure = when (error) {
@@ -161,6 +200,11 @@ class MashaEars(
     private companion object {
         /** ERROR_LANGUAGE_NOT_SUPPORTED (12) y ERROR_LANGUAGE_UNAVAILABLE (13), de Android 12. */
         val LANGUAGE_ERRORS = setOf(12, 13)
+
+        /** ERROR_AUDIO (3), ERROR_CLIENT (5) y ERROR_CANNOT_CHECK_SUPPORT (14): no sabe leer el pipe. */
+        val STREAM_ERRORS = setOf(SpeechRecognizer.ERROR_AUDIO, SpeechRecognizer.ERROR_CLIENT, 14)
+        const val STREAM_PROBE_MS = 1_500L
+        const val STREAM_RATE = 16_000
     }
 }
 

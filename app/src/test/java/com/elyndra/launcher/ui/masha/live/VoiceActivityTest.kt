@@ -1,65 +1,41 @@
 package com.elyndra.launcher.ui.masha.live
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.PI
 import kotlin.math.sin
 
-/** El detector de voz del barge-in: el fondo no dispara, una voz sostenida sí (una vez). */
+/** El VAD de repuesto por energía (sin Silero): el fondo no es voz, algo claro por encima sí. */
 class VoiceActivityTest {
 
-    private fun frames(vad: VoiceActivity, db: Float, n: Int): List<Boolean> = (1..n).map { vad.accept(db) }
-
     @Test
-    fun steadyBackgroundNeverTriggers() {
+    fun steadyBackgroundIsNotSpeech() {
         val vad = VoiceActivity()
-        assertTrue(frames(vad, -55f, 200).none { it })
+        assertTrue((1..200).map { vad.prob(-55f) }.all { it < 0.1f })
     }
 
     @Test
-    fun lucysOwnEchoBecomesTheFloor() {
-        // El detector se abre cuando ella ya suena: lo que se cuela tras la cancelación de eco es el fondo,
-        // con sus subidas y bajadas de unos pocos dB.
+    fun aClearVoiceAboveTheFloorIs() {
         val vad = VoiceActivity()
-        val echo = (0 until 400).map { -40f + if (it % 7 < 3) 4f else -3f }
-        assertTrue(echo.none { vad.accept(it) })
-        // El usuario hablando claramente por encima, sí.
-        assertTrue(frames(vad, -22f, 20).any { it })
+        repeat(100) { vad.prob(-58f) }
+        assertTrue(vad.prob(-28f) > 0.9f)
     }
 
     @Test
-    fun sustainedSpeechAboveTheFloorTriggersOnce() {
-        val vad = VoiceActivity(frameMs = 20, minSpeechMs = 260)
-        frames(vad, -55f, 50)
-        val speech = frames(vad, -28f, 40)
-        assertEquals(1, speech.count { it })
-        assertEquals(12, speech.indexOf(true)) // 13 tramos de 20 ms = 260 ms
-    }
-
-    @Test
-    fun aShortClickDoesNotTrigger() {
+    fun theFloorFollowsTheRoomDownQuicklyAndUpSlowly() {
         val vad = VoiceActivity()
-        frames(vad, -55f, 50)
-        assertTrue(frames(vad, -20f, 5).none { it })
-        assertTrue(frames(vad, -55f, 10).none { it })
-    }
-
-    @Test
-    fun itCanTriggerAgainAfterSilence() {
-        val vad = VoiceActivity()
-        frames(vad, -55f, 50)
-        assertTrue(frames(vad, -28f, 20).any { it })
-        frames(vad, -55f, 20)
-        assertTrue(frames(vad, -28f, 20).any { it })
+        repeat(100) { vad.prob(-40f) }
+        repeat(20) { vad.prob(-70f) }
+        // Bajó deprisa: −35 ya destaca (con el suelo aún en −40 no lo haría).
+        assertTrue(vad.prob(-35f) > 0.5f)
     }
 
     @Test
     fun veryQuietSoundsNeverCountAsSpeech() {
         val vad = VoiceActivity()
-        frames(vad, -90f, 50)
-        assertFalse(frames(vad, -60f, 50).any { it }) // muy por encima del fondo, pero bajo el mínimo
+        repeat(50) { vad.prob(-95f) }
+        assertEquals(0f, vad.prob(-60f))
     }
 
     @Test

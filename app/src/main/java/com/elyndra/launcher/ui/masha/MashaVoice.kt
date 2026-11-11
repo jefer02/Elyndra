@@ -110,11 +110,25 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
         if (q != queued) queued = q
     }
 
+    /**
+     * La frase que suena ahora (tal como la escribió ella, sin normalizar), o
+     * null: el subtítulo (hilo principal).
+     */
+    var nowSaying by mutableStateOf<String?>(null)
+        private set
+
+    /** Las frases que llegaron a sonar desde que empezó a hablar (para "lo que dijo" al interrumpirla). */
+    private val spokenRun = ArrayList<String>()
+
+    /** En pausa porque el usuario empezó a hablar (ver [pause]). */
+    var paused by mutableStateOf(false)
+        private set
+
     /** Frases que llegaron antes de que hubiera motor: se dicen en cuanto lo hay. */
     private val waiting = ArrayList<String>()
 
     /** Una frase en curso: su modelo (hilo de análisis) y su item de render. */
-    private inner class Job(val id: String, val text: String, val gen: Int, val sayNanos: Long, val voice: VoiceInfo) {
+    private inner class Job(val id: String, val text: String, val raw: String, val gen: Int, val sayNanos: Long, val voice: VoiceInfo) {
         val item = LipSync.Item(id)
         var utt: Utterance? = null // hilo de análisis
         /** Copia a media frecuencia para el análisis (voz a 44,1 kHz), o null. */
@@ -265,10 +279,11 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
         if (order.isEmpty()) {
             runStartNanos = now
             runHeard = false
+            spokenRun.clear()
         }
         val id = "masha-${seq++}"
         if (BuildConfig.DEBUG) Log.d(TAG, "say $id [${voice.engineId}]: \"$text\"")
-        val j = Job(id, text, gen, now, voice)
+        val j = Job(id, text, raw, gen, now, voice)
         jobs[id] = j
         order += j
         lip.add(j.item)
@@ -410,6 +425,7 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
             val t = out.seconds(j.item, now)
             if (!j.heard && (j.speakMode || out.isPlaying) && !t.isNaN() && t > 0.0) {
                 j.heard = true
+                spokenRun += j.raw
                 if (!runHeard) {
                     runHeard = true
                     // Cuándo empezó a oírse de verdad: ahora menos lo que ya lleva sonando.
@@ -430,13 +446,43 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
         }
         val speaking = order.isNotEmpty() && (any || runHeard)
         if (speaking != presence.speaking) presence.speaking = speaking
+        val saying = order.firstOrNull { it.heard }?.raw
+        if (saying != nowSaying) nowSaying = saying
         refreshQueued()
         if (order.isNotEmpty()) main.postDelayed(ticker, TICK_MS)
     }
 
+    /**
+     * Pausa a media frase (el usuario empezó a hablar en la conversación en
+     * vivo): la boca se queda quieta y lo que falta sigue en cola hasta
+     * [resume] o [stop].
+     */
+    fun pause() {
+        if (released || paused) return
+        paused = true
+        out.hold()
+    }
+
+    fun resume() {
+        if (released || !paused) return
+        paused = false
+        out.resume()
+    }
+
+    /** Lo que llegó a decir desde que empezó a hablar (frases que sonaron, aunque fuera un poco). */
+    fun spokenSoFar(): String = spokenRun.joinToString(" ").trim()
+
+    /** Lo que suena es lo último que tiene en cola (para saber si su pregunta final es esta). */
+    val sayingLast: Boolean get() = waiting.isEmpty() && order.count { !it.heard } == 0 && order.size <= 1
+
+    /** Nivel (dBFS) de lo que sale ahora por la voz; lo pide el micrófono de la conversación en vivo. */
+    fun soundingLevelDb(): Float = out.soundingLevelDb()
+
     /** Calla ya (y olvida lo que quedaba en cola). */
     fun stop() {
         if (released) return
+        paused = false
+        nowSaying = null
         gen++
         engine.stop(jobs.keys.toList())
         out.stop()

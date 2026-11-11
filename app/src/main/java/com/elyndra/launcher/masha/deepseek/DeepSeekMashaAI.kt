@@ -87,7 +87,9 @@ class DeepSeekMashaAI @Inject constructor(
         val messages = ArrayList<Message>()
         messages += Message.System(MashaPrompt.SYSTEM)
         request.history.takeLast(MAX_HISTORY).forEach { turn ->
-            val text = AffinityTag.strip(turn.text).text.take(MAX_TURN_CHARS)
+            val clean = AffinityTag.strip(turn.text).text.take(MAX_TURN_CHARS)
+            // Cortada por el usuario: el modelo lo sabe y no la repite (ver MashaPrompt, INTERRUPTIONS).
+            val text = if (turn.interrupted && turn.role == MashaTurn.Role.Masha) "$clean\n$INTERRUPTED_NOTE" else clean
             messages += if (turn.role == MashaTurn.Role.User) Message.User(text) else Message.Assistant(text)
         }
         // El contexto va en el último mensaje, no en el de sistema: así el
@@ -290,18 +292,21 @@ class DeepSeekMashaAI @Inject constructor(
         cachedPromptTokens + o.cachedPromptTokens,
     )
 
-    private companion object {
-        val JSON = "application/json".toMediaType()
+    companion object {
+        private val JSON = "application/json".toMediaType()
 
-        const val MAX_ROUNDS = 5
-        const val MAX_HISTORY = 12
-        const val MAX_TURN_CHARS = 1_500
+        /** Lo que ve el modelo tras una respuesta suya cortada por el usuario. */
+        const val INTERRUPTED_NOTE = "(The user interrupted you here.)"
+
+        private const val MAX_ROUNDS = 5
+        private const val MAX_HISTORY = 12
+        private const val MAX_TURN_CHARS = 1_500
 
         /** DeepSeek recomienda 1.0–1.3 para conversación; 1.0 mantiene los datos a raya. */
-        const val CHAT_TEMPERATURE = 1.0
-        const val CHAT_MAX_TOKENS = 900
+        private const val CHAT_TEMPERATURE = 1.0
+        private const val CHAT_MAX_TOKENS = 900
 
         /** Una respuesta de consulta vale media hora si nada ha cambiado. */
-        const val CACHE_TTL_MS = 30L * 60 * 1000
+        private const val CACHE_TTL_MS = 30L * 60 * 1000
     }
 }

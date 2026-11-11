@@ -273,6 +273,20 @@ class DeepSeekTest {
     }
 
     @Test
+    fun anInterruptedReplyReachesTheModelWithTheNote() = runBlocking {
+        server.enqueue(sse(text("Oh, okay."), stop))
+        val history = listOf(
+            MashaTurn(MashaTurn.Role.User, "what should I play?"),
+            MashaTurn(MashaTurn.Role.Masha, "Okay, I have one you'll love…", interrupted = true),
+        )
+        ai.chat(MashaChatRequest(history, "wait, what about Okami?", "{}", "fp-1", "en"), null).toList()
+        val body = server.takeRequest().body.readUtf8()
+        assertTrue(body.contains("Okay, I have one you'll love…\\n(The user interrupted you here.)"))
+        // La nota no se pega a los mensajes no cortados.
+        assertFalse(body.contains("what should I play?\\n(The user"))
+    }
+
+    @Test
     fun pingReadsTheBalance() = runBlocking {
         server.enqueue(MockResponse().setBody("""{"is_available":true,"balance_infos":[{"currency":"USD","total_balance":"4.20"}]}"""))
         assertEquals("4.20 USD", ai.ping().getOrNull())

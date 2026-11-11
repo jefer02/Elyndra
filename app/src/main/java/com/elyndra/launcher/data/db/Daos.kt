@@ -164,6 +164,13 @@ interface MashaDao {
 
     @Query("DELETE FROM masha_messages")
     suspend fun clearMessages()
+
+    /** La última respuesta de [role] pasa a [text], marcada como interrumpida. */
+    @Query(
+        "UPDATE masha_messages SET text = :text, interrupted = 1 WHERE id = " +
+            "(SELECT id FROM masha_messages WHERE role = :role ORDER BY created_at DESC, id DESC LIMIT 1)",
+    )
+    suspend fun interruptLastMessage(role: String, text: String)
 }
 
 @Dao

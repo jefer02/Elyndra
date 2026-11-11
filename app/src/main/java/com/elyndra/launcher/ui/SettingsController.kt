@@ -335,6 +335,13 @@ class SettingsController(private val vm: ElyndraViewModel) {
         preview.play(text, lang, mashaVoiceSpeaker, mashaVoiceRate)
     }
 
+    var lucyVoiceInterrupt by mutableStateOf(store.lucyVoiceInterrupt); private set
+
+    fun toggleLucyVoiceInterrupt() {
+        lucyVoiceInterrupt = !lucyVoiceInterrupt
+        store.lucyVoiceInterrupt = lucyVoiceInterrupt
+    }
+
     var mashaSoundscape by mutableStateOf(store.mashaSoundscape); private set
 
     fun toggleMashaSoundscape() {

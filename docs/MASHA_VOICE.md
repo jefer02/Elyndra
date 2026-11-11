@@ -69,18 +69,42 @@ MashaScreen ──feed(texto, final)──▶ MashaVoice ──▶ VoiceRouter �
 ### Conversación en vivo (`ui/masha/live/`)
 
 - **Tocar** el micrófono (o **Y** en el mando) enciende o apaga el modo en vivo; **mantener** es pulsar
-  para hablar (al soltar se manda). El permiso de micrófono se pide la primera vez.
-- Turnos en `LiveTurns` (puro): Idle → Listening → Thinking → Speaking → Listening. Dos escuchas seguidas
-  sin nada terminan la sesión; Stop o la app al fondo la terminan desde cualquier estado.
-- Oír: `MashaEars` usa el reconocedor **del dispositivo** (Android 12+) si lo hay y tiene el idioma; si
-  no, el servicio del sistema, y la pantalla avisa de que el audio lo procesa el sistema.
-- Contestar: la misma `MashaController.send()` del chat (herramientas, sin conexión incluidas); la voz habla
-  frase a frase según llega (`StreamChunker`), aunque la voz esté apagada en Ajustes.
-- Barge-in: mientras Lucy habla, `BargeInListener` graba con `VOICE_COMMUNICATION` + cancelación de eco y
-  `VoiceActivity` detecta voz sostenida (≈260 ms sobre el fondo). Solo con cancelación de eco o con
-  auriculares; si no, se interrumpe manteniendo el botón. Nunca a la vez que el reconocedor.
-- Fin de turno: respuesta completa y `MashaVoice.queued` en falso; si la voz no llega a sonar en 8 s
-  (sin motor), se vuelve a escuchar igual.
+  para hablar (al soltar se manda) o, en vivo, cortar a Lucy ya. El permiso se pide la primera vez.
+  Nunca se enciende solo; se apaga al salir de la pantalla, con la app al fondo o la pantalla apagada
+  (`ON_STOP`, el micrófono se suelta en el momento), al tocar otra vez o a los **3 minutos** sin que el
+  usuario diga nada (`LiveTurns.IDLE_TIMEOUT_MS`). El punto "EN VIVO" late mientras el micrófono está abierto.
+- **Micrófono siempre abierto** (`LiveMic`): `AudioRecord` con `VOICE_RECOGNITION` a 16 kHz, **sin modo
+  llamada** (la voz de Lucy sigue en `USAGE_ASSISTANT` con calidad normal y la música no cambia), con
+  `AcousticEchoCanceler`/`NoiseSuppressor` si el móvil los deja usar fuera de una llamada. Tramos de 16 ms:
+  anillo de 1,2 s (`PcmRing`), VAD (Silero v5 en ONNX Runtime, `SileroVad`; por energía en 32 bits,
+  `VoiceActivity`), puerta de eco y segmentador (`LiveEar`).
+- **Su propia voz como referencia** (`EchoGate`): `SpeechOutput` anota el nivel de lo que escribe en la pista
+  (`PlaybackEnvelope`) y el micrófono lo lee en la trama que suena (reloj de la pista). La puerta estima el
+  retardo altavoz→micro cruzando envolventes (0–384 ms), aprende el acoplamiento solo con tramos que siguen
+  a su voz y deja pasar la voz que supera el eco esperado en 5 dB (con 4 dB más de margen si el micro sigue
+  su envolvente: distorsión a volumen alto). Con ella callada, decide el VAD.
+- **Turnos** (`LiveTurns`, puro): Waiting → UserSpeaking (≥ 250 ms de voz) → fin de turno con **700 ms** de
+  silencio (`SpeechSegmenter`) → Thinking → Speaking → Waiting. Si habla mientras piensa, se cancela la
+  petición y se espera a que termine.
+- **Interrumpir**: con ella hablando, a los 250 ms de voz del usuario se **pausa** (`MashaVoice.pause`, la
+  pista se para sin perder la cola) y el reconocedor ya escucha. `HoldDecision`: una muletilla corta ("mm",
+  "ajá", "うん"… `Backchannel`, 6 idiomas) → sigue donde iba; cualquier otra palabra, más de 900 ms de voz o
+  un "sí" a su pregunta final → se corta: en el hilo queda solo lo que llegó a decir, marcado como
+  interrumpido (columna `interrupted`, migración 9→10), y DeepSeek lo recibe con la nota
+  `(The user interrupted you here.)` (prompt v8, INTERRUPTIONS). Una pausa nunca dura más de 2,5 s.
+- **Ajuste "Interrumpir con la voz por el altavoz"** (Ajustes → Lucy, encendido por defecto): apagado y por
+  el altavoz, lo que se oye mientras ella habla no la corta (solo el botón); con auriculares siempre.
+- **Reconocer sin perder el principio**: en Android 13+ `MashaEars.startStream` escucha nuestro audio por un
+  pipe (`EXTRA_AUDIO_SOURCE`, PCM 16 kHz) empezando por el último segundo del anillo. Si el reconocedor no
+  acepta audio de fuera (error al empezar), **relevo**: se suelta nuestro micrófono y escucha él (se pierden
+  ~300–600 ms del principio); igual en Android 12 o menos. Reconocedor del dispositivo si lo hay y tiene el
+  idioma; si no, el del sistema (y se avisa).
+- **Log `LucyLive`**: por turno, fin de voz → texto final y fin de voz → primera palabra de Lucy; por pausa,
+  muletilla o corte; al cerrar, pausas/siguió/cortes y lo que vio el micrófono (tramos con Lucy, eco
+  descartado, voz sobre Lucy, AEC/NS, Silero, acoplamiento). Falso disparo = pausa que sigue sin texto.
+- Medido sin móvil (`SpeakerEchoSimulationTest`, voz sintética, VAD de energía): volumen medio 0 falsos/min,
+  8 % de barge-ins perdidos, ~295 ms de reacción; volumen alto (eco al nivel del usuario, altavoz saturado)
+  0 falsos/min y 50 % perdidos (26 % si el usuario sube la voz). A volumen alto haría falta un AEC por software.
 
 ### Ánimo y prosodia
 
@@ -210,8 +234,9 @@ Google TTS perdía PCM cuando se le encolaban varias frases ya en caché (ahora 
 - Voces femeninas de Google en pt/fr/de/ja (`SystemTtsEngine.FEMALE`).
 - Sincronía de labios a ojo con la voz natural, altavoz y Bluetooth (los ajustes por salida no cambian).
 - Descarga del modelo con datos móviles / Wi-Fi lenta y reanudación.
-- Conversación en vivo: latencia de turno, falsos barge-in por el altavoz con y sin cancelación de eco, y
-  qué móviles tienen reconocedor en el dispositivo para cada idioma.
+- Conversación en vivo: latencia de turno, falsos disparos y barge-ins perdidos por el altavoz a volumen
+  medio y alto (log `LucyLive`), qué reconocedores aceptan `EXTRA_AUDIO_SOURCE` y qué móviles tienen
+  reconocedor en el dispositivo para cada idioma.
 
 ## Herramientas de QA (solo debug)
 

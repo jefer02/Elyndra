@@ -75,6 +75,12 @@ their owners and appear only as text that identifies the system.
 |---|---|---|
 | (none: drawn in code) | Original work for Elyndra | Elyndra's license ([LICENSE](LICENSE)) |
 
+## Machine-learning model bundled in the APK
+
+| Model | Used in | Copyright | License |
+|---|---|---|---|
+| [Silero VAD](https://github.com/snakers4/silero-vad) v5 (`silero_vad.onnx`, v5.1.2) | `assets/live/silero_vad.onnx` (voice detection in Lucy's live conversation) | © 2020-present Silero Team | MIT, full notice in [`app/src/main/assets/live/SILERO_LICENSE.txt`](app/src/main/assets/live/SILERO_LICENSE.txt) |
+
 ## Machine-learning model downloaded at runtime
 
 | Model | Copyright | License |

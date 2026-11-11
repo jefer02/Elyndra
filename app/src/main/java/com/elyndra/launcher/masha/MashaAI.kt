@@ -15,7 +15,12 @@ import kotlinx.serialization.json.JsonObject
    ───────────────────────────────────────────────────────────── */
 
 /** Un turno de la conversación ya terminado. */
-data class MashaTurn(val role: Role, val text: String) {
+data class MashaTurn(
+    val role: Role,
+    val text: String,
+    /** El usuario le cortó a media respuesta (conversación en vivo): [text] es solo lo que llegó a decir. */
+    val interrupted: Boolean = false,
+) {
     enum class Role { User, Masha }
 }
 

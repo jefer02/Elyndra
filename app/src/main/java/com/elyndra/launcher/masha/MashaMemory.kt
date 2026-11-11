@@ -25,6 +25,8 @@ data class StoredMessage(
     val gameKey: String?,
     val attachment: MashaAttachment?,
     val createdAt: Long,
+    /** Respuesta cortada por el usuario (ver MashaTurn.interrupted). */
+    val interrupted: Boolean = false,
 )
 
 /**
@@ -106,6 +108,7 @@ class MashaMemory @Inject constructor(private val dao: MashaDao) {
                 gameKey = m.gameKey,
                 attachment = m.attachment?.let { a -> runCatching { json.decodeFromString(MashaAttachment.serializer(), a) }.getOrNull() },
                 createdAt = m.createdAt,
+                interrupted = m.interrupted,
             )
         }
 
@@ -118,10 +121,16 @@ class MashaMemory @Inject constructor(private val dao: MashaDao) {
                     gameKey = message.gameKey,
                     attachment = message.attachment?.let { json.encodeToString(MashaAttachment.serializer(), it) },
                     createdAt = message.createdAt,
+                    interrupted = message.interrupted,
                 ),
             )
             dao.trimMessages(MAX_MESSAGES)
         }
+    }
+
+    /** La última respuesta guardada de Lucy se cortó: se queda con [text] (lo que llegó a decir). */
+    suspend fun markLastInterrupted(text: String) {
+        runCatching { dao.interruptLastMessage(ROLE_MASHA, text) }
     }
 
     suspend fun clearHistory() = dao.clearMessages()

@@ -392,6 +392,15 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean("masha.highRefresh", false)
         set(v) = prefs.edit { putBoolean("masha.highRefresh", v) }
 
+    /**
+     * Conversación en vivo por el altavoz: hablar encima de Lucy la corta (si
+     * en un móvil se corta sola con su propia voz, se apaga y queda el botón).
+     * Con auriculares siempre se puede.
+     */
+    var lucyVoiceInterrupt: Boolean
+        get() = prefs.getBoolean("lucy.voiceInterrupt", true)
+        set(v) = prefs.edit { putBoolean("lucy.voiceInterrupt", v) }
+
     /** El ambiente sonoro del holotanque (zumbido, pads, datos) en la pantalla de Masha. */
     var mashaSoundscape: Boolean
         get() = prefs.getBoolean("masha.soundscape", true)

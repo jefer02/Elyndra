@@ -120,6 +120,8 @@ data class ChatMessage(
     val restored: Boolean = false,
     /** El saludo de cortesía: se enseña, pero no se le manda al modelo. */
     val greeting: Boolean = false,
+    /** El usuario la cortó hablando (conversación en vivo): [text] es solo lo que llegó a decir. */
+    val interrupted: Boolean = false,
     val id: Long = nextMessageId(),
 )
 

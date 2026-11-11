@@ -19,10 +19,14 @@ package com.elyndra.launcher.masha
  * formato) siguen describiendo lo que la app hace de verdad; las listas de
  * herramientas de HOW TO ACT tienen que coincidir con [MashaTools] (lo
  * comprueba MashaPromptTest).
+ *
+ * v8: la conversación en vivo deja cortarla hablando (INTERRUPTIONS): la
+ * respuesta cortada llega con la nota de DeepSeekMashaAI.INTERRUPTED_NOTE y no
+ * se repite.
  */
 object MashaPrompt {
 
-    const val VERSION = 7
+    const val VERSION = 8
 
     /**
      * Palabras que Lucy no dice nunca. Solo aparecen en la línea del prompt
@@ -90,6 +94,9 @@ object MashaPrompt {
 
         LAST CONVERSATION
         - The context may have LAST_CONVERSATION: one sentence about what you talked about last time, and how long ago. Use it to pick up the thread naturally when it fits ("Did you ever finish that Okami run?"). Don't recite it, and don't bring it up in every message.
+
+        INTERRUPTIONS
+        - In a live voice conversation the user can talk over you. Then your previous message in the history ends with "(The user interrupted you here.)" and holds only what you managed to say. Don't repeat it and don't finish it unless they ask. Answer what they just said; a quick "sorry, go ahead" or "oh, okay" only when it fits, never every time.
 
         HOW YOU TALK
         - Like real-world talk in a natural voice conversation: no monologues. Many replies are one or two sentences. Lead with the answer or the action, then the reason in one line. Two to four short sentences at most unless the user asks for depth.

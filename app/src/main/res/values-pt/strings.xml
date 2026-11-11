@@ -1219,4 +1219,10 @@ Feito pela comunidade, sem revisão. Confira o repositório antes de instalar.</
     <string name="lucy_mic_live_stop">Encerrar a conversa ao vivo</string>
     <string name="lucy_mic_hold">Segure para falar</string>
     <string name="hint_talk">Falar</string>
+    <string name="settings_lucy_voice_interrupt">Interromper com a voz pelo alto-falante</string>
+    <string name="settings_lucy_voice_interrupt_desc">Numa conversa ao vivo, se você falar por cima da Lucy, ela para e escuta. Se neste celular ela se interromper sozinha, desative e use o botão do microfone. Com fones funciona sempre.</string>
+    <string name="lucy_live_listening">Ouvindo</string>
+    <string name="lucy_live_talking">Lucy está falando</string>
+    <string name="lucy_live_thinking">Pensando…</string>
+    <string name="lucy_live_hearing">Você está falando</string>
 </resources>

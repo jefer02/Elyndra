@@ -1169,4 +1169,10 @@
     <string name="lucy_mic_live_stop">ライブ会話を終える</string>
     <string name="lucy_mic_hold">長押しで話す</string>
     <string name="hint_talk">話す</string>
+    <string name="settings_lucy_voice_interrupt">スピーカーでも声で割り込む</string>
+    <string name="settings_lucy_voice_interrupt_desc">ライブ会話中にLucyの話にかぶせて話すと、彼女は話を止めて聞きます。この端末で勝手に止まってしまう場合はオフにして、マイクボタンを使ってください。ヘッドホンでは常に使えます。</string>
+    <string name="lucy_live_listening">聞いています</string>
+    <string name="lucy_live_talking">Lucyが話しています</string>
+    <string name="lucy_live_thinking">考え中…</string>
+    <string name="lucy_live_hearing">あなたが話しています</string>
 </resources>

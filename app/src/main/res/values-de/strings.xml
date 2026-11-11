@@ -1201,4 +1201,10 @@ Von der Community erstellt, nicht geprüft. Sieh dir vor der Installation das Re
     <string name="lucy_mic_live_stop">Live-Unterhaltung beenden</string>
     <string name="lucy_mic_hold">Halten zum Sprechen</string>
     <string name="hint_talk">Sprechen</string>
+    <string name="settings_lucy_voice_interrupt">Per Stimme unterbrechen (Lautsprecher)</string>
+    <string name="settings_lucy_voice_interrupt_desc">In einem Live-Gespräch hört Lucy auf und hört zu, wenn du dazwischensprichst. Unterbricht sie sich auf diesem Handy von selbst, schalte es aus und nutze die Mikrofontaste. Mit Kopfhörern klappt es immer.</string>
+    <string name="lucy_live_listening">Hört zu</string>
+    <string name="lucy_live_talking">Lucy spricht</string>
+    <string name="lucy_live_thinking">Denkt nach…</string>
+    <string name="lucy_live_hearing">Du sprichst</string>
 </resources>

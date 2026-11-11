@@ -105,7 +105,14 @@ class MashaPromptTest {
     }
 
     @Test
-    fun theVersionIsBumpedForTheNewPersona() {
-        assertEquals(7, MashaPrompt.VERSION)
+    fun interruptionsUseTheNoteTheAppSends() {
+        assertTrue(prompt.lines().any { it.trim() == "INTERRUPTIONS" })
+        assertTrue(prompt.contains(com.elyndra.launcher.masha.deepseek.DeepSeekMashaAI.INTERRUPTED_NOTE))
+        assertTrue(prompt.contains("Don't repeat it"))
+    }
+
+    @Test
+    fun theVersionIsBumpedForLiveInterruptions() {
+        assertEquals(8, MashaPrompt.VERSION)
     }
 }

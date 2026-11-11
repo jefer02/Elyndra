@@ -258,6 +258,13 @@ private fun VoiceGroup(vm: ElyndraViewModel) {
             }
             Spacer(Modifier.height(8.dp))
             ElyText(stringResource(R.string.settings_masha_voice_notice), size = 9f, color = P.ink2, lineHeightRatio = 1.45f)
+            Spacer(Modifier.height(10.dp))
+            ToggleRow(
+                title = stringResource(R.string.settings_lucy_voice_interrupt),
+                desc = stringResource(R.string.settings_lucy_voice_interrupt_desc),
+                checked = s.lucyVoiceInterrupt,
+                onToggle = s::toggleLucyVoiceInterrupt,
+            )
         }
     }
 }
