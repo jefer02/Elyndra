@@ -355,10 +355,13 @@ metadatos, revisión y arcos, y lo resuelve con **las mismas capacidades**
   /chat/completions` con `stream: true`, `tools`, `tool_choice: auto`.
   El bucle de herramientas admite hasta 5 vueltas. Cancelar la conversación
   cancela la llamada HTTP al instante.
-- **Prompt de sistema** (`MashaPrompt`, versionado): personalidad (inteligente,
-  directa, algo sarcástica cuando encaja, siempre útil), qué es Elyndra, cómo
-  leer el contexto, cuándo actuar (solo lo que se pide), reglas firmes (nada de
-  piratería, ningún dato inventado, solo juegos de la biblioteca).
+- **Prompt de sistema** (`MashaPrompt`, versionado, v6): quién es Lucy
+  (22 años, estética gótica/alt, nerd en secreto, cariñosa y algo coqueta, nunca
+  posesiva ni nada sexual), lo que puede y no puede hacer de verdad, qué es
+  Elyndra, cómo leer el contexto, cuándo actuar (solo lo que se pide; las listas
+  de herramientas coinciden con `MashaTools`, lo comprueba `MashaPromptTest`),
+  reglas firmes (nada de piratería, ningún dato inventado, solo juegos de la
+  biblioteca) y formato para voz.
 - **Contexto** (`MashaContextBuilder`): hora, dispositivo, pantalla y foco,
   biblioteca por sistema, horas de la semana, en curso / recientes /
   abandonados / nunca abiertos, lo que mejor va aquí, estado de arte y

@@ -93,8 +93,9 @@ listas, limpieza, metadatos, emuladores, memoria…) y el modo sin conexión.
 
 Cambios de comportamiento:
 
-- `MashaPrompt` (VERSION 4): personalidad (leal, empática, humor seco) y "tus respuestas se
-  leen en voz alta". Subir la versión invalida la caché de respuestas antigua.
+- `MashaPrompt` (VERSION 6): la personalidad de Lucy (alt, cariñosa, algo nerd; sin contenido
+  sexual ni celos) y "tus respuestas se leen en voz alta". Subir la versión invalida la caché
+  de respuestas antigua.
 - `MashaController.mood`: el ánimo se deduce en local de la respuesta y de las herramientas usadas.
 
 ## El modelo: cara y manos

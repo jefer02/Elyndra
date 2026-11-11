@@ -397,7 +397,7 @@
     <string name="masha">Lucy</string>
     <string name="masha_offline_mode">Sin conexión · respuestas locales</string>
     <string name="masha_placeholder">Pregúntale a Lucy o dile qué hacer…</string>
-    <string name="masha_greeting">Aquí Lucy. Conozco tu biblioteca, cómo juegas y lo que aguanta tu móvil. Pregúntame lo que quieras, o dime cuánto tiempo tienes.</string>
+    <string name="masha_greeting">Hola, soy Lucy. Conozco tu biblioteca, cómo juegas y lo que aguanta tu móvil. Dime cuánto tiempo tienes y te busco algo.</string>
     <string name="masha_stat_week">Esta semana</string>
     <string name="masha_stat_top">Más jugado</string>
     <string name="masha_stat_sessions">Sesiones</string>
@@ -428,14 +428,14 @@
     <string name="masha_err_rate">DeepSeek pide calma. Dame un momento.</string>
     <string name="masha_err_unavailable">DeepSeek está saturado o caído. Contesto sin conexión.</string>
     <string name="masha_err_generic">Algo se ha liado por mi parte. Prueba a preguntarlo de otra forma.</string>
-    <string name="masha_off_launch">Lanzando %1$s.</string>
-    <string name="masha_off_not_found">No encuentro «%1$s» en tu biblioteca.</string>
-    <string name="masha_off_plan_continue">Retomando donde lo dejaste:</string>
-    <string name="masha_off_plan_light">Algo ligero:</string>
-    <string name="masha_off_plan_new">Algo nuevo para ti:</string>
-    <string name="masha_off_plan_any">Este es el plan:</string>
-    <string name="masha_off_plan_empty">Ahora mismo nada de tu biblioteca encaja con eso.</string>
-    <string name="masha_off_plan_device">He dejado fuera las consolas pesadas: tu batería o la temperatura no están para eso.</string>
+    <string name="masha_off_launch">%1$s, marchando. Que lo disfrutes.</string>
+    <string name="masha_off_not_found">Mmm. No encuentro «%1$s» en tu biblioteca.</string>
+    <string name="masha_off_plan_continue">Seguimos donde lo dejaste:</string>
+    <string name="masha_off_plan_light">Algo ligero, entonces:</string>
+    <string name="masha_off_plan_new">Algo que aún no has tocado:</string>
+    <string name="masha_off_plan_any">Vale, yo jugaría a esto:</string>
+    <string name="masha_off_plan_empty">Mmm. Ahora mismo nada de tu biblioteca encaja con eso.</string>
+    <string name="masha_off_plan_device">He dejado fuera las consolas pesadas. Tu móvil necesita un respiro.</string>
     <string name="masha_off_stats">Esta semana: %1$s en %2$d sesiones (la anterior: %3$s). Lo más jugado: %4$s.</string>
     <string name="masha_off_stats_empty">Esta semana aún no has jugado. La anterior jugaste %1$s.</string>
     <plurals name="masha_off_list">
@@ -443,12 +443,12 @@
         <item quantity="other">%d juegos.</item>
     </plurals>
     <string name="masha_off_list_empty">Ninguno ahora mismo. Todo limpio.</string>
-    <string name="masha_off_metadata">Descargando lo que falta en segundo plano. Las carátulas irán apareciendo.</string>
+    <string name="masha_off_metadata">Voy. Las carátulas irán apareciendo según lleguen.</string>
     <string name="masha_off_cleanup">Revisión: %1$d grupos de duplicados, %2$d juegos incompletos y %3$d nombres raros. Yo no toco tus archivos: decides tú.</string>
-    <string name="masha_off_no_arcs">No hay arcos activos. Pídeme uno cuando esté en línea, algo como «la saga Castlevania entera, en orden».</string>
+    <string name="masha_off_no_arcs">Aún no hay arcos. Pídeme uno cuando vuelva a estar en línea, algo como «la saga Castlevania entera, en orden». Me apunto.</string>
     <string name="masha_off_arc">«%1$s»: paso %2$d de %3$d, toca %4$s.</string>
-    <string name="masha_off_unknown">Estoy sin conexión, así que nada de charla, pero puedo planear una sesión, enseñarte listas, contar tus horas y lanzar juegos.</string>
-    <string name="masha_off_unknown_nokey">Todavía no tengo clave de DeepSeek, así que nada de charla, pero puedo planear sesiones, enseñarte listas, contar tus horas y lanzar juegos. Pon la clave en Ajustes → Lucy.</string>
+    <string name="masha_off_unknown">Estoy sin conexión, así que ahora no puedo charlar de verdad. Aun así puedo planear un rato, enseñarte tus listas, contar tus horas o lanzar algo.</string>
+    <string name="masha_off_unknown_nokey">Todavía no tengo clave de DeepSeek, así que no puedo charlar de verdad. Aun así puedo planear un rato, enseñarte tus listas, contar tus horas o lanzar algo. La clave va en Ajustes → Lucy.</string>
     <string name="masha_insight_empty">Estanterías vacías. Añade una carpeta de ROMs o tus juegos Android y yo me encargo del resto.</string>
     <string name="masha_insight_hot">Tu móvil va caliente. ¿Algo ligero un rato?</string>
     <string name="masha_insight_arc">«%1$s», paso %2$d de %3$d: toca %4$s.</string>
@@ -758,7 +758,7 @@
     <string name="masha_write_cancelled">Cancelado. No he cambiado nada.</string>
     <string name="masha_off_nothing_to_add">No hay nada nuevo que añadir: todo lo instalado ya está en tu biblioteca.</string>
     <string name="masha_off_add_confirm">Estos juegos instalados no están en tu biblioteca. ¿Los añado?</string>
-    <string name="masha_off_rename_which">¿Qué juego? Abre su ficha o selecciónalo primero.</string>
+    <string name="masha_off_rename_which">¿Cuál? Abre su ficha o selecciónalo primero.</string>
     <string name="masha_off_renamed">Listo: «%1$s» ahora se llama «%2$s».</string>
     <string name="masha_off_rename_bad">«%1$s» no parece un nombre de juego.</string>
     <string name="masha_confirm_rename">Cambiar el nombre de «%1$s» a «%2$s»</string>
