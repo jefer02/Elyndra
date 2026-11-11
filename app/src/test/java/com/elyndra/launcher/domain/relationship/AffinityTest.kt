@@ -112,4 +112,64 @@ class AffinityTest {
         assertEquals(Affinity.START, store.score)
         assertEquals(0, store.gainedToday)
     }
+
+    @Test
+    fun gainsAreRememberedWithTheirReasonButLossesAreNot() {
+        val a = affinity()
+        a.apply(3, GainReason.CuriousAboutHer)
+        a.apply(-4)
+        a.apply(2, GainReason.Humour)
+        assertEquals(listOf(2 to GainReason.Humour, 3 to GainReason.CuriousAboutHer), a.recentGains.map { it.points to it.reason })
+        assertEquals(now, a.recentGains.first().at)
+    }
+
+    @Test
+    fun gainsRecordWhatTheDailyCapLetThrough() {
+        val a = affinity()
+        a.apply(10, GainReason.Compliment)
+        a.apply(10, GainReason.Compliment) // solo entran 5 (tope 15)
+        a.apply(10, GainReason.Compliment) // nada: no se apunta
+        assertEquals(listOf(5, 10), a.recentGains.map { it.points })
+    }
+
+    @Test
+    fun onlyTheLastEightGainsAreKept() {
+        val a = affinity()
+        repeat(12) { day ->
+            now = at(2026, 11, 1 + day, 12)
+            a.apply(1, GainReason.Greeting)
+        }
+        assertEquals(Affinity.MAX_GAINS, a.recentGains.size)
+    }
+
+    @Test
+    fun eachLevelIsCelebratedOnce() {
+        val store = MemoryAffinityStore(score = 33)
+        val a = affinity(store)
+        val up = a.apply(5) // 33 → 38: Friendly por primera vez
+        assertEquals(true, up.levelUp)
+        assertEquals(true, up.celebrate)
+        a.apply(-5) // vuelve a Curious
+        now = at(2026, 11, 11, 12)
+        val again = a.apply(5) // otra vez Friendly: sube, pero ya se celebró
+        assertEquals(true, again.levelUp)
+        assertEquals(false, again.celebrate)
+    }
+
+    @Test
+    fun aStoreFromBeforeV3StartsCelebratingFromItsCurrentLevel() {
+        // Sin "celebrated" guardado: el nivel actual cuenta como visto, no se celebra lo ya alcanzado.
+        val store = MemoryAffinityStore(score = 70, celebrated = -1)
+        val a = affinity(store)
+        assertEquals(false, a.apply(1).celebrate)
+        assertEquals(AffinityLevel.Close.ordinal, store.celebrated)
+    }
+
+    @Test
+    fun resetForgetsGainsAndCelebrations() {
+        val store = MemoryAffinityStore(score = 70, celebrated = 4, gains = listOf(AffinityGain(3, GainReason.Chat, 1)))
+        affinity(store).reset()
+        assertEquals(emptyList<AffinityGain>(), store.gains)
+        assertEquals(AffinityLevel.Curious.ordinal, store.celebrated)
+    }
 }

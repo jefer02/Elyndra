@@ -20,6 +20,7 @@ import com.elyndra.launcher.domain.lists.ListRule
 import com.elyndra.launcher.domain.lists.SmartLists
 import com.elyndra.launcher.domain.relationship.AffinityLevel
 import com.elyndra.launcher.domain.relationship.AffinityScorer
+import com.elyndra.launcher.domain.relationship.GainReason
 import com.elyndra.launcher.domain.session.SessionMood
 import com.elyndra.launcher.masha.ConversationRecall
 import com.elyndra.launcher.masha.MashaAttachment
@@ -87,6 +88,23 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
 
     /** Sube cada vez que la relación sube de nivel: Lucy lo celebra con un gesto (nunca hay aviso al bajar). */
     var levelUps by mutableIntStateOf(0); private set
+
+    /** Cómo va hacia el siguiente nivel (barra del panel "Lucy y tú" y de Ajustes). */
+    var affinityProgress by mutableStateOf(brain.affinity.progress); private set
+
+    /** Las últimas subidas, la más nueva primero (las bajadas no se enseñan). */
+    var recentGains by mutableStateOf(brain.affinity.recentGains); private set
+
+    /** Cada subida de puntos: [gainSeq] cambia y [lastGain] dice cuántos (el "+N" flotante). */
+    var gainSeq by mutableIntStateOf(0); private set
+    var lastGain by mutableIntStateOf(0); private set
+
+    /** Un nivel alcanzado por primera vez, para la tarjeta de celebración (null = ninguna). */
+    var celebration by mutableStateOf<AffinityLevel?>(null); private set
+
+    fun dismissCelebration() {
+        celebration = null
+    }
 
     /** El último mensaje del usuario: repetirlo tal cual no suma. */
     private var lastUserText: String? = null
@@ -296,12 +314,19 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
             val isAction = intent !is OfflineIntent.Hello && intent !is OfflineIntent.Unknown
             AffinityScorer.score(message, level, isAction, previous)
         }
-        val change = brain.affinity.apply(delta)
-        affinityLevel = change.newLevel
+        // La IA no dice por qué: su puntuación va como "charla"; la local sí sabe el motivo.
+        val reason = if (modelDelta != null) GainReason.Chat else AffinityScorer.reason(message, level)
+        val change = brain.affinity.apply(delta, reason)
+        refreshAffinity()
+        if (change.gained > 0) {
+            lastGain = change.gained
+            gainSeq++
+        }
         if (change.levelUp) {
             levelUps++
             mood = MashaMood.Warm
         }
+        if (change.celebrate) celebration = change.newLevel
     }
 
     /** Los celos sin conexión: nada hasta [AffinityLevel.Friendly]; de ahí, más intensos cuanto más cerca. */
@@ -318,6 +343,8 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     /** "Olvidar todo": la relación vuelve al principio (y el corazón con ella). */
     fun refreshAffinity() {
         affinityLevel = brain.affinity.level
+        affinityProgress = brain.affinity.progress
+        recentGains = brain.affinity.recentGains
     }
 
     /* ── confirmaciones ───────────────────────────────────────── */

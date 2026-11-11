@@ -99,4 +99,13 @@ class AffinityScorerTest {
         val all = "you're amazing thanks do you like cats today I feel happy jaja"
         assertTrue(score(all, AffinityLevel.Devoted) <= Affinity.MAX_DELTA)
     }
+
+    @Test
+    fun theReasonIsTheStrongestCategoryPresent() {
+        assertEquals(GainReason.Compliment, AffinityScorer.reason("you're amazing, thanks", AffinityLevel.Curious))
+        assertEquals(GainReason.Kindness, AffinityScorer.reason("thank you so much", AffinityLevel.Curious))
+        assertEquals(GainReason.CuriousAboutHer, AffinityScorer.reason("do you like cats?", AffinityLevel.Curious))
+        assertEquals(GainReason.Greeting, AffinityScorer.reason("hola", AffinityLevel.Curious))
+        assertEquals(GainReason.Chat, AffinityScorer.reason("launch zelda", AffinityLevel.Curious))
+    }
 }

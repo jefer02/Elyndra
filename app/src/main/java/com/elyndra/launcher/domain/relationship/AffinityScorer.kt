@@ -46,6 +46,23 @@ object AffinityScorer {
         return points.coerceIn(-Affinity.MAX_DELTA, Affinity.MAX_DELTA)
     }
 
+    /**
+     * Por qué sumaría [message] (el motivo más fuerte que haya), para el
+     * historial del panel; [GainReason.Chat] si no hay ninguno claro.
+     */
+    fun reason(message: String, level: AffinityLevel): GainReason {
+        val t = fold(message).trim()
+        return when {
+            has(t, COMPLIMENTS) -> GainReason.Compliment
+            has(t, KINDNESS) -> GainReason.Kindness
+            has(t, CURIOUS_ABOUT_HER) -> GainReason.CuriousAboutHer
+            has(t, PERSONAL) -> GainReason.Sharing
+            level >= AffinityLevel.Friendly && has(t, HUMOUR) -> GainReason.Humour
+            has(t, GREETINGS) -> GainReason.Greeting
+            else -> GainReason.Chat
+        }
+    }
+
     /** Lo que propone la IA, con la red de seguridad local: lo sexual nunca suma. */
     fun guard(message: String, modelDelta: Int): Int =
         if (isSexual(fold(message))) minOf(modelDelta, 0) else modelDelta

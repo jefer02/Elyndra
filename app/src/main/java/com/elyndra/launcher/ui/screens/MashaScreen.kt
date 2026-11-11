@@ -28,6 +28,13 @@ import android.content.pm.PackageManager
 import com.elyndra.launcher.BuildConfig
 import com.elyndra.launcher.ui.masha.MashaDebugSay
 import com.elyndra.launcher.ui.masha.AffinityHeart
+import com.elyndra.launcher.ui.masha.AffinityPanel
+import com.elyndra.launcher.ui.masha.FloatingGain
+import com.elyndra.launcher.ui.masha.LevelUpCard
+import com.elyndra.launcher.ui.LocalUiSounds
+import com.elyndra.launcher.sound.UiSound
+import com.elyndra.launcher.input.Pad
+import androidx.compose.ui.BiasAlignment
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -186,6 +193,8 @@ fun MashaScreen(vm: ElyndraViewModel) {
     val area = remember { FaceAreaProbe() }
     var chatOpen by rememberSaveable { mutableStateOf(true) }
     var soundOpen by remember { mutableStateOf(false) }
+    // El panel "Lucy y tú" (el corazón de la cabecera o L1).
+    var bondOpen by remember { mutableStateOf(false) }
 
     // ── voz, oído y ambiente ──
     val voice = rememberMashaVoice(presence, lang, settings.mashaVoice)
@@ -375,6 +384,25 @@ fun MashaScreen(vm: ElyndraViewModel) {
     LaunchedEffect(stage) { if (stage == StageStatus.Ready) presence.play(MashaPresence.Cue.Wave) }
     // Sube la relación de nivel: un gesto contento (el corazón late en la cabecera). Al bajar, nada.
     LaunchedEffect(masha.levelUps) { if (masha.levelUps > 0) presence.play(MashaPresence.Cue.Happy) }
+    // Cada subida de puntos: el "+N" flotante y un toque suave. Las bajadas no suenan ni se ven.
+    val uiSounds = LocalUiSounds.current
+    LaunchedEffect(masha.gainSeq) { if (masha.gainSeq > 0) uiSounds?.play(UiSound.ToggleOn) }
+    LaunchedEffect(masha.celebration) { if (masha.celebration != null) uiSounds?.play(UiSound.Open) }
+    // Mando: atajos solo con la pantalla libre (sin teclado abierto; diálogos y hojas van antes en InputController).
+    val padHandler by rememberUpdatedState { pad: Pad ->
+        when {
+            masha.celebration != null && (pad == Pad.Back || pad == Pad.Confirm) -> { masha.dismissCelebration(); true }
+            bondOpen && (pad == Pad.Back || pad == Pad.PagePrev) -> { bondOpen = false; true }
+            vm.input.imeVisible -> false
+            pad == Pad.PagePrev -> { bondOpen = true; true }
+            pad == Pad.Details -> { chatOpen = !chatOpen; true }
+            else -> false
+        }
+    }
+    DisposableEffect(Unit) {
+        vm.input.mashaPad = { padHandler(it) }
+        onDispose { vm.input.mashaPad = null }
+    }
     LaunchedEffect(last?.id, last?.pending) {
         if (last != null && last.fromMasha && !last.pending && last.attachment != null && last.id != alreadyShown) {
             presence.play(MashaPresence.Cue.Explain)
@@ -472,6 +500,7 @@ fun MashaScreen(vm: ElyndraViewModel) {
                     voice.stop()
                     masha.clearConversation(greeting)
                 },
+                onBond = { bondOpen = true },
             )
             if (m.landscape) {
                 Row(Modifier.weight(1f).fillMaxWidth()) {
@@ -496,6 +525,34 @@ fun MashaScreen(vm: ElyndraViewModel) {
         ) {
             SoundPanel(vm, glow)
         }
+
+        // El "+N" junto a ella (a la altura del pecho en el plano entero).
+        FloatingGain(
+            masha.gainSeq,
+            masha.lastGain,
+            glow,
+            Modifier.align(if (m.landscape) BiasAlignment(-0.5f, -0.1f) else BiasAlignment(0.35f, -0.35f)),
+        )
+        // "Lucy y tú": sobre un velo; tocar fuera lo cierra.
+        AnimatedVisibility(bondOpen, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
+            Box(
+                Modifier.fillMaxSize().background(Holo.bg.copy(alpha = 0.55f)).shapeClickable(RoundedCornerShape(0.dp), onClick = { bondOpen = false }),
+                contentAlignment = Alignment.Center,
+            ) {
+                AffinityPanel(
+                    masha.affinityProgress,
+                    masha.recentGains,
+                    glow,
+                    onClose = { bondOpen = false },
+                    modifier = Modifier.safeAreaPadding().padding(m.pad),
+                )
+            }
+        }
+        // La primera vez en un nivel: su tarjeta (una sola vez por nivel).
+        val celebration = masha.celebration
+        AnimatedVisibility(celebration != null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.Center)) {
+            if (celebration != null) LevelUpCard(celebration, glow, onDismiss = masha::dismissCelebration, modifier = Modifier.padding(m.pad))
+        }
     }
 }
 
@@ -513,6 +570,7 @@ private fun TopBar(
     onSound: () -> Unit,
     onRecenter: () -> Unit,
     onNewChat: () -> Unit,
+    onBond: () -> Unit,
 ) {
     val masha = vm.masha
     val status = when {
@@ -546,7 +604,7 @@ private fun TopBar(
                     letterSpacing = tracking(0.06f),
                 )
                 Spacer(Modifier.width(10.dp))
-                AffinityHeart(masha.affinityLevel, masha.levelUps, glow, Holo.dim)
+                AffinityHeart(masha.affinityLevel, masha.levelUps, glow, Holo.dim, onClick = onBond)
             }
         }
         HoloIcon(stringResource(if (chatOpen) R.string.masha_hide_chat else R.string.masha_show_chat), glow, onClick = onToggleChat) { ChatGlyph(chatOpen) }
@@ -1052,4 +1110,9 @@ private class FaceAreaProbe {
 /** Lo que mide la barra de arriba en horizontal (8 + 38 + 8 dp). */
 private val LANDSCAPE_BAR = 54.dp
 
-private val MASHA_HINTS = listOf(PadHint("A", R.string.hint_select), PadHint("Y", R.string.hint_talk), PadHint("B", R.string.hint_back))
+private val MASHA_HINTS = listOf(
+    PadHint("A", R.string.hint_select),
+    PadHint("Y", R.string.hint_talk),
+    PadHint("L1", R.string.hint_bond),
+    PadHint("B", R.string.hint_back),
+)

@@ -218,6 +218,13 @@ class InputController(private val vm: ElyndraViewModel) {
     var mashaMic: MicHook? = null
 
     /**
+     * Los atajos de la pantalla de Lucy (X: chat, Select: teclado, L1: "Lucy y
+     * tú", B/A en sus paneles). Lo pone MashaScreen; solo llega aquí si no hay
+     * diálogo ni hoja encima (van antes en [handle]). Devuelve si lo usó.
+     */
+    var mashaPad: ((Pad) -> Boolean)? = null
+
+    /**
      * Un botón que se suelta. Solo cuenta Y en la pantalla de Lucy (mantener
      * para hablar, tocar para la conversación en vivo); el resto se maneja al pulsar.
      */
@@ -291,7 +298,12 @@ class InputController(private val vm: ElyndraViewModel) {
      * Pantallas de formulario (Ajustes, Añadir, Masha): las direcciones y A
      * las mueve el foco de Compose; aquí solo volver y Start.
      */
-    private fun form(pad: Pad): Boolean = when (pad) {
+    private fun form(pad: Pad): Boolean = when {
+        vm.screen == Screen.Masha && mashaPad?.invoke(pad) == true -> true
+        else -> formDefault(pad)
+    }
+
+    private fun formDefault(pad: Pad): Boolean = when (pad) {
         Pad.Back -> { vm.back(); true }
         // L1/R1: en Ajustes, categoría (o mover la fuente cogida); en Añadir, pestaña.
         Pad.PagePrev, Pad.PageNext -> {

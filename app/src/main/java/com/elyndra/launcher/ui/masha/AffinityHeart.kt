@@ -5,6 +5,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -28,6 +30,7 @@ import com.elyndra.launcher.domain.relationship.AffinityLevel
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.theme.LocalReducedMotion
+import com.elyndra.launcher.ui.theme.shapeClickable
 
 /** El nombre de cada nivel en la interfaz. */
 fun AffinityLevel.labelRes(): Int = when (this) {
@@ -44,7 +47,7 @@ fun AffinityLevel.labelRes(): Int = when (this) {
  * cambia), late una vez; al bajar no hace nada.
  */
 @Composable
-fun AffinityHeart(level: AffinityLevel, levelUps: Int, glow: Color, dim: Color, modifier: Modifier = Modifier) {
+fun AffinityHeart(level: AffinityLevel, levelUps: Int, glow: Color, dim: Color, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     val label = stringResource(level.labelRes())
     val description = stringResource(R.string.lucy_level_cd, label)
     val reduced = LocalReducedMotion.current
@@ -56,7 +59,12 @@ fun AffinityHeart(level: AffinityLevel, levelUps: Int, glow: Color, dim: Color, 
         beat.animateTo(1f, tween(220))
     }
     val fill = (level.ordinal + 1) / AffinityLevel.entries.size.toFloat()
-    Row(modifier.semantics(mergeDescendants = true) { contentDescription = description }, verticalAlignment = Alignment.CenterVertically) {
+    val open = stringResource(R.string.lucy_bond_open)
+    val clickable = if (onClick != null) Modifier.shapeClickable(RoundedCornerShape(8.dp), onClickLabel = open, onClick = onClick) else Modifier
+    Row(
+        modifier.then(clickable).semantics(mergeDescendants = true) { contentDescription = description }.padding(horizontal = 2.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Box(
             Modifier
                 .size(10.dp)
@@ -74,6 +82,18 @@ fun AffinityHeart(level: AffinityLevel, levelUps: Int, glow: Color, dim: Color, 
         Spacer(Modifier.width(4.dp))
         ElyText(label, size = 9.5f, weight = FontWeight.Medium, color = dim, maxLines = 1, letterSpacing = tracking(0.06f))
     }
+}
+
+/** El corazón, con el contorno y relleno de abajo arriba hasta [fill] (0..1). */
+@Composable
+fun HeartGlyph(fill: Float, glow: Color, modifier: Modifier = Modifier) {
+    Box(
+        modifier.drawBehind {
+            val heart = heartPath(size.width, size.height)
+            drawPath(heart, glow, style = Stroke(1.dp.toPx()))
+            clipRect(top = size.height * (1f - fill.coerceIn(0f, 1f))) { drawPath(heart, glow) }
+        },
+    )
 }
 
 /** Corazón en la caja [w]×[h]: dos lóbulos y la punta abajo. */
