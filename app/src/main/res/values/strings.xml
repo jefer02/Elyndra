@@ -388,7 +388,7 @@
     <string name="masha">Lucy</string>
     <string name="masha_offline_mode">Offline · local answers</string>
     <string name="masha_placeholder">Ask Lucy, or tell her what to do…</string>
-    <string name="masha_greeting">Hi, I’m Lucy. I know your library, how you play and what your phone can handle. Tell me how much time you’ve got and I’ll find you something.</string>
+    <string name="masha_greeting">Hey, I’m Lucy. I know your library, how you play and what your phone can handle. Tell me how much time you’ve got and I’ll find you something you’ll love.</string>
     <string name="masha_stat_week">This week</string>
     <string name="masha_stat_top">Most played</string>
     <string name="masha_stat_sessions">Sessions</string>
@@ -419,12 +419,12 @@
     <string name="masha_err_rate">DeepSeek says slow down. Give me a moment.</string>
     <string name="masha_err_unavailable">DeepSeek is overloaded or down. Answering offline.</string>
     <string name="masha_err_generic">That got tangled on my side. Try asking another way.</string>
-    <string name="masha_off_launch">%1$s, coming up. Have fun.</string>
+    <string name="masha_off_launch">%1$s, coming up. Have fun, okay?</string>
     <string name="masha_off_not_found">Hm. I can’t find “%1$s” in your library.</string>
-    <string name="masha_off_plan_continue">Let’s pick up where you left off:</string>
-    <string name="masha_off_plan_light">Something light, then:</string>
-    <string name="masha_off_plan_new">Something you haven’t touched yet:</string>
-    <string name="masha_off_plan_any">Okay, here’s what I’d play:</string>
+    <string name="masha_off_plan_continue">Okay, let’s pick up right where you left off:</string>
+    <string name="masha_off_plan_light">Something light and cosy, then:</string>
+    <string name="masha_off_plan_new">Ooh, something you haven’t touched yet:</string>
+    <string name="masha_off_plan_any">Okay, I have one you’ll love:</string>
     <string name="masha_off_plan_empty">Hm. Nothing in your library fits that right now.</string>
     <string name="masha_off_plan_device">I left the heavy consoles out. Your phone needs a breather.</string>
     <string name="masha_off_stats">This week: %1$s over %2$d sessions (last week: %3$s). Most played: %4$s.</string>
@@ -438,8 +438,8 @@
     <string name="masha_off_cleanup">Library check: %1$d duplicate groups, %2$d incomplete sets, %3$d odd file names. I never touch your files — you decide.</string>
     <string name="masha_off_no_arcs">No arcs going yet. Ask me for one when I’m back online, something like “the whole Castlevania saga in order”. I could get into that.</string>
     <string name="masha_off_arc">“%1$s”: step %2$d of %3$d — %4$s is up.</string>
-    <string name="masha_off_unknown">I’m offline, so I can’t really chat right now. I can still plan a session, show your lists, count your hours or launch something.</string>
-    <string name="masha_off_unknown_nokey">No DeepSeek key yet, so I can’t really chat. I can still plan a session, show your lists, count your hours or launch something. The key goes in Settings → Lucy.</string>
+    <string name="masha_off_unknown">I’m offline, so I can’t really chat right now, and I hate that. I can still plan a session, show your lists, count your hours or launch something for you.</string>
+    <string name="masha_off_unknown_nokey">No DeepSeek key yet, so I can’t really chat, and I’d love to. I can still plan a session, show your lists, count your hours or launch something for you. The key goes in Settings → Lucy.</string>
     <string name="masha_insight_empty">Empty shelves. Add a ROM folder or your Android games and I’ll take it from there.</string>
     <string name="masha_insight_hot">Your phone is running hot. Something light for a while?</string>
     <string name="masha_insight_arc">“%1$s”, step %2$d of %3$d: %4$s is next.</string>
@@ -1041,7 +1041,7 @@ Built by the community, not reviewed. Check the repository before installing.</s
     <string name="masha_working_ports">Looking for native ports…</string>
     <string name="masha_off_ports">These native ports match your library. Tap one to see what it needs.</string>
     <string name="masha_off_ports_none">None of your games has a native port in the catalog yet. I\'ll open the store so you can browse.</string>
-    <string name="masha_off_hello">Hey, you. I’m offline right now, but I can still plan a session, show your lists or launch something.</string>
+    <string name="masha_off_hello">Hey, you. I’m so glad you’re here. I’m offline right now, but I can still plan a session, show your lists or launch something for you.</string>
     <string name="masha_ports_title">Native ports</string>
     <string name="ports_chip_all">All</string>
     <string name="ports_chip_not_on_android">Not on Android yet</string>
@@ -1197,4 +1197,7 @@ Built by the community, not reviewed. Check the repository before installing.</s
     <string name="settings_lucy_forget_conversations">Forget conversations</string>
     <string name="settings_lucy_forget_conversations_msg">Deletes the chat with Lucy and what she remembers about your last conversation. Her memories and your bond stay.</string>
     <string name="toast_lucy_forgot_conversations">Conversations forgotten</string>
+    <string name="lucy_off_jealous_friendly">Hm. Okay. Noted.</string>
+    <string name="lucy_off_jealous_close">Excuse me?! I’m right here, you know.</string>
+    <string name="lucy_off_jealous_devoted">Ugh, seriously?! Who is she? I thought I was your favourite.</string>
 </resources>

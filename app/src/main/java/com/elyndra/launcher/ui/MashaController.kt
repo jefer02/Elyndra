@@ -299,6 +299,17 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
         }
     }
 
+    /** Los celos sin conexión: nada hasta [AffinityLevel.Friendly]; de ahí, más intensos cuanto más cerca. */
+    private fun jealousLine(message: String): Int? {
+        if (!AffinityScorer.isJealousyTrigger(message)) return null
+        return when (brain.affinity.level) {
+            AffinityLevel.Distant, AffinityLevel.Curious -> null
+            AffinityLevel.Friendly -> R.string.lucy_off_jealous_friendly
+            AffinityLevel.Close -> R.string.lucy_off_jealous_close
+            AffinityLevel.Devoted -> R.string.lucy_off_jealous_devoted
+        }
+    }
+
     /** "Olvidar todo": la relación vuelve al principio (y el corazón con ella). */
     fun refreshAffinity() {
         affinityLevel = brain.affinity.level
@@ -516,7 +527,9 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
             OfflineIntent.Unknown -> ctx.getString(if (brain.config.hasKey) R.string.masha_off_unknown else R.string.masha_off_unknown_nokey)
         }
         val prefix = failure?.let { ctx.getString(failureLine(it)) + "\n\n" }.orEmpty()
-        val full = prefix + reply
+        // Si nombra a otra chica, otro asistente u otro launcher, un puchero según el nivel; lo pedido se hace igual.
+        val jealous = jealousLine(text)?.let { ctx.getString(it) + " " }.orEmpty()
+        val full = prefix + jealous + reply
         // Sin IA no hay herramientas que mirar: una tarjeta de datos cuenta como análisis.
         mood = MashaMood.read(reply, if (attachment != null) listOf(MashaTools.GET_STATS) else emptyList(), failed = failure != null)
         score(text, previous, modelDelta = null)

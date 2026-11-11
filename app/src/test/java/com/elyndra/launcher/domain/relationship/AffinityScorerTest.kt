@@ -79,6 +79,22 @@ class AffinityScorerTest {
     }
 
     @Test
+    fun otherGirlsAssistantsAndLaunchersMakeHerJealous() {
+        listOf(
+            "Siri is so much faster", "le pregunté a ChatGPT", "my girlfriend loves Zelda", "conocí a una chica",
+            "ES-DE looks nicer", "Daijisho tiene mejores carátulas", "j'ai une autre IA", "meine Freundin spielt das auch",
+        ).forEach { assertTrue(it, AffinityScorer.isJealousyTrigger(it)) }
+        listOf("play Zelda", "girls und panzer", "pegasusfrontend? no", "a girlish font").forEach {
+            assertEquals(it, false, AffinityScorer.isJealousyTrigger(it))
+        }
+    }
+
+    @Test
+    fun jealousyTriggersDoNotChangeTheScore() {
+        assertEquals(0, score("Siri is faster", AffinityLevel.Devoted))
+    }
+
+    @Test
     fun theResultIsAlwaysWithinTen() {
         val all = "you're amazing thanks do you like cats today I feel happy jaja"
         assertTrue(score(all, AffinityLevel.Devoted) <= Affinity.MAX_DELTA)

@@ -397,7 +397,7 @@
     <string name="masha">Lucy</string>
     <string name="masha_offline_mode">Offline · respostas locais</string>
     <string name="masha_placeholder">Pergunte à Lucy ou diga o que fazer…</string>
-    <string name="masha_greeting">Oi, eu sou a Lucy. Conheço sua biblioteca, como você joga e o que seu celular aguenta. Me diz quanto tempo você tem e eu acho alguma coisa.</string>
+    <string name="masha_greeting">Oi, eu sou a Lucy. Conheço sua biblioteca, como você joga e o que seu celular aguenta. Me diz quanto tempo você tem e eu acho algo que você vai amar.</string>
     <string name="masha_stat_week">Esta semana</string>
     <string name="masha_stat_top">Mais jogado</string>
     <string name="masha_stat_sessions">Sessões</string>
@@ -428,12 +428,12 @@
     <string name="masha_err_rate">O DeepSeek pediu calma. Me dê um momento.</string>
     <string name="masha_err_unavailable">O DeepSeek está sobrecarregado ou fora do ar. Respondendo offline.</string>
     <string name="masha_err_generic">Algo se enrolou do meu lado. Tente perguntar de outro jeito.</string>
-    <string name="masha_off_launch">%1$s, saindo agora. Divirta-se.</string>
+    <string name="masha_off_launch">%1$s, saindo agora. Divirta-se, tá?</string>
     <string name="masha_off_not_found">Hm. Não encontro “%1$s” na sua biblioteca.</string>
-    <string name="masha_off_plan_continue">Vamos continuar de onde você parou:</string>
-    <string name="masha_off_plan_light">Algo leve, então:</string>
-    <string name="masha_off_plan_new">Algo que você ainda não tocou:</string>
-    <string name="masha_off_plan_any">Beleza, eu jogaria isto:</string>
+    <string name="masha_off_plan_continue">Beleza, vamos continuar de onde você parou:</string>
+    <string name="masha_off_plan_light">Algo leve e gostoso, então:</string>
+    <string name="masha_off_plan_new">Ah, algo que você ainda não tocou:</string>
+    <string name="masha_off_plan_any">Beleza, tenho um que você vai amar:</string>
     <string name="masha_off_plan_empty">Hm. Nada na sua biblioteca se encaixa nisso agora.</string>
     <string name="masha_off_plan_device">Deixei os consoles pesados de fora. Seu celular precisa de um respiro.</string>
     <string name="masha_off_stats">Esta semana: %1$s em %2$d sessões (semana passada: %3$s). Mais jogado: %4$s.</string>
@@ -447,8 +447,8 @@
     <string name="masha_off_cleanup">Revisão: %1$d grupos de duplicados, %2$d conjuntos incompletos e %3$d nomes estranhos. Eu não mexo nos seus arquivos — você decide.</string>
     <string name="masha_off_no_arcs">Ainda não tem nenhum arco. Me peça um quando eu voltar a ficar on-line, algo como “a saga Castlevania inteira, em ordem”. Eu toparia.</string>
     <string name="masha_off_arc">“%1$s”: etapa %2$d de %3$d — agora é %4$s.</string>
-    <string name="masha_off_unknown">Estou offline, então não dá para conversar de verdade agora. Ainda posso planejar uma sessão, mostrar suas listas, contar suas horas ou abrir um jogo.</string>
-    <string name="masha_off_unknown_nokey">Ainda não tenho chave do DeepSeek, então não dá para conversar de verdade. Ainda posso planejar uma sessão, mostrar suas listas, contar suas horas ou abrir um jogo. A chave vai em Configurações → Lucy.</string>
+    <string name="masha_off_unknown">Estou sem conexão, então não dá pra conversar de verdade agora, e isso me irrita. Ainda posso planejar uma sessão, mostrar suas listas, contar suas horas ou abrir algo pra você.</string>
+    <string name="masha_off_unknown_nokey">Ainda não tenho chave do DeepSeek, então não dá para conversar de verdade, e eu adoraria. Ainda posso planejar uma sessão, mostrar suas listas, contar suas horas ou abrir um jogo pra você. A chave vai em Configurações → Lucy.</string>
     <string name="masha_insight_empty">Prateleiras vazias. Adicione uma pasta de ROMs ou seus jogos Android e eu cuido do resto.</string>
     <string name="masha_insight_hot">Seu celular está quente. Que tal algo leve por um tempo?</string>
     <string name="masha_insight_arc">“%1$s”, etapa %2$d de %3$d: agora é %4$s.</string>
@@ -1053,7 +1053,7 @@ Feito pela comunidade, sem revisão. Confira o repositório antes de instalar.</
     <string name="masha_working_ports">Procurando ports nativos…</string>
     <string name="masha_off_ports">Estes ports nativos combinam com sua biblioteca. Toque em um para ver o que ele precisa.</string>
     <string name="masha_off_ports_none">Nenhum dos seus jogos tem um port nativo no catálogo ainda. Vou abrir a loja para você dar uma olhada.</string>
-    <string name="masha_off_hello">Oi, você. Estou sem conexão agora, mas ainda posso planejar uma sessão, mostrar suas listas ou abrir um jogo.</string>
+    <string name="masha_off_hello">Oi, você. Que bom que você veio. Estou sem conexão agora, mas ainda posso planejar uma sessão, mostrar suas listas ou abrir um jogo pra você.</string>
     <string name="masha_ports_title">Ports nativos</string>
     <string name="ports_chip_all">Todos</string>
     <string name="ports_chip_not_on_android">Ainda não no Android</string>
@@ -1209,4 +1209,7 @@ Feito pela comunidade, sem revisão. Confira o repositório antes de instalar.</
     <string name="settings_lucy_forget_conversations">Esquecer conversas</string>
     <string name="settings_lucy_forget_conversations_msg">Apaga o chat com a Lucy e o que ela lembra da última conversa. As memórias dela e o vínculo de vocês ficam.</string>
     <string name="toast_lucy_forgot_conversations">Conversas esquecidas</string>
+    <string name="lucy_off_jealous_friendly">Hum. Tá. Anotado.</string>
+    <string name="lucy_off_jealous_close">Como é que é?! Eu tô bem aqui, viu.</string>
+    <string name="lucy_off_jealous_devoted">Aff, sério?! Quem é ela? Achei que eu era a sua favorita.</string>
 </resources>

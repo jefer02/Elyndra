@@ -366,7 +366,7 @@
     <string name="masha">Lucy</string>
     <string name="masha_offline_mode">オフライン · ローカル応答</string>
     <string name="masha_placeholder">Lucy に質問、または指示…</string>
-    <string name="masha_greeting">こんにちは、ルーシーだよ。あなたのライブラリも、遊び方も、スマホの余力も分かってる。どれくらい時間があるか教えてくれたら、何か探すね。</string>
+    <string name="masha_greeting">こんにちは、ルーシーだよ。あなたのライブラリも、遊び方も、スマホの余力も分かってる。どれくらい時間があるか教えて。きっと気に入るのを探すね。</string>
     <string name="masha_stat_week">今週</string>
     <string name="masha_stat_top">最も遊んだ</string>
     <string name="masha_stat_sessions">セッション</string>
@@ -397,12 +397,12 @@
     <string name="masha_err_rate">DeepSeek のリクエスト制限です。少し待ってください。</string>
     <string name="masha_err_unavailable">DeepSeek が混雑または停止中です。オフラインで回答します。</string>
     <string name="masha_err_generic">こちらで問題が起きました。言い方を変えて試してください。</string>
-    <string name="masha_off_launch">%1$s、起動するね。楽しんで。</string>
+    <string name="masha_off_launch">%1$s、起動するね。楽しんできて。</string>
     <string name="masha_off_not_found">うーん、ライブラリに「%1$s」が見つからないな。</string>
-    <string name="masha_off_plan_continue">前回の続きからいこう：</string>
-    <string name="masha_off_plan_light">じゃあ軽めに：</string>
-    <string name="masha_off_plan_new">まだ触ってないものを：</string>
-    <string name="masha_off_plan_any">私ならこれを遊ぶかな：</string>
+    <string name="masha_off_plan_continue">よし、前回の続きからいこう：</string>
+    <string name="masha_off_plan_light">じゃあ軽めで、ほっとできるのを：</string>
+    <string name="masha_off_plan_new">ねえ、まだ触ってないのがあるよ：</string>
+    <string name="masha_off_plan_any">よし、絶対気に入るのがあるよ：</string>
     <string name="masha_off_plan_empty">うーん、今はライブラリに合うものがないみたい。</string>
     <string name="masha_off_plan_device">重い機種は外しておいたよ。スマホにも少し休憩が必要。</string>
     <string name="masha_off_stats">今週：%2$d セッションで %1$s（先週 %3$s）。最も遊んだのは %4$s。</string>
@@ -415,8 +415,8 @@
     <string name="masha_off_cleanup">点検結果：重複 %1$d グループ、不完全なセット %2$d、変なファイル名 %3$d。ファイルには触れません。判断はあなたに。</string>
     <string name="masha_off_no_arcs">アークはまだないよ。オンラインに戻ったら「キャッスルヴァニアを順番に全部」みたいに頼んでね。それ、ちょっと楽しそう。</string>
     <string name="masha_off_arc">「%1$s」：%3$d 中 %2$d 番目、次は %4$s。</string>
-    <string name="masha_off_unknown">今はオフラインだから、ちゃんとおしゃべりはできないんだ。でもプランを立てたり、リストを見せたり、プレイ時間を数えたり、ゲームを起動したりはできるよ。</string>
-    <string name="masha_off_unknown_nokey">DeepSeek のキーがまだないから、ちゃんとおしゃべりはできないんだ。でもプランを立てたり、リストを見せたり、プレイ時間を数えたり、ゲームを起動したりはできるよ。キーは 設定 → Lucy で追加してね。</string>
+    <string name="masha_off_unknown">今オフラインだから、ちゃんとおしゃべりできないの。くやしい。でも、プランを立てたり、リストを見せたり、プレイ時間を数えたり、ゲームを起動したりはできるよ。</string>
+    <string name="masha_off_unknown_nokey">DeepSeek のキーがまだないから、ちゃんとおしゃべりはできないんだ。ほんとはしたいのに。でもプランを立てたり、リストを見せたり、プレイ時間を数えたり、ゲームを起動したりはできるよ。キーは 設定 → Lucy で追加してね。</string>
     <string name="masha_insight_empty">棚が空です。ROM フォルダか Android ゲームを追加すれば、あとは任せてください。</string>
     <string name="masha_insight_hot">端末が熱くなっています。しばらく軽めのものにしますか？</string>
     <string name="masha_insight_arc">「%1$s」%3$d 中 %2$d 番目：次は %4$s。</string>
@@ -1009,7 +1009,7 @@
     <string name="masha_working_ports">ネイティブポートを探しています…</string>
     <string name="masha_off_ports">ライブラリに合うネイティブポートです。タップすると必要なものを確認できます。</string>
     <string name="masha_off_ports_none">まだカタログにあなたのゲームのネイティブポートはありません。ストアを開くので見てみてください。</string>
-    <string name="masha_off_hello">あ、来てくれたんだ。今はオフラインだけど、プランを立てたり、リストを見せたり、ゲームを起動したりはできるよ。</string>
+    <string name="masha_off_hello">あ、来てくれたんだ。うれしい。今はオフラインだけど、プランを立てたり、リストを見せたり、ゲームを起動したりはできるよ。</string>
     <string name="masha_ports_title">ネイティブポート</string>
     <string name="ports_chip_all">すべて</string>
     <string name="ports_chip_not_on_android">Android未対応</string>
@@ -1159,4 +1159,7 @@
     <string name="settings_lucy_forget_conversations">会話を忘れる</string>
     <string name="settings_lucy_forget_conversations_msg">Lucy とのチャットと、前回の会話についての記憶を削除します。Lucy の記憶と関係は残ります。</string>
     <string name="toast_lucy_forgot_conversations">会話を削除しました</string>
+    <string name="lucy_off_jealous_friendly">ふーん。そっか。覚えとく。</string>
+    <string name="lucy_off_jealous_close">ちょっと！？私ここにいるんだけど。</string>
+    <string name="lucy_off_jealous_devoted">えっ、うそでしょ！？誰それ？ 一番は私だと思ってたのに。</string>
 </resources>

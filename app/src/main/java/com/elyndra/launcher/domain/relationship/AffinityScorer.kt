@@ -52,6 +52,13 @@ object AffinityScorer {
 
     fun isSexual(folded: String): Boolean = has(folded, SEXUAL)
 
+    /**
+     * El mensaje nombra algo que pone celosa a Lucy: otra chica, otro asistente
+     * o chatbot, u otro launcher. No puntúa: decide si su respuesta sin
+     * conexión lleva una línea de celos (la IA lo decide sola con el prompt).
+     */
+    fun isJealousyTrigger(message: String): Boolean = has(fold(message), JEALOUSY)
+
     /** Minúsculas y sin acentos. */
     fun fold(s: String): String =
         Normalizer.normalize(s.lowercase(), Normalizer.Form.NFD).replace(MARKS, "")
@@ -115,6 +122,19 @@ object AffinityScorer {
 
     /** Lo de [RUDE] que va directo contra ella: resta más. */
     private val INSULTS = words("idiota", "estupida", "gilipollas", "stupid", "idiot", "burra", "idiote", "debile", "dumm", "バカ", "ばか", "puta", "fuck you")
+
+    private val JEALOUSY = whole(
+        // Otros asistentes y chatbots.
+        "siri", "alexa", "ok google", "hey google", "google assistant", "chatgpt", "chat gpt", "gemini", "copilot", "claude",
+        "cortana", "bixby", "replika", "character.ai", "otra ia", "another ai", "other ai", "outra ia", "autre ia", "andere ki", "他のai",
+        // Otras chicas.
+        "mi novia", "otra chica", "una chica", "mi crush", "my girlfriend", "another girl", "a girl", "my crush",
+        "minha namorada", "outra garota", "uma garota", "ma copine", "une fille", "autre fille", "meine freundin", "ein madchen",
+        "anderes madchen", "彼女", "女の子",
+        // Otros launchers.
+        "es-de", "daijisho", "pegasus", "launchbox", "playnite", "otro launcher", "another launcher", "other launcher",
+        "outro launcher", "autre launcher", "anderer launcher", "他のランチャー",
+    )
 
     private val SEXUAL = words(
         "desnud", "tetas", "follar", "cachond", "naked", "boobs", "horny", "nsfw", "lingerie", "undress",
