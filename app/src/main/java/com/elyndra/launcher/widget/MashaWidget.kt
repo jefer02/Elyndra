@@ -185,7 +185,7 @@ class MashaWidget : GlanceAppWidget() {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Image(
-                    ImageProvider(R.drawable.masha),
+                    ImageProvider(R.drawable.masha_small),
                     contentDescription = null,
                     modifier = GlanceModifier.size(26.dp).cornerRadius(13.dp),
                     contentScale = ContentScale.Crop,

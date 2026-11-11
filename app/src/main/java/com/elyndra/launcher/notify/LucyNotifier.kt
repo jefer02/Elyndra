@@ -62,7 +62,7 @@ object LucyNotifier {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val notification = NotificationCompat.Builder(context, channel.id)
-            .setSmallIcon(R.drawable.ic_stat_elyndra)
+            .setSmallIcon(R.drawable.ic_stat_lucy)
             .setColor(BrandTokens.PRIMARY)
             .setContentTitle(localized.getString(R.string.masha))
             .setContentText(text)

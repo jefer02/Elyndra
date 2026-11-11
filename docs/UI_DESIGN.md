@@ -352,14 +352,21 @@ suelta a los 10 s de salir de su pantalla.
 
 ## 10. Lucy en la biblioteca
 
-**Emblema** (`res/drawable/masha.xml`, vectorial; fuente en
-`tools/masha_icon/`: `masha_emblem.svg`, la M calculada por `glyph.py` y
-`svg2vector.py`, que genera el XML). Un orbe de cristal con aurora dentro
-(índigo, cian y violeta, con un rescoldo champán abajo), reflejo arriba y canto
-de luz; dentro, la M de Lucy en un corte de alto contraste —trazos gruesos y
-finos, terminales planos, como una Didot— y un destello de cuatro puntas. Se lee
-de 24 a 300 dp, en claro y en oscuro. Es el mismo en el botón, "Lucy recuerda",
-la vista previa de su color, el widget y la sala del holograma.
+**Emblema** (Holotank L; todo sale de `tools/masha_icon/lucy_emblem.py`, que
+dibuja la geometría y escribe los XML: no se editan a mano). Un L macizo cuyo pie
+es la placa emisora del holotanque; la punta del fuste se materializa en líneas
+de escaneo que adelgazan hacia arriba. Lo envuelve un prisma de cristal con la
+base plana que se abre arriba a la derecha —el hueco del anillo de foco, con un
+remate de luz en cada extremo del canto—, y en esa abertura asoma ella: el rombo
+champán al que sube el haz cian. Paleta Plasma; el cristal oscuro hace que se lea
+igual en claro y en oscuro.
+- `masha.xml`: a color, para 40 dp o más (el botón, la sala del holograma).
+- `masha_small.xml`: el glifo para 32 dp o menos ("Lucy recuerda", la vista
+  previa de su color, el widget): tres franjas opacas en vez de seis
+  translúcidas y sin el filo interior, para que la punta del L siga nítida.
+- `lucy_mono.xml` e `ic_stat_lucy.xml`: plano, de un color (el segundo es el
+  icono pequeño de sus notificaciones). El icono de la app sigue siendo el de
+  Elyndra.
 
 **Botón**: fijo, la primera pieza de la barra del hero, arriba a la izquierda
 (también la primera para el mando). Mide 40 dp —un avatar, algo mayor que las

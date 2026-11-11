@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Emblema de Lucy (Holotank L): un L macizo cuyo pie es la placa emisora del
+  holotanque; la punta del fuste se materializa en líneas de escaneo. El prisma
+  de cristal tiene la base plana y se abre arriba a la derecha (el hueco del
+  anillo de foco), donde asoma ella: el rombo de luz al que sube el haz.
+  Icono pequeño de las notificaciones de Lucy: blanco plano, el sistema lo tiñe.
+  Generado por tools/masha_icon/lucy_emblem.py: no se edita a mano.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="24dp"
+    android:height="24dp"
+    android:tint="#FFFFFFFF"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M81.68 22.98 L89.51 27.5 Q94.7 30.5 94.7 36.5 L94.7 71.5 Q94.7 77.5 89.51 80.5 L73.04 90.01 Q67.84 93.01 61.84 93.01 L46.16 93.01 Q40.16 93.01 34.96 90.01 L18.49 80.5 Q13.3 77.5 13.3 71.5 L13.3 36.5 Q13.3 30.5 18.49 27.5 L48.8 10 Q54 7 59.2 10 L65.4 13.58"
+        android:strokeWidth="4.4"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:strokeColor="#FFFFFFFF" />
+    <path
+        android:pathData="M37 47 L51 47 L51 64 L73 64 L78 69 L78 75 L37 75 Z M37 45.7 L51 45.7 L51 41.5 L37 41.5 Z M37 39.6 L51 39.6 L51 36.8 L37 36.8 Z M37 34.3 L51 34.3 L51 32.5 L37 32.5 Z"
+        android:fillColor="#FFFFFFFF" />
+    <path
+        android:pathData="M72.1 18.45 L76.3 22.65 L72.1 26.85 L67.9 22.65 Z"
+        android:fillColor="#FFFFFFFF" />
+</vector>
