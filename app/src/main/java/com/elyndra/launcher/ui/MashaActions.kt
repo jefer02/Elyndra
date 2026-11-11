@@ -5,6 +5,12 @@ import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.library.Names
 import com.elyndra.launcher.domain.ports.PortDisplay
 import com.elyndra.launcher.domain.ports.StoreRows
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.delay
+import com.elyndra.launcher.masha.WriteOutcome
+import com.elyndra.launcher.masha.ConfirmKind
+import com.elyndra.launcher.domain.ports.PortRecommend
+import com.elyndra.launcher.domain.ports.PortEntry
 import com.elyndra.launcher.masha.MashaAttachment
 import com.elyndra.launcher.masha.MashaBrain
 import com.elyndra.launcher.masha.MashaToolbox
@@ -41,7 +47,7 @@ import kotlinx.serialization.json.putJsonArray
 class MashaActions(
     private val vm: ElyndraViewModel,
     private val brain: MashaBrain,
-    writes: MashaWrites = MashaWrites(),
+    private val writes: MashaWrites = MashaWrites(),
 ) : MashaToolbox {
 
     /** Nombres, juegos por añadir y emuladores (ver [MashaLibraryActions]). */
@@ -83,7 +89,9 @@ class MashaActions(
             MashaTools.LIST_EMULATORS -> library.listEmulators()
             MashaTools.SET_PREFERRED_EMULATOR -> library.setPreferred(a)
             MashaTools.UNDO_LAST_ACTION -> library.undo()
-            MashaTools.FIND_PORT -> findPort(a.str("query"), a.bool("open") == true)
+            MashaTools.FIND_PORTS -> findPorts(a)
+            MashaTools.OPEN_PORT -> openPort(a)
+            MashaTools.INSTALL_PORT -> installPort(a)
             MashaTools.RECOMMEND -> recommend(a)
             else -> toolFail("unknown tool ${call.name}")
         }
@@ -196,36 +204,94 @@ class MashaActions(
         }
     }
 
-    private suspend fun findPort(query: String?, open: Boolean): ToolResult {
+    /** La tienda cargada (de la red, de la caché o la copia del APK: sin conexión también hay catálogo). */
+    private suspend fun portsReady(): PortsController {
         val ports = vm.ports
         if (ports.catalog.isEmpty()) onMain { ports.onOpen() }.also { ports.awaitCatalog() }
+        return ports
+    }
+
+    private suspend fun findPorts(a: JsonObject): ToolResult {
+        val ports = portsReady()
         val owned = onMain { ports.owned() }
-        val found = StoreRows.find(ports.catalog, query, owned)
-        if (open) found.firstOrNull()?.let { first -> onMain { ports.openPort(first.lead.id) } }
-        if (found.isEmpty()) return toolOk("no ports found", mutating = open)
-        return toolOk(attachment = MashaAttachment.Ports(query, found.map { it.lead.id }), mutating = open) {
-            put("count", found.size)
+        val installed = ports.installed.keys
+        val updates = onMain { ports.updateIds() }
+        val found = PortRecommend.search(
+            ports.catalog, a.str("query"), a.str("genre"), a.str("mood"), owned,
+            includeIncompatible = a.bool("include_incompatible") == true, installedIds = installed,
+        )
+        if (found.groups.isEmpty()) {
+            return toolOk(if (found.incompatible > 0) "${found.incompatible} found, but none can be installed on this device" else "no ports found") {
+                put("incompatible_hidden", found.incompatible)
+            }
+        }
+        return toolOk(attachment = MashaAttachment.Ports(a.str("query"), found.groups.map { PortRecommend.best(it).id })) {
+            put("count", found.groups.size)
+            if (found.incompatible > 0) put("incompatible_hidden", found.incompatible)
             putJsonArray("ports") {
-                found.forEach { g ->
-                    val p = g.lead
+                found.groups.forEach { g ->
+                    val p = PortRecommend.best(g)
                     addJsonObject {
+                        put("port_id", p.id)
                         put("game", PortDisplay.title(p))
                         put("original_platform", p.platform)
                         put("port", p.name)
                         p.developer?.let { put("developer", it) }
-                        put("ports_available", g.ports.size)
                         put("kind", p.kind)
-                        put("repo", p.releaseRepo.slug)
-                        put("installable_on_android", g.ports.any { it.installable })
-                        put("installed", g.ports.any { it.id in ports.installed })
+                        put("ports_available", g.ports.size)
+                        put("state", PortRecommend.state(p, installed, updates))
+                        put("runs_on_this_device", PortRecommend.compatible(g))
+                        PortRecommend.requiredGame(p)?.let { put("needs_data_files_from", it) }
                         put("in_library", owned.any { it.port.id in g.ids })
-                        put("needs_own_copy", p.requires.userRom)
                         put("verified", p.verified)
                         if (p.trust.prerelease) put("prerelease", true)
                     }
                 }
             }
         }
+    }
+
+    /** El port por id o, si no, el mejor resultado para el nombre del juego. */
+    private fun portFor(ports: PortsController, a: JsonObject): PortEntry? {
+        a.str("port_id")?.trim()?.takeIf { it.isNotEmpty() }?.let { id -> ports.catalog.firstOrNull { it.id == id }?.let { return it } }
+        val game = a.str("game")?.trim()?.takeIf { it.isNotEmpty() } ?: a.str("port_id") ?: return null
+        return StoreRows.find(ports.catalog, game, emptyList(), limit = 1).firstOrNull()?.let(PortRecommend::best)
+    }
+
+    private suspend fun openPort(a: JsonObject): ToolResult {
+        val ports = portsReady()
+        val port = portFor(ports, a) ?: return toolFail("that port is not in the Ports store")
+        onMain { ports.openPort(port.id) }
+        return toolOk("opened the store page of ${port.name}", MashaAttachment.Done("◈ ${PortDisplay.title(port)}"), mutating = true)
+    }
+
+    /**
+     * Instalar un port: siempre una tarjeta de confirmación y, al confirmar, el
+     * flujo de la tienda de siempre (PortInstallController.primary: el aviso de
+     * port sin verificar, la descarga y el instalador del sistema). Nunca otro camino.
+     */
+    private suspend fun installPort(a: JsonObject): ToolResult {
+        val ports = portsReady()
+        val port = portFor(ports, a) ?: return toolFail("that port is not in the Ports store")
+        if (!port.installable) return toolFail("${port.name} can't be installed on this device")
+        val updates = onMain { ports.updateIds() }
+        if (port.id in ports.installed && port.id !in updates) return toolFail("${port.name} is already installed and up to date")
+        val title = PortDisplay.title(port)
+        val w = writes.propose(ConfirmKind.INSTALL_PORT, listOf(title, PortRecommend.requiredGame(port).orEmpty())) {
+            withContext(Dispatchers.Main) {
+                // Sin releases aún ("Free"), la tienda primero las pide; luego, su botón de siempre.
+                ports.ensureReleases(port, prefetch = false, force = true)
+            }
+            withTimeoutOrNull(RELEASES_WAIT_MS) {
+                while (withContext(Dispatchers.Main) { ports.latest(port) } == null) delay(200)
+            }
+            withContext(Dispatchers.Main) {
+                vm.ports.openPort(port.id)
+                vm.portInstall.primary(port)
+            }
+            WriteOutcome("⬇ $title")
+        }
+        return toolOk("waiting for the user's confirmation in the chat card", MashaAttachment.Confirm(w.id, w.kind, w.items), mutating = true)
     }
 
     private suspend fun filterLibrary(a: JsonObject): ToolResult {
@@ -328,5 +394,8 @@ class MashaActions(
     private companion object {
         /** El motivo de una tarjeta: una línea. */
         const val MAX_REASON = 140
+
+        /** Lo que se espera a que la tienda sepa qué release instalar. */
+        const val RELEASES_WAIT_MS = 15_000L
     }
 }

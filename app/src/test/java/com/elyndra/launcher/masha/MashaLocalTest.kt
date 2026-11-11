@@ -22,6 +22,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import com.elyndra.launcher.domain.ports.GameArt
+import com.elyndra.launcher.domain.ports.GhRepo
+import com.elyndra.launcher.domain.ports.PortBuild
+import com.elyndra.launcher.domain.ports.PortEntry
+import com.elyndra.launcher.domain.ports.PortGame
+import com.elyndra.launcher.domain.ports.PortRecommend
+import com.elyndra.launcher.domain.ports.Requirement
 import com.elyndra.launcher.domain.relationship.AffinityLevel
 import org.junit.Test
 import java.time.ZoneId
@@ -122,7 +129,16 @@ class MashaLocalTest {
             "gibt es eine native Portierung?",
             "busca recompilaciones de Xbox 360",
             "show me decompilations",
-        ).forEach { assertEquals(it, OfflineIntent.FindPort, OfflineIntents.detect(it)) }
+        ).forEach { assertTrue(it, OfflineIntents.detect(it) is OfflineIntent.FindPort) }
+    }
+
+    @Test
+    fun aPortRequestCanNameTheGame() {
+        assertEquals(OfflineIntent.FindPort("Zelda"), OfflineIntents.detect("is there a native port of Zelda?"))
+        assertEquals(OfflineIntent.FindPort("Doom"), OfflineIntents.detect("Lucy, ¿hay algún port de Doom para el móvil?"))
+        assertEquals(OfflineIntent.FindPort("Xbox 360"), OfflineIntents.detect("busca recompilaciones de Xbox 360"))
+        assertEquals(OfflineIntent.FindPort("Quake"), OfflineIntents.detect("any port like Quake"))
+        assertEquals(OfflineIntent.FindPort(null), OfflineIntents.detect("¿hay algún port nativo?"))
     }
 
     @Test
@@ -158,6 +174,7 @@ class MashaLocalTest {
         userFolders: List<String> = emptyList(),
         relationship: AffinityLevel? = null,
         lastConversation: Pair<String, Long>? = null,
+        ports: PortRecommend.Summary? = null,
     ): BuiltContext {
         val games = library.games()
         val snapshot = KnowledgeSnapshot(library, games, GameProfiles.buildAll(games, library.sessions, now = now), LibraryCurator.analyze(games), emptyList(), now)
@@ -179,8 +196,41 @@ class MashaLocalTest {
                 userFolders = userFolders,
                 relationship = relationship,
                 lastConversation = lastConversation,
+                ports = ports,
             ),
         )
+    }
+
+    /** Un catálogo con repositorios, enlaces de arte y builds: nada de eso puede llegar al contexto. */
+    private fun portsSummary(): PortRecommend.Summary {
+        val catalog = listOf(
+            PortEntry(
+                id = "soh",
+                name = "Ship of Harkinian",
+                repo = GhRepo("HarbourMasters", "Shipwright"),
+                game = PortGame("The Legend of Zelda: Ocarina of Time", "n64", art = GameArt(cover = "https://cdn.example.com/zelda.png")),
+                builds = listOf(PortBuild("android")),
+                requires = Requirement(userRom = true),
+                screenshots = listOf("https://example.com/shot.png"),
+            ),
+            PortEntry(id = "starship", name = "Starship", repo = GhRepo("HarbourMasters", "Starship"), game = PortGame("Star Fox 64", "n64")),
+        )
+        return PortRecommend.summary(catalog, installedIds = setOf("starship"), updateIds = emptySet(), owned = emptyList()).copy(
+            forYourLibrary = listOf("The Legend of Zelda: Ocarina of Time"),
+        )
+    }
+
+    @Test
+    fun portsGoInTheContextAsCountsAndNames() {
+        val root = DeepSeekProtocolJson.parse(build(DeviceState(), ports = portsSummary()).json)
+        val ports = root["PORTS"]!!.jsonObject
+        assertEquals(2, ports["total"]!!.jsonPrimitive.content.toInt())
+        assertEquals(1, ports["runs_on_this_device"]!!.jsonPrimitive.content.toInt())
+        assertEquals(1, ports["installed"]!!.jsonPrimitive.content.toInt())
+        assertEquals("The Legend of Zelda: Ocarina of Time", ports["for_your_library"]!!.jsonArray[0].jsonPrimitive.content)
+        // Volátil: instalar un port no invalida las respuestas guardadas.
+        assertEquals(build(DeviceState()).fingerprint, build(DeviceState(), ports = portsSummary()).fingerprint)
+        assertFalse("PORTS" in DeepSeekProtocolJson.parse(build(DeviceState()).json))
     }
 
     @Test
@@ -203,12 +253,18 @@ class MashaLocalTest {
     @Test
     fun theContextNeverCarriesPathsOrUris() {
         val summary = "We talked about content://com.android.externalstorage.documents/tree/primary:ROMs/okami.iso and /storage/emulated/0/media/x"
-        listOf(build(DeviceState(batteryPct = 50)), build(DeviceState(batteryPct = 50), lastConversation = summary to NOW - 3_600_000)).forEach {
+        listOf(
+            build(DeviceState(batteryPct = 50)),
+            build(DeviceState(batteryPct = 50), lastConversation = summary to NOW - 3_600_000),
+            build(DeviceState(batteryPct = 50), ports = portsSummary()),
+        ).forEach {
             val json = it.json
             assertFalse("content://" in json)
             assertFalse("primary:" in json)
             assertFalse(".iso" in json)
             assertFalse("media/" in json)
+            assertFalse("://" in json)
+            assertFalse("HarbourMasters" in json)
         }
     }
 

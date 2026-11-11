@@ -405,6 +405,7 @@ private fun ConfirmCard(vm: ElyndraViewModel, c: MashaAttachment.Confirm, glow: 
         com.elyndra.launcher.masha.ConfirmKind.ADD_GAMES -> pluralStringResource(R.plurals.masha_confirm_add, c.items.size, c.items.size)
         com.elyndra.launcher.masha.ConfirmKind.RENAME -> stringResource(R.string.masha_confirm_rename, c.items.getOrElse(0) { "?" }, c.items.getOrElse(1) { "?" })
         com.elyndra.launcher.masha.ConfirmKind.SET_EMULATOR -> stringResource(R.string.masha_confirm_emulator, c.items.getOrElse(0) { "?" }, c.items.getOrElse(1) { "?" })
+        com.elyndra.launcher.masha.ConfirmKind.INSTALL_PORT -> stringResource(R.string.lucy_confirm_install_port, c.items.getOrElse(0) { "?" })
         else -> c.kind
     }
     Column(
@@ -416,6 +417,10 @@ private fun ConfirmCard(vm: ElyndraViewModel, c: MashaAttachment.Confirm, glow: 
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         ElyText(title, size = 11.5f, weight = FontWeight.Bold, color = Holo.text)
+        if (c.kind == com.elyndra.launcher.masha.ConfirmKind.INSTALL_PORT) {
+            c.items.getOrNull(1)?.takeIf { it.isNotEmpty() }?.let { ElyText(stringResource(R.string.lucy_port_needs_files, it), size = 10f, color = Holo.dim) }
+            ElyText(stringResource(R.string.lucy_confirm_install_port_flow), size = 9.5f, color = Holo.dim)
+        }
         if (c.kind == com.elyndra.launcher.masha.ConfirmKind.ADD_GAMES) {
             c.items.take(12).forEach { ElyText("• $it", size = 10f, color = Holo.dim, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             if (c.items.size > 12) ElyText(stringResource(R.string.masha_confirm_more, c.items.size - 12), size = 10f, color = Holo.dim)

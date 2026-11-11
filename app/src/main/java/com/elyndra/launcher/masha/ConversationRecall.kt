@@ -112,7 +112,7 @@ object ConversationRecall {
                 OfflineIntent.Arcs -> ConversationTopic("We talked about their game arcs.", null)
                 OfflineIntent.AddInstalled -> ConversationTopic("We added their installed games to the library.", null)
                 is OfflineIntent.Rename -> ConversationTopic("We renamed one of their games.", null)
-                OfflineIntent.FindPort -> ConversationTopic("We looked for native ports of their games.", null)
+                is OfflineIntent.FindPort -> ConversationTopic("We looked for native ports of their games.", null)
                 OfflineIntent.Hello, OfflineIntent.Unknown -> null
             }
             if (topic != null) return topic.copy(summary = sanitize(topic.summary) ?: return null, game = topic.game?.let(::cleanTitle))

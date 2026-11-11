@@ -1252,4 +1252,7 @@ Von der Community erstellt, nicht geprüft. Sieh dir vor der Installation das Re
     <string name="lucy_port_available">Im Store</string>
     <string name="lucy_port_not_android">Noch nicht für Android</string>
     <string name="lucy_port_needs_files">Braucht Dateien aus deiner Kopie von %1$s</string>
+    <string name="lucy_confirm_install_port">%1$s aus dem Port-Store installieren?</string>
+    <string name="lucy_confirm_install_port_flow">Der Store öffnet sich und installiert es wie gewohnt. Nichts wird installiert, bevor du bestätigst.</string>
+    <string name="lucy_off_ports_query_none">Ich habe im Port-Store nachgesehen, aber für %1$s läuft hier nichts. Sorry!</string>
 </resources>

@@ -18,6 +18,7 @@ import com.elyndra.launcher.domain.insights.Insight
 import com.elyndra.launcher.domain.lists.DynamicList
 import com.elyndra.launcher.domain.lists.ListRule
 import com.elyndra.launcher.domain.lists.SmartLists
+import com.elyndra.launcher.domain.ports.PortRecommend
 import com.elyndra.launcher.domain.relationship.AffinityLevel
 import com.elyndra.launcher.domain.relationship.AffinityScorer
 import com.elyndra.launcher.domain.relationship.GainReason
@@ -418,7 +419,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     }
 
     private suspend fun online(text: String, previous: String?, history: List<MashaTurn>, language: String, cacheable: Boolean) {
-        val context = brain.context(language, vm.screenName(), vm.focusName())
+        val context = brain.context(language, vm.screenName(), vm.focusName(), portsSummary())
         val index = messages.size
         messages += ChatMessage(fromMasha = true, text = "", pending = true)
         val buffer = StringBuilder()
@@ -485,6 +486,19 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                 }
             }
         }
+    }
+
+    /**
+     * La tienda resumida para el contexto (PORTS). Sin catálogo aún, se pide
+     * en segundo plano (red, caché o la copia del APK) y esta vez no va.
+     */
+    private fun portsSummary(): PortRecommend.Summary? {
+        val ports = vm.ports
+        if (ports.catalog.isEmpty()) {
+            ports.onOpen()
+            return null
+        }
+        return PortRecommend.summary(ports.catalog, ports.installed.keys, ports.updateIds(), ports.owned())
     }
 
     /** Si se cortó a medias, lo que quedó escrito se da por bueno (sin la marca de "escribiendo"). */
@@ -574,12 +588,15 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                     if (result.ok) ctx.getString(R.string.masha_off_renamed, focused, intent.name) else ctx.getString(R.string.masha_off_rename_bad, intent.name)
                 }
             }
-            OfflineIntent.FindPort -> {
-                val result = actions.execute(ToolCall("local", MashaTools.FIND_PORT, buildJsonObject {}))
+            is OfflineIntent.FindPort -> {
+                // Del catálogo cargado o, sin red, del guardado (o la copia del APK).
+                val result = actions.execute(ToolCall("local", MashaTools.FIND_PORTS, buildJsonObject { intent.query?.let { put("query", it) } }))
                 val found = result.attachment as? MashaAttachment.Ports
                 if (found != null) {
                     attachment = found
                     ctx.getString(R.string.masha_off_ports)
+                } else if (intent.query != null) {
+                    ctx.getString(R.string.lucy_off_ports_query_none, intent.query)
                 } else {
                     // Nada de la biblioteca tiene port: la tienda, para mirar.
                     vm.openPorts()
@@ -752,7 +769,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     private fun workingLabel(call: ToolCall): UiText = UiText.res(
         when (call.name) {
             MashaTools.FIND_GAMES, MashaTools.OPEN_LIST -> R.string.masha_working_search
-            MashaTools.FIND_PORT -> R.string.masha_working_ports
+            MashaTools.FIND_PORTS, MashaTools.OPEN_PORT, MashaTools.INSTALL_PORT -> R.string.masha_working_ports
             MashaTools.GET_GAME_PROFILE, MashaTools.SUGGEST_EMULATOR -> R.string.masha_working_profile
             MashaTools.PLAN_SESSION -> R.string.masha_working_plan
             MashaTools.CREATE_ARC, MashaTools.GET_ARCS -> R.string.masha_working_arc

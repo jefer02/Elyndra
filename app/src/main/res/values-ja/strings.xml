@@ -1220,4 +1220,7 @@
     <string name="lucy_port_available">ストアにあり</string>
     <string name="lucy_port_not_android">Android未対応</string>
     <string name="lucy_port_needs_files">お持ちの『%1$s』のファイルが必要</string>
+    <string name="lucy_confirm_install_port">ポートストアから%1$sをインストールしますか？</string>
+    <string name="lucy_confirm_install_port_flow">ストアが開き、いつもの手順でインストールします。確認するまで何もインストールされません。</string>
+    <string name="lucy_off_ports_query_none">ポートストアを探したけど、%1$sでここで動くものはなかったよ。ごめんね！</string>
 </resources>

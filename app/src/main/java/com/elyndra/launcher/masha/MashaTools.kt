@@ -49,7 +49,9 @@ object MashaTools {
     const val LIST_EMULATORS = "list_emulators"
     const val SET_PREFERRED_EMULATOR = "set_preferred_emulator"
     const val UNDO_LAST_ACTION = "undo_last_action"
-    const val FIND_PORT = "find_port"
+    const val FIND_PORTS = "find_ports"
+    const val OPEN_PORT = "open_port"
+    const val INSTALL_PORT = "install_port"
     const val RECOMMEND = "show_recommendations"
 
     /** Cuántas tarjetas como mucho en una recomendación. */
@@ -60,6 +62,7 @@ object MashaTools {
         LAUNCH_GAME, SET_GAME_EMULATOR, CREATE_LIST, CREATE_ARC, UPDATE_METADATA, REMEMBER, FORGET,
         FILTER_LIBRARY, SET_ART, ADD_GAME, REMOVE_GAME, SET_ACCENT, SET_DARK_MODE,
         RENAME_GAME, ADD_GAMES, OPEN_ADD_ROMS, SET_PREFERRED_EMULATOR, UNDO_LAST_ACTION,
+        OPEN_PORT, INSTALL_PORT,
     )
 
     val ACCENTS = listOf("indigo", "abismo", "medianoche", "mandarina", "fuego", "menta", "cobalto", "lila", "coral", "turquesa", "oro", "chicle", "grafito")
@@ -225,15 +228,29 @@ object MashaTools {
             },
             tool(UNDO_LAST_ACTION, "Undo the last rename, add or emulator change made through you. Only when the user asks.") {},
             tool(
-                FIND_PORT,
+                FIND_PORTS,
                 "Native Android ports (decompilations/recompilations/source ports) from Elyndra's Ports store, for console and PC games. " +
-                    "Search by the original game's name. One result per game: 'game' is its name, 'port' the best port of it, 'ports_available' how many exist. " +
-                    "Without a query: games already in the library that have a port. " +
-                    "Each result says if it is installable on Android, installed, and which original game the user must own (never offer or link ROMs). " +
-                    "open=true opens the store page of the first result.",
+                    "Search by port or original game name (just the name: 'Doom', not 'something like Doom'), by genre, or by mood. " +
+                    "Without query, genre or mood: library games that have a port. One result per game, compatible with this device first; " +
+                    "incompatible ones are only counted unless include_incompatible. Each result says its state (installed, update_available, " +
+                    "available, not_on_android), whether it runs here, and which original game's data files it needs (the user must own it; never offer or link ROMs).",
             ) {
-                string("query", "Game or port name, e.g. 'Ocarina of Time', 'Mario', 'Xbox 360'.")
-                boolean("open", "Open the store on the first result.")
+                string("query", "Port or original game name, e.g. 'Ocarina of Time', 'Doom', 'Mario 64'.")
+                string("genre", "Optional genre: platformer, racing, rpg, shooter or strategy.")
+                string("mood", "Optional mood in the user's words, e.g. 'scary', 'chill', 'with friends', 'fast', 'story', 'puzzle'.")
+                boolean("include_incompatible", "Also return ports that can't be installed on this device.")
+            },
+            tool(OPEN_PORT, "Open a port's page in the Ports store. Only when the user wants to see it.") {
+                string("port_id", "The port id from find_ports.")
+                string("game", "Or the original game's name.")
+            },
+            tool(
+                INSTALL_PORT,
+                "Install a port from the Ports store. The app shows a confirm card first and then the store's own install flow; nothing is installed until the user confirms. " +
+                    "Only when the user asked for it or agreed to your suggestion. Say first if it needs files from the original game.",
+            ) {
+                string("port_id", "The port id from find_ports.")
+                string("game", "Or the original game's name.")
             },
         )
     }

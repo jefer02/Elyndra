@@ -1270,4 +1270,7 @@ Feito pela comunidade, sem revisão. Confira o repositório antes de instalar.</
     <string name="lucy_port_available">Na loja</string>
     <string name="lucy_port_not_android">Ainda não no Android</string>
     <string name="lucy_port_needs_files">Precisa de arquivos da sua cópia de %1$s</string>
+    <string name="lucy_confirm_install_port">Instalar %1$s da loja de ports?</string>
+    <string name="lucy_confirm_install_port_flow">A loja abre e instala como sempre. Nada é instalado até você confirmar.</string>
+    <string name="lucy_off_ports_query_none">Olhei na loja de ports e não tem nada de %1$s que rode aqui. Desculpa!</string>
 </resources>

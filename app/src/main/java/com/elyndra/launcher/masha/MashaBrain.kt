@@ -12,6 +12,7 @@ import com.elyndra.launcher.domain.insights.Insight
 import com.elyndra.launcher.domain.insights.InsightInput
 import com.elyndra.launcher.domain.insights.InsightPacing
 import com.elyndra.launcher.domain.insights.MashaInsights
+import com.elyndra.launcher.domain.ports.PortRecommend
 import com.elyndra.launcher.domain.relationship.Affinity
 import com.elyndra.launcher.domain.session.ArcStep
 import com.elyndra.launcher.launch.EmulatorInventory
@@ -66,7 +67,7 @@ class MashaBrain @Inject constructor(
     /** Masha puede usar la IA ahora mismo (clave, permiso del usuario y red). */
     fun canGoOnline(): Boolean = ai.isAvailable && device.snapshot().isOnline
 
-    suspend fun context(language: String, screen: String?, focus: String?): BuiltContext {
+    suspend fun context(language: String, screen: String?, focus: String?, ports: PortRecommend.Summary? = null): BuiltContext {
         val snapshot = knowledge.snapshot()
         val folderEmulators = snapshot.library.folders
             .mapNotNull { f -> f.emulatorId?.let { e -> f.systemId to (orchestrator.name(e) to orchestrator.isInstalled(e)) } }
@@ -89,6 +90,7 @@ class MashaBrain @Inject constructor(
                 userFolders = UserFolderLogic.sorted(snapshot.library.userFolders).map { it.name },
                 relationship = affinity.level,
                 lastConversation = conversation.summary?.let { it to conversation.lastActivityAt },
+                ports = ports,
             ),
         )
     }

@@ -3,6 +3,7 @@ package com.elyndra.launcher.masha
 import com.elyndra.launcher.domain.Game
 import com.elyndra.launcher.domain.device.DeviceState
 import com.elyndra.launcher.domain.lists.SmartLists
+import com.elyndra.launcher.domain.ports.PortRecommend
 import com.elyndra.launcher.domain.profile.GameProfile
 import com.elyndra.launcher.domain.profile.PlayState
 import com.elyndra.launcher.domain.relationship.AffinityLevel
@@ -48,6 +49,8 @@ data class ContextInput(
     val relationship: AffinityLevel? = null,
     /** El tema de la última conversación y cuándo fue su último mensaje (epoch ms); null = nada. */
     val lastConversation: Pair<String, Long>? = null,
+    /** La tienda de ports en números y nombres de juegos (nunca enlaces ni rutas); null = sin catálogo aún. */
+    val ports: PortRecommend.Summary? = null,
 )
 
 data class BuiltContext(val json: String, val fingerprint: String)
@@ -154,6 +157,16 @@ object MashaContextBuilder {
                         put("summary", clean)
                         if (at > 0) put("ago", ago(now - at))
                     }
+                }
+            }
+            // Volátil: instalar o actualizar un port no debe invalidar respuestas guardadas.
+            input.ports?.let { p ->
+                putJsonObject("PORTS") {
+                    put("total", p.total)
+                    put("runs_on_this_device", p.compatible)
+                    put("installed", p.installed)
+                    put("updates", p.updates)
+                    if (p.forYourLibrary.isNotEmpty()) putJsonArray("for_your_library") { p.forYourLibrary.forEach { add(it) } }
                 }
             }
         }

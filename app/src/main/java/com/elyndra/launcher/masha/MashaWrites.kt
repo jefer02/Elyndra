@@ -22,6 +22,9 @@ object ConfirmKind {
     const val ADD_GAMES = "add_games"
     const val RENAME = "rename"
     const val SET_EMULATOR = "set_emulator"
+
+    /** Instalar un port de la tienda (items: nombre del juego, juego original del que hacen falta archivos o vacío). */
+    const val INSTALL_PORT = "install_port"
 }
 
 /** Estado de una tarjeta de confirmación. */
