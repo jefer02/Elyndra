@@ -46,6 +46,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -207,7 +208,9 @@ fun MashaScreen(vm: ElyndraViewModel) {
 
     // ── conversación ──
     val greeting = stringResource(R.string.masha_greeting)
-    LaunchedEffect(greeting) { masha.onOpen(greeting) }
+    LaunchedEffect(greeting) { masha.onOpen(greeting, lang) }
+    // Al salir, la conversación se da por terminada y se resume (para retomarla al volver).
+    DisposableEffect(Unit) { onDispose { masha.onClose() } }
     // Lo que ya estaba en pantalla al entrar no se vuelve a leer en voz alta.
     val alreadyShown = remember { masha.messages.lastOrNull()?.id }
     val last = masha.messages.lastOrNull()

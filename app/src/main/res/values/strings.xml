@@ -1192,4 +1192,9 @@ Built by the community, not reviewed. Check the repository before installing.</s
     <string name="lucy_level_close">Close</string>
     <string name="lucy_level_devoted">Devoted</string>
     <string name="lucy_level_cd">Your bond with Lucy: %1$s</string>
+    <string name="lucy_welcome_back_game">Hey, you’re back. Did you get anywhere with %1$s?</string>
+    <string name="lucy_welcome_back">Hey, you’re back. Want to pick up where we left off?</string>
+    <string name="settings_lucy_forget_conversations">Forget conversations</string>
+    <string name="settings_lucy_forget_conversations_msg">Deletes the chat with Lucy and what she remembers about your last conversation. Her memories and your bond stay.</string>
+    <string name="toast_lucy_forgot_conversations">Conversations forgotten</string>
 </resources>

@@ -21,7 +21,10 @@ import com.elyndra.launcher.domain.lists.SmartLists
 import com.elyndra.launcher.domain.relationship.AffinityLevel
 import com.elyndra.launcher.domain.relationship.AffinityScorer
 import com.elyndra.launcher.domain.session.SessionMood
+import com.elyndra.launcher.masha.ConversationRecall
 import com.elyndra.launcher.masha.MashaAttachment
+import com.elyndra.launcher.masha.MashaContextBuilder
+import com.elyndra.launcher.masha.MashaPrompt
 import com.elyndra.launcher.masha.MashaBrain
 import com.elyndra.launcher.masha.MashaChatRequest
 import com.elyndra.launcher.masha.MashaError
@@ -35,6 +38,7 @@ import com.elyndra.launcher.masha.offline.OfflineIntents
 import com.elyndra.launcher.ui.masha.MashaMood
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -100,9 +104,16 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     }
 
     /** Al abrir el chat: recupera el hilo guardado (una vez) y saluda si está vacío. */
-    fun onOpen(greeting: String) {
+    /**
+     * Al abrir el chat: recupera el hilo guardado (una vez). Si pasó más de
+     * media hora desde el último mensaje y hay un tema guardado, Lucy saluda
+     * retomándolo; si no, el hilo sigue tal cual (y con el hilo vacío, el saludo de siempre).
+     */
+    fun onOpen(greeting: String, uiLanguage: String) {
+        val welcome = ConversationRecall.shouldWelcomeBack(System.currentTimeMillis(), recall)
         if (historyLoaded) {
-            if (messages.isEmpty()) messages += ChatMessage(fromMasha = true, text = greeting, greeting = true)
+            if (welcome) welcomeBack(uiLanguage)
+            else if (messages.isEmpty()) messages += ChatMessage(fromMasha = true, text = greeting, greeting = true)
             return
         }
         historyLoaded = true
@@ -118,9 +129,98 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                         restored = true,
                     )
                 }
-                if (messages.isEmpty()) messages += ChatMessage(fromMasha = true, text = greeting, greeting = true)
             }
+            if (welcome) welcomeBack(uiLanguage)
+            else if (messages.isEmpty()) messages += ChatMessage(fromMasha = true, text = greeting, greeting = true)
         }
+    }
+
+    /* ── la última conversación ───────────────────────────────── */
+
+    private val recall get() = brain.conversation
+    private var idleJob: Job? = null
+    private var welcomeJob: Job? = null
+
+    /** Al salir de la pantalla: la conversación termina y se resume (sigue aunque la pantalla ya no esté). */
+    fun onClose() {
+        idleJob?.cancel()
+        vm.viewModelScope.launch { summarize() }
+    }
+
+    /** Hubo un mensaje: se apunta y, tras [ConversationRecall.IDLE_END_MS] de silencio, se da por terminada. */
+    private fun noteActivity(at: Long) {
+        recall.lastActivityAt = at
+        idleJob?.cancel()
+        idleJob = vm.viewModelScope.launch {
+            delay(ConversationRecall.IDLE_END_MS)
+            summarize()
+        }
+    }
+
+    /**
+     * Guarda una frase con el tema de la conversación: con IA, una llamada
+     * barata; sin ella (o si falla), los juegos y las intenciones que salieron.
+     */
+    private suspend fun summarize() {
+        if (!ConversationRecall.needsSummary(recall)) return
+        val turns = messages.filterNot { it.pending || it.greeting || it.text.isBlank() }
+            .map { MashaTurn(if (it.fromMasha) MashaTurn.Role.Masha else MashaTurn.Role.User, it.text) }
+        if (turns.isEmpty()) return
+        val upTo = recall.lastActivityAt
+        val titles = vm.library.roms.map { it.displayTitle } + vm.library.apps.map { it.displayTitle }
+        val local = ConversationRecall.fallback(turns, titles)
+        val online = if (brain.canGoOnline()) {
+            brain.ai.complete(ConversationRecall.SUMMARY_SYSTEM, ConversationRecall.transcript(turns), maxTokens = 60, temperature = 0.3)
+                .getOrNull()
+                ?.let(ConversationRecall::sanitize)
+        } else {
+            null
+        }
+        val summary = online ?: local?.summary ?: return
+        recall.summary = summary
+        recall.topicGame = local?.game
+        recall.summarizedUpTo = upTo
+    }
+
+    /**
+     * El saludo al volver, retomando el tema: con IA, en su voz y a su nivel
+     * (una llamada con su prompt y el contexto); sin ella, una frase fija con
+     * el juego del que se habló, si lo hubo.
+     */
+    private fun welcomeBack(language: String) {
+        val summary = recall.summary ?: return
+        if (busy || welcomeJob?.isActive == true) return
+        val away = System.currentTimeMillis() - recall.lastActivityAt
+        val index = messages.size
+        messages += ChatMessage(fromMasha = true, text = "", pending = true)
+        welcomeJob = vm.viewModelScope.launch {
+            val online = if (brain.canGoOnline()) {
+                val context = brain.context(language, vm.screenName(), vm.focusName())
+                val prompt = "CONTEXT (JSON):\n${context.json}\nUI_LANGUAGE: $language\n\n" +
+                    ConversationRecall.welcomeInstruction(summary, MashaContextBuilder.ago(away).removeSuffix(" ago"))
+                brain.ai.complete(MashaPrompt.SYSTEM, prompt, maxTokens = 160).getOrNull()?.takeIf { it.isNotBlank() }
+            } else {
+                null
+            }
+            val ctx = localized()
+            val text = online ?: recall.topicGame?.let { ctx.getString(R.string.lucy_welcome_back_game, it) }
+                ?: ctx.getString(R.string.lucy_welcome_back)
+            if (index in messages.indices && messages[index].pending) {
+                messages[index] = messages[index].copy(text = text, pending = false, offline = online == null)
+            } else {
+                messages += ChatMessage(fromMasha = true, text = text, offline = online == null)
+            }
+            mood = MashaMood.Warm
+            persist(StoredMessage(MashaTurn.Role.Masha, text, null, null, System.currentTimeMillis()))
+        }
+    }
+
+    /** "Olvidar conversaciones": el hilo y el último tema (los recuerdos y la relación se quedan). */
+    fun forgetConversations() {
+        welcomeJob?.cancel()
+        idleJob?.cancel()
+        recall.clear()
+        clearConversation(null)
     }
 
     /**
@@ -601,6 +701,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     }
 
     private fun persist(message: StoredMessage) {
+        noteActivity(message.createdAt)
         vm.viewModelScope.launch { brain.memory.saveMessage(message) }
     }
 

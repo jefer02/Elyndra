@@ -510,6 +510,22 @@ class SettingsController(private val vm: ElyndraViewModel) {
         )
     }
 
+    /** "Olvidar conversaciones": el chat y el último tema; los recuerdos y la relación se quedan. */
+    fun forgetLucyConversations() {
+        vm.showDialog(
+            DialogSpec(
+                title = UiText.res(R.string.settings_lucy_forget_conversations),
+                message = UiText.res(R.string.settings_lucy_forget_conversations_msg),
+                destructive = true,
+                confirm = DialogButton(UiText.res(R.string.remove)) {
+                    vm.masha.forgetConversations()
+                    vm.showToast(UiText.res(R.string.toast_lucy_forgot_conversations))
+                },
+                dismiss = DialogButton(UiText.res(R.string.close)) {},
+            ),
+        )
+    }
+
     /* ── acerca de y opciones de desarrollador ────────────────── */
 
     /** Opciones de desarrollador visibles (se desbloquean con siete toques en la versión). */

@@ -1204,4 +1204,9 @@ Fait par la communauté, non vérifié. Consultez le dépôt avant d\'installer.
     <string name="lucy_level_close">Proche</string>
     <string name="lucy_level_devoted">Inséparable</string>
     <string name="lucy_level_cd">Votre lien avec Lucy : %1$s</string>
+    <string name="lucy_welcome_back_game">Hé, te revoilà. T’as avancé dans %1$s ?</string>
+    <string name="lucy_welcome_back">Hé, te revoilà. On reprend là où on s’était arrêtés ?</string>
+    <string name="settings_lucy_forget_conversations">Oublier les conversations</string>
+    <string name="settings_lucy_forget_conversations_msg">Supprime la discussion avec Lucy et ce dont elle se souvient de votre dernière conversation. Ses souvenirs et votre lien restent.</string>
+    <string name="toast_lucy_forgot_conversations">Conversations oubliées</string>
 </resources>

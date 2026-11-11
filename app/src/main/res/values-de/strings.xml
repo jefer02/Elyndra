@@ -1186,4 +1186,9 @@ Von der Community erstellt, nicht geprüft. Sieh dir vor der Installation das Re
     <string name="lucy_level_close">Vertraut</string>
     <string name="lucy_level_devoted">Unzertrennlich</string>
     <string name="lucy_level_cd">Bindung zu Lucy: %1$s</string>
+    <string name="lucy_welcome_back_game">Hey, da bist du ja wieder. Bist du bei %1$s weitergekommen?</string>
+    <string name="lucy_welcome_back">Hey, du bist zurück. Machen wir da weiter, wo wir aufgehört haben?</string>
+    <string name="settings_lucy_forget_conversations">Unterhaltungen vergessen</string>
+    <string name="settings_lucy_forget_conversations_msg">Löscht den Chat mit Lucy und was sie von eurer letzten Unterhaltung weiß. Ihre Erinnerungen und eure Bindung bleiben.</string>
+    <string name="toast_lucy_forgot_conversations">Unterhaltungen vergessen</string>
 </resources>

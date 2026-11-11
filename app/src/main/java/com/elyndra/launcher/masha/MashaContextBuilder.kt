@@ -46,6 +46,8 @@ data class ContextInput(
     val userFolders: List<String> = emptyList(),
     /** El nivel de la relación con Lucy (elige el tono); null = no se manda. */
     val relationship: AffinityLevel? = null,
+    /** El tema de la última conversación y cuándo fue su último mensaje (epoch ms); null = nada. */
+    val lastConversation: Pair<String, Long>? = null,
 )
 
 data class BuiltContext(val json: String, val fingerprint: String)
@@ -144,6 +146,15 @@ object MashaContextBuilder {
             putJsonObject("screen") {
                 put("view", input.screen ?: "library")
                 input.focus?.let { put("focused", it) }
+            }
+            // Volátil: el "hace cuánto" cambia solo. Se vuelve a limpiar aquí por si acaso.
+            input.lastConversation?.let { (summary, at) ->
+                ConversationRecall.sanitize(summary)?.let { clean ->
+                    putJsonObject("LAST_CONVERSATION") {
+                        put("summary", clean)
+                        if (at > 0) put("ago", ago(now - at))
+                    }
+                }
             }
         }
 

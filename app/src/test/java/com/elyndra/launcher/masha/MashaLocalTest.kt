@@ -157,6 +157,7 @@ class MashaLocalTest {
         memories: List<Memory> = emptyList(),
         userFolders: List<String> = emptyList(),
         relationship: AffinityLevel? = null,
+        lastConversation: Pair<String, Long>? = null,
     ): BuiltContext {
         val games = library.games()
         val snapshot = KnowledgeSnapshot(library, games, GameProfiles.buildAll(games, library.sessions, now = now), LibraryCurator.analyze(games), emptyList(), now)
@@ -177,6 +178,7 @@ class MashaLocalTest {
                 savedLists = listOf("RPG pendientes"),
                 userFolders = userFolders,
                 relationship = relationship,
+                lastConversation = lastConversation,
             ),
         )
     }
@@ -200,11 +202,23 @@ class MashaLocalTest {
 
     @Test
     fun theContextNeverCarriesPathsOrUris() {
-        val json = build(DeviceState(batteryPct = 50)).json
-        assertFalse("content://" in json)
-        assertFalse("primary:" in json)
-        assertFalse(".iso" in json)
-        assertFalse("media/" in json)
+        val summary = "We talked about content://com.android.externalstorage.documents/tree/primary:ROMs/okami.iso and /storage/emulated/0/media/x"
+        listOf(build(DeviceState(batteryPct = 50)), build(DeviceState(batteryPct = 50), lastConversation = summary to NOW - 3_600_000)).forEach {
+            val json = it.json
+            assertFalse("content://" in json)
+            assertFalse("primary:" in json)
+            assertFalse(".iso" in json)
+            assertFalse("media/" in json)
+        }
+    }
+
+    @Test
+    fun theLastConversationGoesInTheContextWithHowLongAgo() {
+        val root = DeepSeekProtocolJson.parse(build(DeviceState(), lastConversation = "We talked about Okami." to NOW - 3 * 3_600_000L).json)
+        val last = root["LAST_CONVERSATION"]!!.jsonObject
+        assertEquals("We talked about Okami.", last["summary"]!!.jsonPrimitive.content)
+        assertEquals("3h ago", last["ago"]!!.jsonPrimitive.content)
+        assertFalse("LAST_CONVERSATION" in DeepSeekProtocolJson.parse(build(DeviceState()).json))
     }
 
     @Test

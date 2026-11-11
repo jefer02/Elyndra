@@ -4,6 +4,7 @@ import com.elyndra.launcher.domain.library.UserFolderLogic
 import com.elyndra.launcher.core.device.DeviceStateMonitor
 import com.elyndra.launcher.data.AffinityPrefs
 import com.elyndra.launcher.data.ArcRepository
+import com.elyndra.launcher.data.ConversationPrefs
 import com.elyndra.launcher.data.InsightPacingPrefs
 import com.elyndra.launcher.data.SettingsStore
 import com.elyndra.launcher.data.Systems
@@ -47,7 +48,11 @@ class MashaBrain @Inject constructor(
     private val settings: SettingsStore,
     private val pacingStore: InsightPacingPrefs,
     affinityStore: AffinityPrefs,
+    conversationStore: ConversationPrefs,
 ) {
+
+    /** De qué iba la última conversación y cuándo fue (ver [ConversationRecall]). */
+    val conversation: ConversationStore = conversationStore
 
     /** La relación con Lucy: cuánto de cálida suena (nunca lo que puede hacer). */
     val affinity = Affinity(affinityStore)
@@ -83,6 +88,7 @@ class MashaBrain @Inject constructor(
                 savedLists = skills.savedListNames(),
                 userFolders = UserFolderLogic.sorted(snapshot.library.userFolders).map { it.name },
                 relationship = affinity.level,
+                lastConversation = conversation.summary?.let { it to conversation.lastActivityAt },
             ),
         )
     }
@@ -132,9 +138,10 @@ class MashaBrain @Inject constructor(
             .map { (arc, step) -> arc.title to step }
     }
 
-    /** Borra todo lo que Masha guarda: recuerdos, hilo, respuestas en caché y la relación. */
+    /** Borra todo lo que Masha guarda: recuerdos, hilo, el último tema, respuestas en caché y la relación. */
     suspend fun forgetEverything() {
         affinity.reset()
+        conversation.clear()
         memory.clearMemories()
         memory.clearHistory()
         cache.clear()

@@ -157,6 +157,8 @@ internal fun MashaColumn(vm: ElyndraViewModel) {
         SettingsGroup {
             ElyText(stringResource(R.string.settings_masha_privacy), size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
             Spacer(Modifier.height(10.dp))
+            GhostButton(stringResource(R.string.settings_lucy_forget_conversations), s::forgetLucyConversations)
+            Spacer(Modifier.height(8.dp))
             GhostButton(stringResource(R.string.settings_masha_forget), s::forgetMasha)
         }
     }
