@@ -351,6 +351,13 @@ class SettingsController(private val vm: ElyndraViewModel) {
         store.lucySuggestions = lucySuggestions
     }
 
+    var lucyTrustCoachShown by mutableStateOf(store.lucyTrustCoachShown); private set
+
+    fun markLucyTrustCoachShown() {
+        lucyTrustCoachShown = true
+        store.lucyTrustCoachShown = true
+    }
+
     var lucyMicLocked by mutableStateOf(store.lucyMicLocked); private set
 
     fun updateLucyMicLocked(locked: Boolean) {

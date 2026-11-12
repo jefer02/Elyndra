@@ -26,7 +26,19 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
+import com.elyndra.launcher.domain.relationship.AffinityBadge
 import com.elyndra.launcher.domain.relationship.AffinityLevel
+import com.elyndra.launcher.domain.relationship.AffinityProgress
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.style.TextOverflow
 import com.elyndra.launcher.ui.components.ElyText
 import com.elyndra.launcher.ui.components.tracking
 import com.elyndra.launcher.ui.theme.LocalReducedMotion
@@ -39,49 +51,6 @@ fun AffinityLevel.labelRes(): Int = when (this) {
     AffinityLevel.Friendly -> R.string.lucy_level_friendly
     AffinityLevel.Close -> R.string.lucy_level_close
     AffinityLevel.Devoted -> R.string.lucy_level_devoted
-}
-
-/**
- * El nivel de la relación con Lucy, discreto: un corazón que se llena por
- * tramos (uno por nivel) y el nombre del nivel. Cuando sube ([levelUps]
- * cambia), late una vez; al bajar no hace nada.
- */
-@Composable
-fun AffinityHeart(level: AffinityLevel, levelUps: Int, glow: Color, dim: Color, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
-    val label = stringResource(level.labelRes())
-    val description = stringResource(R.string.lucy_level_cd, label)
-    val reduced = LocalReducedMotion.current
-    val beat = remember { Animatable(1f) }
-    LaunchedEffect(levelUps) {
-        if (levelUps == 0 || reduced) return@LaunchedEffect
-        beat.animateTo(1.45f, tween(180))
-        beat.animateTo(0.92f, tween(160))
-        beat.animateTo(1f, tween(220))
-    }
-    val fill = (level.ordinal + 1) / AffinityLevel.entries.size.toFloat()
-    val open = stringResource(R.string.lucy_bond_open)
-    val clickable = if (onClick != null) Modifier.shapeClickable(RoundedCornerShape(8.dp), onClickLabel = open, onClick = onClick) else Modifier
-    Row(
-        modifier.then(clickable).semantics(mergeDescendants = true) { contentDescription = description }.padding(horizontal = 2.dp, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier
-                .size(10.dp)
-                .graphicsLayer {
-                    scaleX = beat.value
-                    scaleY = beat.value
-                }
-                .drawBehind {
-                    val heart = heartPath(size.width, size.height)
-                    drawPath(heart, glow, style = Stroke(1.dp.toPx()))
-                    // Lleno de abajo arriba, un tramo por nivel.
-                    clipRect(top = size.height * (1f - fill)) { drawPath(heart, glow) }
-                },
-        )
-        Spacer(Modifier.width(4.dp))
-        ElyText(label, size = 9.5f, weight = FontWeight.Medium, color = dim, maxLines = 1, letterSpacing = tracking(0.06f))
-    }
 }
 
 /** El corazón, con el contorno y relleno de abajo arriba hasta [fill] (0..1). */
@@ -104,4 +73,103 @@ private fun heartPath(w: Float, h: Float): Path = Path().apply {
     cubicTo(w * 0.54f, h * 0.1f, w * 0.68f, h * 0.02f, w * 0.82f, h * 0.14f)
     cubicTo(w * 1.02f, h * 0.32f, w * 0.9f, h * 0.62f, w * 0.5f, h * 0.92f)
     close()
+}
+
+/**
+ * La insignia de confianza de la cabecera: el corazón con un aro que se llena
+ * hacia el siguiente nivel, el nombre del nivel con "Nivel 2 de 5" y una barra
+ * fina con lo que falta ("12 pts para Cercana"). Es claramente pulsable (caja
+ * con borde y ›) y abre "Lucy y tú". Cuando cambia la puntuación el aro se
+ * llena animado (al subir de nivel, hasta arriba y vuelve a empezar); el
+ * corazón late al subir.
+ */
+@Composable
+fun TrustBadge(progress: AffinityProgress, levelUps: Int, glow: Color, dim: Color, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val badge = AffinityBadge.of(progress)
+    val reduced = LocalReducedMotion.current
+    val ring = remember { Animatable(badge.ring) }
+    val shown = remember { arrayOf(badge) }
+    LaunchedEffect(badge) {
+        val steps = AffinityBadge.ringSteps(shown[0], badge)
+        shown[0] = badge
+        if (reduced) {
+            ring.snapTo(badge.ring)
+            return@LaunchedEffect
+        }
+        steps.forEachIndexed { i, target ->
+            // El salto de lleno a vacío al subir de nivel es instantáneo.
+            if (i == 1 && steps.size == 3) ring.snapTo(target) else ring.animateTo(target, tween(700))
+        }
+    }
+    val beat = remember { Animatable(1f) }
+    LaunchedEffect(levelUps) {
+        if (levelUps == 0 || reduced) return@LaunchedEffect
+        beat.animateTo(1.35f, tween(180))
+        beat.animateTo(0.94f, tween(160))
+        beat.animateTo(1f, tween(220))
+    }
+    val name = stringResource(badge.level.labelRes())
+    val levelLine = stringResource(R.string.lucy_level_of, badge.number, badge.total)
+    val toNext = badge.next?.let { stringResource(R.string.lucy_pts_to, badge.pointsToNext, stringResource(it.labelRes())) }
+        ?: stringResource(R.string.lucy_bond_max)
+    val description = stringResource(R.string.lucy_trust_badge_cd, name, badge.number, badge.total, toNext)
+    val open = stringResource(R.string.lucy_bond_open)
+    val shape = RoundedCornerShape(12.dp)
+    Row(
+        modifier
+            .heightIn(min = 44.dp)
+            .widthIn(max = 230.dp)
+            .clip(shape)
+            .background(glow.copy(alpha = 0.10f))
+            .border(1.dp, glow.copy(alpha = 0.45f), shape)
+            .shapeClickable(shape, onClickLabel = open, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = description }
+            .padding(horizontal = 8.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(30.dp)
+                .graphicsLayer {
+                    scaleX = beat.value
+                    scaleY = beat.value
+                }
+                .drawBehind {
+                    val stroke = 2.5.dp.toPx()
+                    val inset = stroke / 2
+                    val arcSize = androidx.compose.ui.geometry.Size(size.width - stroke, size.height - stroke)
+                    val topLeft = androidx.compose.ui.geometry.Offset(inset, inset)
+                    drawArc(glow.copy(alpha = 0.22f), -90f, 360f, false, topLeft, arcSize, style = Stroke(stroke))
+                    drawArc(glow, -90f, 360f * ring.value, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+                    // El corazón dentro, lleno por tramos (uno por nivel).
+                    val h = size.width * 0.46f
+                    val o = (size.width - h) / 2
+                    val heart = heartPath(h, h).apply { translate(androidx.compose.ui.geometry.Offset(o, o + h * 0.04f)) }
+                    drawPath(heart, glow, style = Stroke(1.dp.toPx()))
+                    val fill = badge.number / badge.total.toFloat()
+                    clipRect(top = o + h * (1f - fill)) { drawPath(heart, glow) }
+                },
+        )
+        Spacer(Modifier.width(8.dp))
+        Column(Modifier.weight(1f, fill = false)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ElyText(name, size = 11f, weight = FontWeight.Bold, color = Color.White, maxLines = 1)
+                Spacer(Modifier.width(6.dp))
+                ElyText(levelLine, size = 9f, weight = FontWeight.Medium, color = dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.height(3.dp))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(glow.copy(alpha = 0.2f))
+                    .drawBehind { drawRect(glow, size = size.copy(width = size.width * ring.value.coerceIn(0f, 1f))) },
+            )
+            Spacer(Modifier.height(2.dp))
+            ElyText(toNext, size = 8.5f, color = dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.width(6.dp))
+        ElyText("›", size = 15f, weight = FontWeight.Bold, color = glow)
+    }
 }

@@ -28,7 +28,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import com.elyndra.launcher.BuildConfig
 import com.elyndra.launcher.ui.masha.MashaDebugSay
-import com.elyndra.launcher.ui.masha.AffinityHeart
+import com.elyndra.launcher.ui.masha.TrustBadge
 import com.elyndra.launcher.masha.ReplyShape
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -611,12 +611,16 @@ fun MashaScreen(vm: ElyndraViewModel) {
                 Modifier.fillMaxSize().background(Holo.bg.copy(alpha = 0.55f)).shapeClickable(RoundedCornerShape(0.dp), onClick = { bondOpen = false }),
                 contentAlignment = Alignment.Center,
             ) {
+                // Tocar dentro del panel no lo cierra (antes el toque caía en el velo y se cerraba solo).
                 AffinityPanel(
                     masha.affinityProgress,
                     masha.recentGains,
                     glow,
                     onClose = { bondOpen = false },
-                    modifier = Modifier.safeAreaPadding().padding(m.pad),
+                    modifier = Modifier
+                        .safeAreaPadding()
+                        .padding(m.pad)
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
                 )
             }
         }
@@ -652,42 +656,74 @@ private fun TopBar(
         vm.brain.canGoOnline() -> stringResource(R.string.masha_status_online)
         else -> stringResource(R.string.masha_status_offline)
     }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(start = pad, end = pad, top = if (landscape) 8.dp else 14.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        HoloIcon(stringResource(R.string.masha_back), glow, onClick = { vm.go(Screen.Library) }) { Box(Modifier.size(16.dp)) { BackChevron(color = Color.White) } }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            ElyText("LUCY", size = 17f, weight = FontWeight.Bold, color = Holo.text, letterSpacing = tracking(0.32f))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(6.dp).clip(CircleShape).background(glow))
-                Spacer(Modifier.width(6.dp))
-                ElyText(
-                    status,
-                    modifier = Modifier.weight(1f, fill = false),
-                    size = 9.5f,
-                    weight = FontWeight.Medium,
-                    color = Holo.dim,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    letterSpacing = tracking(0.06f),
-                )
-                Spacer(Modifier.width(10.dp))
-                AffinityHeart(masha.affinityLevel, masha.levelUps, glow, Holo.dim, onClick = onBond)
+    // La marca que señala la insignia: una sola vez (v4), unos segundos o hasta tocarla.
+    var coach by remember { mutableStateOf(!vm.settings.lucyTrustCoachShown) }
+    LaunchedEffect(Unit) {
+        if (!coach) return@LaunchedEffect
+        vm.settings.markLucyTrustCoachShown()
+        delay(COACH_MS)
+        coach = false
+    }
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(start = pad, end = pad, top = if (landscape) 8.dp else 14.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            HoloIcon(stringResource(R.string.masha_back), glow, onClick = { vm.go(Screen.Library) }) { Box(Modifier.size(16.dp)) { BackChevron(color = Color.White) } }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                ElyText("LUCY", size = 17f, weight = FontWeight.Bold, color = Holo.text, letterSpacing = tracking(0.32f))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(6.dp).clip(CircleShape).background(glow))
+                    Spacer(Modifier.width(6.dp))
+                    ElyText(
+                        status,
+                        modifier = Modifier.weight(1f, fill = false),
+                        size = 9.5f,
+                        weight = FontWeight.Medium,
+                        color = Holo.dim,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        letterSpacing = tracking(0.06f),
+                    )
+                }
+            }
+            HoloIcon(stringResource(if (chatOpen) R.string.masha_hide_chat else R.string.masha_show_chat), glow, onClick = onToggleChat) { ChatGlyph(chatOpen) }
+            Spacer(Modifier.width(8.dp))
+            HoloIcon(stringResource(R.string.masha_sound), glow, onClick = onSound) { SpeakerGlyph(vm.settings.mashaSoundscape) }
+            Spacer(Modifier.width(8.dp))
+            HoloIcon(stringResource(R.string.masha_recenter), glow, onClick = onRecenter) { RecenterGlyph() }
+            Spacer(Modifier.width(8.dp))
+            HoloIcon(stringResource(R.string.masha_new_chat), glow, onClick = onNewChat) { PlusGlyph() }
+        }
+        // La confianza, a la vista y pulsable: abre "Lucy y tú" (también L1).
+        Column(Modifier.padding(start = pad, end = pad, bottom = 4.dp)) {
+            TrustBadge(
+                masha.affinityProgress,
+                masha.levelUps,
+                glow,
+                Holo.dim,
+                onClick = {
+                    coach = false
+                    onBond()
+                },
+            )
+            AnimatedVisibility(coach, enter = fadeIn(), exit = fadeOut()) {
+                Column(Modifier.padding(top = 4.dp).shapeClickable(RoundedCornerShape(10.dp)) { coach = false }) {
+                    ElyText("▲", size = 9f, color = glow, modifier = Modifier.padding(start = 18.dp))
+                    Box(Modifier.holoPanel(RoundedCornerShape(10.dp), glow, alpha = 0.9f).padding(horizontal = 10.dp, vertical = 6.dp)) {
+                        ElyText(stringResource(R.string.lucy_trust_coach), size = 10.5f, weight = FontWeight.SemiBold, color = Holo.text)
+                    }
+                }
             }
         }
-        HoloIcon(stringResource(if (chatOpen) R.string.masha_hide_chat else R.string.masha_show_chat), glow, onClick = onToggleChat) { ChatGlyph(chatOpen) }
-        Spacer(Modifier.width(8.dp))
-        HoloIcon(stringResource(R.string.masha_sound), glow, onClick = onSound) { SpeakerGlyph(vm.settings.mashaSoundscape) }
-        Spacer(Modifier.width(8.dp))
-        HoloIcon(stringResource(R.string.masha_recenter), glow, onClick = onRecenter) { RecenterGlyph() }
-        Spacer(Modifier.width(8.dp))
-        HoloIcon(stringResource(R.string.masha_new_chat), glow, onClick = onNewChat) { PlusGlyph() }
     }
 }
+
+/** Lo que dura la marca de la insignia de confianza. */
+private const val COACH_MS = 7_000L
 
 /* ── conversación y dock ──────────────────────────────────────── */
 

@@ -1203,7 +1203,6 @@ Fait par la communauté, non vérifié. Consultez le dépôt avant d\'installer.
     <string name="lucy_level_friendly">Amicale</string>
     <string name="lucy_level_close">Proche</string>
     <string name="lucy_level_devoted">Inséparable</string>
-    <string name="lucy_level_cd">Votre lien avec Lucy : %1$s</string>
     <string name="lucy_welcome_back_game">Hé, te revoilà. T’as avancé dans %1$s ?</string>
     <string name="lucy_welcome_back">Hé, te revoilà. On reprend là où on s’était arrêtés ?</string>
     <string name="settings_lucy_forget_conversations">Oublier les conversations</string>
@@ -1231,6 +1230,10 @@ Fait par la communauté, non vérifié. Consultez le dépôt avant d\'installer.
     <string name="lucy_bond_title">Lucy et vous</string>
     <string name="lucy_bond_open">Ouvrir Lucy et vous</string>
     <string name="lucy_bond_points_to">%1$d points avant %2$s</string>
+    <string name="lucy_level_of">Niveau %1$d sur %2$d</string>
+    <string name="lucy_pts_to">%1$d pts avant %2$s</string>
+    <string name="lucy_trust_badge_cd">Ta confiance avec Lucy : %1$s, niveau %2$d sur %3$d. %4$s. Ouvre Lucy et toi.</string>
+    <string name="lucy_trust_coach">Voilà où en est notre confiance 💙</string>
     <string name="lucy_bond_max">Impossible d’être plus proches</string>
     <string name="lucy_bond_recent">Récemment</string>
     <string name="lucy_bond_none">Rien pour l’instant. Parlez-lui.</string>

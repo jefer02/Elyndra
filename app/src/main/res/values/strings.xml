@@ -1191,7 +1191,6 @@ Built by the community, not reviewed. Check the repository before installing.</s
     <string name="lucy_level_friendly">Friendly</string>
     <string name="lucy_level_close">Close</string>
     <string name="lucy_level_devoted">Devoted</string>
-    <string name="lucy_level_cd">Your bond with Lucy: %1$s</string>
     <string name="lucy_welcome_back_game">Hey, you’re back. Did you get anywhere with %1$s?</string>
     <string name="lucy_welcome_back">Hey, you’re back. Want to pick up where we left off?</string>
     <string name="settings_lucy_forget_conversations">Forget conversations</string>
@@ -1219,6 +1218,10 @@ Built by the community, not reviewed. Check the repository before installing.</s
     <string name="lucy_bond_title">You &amp; Lucy</string>
     <string name="lucy_bond_open">Open You &amp; Lucy</string>
     <string name="lucy_bond_points_to">%1$d points to %2$s</string>
+    <string name="lucy_level_of">Level %1$d of %2$d</string>
+    <string name="lucy_pts_to">%1$d pts to %2$s</string>
+    <string name="lucy_trust_badge_cd">Your trust with Lucy: %1$s, level %2$d of %3$d. %4$s. Opens You and Lucy.</string>
+    <string name="lucy_trust_coach">This is how our trust is going 💙</string>
     <string name="lucy_bond_max">As close as it gets</string>
     <string name="lucy_bond_recent">Recently</string>
     <string name="lucy_bond_none">Nothing yet. Talk to her.</string>

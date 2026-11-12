@@ -1153,7 +1153,6 @@
     <string name="lucy_level_friendly">打ち解けた</string>
     <string name="lucy_level_close">親密</string>
     <string name="lucy_level_devoted">夢中</string>
-    <string name="lucy_level_cd">ルーシーとの関係：%1$s</string>
     <string name="lucy_welcome_back_game">あ、おかえり。%1$sは進んだ？</string>
     <string name="lucy_welcome_back">おかえり。この前の続き、する？</string>
     <string name="settings_lucy_forget_conversations">会話を忘れる</string>
@@ -1181,6 +1180,10 @@
     <string name="lucy_bond_title">あなたとLucy</string>
     <string name="lucy_bond_open">「あなたとLucy」を開く</string>
     <string name="lucy_bond_points_to">「%2$s」まであと%1$dポイント</string>
+    <string name="lucy_level_of">レベル %1$d / %2$d</string>
+    <string name="lucy_pts_to">%2$sまであと%1$dpt</string>
+    <string name="lucy_trust_badge_cd">Lucyとの信頼：%1$s、レベル %2$d / %3$d。%4$s。「Lucyとあなた」を開きます。</string>
+    <string name="lucy_trust_coach">これが私たちの信頼度だよ 💙</string>
     <string name="lucy_bond_max">これ以上ないほど親密</string>
     <string name="lucy_bond_recent">最近</string>
     <string name="lucy_bond_none">まだ何もありません。話しかけてみて。</string>
