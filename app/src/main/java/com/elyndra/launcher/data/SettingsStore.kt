@@ -14,6 +14,21 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
 
     init {
         migrateGlass()
+        migrateLucyChat()
+    }
+
+    /**
+     * Una vez por instalación (v4): el chat de Lucy vuelve a oculto. En
+     * versiones anteriores quedó guardado a la vista (al tocar su botón o X
+     * en el mando) y la pantalla dejaba de ser de ella; desde aquí, lo que el
+     * usuario elija se respeta.
+     */
+    internal fun migrateLucyChat() {
+        if (prefs.getBoolean(LUCY_CHAT_RESET_KEY, false)) return
+        prefs.edit {
+            remove("lucy.chatVisible")
+            putBoolean(LUCY_CHAT_RESET_KEY, true)
+        }
     }
 
     /**
@@ -414,6 +429,11 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean("lucy.micLocked", false)
         set(v) = prefs.edit { putBoolean("lucy.micLocked", v) }
 
+    /** Las sugerencias rápidas bajo Lucy ("Tengo 30-40 minutos"…). Por defecto no: la pantalla es para ella. */
+    var lucySuggestions: Boolean
+        get() = prefs.getBoolean("lucy.suggestions", false)
+        set(v) = prefs.edit { putBoolean("lucy.suggestions", v) }
+
     /** Ya se pidió el permiso del micrófono al abrir su pantalla (no se vuelve a pedir solo). */
     var lucyMicAsked: Boolean
         get() = prefs.getBoolean("lucy.micAsked", false)
@@ -522,6 +542,9 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
 
     companion object {
         private const val VOICE_OFFSET = "voice.offset."
+
+        /** El chat de Lucy ya se devolvió a oculto una vez (ver [migrateLucyChat]). */
+        const val LUCY_CHAT_RESET_KEY = "lucy.v4.chatReset"
 
         /** La versión de los ajustes del cristal de Meridian (ver [migrateGlass]). */
         const val GLASS_VERSION_KEY = "glass.version"

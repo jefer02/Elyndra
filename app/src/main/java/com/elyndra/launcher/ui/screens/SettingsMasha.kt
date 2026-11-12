@@ -295,6 +295,13 @@ private fun VoiceGroup(vm: ElyndraViewModel) {
                 checked = s.lucySubtitles,
                 onToggle = s::toggleLucySubtitles,
             )
+            Spacer(Modifier.height(10.dp))
+            ToggleRow(
+                title = stringResource(R.string.settings_lucy_suggestions),
+                desc = stringResource(R.string.settings_lucy_suggestions_desc),
+                checked = s.lucySuggestions,
+                onToggle = s::toggleLucySuggestions,
+            )
         }
     }
 }

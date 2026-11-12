@@ -25,7 +25,7 @@ class ReplyShapeTest {
     @Test
     fun withoutCardsTheTextIsUntouched() {
         assertEquals(wall, ReplyShape.display(wall, null))
-        assertEquals(wall, ReplyShape.display(wall, MashaAttachment.Done("▶ Okami")))
+        assertEquals(wall, ReplyShape.display(wall, null, done = emptyList()))
     }
 
     @Test
@@ -56,5 +56,19 @@ class ReplyShapeTest {
     @Test
     fun aShortReplyIsKeptWhole() {
         assertEquals("Here you go!", ReplyShape.display("Here you go!", cards))
+    }
+
+    @Test
+    fun everyReplyWithACardOrConfirmationIsShortWhateverToolMadeIt() {
+        val port = MashaAttachment.Ports(null, listOf("gow3"))
+        val confirm = MashaAttachment.Confirm("1", ConfirmKind.ADD_GAMES, listOf("Okami", "Ico"))
+        val done = MashaAttachment.Done("◈ God of War III")
+        listOf(port, confirm, done).forEach { a ->
+            assertTrue(ReplyShape.isCardReply(a))
+            assertEquals("Okay, I've got two for you. The first one is perfect for tonight.", ReplyShape.finalText(wall, a))
+        }
+        // Algo hecho en el turno sin adjunto (las fichas de "hecho") también cuenta.
+        assertTrue(ReplyShape.isCardReply(null, listOf("▶ Okami")))
+        assertEquals(wall, ReplyShape.finalText(wall, null))
     }
 }

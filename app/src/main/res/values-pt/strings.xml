@@ -1259,6 +1259,9 @@ Feito pela comunidade, sem revisão. Confira o repositório antes de instalar.</
     <string name="settings_lucy_bond">Seu vínculo com a Lucy</string>
     <string name="settings_lucy_subtitles">Legendas</string>
     <string name="settings_lucy_subtitles_desc">Com o chat oculto, mostra numa linha o que a Lucy diz enquanto fala.</string>
+    <string name="settings_lucy_suggestions">Mostrar sugestões</string>
+    <string name="settings_lucy_suggestions_desc">Ideias rápidas por baixo da Lucy, como «Tenho 30-40 minutos».</string>
+    <string name="lucy_tile_hint">Toca para abrir; mantém para ver o que é</string>
     <string name="hint_chat">Chat</string>
     <string name="lucy_keyboard">Escrever uma mensagem</string>
     <string name="lucy_pick_hours">%1$d h jogadas</string>

@@ -235,7 +235,8 @@ class MashaActions(
                         put("port_id", p.id)
                         put("game", PortDisplay.title(p))
                         put("original_platform", p.platform)
-                        put("port", p.name)
+                        // El nombre del port solo si es presentable (nunca un slug ni un archivo).
+                        PortDisplay.portName(p)?.let { put("port", it) }
                         p.developer?.let { put("developer", it) }
                         put("kind", p.kind)
                         put("ports_available", g.ports.size)
@@ -262,7 +263,7 @@ class MashaActions(
         val ports = portsReady()
         val port = portFor(ports, a) ?: return toolFail("that port is not in the Ports store")
         onMain { ports.openPort(port.id) }
-        return toolOk("opened the store page of ${port.name}", MashaAttachment.Done("◈ ${PortDisplay.title(port)}"), mutating = true)
+        return toolOk("opened the store page of ${PortDisplay.title(port)}", MashaAttachment.Done("◈ ${PortDisplay.title(port)}"), mutating = true)
     }
 
     /**
@@ -273,9 +274,9 @@ class MashaActions(
     private suspend fun installPort(a: JsonObject): ToolResult {
         val ports = portsReady()
         val port = portFor(ports, a) ?: return toolFail("that port is not in the Ports store")
-        if (!port.installable) return toolFail("${port.name} can't be installed on this device")
+        if (!port.installable) return toolFail("${PortDisplay.title(port)} can't be installed on this device")
         val updates = onMain { ports.updateIds() }
-        if (port.id in ports.installed && port.id !in updates) return toolFail("${port.name} is already installed and up to date")
+        if (port.id in ports.installed && port.id !in updates) return toolFail("${PortDisplay.title(port)} is already installed and up to date")
         val title = PortDisplay.title(port)
         val w = writes.propose(ConfirmKind.INSTALL_PORT, listOf(title, PortRecommend.requiredGame(port).orEmpty())) {
             withContext(Dispatchers.Main) {

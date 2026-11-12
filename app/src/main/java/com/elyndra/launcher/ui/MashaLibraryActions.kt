@@ -134,7 +134,7 @@ class MashaLibraryActions(private val vm: ElyndraViewModel, private val writes: 
             "waiting for the user's confirmation in the chat card (${batch.size} games" +
                 (if (skipped.isNotEmpty()) ", ${skipped.size} over the limit of ${MashaWriteRules.BATCH_CAP} skipped" else "") +
                 (if (notFound.isNotEmpty()) "; not found: ${notFound.joinToString()}" else "") + ")",
-            MashaAttachment.Confirm(w.id, w.kind, names, skipped = skipped.size),
+            MashaAttachment.Confirm(w.id, w.kind, names, skipped = skipped.size, packages = batch.map { (it as? AddItem.App)?.pkg.orEmpty() }),
             mutating = true,
         )
     }

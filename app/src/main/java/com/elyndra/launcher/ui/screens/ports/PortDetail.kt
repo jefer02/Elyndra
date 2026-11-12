@@ -460,7 +460,7 @@ private fun Description(state: PortDetailState, lang: String, modifier: Modifier
     val text = state.port.longText(lang)
     if (text.isBlank()) return
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        StoreSectionTitle(stringResource(R.string.ports_about) + " · " + state.port.name)
+        StoreSectionTitle(listOfNotNull(stringResource(R.string.ports_about), PortDisplay.portName(state.port)).joinToString(" · "))
         ElyText(text, size = 12.5f, weight = FontWeight.Light, color = Store.text.copy(alpha = 0.88f), lineHeightRatio = 1.5f)
         ElyText(
             stringResource(kindLabel(state.port.kind)) + " · " + (state.repo?.license ?: state.port.license ?: stringResource(R.string.ports_license_unknown)),

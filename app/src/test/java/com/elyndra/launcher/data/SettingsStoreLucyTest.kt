@@ -28,4 +28,24 @@ class SettingsStoreLucyTest {
         assertFalse(again.lucySubtitles)
         assertFalse(again.lucyVoiceInterrupt)
     }
+
+    @Test
+    fun `v4 hides the chat once for existing installs, then respects the choice`() {
+        val prefs = MemoryPrefs()
+        // Instalación de antes de v4 con el chat guardado a la vista.
+        prefs.edit().putBoolean("lucy.chatVisible", true).apply()
+        val store = SettingsStore(prefs)
+        assertFalse(store.lucyChatVisible)
+        assertTrue(prefs.getBoolean(SettingsStore.LUCY_CHAT_RESET_KEY, false))
+        store.lucyChatVisible = true
+        assertTrue(SettingsStore(prefs).lucyChatVisible)
+    }
+
+    @Test
+    fun `suggestions are hidden and the mic is unlocked by default`() {
+        val store = SettingsStore(MemoryPrefs())
+        assertFalse(store.lucySuggestions)
+        assertFalse(store.lucyMicLocked)
+        assertFalse(store.lucyMicAsked)
+    }
 }

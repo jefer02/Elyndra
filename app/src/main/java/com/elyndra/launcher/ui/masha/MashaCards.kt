@@ -94,7 +94,7 @@ internal fun HoloMessage(vm: ElyndraViewModel, msg: ChatMessage, glow: Color, la
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                     // Con tarjetas, solo la frase corta que dice: los detalles van en ellas.
-                    val text = ReplyShape.display(msg.text, msg.attachment)
+                    val text = ReplyShape.display(msg.text, msg.attachment, msg.done)
                     if (text.isNotEmpty()) {
                         ElyText(text + if (msg.pending) " ▍" else "", size = 12f, color = Holo.text, lineHeightRatio = 1.55f)
                     }
@@ -139,36 +139,6 @@ internal fun HoloMessage(vm: ElyndraViewModel, msg: ChatMessage, glow: Color, la
                     ElyText(msg.text, size = 12f, color = Color.White, lineHeightRatio = 1.45f)
                 }
             }
-        }
-    }
-}
-
-/**
- * Solo las tarjetas de un mensaje de Lucy (juegos, plan, ports, confirmación,
- * lo que hizo), sin la burbuja de texto: lo que se ve con el chat oculto.
- * Sin nada que enseñar, no pinta nada.
- */
-@Composable
-internal fun HoloCards(vm: ElyndraViewModel, msg: ChatMessage, glow: Color, modifier: Modifier = Modifier) {
-    val attachment = msg.attachment?.takeIf { it !is MashaAttachment.Done }
-    if (attachment == null && msg.done.isEmpty()) return
-    Column(
-        modifier
-            .fillMaxWidth()
-            .animMsgIn(delayMs = if (msg.restored) 0 else 60, key = "cards-${msg.id}")
-            .holoPanel(RoundedCornerShape(16.dp), glow)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(9.dp),
-    ) {
-        if (msg.done.isNotEmpty()) DoneChips(msg.done, glow)
-        when (attachment) {
-            is MashaAttachment.Games -> GamesStrip(vm, attachment)
-            is MashaAttachment.Plan -> PlanCard(vm, attachment, glow)
-            is MashaAttachment.ArcCard -> ArcStrip(vm, attachment)
-            is MashaAttachment.Confirm -> ConfirmCard(vm, attachment, glow)
-            is MashaAttachment.Ports -> PortsStrip(vm, attachment)
-            is MashaAttachment.Picks -> PicksCard(vm, attachment, glow)
-            is MashaAttachment.Done, null -> Unit
         }
     }
 }
@@ -225,7 +195,9 @@ private fun PortsStrip(vm: ElyndraViewModel, a: MashaAttachment.Ports) {
                     .padding(horizontal = 10.dp, vertical = 8.dp),
             ) {
                 ElyText(PortDisplay.title(port), size = 10.5f, weight = FontWeight.SemiBold, color = Holo.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                ElyText(PortDisplay.platformBadge(port.platform) + " · " + port.name, size = 9f, color = Holo.dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // Nunca un id, un paquete o un archivo: sin nombre presentable, solo la plataforma.
+                val line = listOfNotNull(PortDisplay.platformBadge(port.platform), PortDisplay.portName(port)).joinToString(" · ")
+                ElyText(line, size = 9f, color = Holo.dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }

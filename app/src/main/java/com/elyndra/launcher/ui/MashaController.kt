@@ -3,6 +3,7 @@ package com.elyndra.launcher.ui
 import com.elyndra.launcher.masha.ConfirmState
 import com.elyndra.launcher.masha.MashaWriteRules
 import com.elyndra.launcher.masha.MashaWrites
+import com.elyndra.launcher.masha.ReplyShape
 import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -460,15 +461,17 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                     render(final = false)
                 }
                 is MashaEvent.Completed -> {
+                    // Con tarjeta, confirmación o algo hecho: como mucho dos frases, la herramienta que sea (v4).
+                    val shown = ReplyShape.finalText(event.text, attachment, done)
                     buffer.setLength(0)
-                    buffer.append(event.text)
+                    buffer.append(shown)
                     render(final = true)
                     mood = MashaMood.read(event.text, tools, failed = false)
                     // De caché no hay puntuación de la IA (era la de otro mensaje): la pone la regla local.
                     score(text, previous, if (event.fromCache) null else event.affinityDelta)
                     val game = if (attachment == null) findMentionedGame(event.text) else null
                     if (game != null && index in messages.indices) messages[index] = messages[index].copy(game = game)
-                    persist(StoredMessage(MashaTurn.Role.Masha, event.text, game?.key, attachment, System.currentTimeMillis()))
+                    persist(StoredMessage(MashaTurn.Role.Masha, shown, game?.key, attachment, System.currentTimeMillis()))
                     if (index in messages.indices) savedReplyId = messages[index].id
                 }
                 is MashaEvent.Failed -> {
@@ -609,7 +612,8 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
         val prefix = failure?.let { ctx.getString(failureLine(it)) + "\n\n" }.orEmpty()
         // Si nombra a otra chica, otro asistente u otro launcher, un puchero según el nivel; lo pedido se hace igual.
         val jealous = jealousLine(text)?.let { ctx.getString(it) + " " }.orEmpty()
-        val full = prefix + jealous + reply
+        // Con tarjeta, solo la frase corta (las tarjetas cuentan el resto).
+        val full = ReplyShape.finalText(prefix + jealous + reply, attachment)
         // Sin IA no hay herramientas que mirar: una tarjeta de datos cuenta como análisis.
         mood = MashaMood.read(reply, if (attachment != null) listOf(MashaTools.GET_STATS) else emptyList(), failed = failure != null)
         score(text, previous, modelDelta = null)

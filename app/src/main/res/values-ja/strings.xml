@@ -1209,6 +1209,9 @@
     <string name="settings_lucy_bond">Lucyとの関係</string>
     <string name="settings_lucy_subtitles">字幕</string>
     <string name="settings_lucy_subtitles_desc">チャットを隠しているとき、Lucyが話している内容を1行で表示します。</string>
+    <string name="settings_lucy_suggestions">おすすめの話題を表示</string>
+    <string name="settings_lucy_suggestions_desc">Lucyの下に「30〜40分ある」などの話題を表示します。</string>
+    <string name="lucy_tile_hint">タップで開く・長押しで内容を表示</string>
     <string name="hint_chat">チャット</string>
     <string name="lucy_keyboard">メッセージを入力</string>
     <string name="lucy_pick_hours">%1$d時間プレイ</string>

@@ -1,5 +1,6 @@
 package com.elyndra.launcher.ui.screens
 
+import com.elyndra.launcher.domain.ports.PortDisplay
 import android.text.format.Formatter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -247,7 +248,7 @@ private fun DetailsContent(
         // Un port instalado desde la tienda lo dice (es la "etiqueta" de port de la biblioteca).
         if (app != null && vm.portInstall.isPortKey(key)) {
             val port = vm.portInstall.portForKey(key)
-            add(if (port != null) stringResource(R.string.ports_port_badge_named, port.name) else stringResource(R.string.ports_port_badge))
+            add(port?.let { PortDisplay.portName(it) }?.let { stringResource(R.string.ports_port_badge_named, it) } ?: stringResource(R.string.ports_port_badge))
         }
         add(if (stats.minutes > 0) stringResource(R.string.played_time, fmtMinutes(stats.minutes)) else stringResource(R.string.never_played))
     }

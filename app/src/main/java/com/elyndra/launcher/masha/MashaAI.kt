@@ -228,6 +228,8 @@ sealed interface MashaAttachment {
         val items: List<String>,
         /** Lo que no entró en el lote (se cuenta, no se lista). */
         val skipped: Int = 0,
+        /** El paquete de cada item que es una app instalada ("" si es una ROM): su icono en la cuadrícula. */
+        val packages: List<String> = emptyList(),
         val state: String = ConfirmState.PENDING,
     ) : MashaAttachment
 }

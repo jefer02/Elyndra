@@ -34,7 +34,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.layout.heightIn
-import com.elyndra.launcher.ui.masha.HoloCards
+import com.elyndra.launcher.ui.masha.HoloTiles
 import com.elyndra.launcher.ui.masha.SubtitleLine
 import com.elyndra.launcher.ui.masha.captionMs
 import com.elyndra.launcher.ui.masha.AffinityPanel
@@ -431,7 +431,7 @@ fun MashaScreen(vm: ElyndraViewModel) {
     // Con tarjetas solo dice la frase corta (ReplyShape): los detalles se ven en ellas.
     LaunchedEffect(last?.id, last?.text?.length, last?.pending, last?.attachment, speakReplies) {
         if (last == null || !last.fromMasha || last.restored || last.id == alreadyShown || !speakReplies) return@LaunchedEffect
-        val spoken = if (ReplyShape.hasCards(last.attachment)) ReplyShape.spokenLine(last.text, ellipsis = false) else last.text
+        val spoken = if (ReplyShape.isCardReply(last.attachment, last.done)) ReplyShape.spokenLine(last.text, ellipsis = false) else last.text
         voice.feed(last.id, spoken, final = !last.pending)
     }
     // Lo que se lee con el chat oculto: la frase que suena (subtítulo) o, sin voz, la respuesta un rato.
@@ -439,7 +439,7 @@ fun MashaScreen(vm: ElyndraViewModel) {
     LaunchedEffect(last?.id, last?.pending, speakReplies) {
         caption = null
         if (speakReplies || last == null || !last.fromMasha || last.pending || last.restored || last.id == alreadyShown) return@LaunchedEffect
-        val text = ReplyShape.display(last.text, last.attachment).trim().takeIf { it.isNotEmpty() } ?: return@LaunchedEffect
+        val text = ReplyShape.display(last.text, last.attachment, last.done).trim().takeIf { it.isNotEmpty() } ?: return@LaunchedEffect
         caption = text
         delay(captionMs(text))
         caption = null
@@ -739,22 +739,24 @@ private fun ColumnScope.Conversation(
             }
         }
     } else {
-        // Chat oculto: su subtítulo y, si la última respuesta trae tarjetas, solo las tarjetas.
+        // Chat oculto: su subtítulo y, si la última respuesta trae algo que enseñar, solo las imágenes (sin texto).
         SubtitleLine(subtitle, maxLines = if (presence.speaking) 1 else 3)
         val cards = masha.messages.lastOrNull()?.takeIf { it.fromMasha && !it.greeting }
         if (cards != null) {
             Box(Modifier.fillMaxWidth().heightIn(max = if (landscape) 220.dp else 300.dp).padding(top = 8.dp)) {
-                Box(Modifier.verticalScroll(rememberScrollState())) { HoloCards(vm, cards, glow) }
+                Box(Modifier.verticalScroll(rememberScrollState())) { HoloTiles(vm, cards, glow) }
             }
         }
         if (masha.busy && masha.working != null) {
             Spacer(Modifier.height(8.dp))
-            HoloWorking(masha.working?.resolve(), glow)
+            // Sin texto: solo los puntos de "está en ello".
+            HoloWorking(null, glow)
         }
     }
     Spacer(Modifier.height(8.dp))
+    // Las sugerencias rápidas, solo si se piden en Ajustes → Lucy (por defecto no).
     Box(Modifier.onGloballyPositioned { area.chipsTop = it.boundsInRoot().top }) {
-        Suggestions(vm, glow) { masha.sendSuggestion(it, lang) }
+        if (vm.settings.lucySuggestions) Suggestions(vm, glow) { masha.sendSuggestion(it, lang) }
     }
     Spacer(Modifier.height(8.dp))
     Dock(vm, presence, glow, mic, compact = !open && !typing, typing = typing, onTyping = onTyping)

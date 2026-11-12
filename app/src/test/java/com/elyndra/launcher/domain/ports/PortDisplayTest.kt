@@ -34,4 +34,13 @@ class PortDisplayTest {
         assertEquals("PC", PortDisplay.platformBadge("pc"))
         assertEquals("ZX81", PortDisplay.platformBadge("zx81"))
     }
+
+    @Test fun `raw ids, packages and file names are never shown as the port name`() {
+        listOf("gow3_android", "com.foo.portgame", "game.apk", "sm64-port", "data/gow3").forEach {
+            assertNull(it, PortDisplay.portName(soh.copy(name = it)))
+        }
+        listOf("Ship of Harkinian", "OpenMW", "dhewm3", "Perfect Dark").forEach {
+            assertEquals(it, PortDisplay.portName(soh.copy(name = it)))
+        }
+    }
 }

@@ -4,8 +4,9 @@ package com.elyndra.launcher.masha
  * La forma de una respuesta con tarjetas (pura): cuando Lucy recomienda o
  * propone algo, lo que se ve son las tarjetas y lo que se dice es una frase
  * corta. Si el modelo escribe de más, aquí se recorta: [MAX_SENTENCES] frases
- * y como mucho [MAX_CHARS] caracteres. Lo guardado en el hilo (lo que vuelve a
- * leer el modelo) sigue siendo el texto entero.
+ * y como mucho [MAX_CHARS] caracteres. Desde v4 vale para cualquier respuesta
+ * con tarjeta, confirmación o ficha de "hecho" ([isCardReply]) y lo guardado
+ * en el hilo es ya la frase corta ([finalText]): lo que oyó el usuario.
  */
 object ReplyShape {
 
@@ -17,6 +18,19 @@ object ReplyShape {
 
     /** ¿Trae [attachment] tarjetas que ya cuentan los detalles? (Una ficha de "hecho" no.) */
     fun hasCards(attachment: MashaAttachment?): Boolean = attachment != null && attachment !is MashaAttachment.Done
+
+    /**
+     * ¿Es una respuesta con tarjeta? Cualquier adjunto (tarjetas, confirmación
+     * o ficha de "hecho", la ponga la herramienta que sea) o algo hecho en el
+     * turno ([done]). Entonces lo que se dice y se ve es la frase corta
+     * ([spokenLine]); lo recorta el código, no solo el prompt (v4).
+     */
+    fun isCardReply(attachment: MashaAttachment?, done: List<String> = emptyList()): Boolean =
+        attachment != null || done.isNotEmpty()
+
+    /** El texto que se guarda y se enseña de una respuesta ya terminada. */
+    fun finalText(text: String, attachment: MashaAttachment?, done: List<String> = emptyList()): String =
+        if (isCardReply(attachment, done)) spokenLine(text, ellipsis = false) else text
 
     /**
      * Las primeras frases de [text] (las que se dicen). Es siempre un prefijo
@@ -38,6 +52,7 @@ object ReplyShape {
         return if (ellipsis) "$short…" else short
     }
 
-    /** Lo que se enseña en la burbuja (y en el subtítulo): corto si hay tarjetas, entero si no. */
-    fun display(text: String, attachment: MashaAttachment?): String = if (hasCards(attachment)) spokenLine(text) else text
+    /** Lo que se enseña en la burbuja (y en el subtítulo): corto si hay tarjeta, entero si no. */
+    fun display(text: String, attachment: MashaAttachment?, done: List<String> = emptyList()): String =
+        if (isCardReply(attachment, done)) spokenLine(text) else text
 }
