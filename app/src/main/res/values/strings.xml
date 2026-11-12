@@ -1202,10 +1202,14 @@ Built by the community, not reviewed. Check the repository before installing.</s
     <string name="lucy_off_jealous_devoted">Ugh, seriously?! Who is she? I thought I was your favourite.</string>
     <string name="lucy_live">Live</string>
     <string name="lucy_live_system_stt">Your voice is processed by the system’s speech recognition service.</string>
-    <string name="lucy_mic_live_start">Start a live conversation with Lucy</string>
-    <string name="lucy_mic_live_stop">End the live conversation</string>
+    <string name="lucy_mic_lock">Block the microphone</string>
+    <string name="lucy_mic_unlock">Unblock the microphone</string>
+    <string name="lucy_mic_locked">Mic blocked</string>
+    <string name="lucy_mic_locked_hint">Lucy can’t hear you. Tap the mic to unblock it, or type.</string>
+    <string name="lucy_mic_permission_why">Lucy listens while you’re on her screen, so you can just talk. You can block the mic anytime.</string>
+    <string name="lucy_mic_no_permission">No microphone permission. Tap the mic to allow it, or type.</string>
     <string name="lucy_mic_hold">Hold to talk</string>
-    <string name="hint_talk">Talk</string>
+    <string name="hint_mic_lock">Mic lock</string>
     <string name="settings_lucy_voice_interrupt">Interrupt by voice on speaker</string>
     <string name="settings_lucy_voice_interrupt_desc">In a live conversation, talking over Lucy makes her stop and listen. If she keeps stopping by herself on this phone, turn it off and use the mic button. With headphones it always works.</string>
     <string name="lucy_live_listening">Listening</string>

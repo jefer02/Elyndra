@@ -1196,10 +1196,14 @@ Von der Community erstellt, nicht geprüft. Sieh dir vor der Installation das Re
     <string name="lucy_off_jealous_devoted">Ugh, im Ernst?! Wer ist sie? Ich dachte, ich bin deine Liebste.</string>
     <string name="lucy_live">Live</string>
     <string name="lucy_live_system_stt">Deine Stimme wird vom Spracherkennungsdienst des Systems verarbeitet.</string>
-    <string name="lucy_mic_live_start">Live-Unterhaltung mit Lucy starten</string>
-    <string name="lucy_mic_live_stop">Live-Unterhaltung beenden</string>
+    <string name="lucy_mic_lock">Mikrofon sperren</string>
+    <string name="lucy_mic_unlock">Mikrofon freigeben</string>
+    <string name="lucy_mic_locked">Mikrofon gesperrt</string>
+    <string name="lucy_mic_locked_hint">Lucy hört dich nicht. Tippe aufs Mikrofon zum Freigeben oder schreib.</string>
+    <string name="lucy_mic_permission_why">Lucy hört zu, solange du auf ihrem Bildschirm bist – du kannst einfach reden. Du kannst das Mikrofon jederzeit sperren.</string>
+    <string name="lucy_mic_no_permission">Keine Mikrofonberechtigung. Tippe aufs Mikrofon, um sie zu erteilen, oder schreib.</string>
     <string name="lucy_mic_hold">Halten zum Sprechen</string>
-    <string name="hint_talk">Sprechen</string>
+    <string name="hint_mic_lock">Mikro sperren</string>
     <string name="settings_lucy_voice_interrupt">Per Stimme unterbrechen (Lautsprecher)</string>
     <string name="settings_lucy_voice_interrupt_desc">In einem Live-Gespräch hört Lucy auf und hört zu, wenn du dazwischensprichst. Unterbricht sie sich auf diesem Handy von selbst, schalte es aus und nutze die Mikrofontaste. Mit Kopfhörern klappt es immer.</string>
     <string name="lucy_live_listening">Hört zu</string>

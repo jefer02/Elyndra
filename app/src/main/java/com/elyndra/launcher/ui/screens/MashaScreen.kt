@@ -16,6 +16,7 @@ import com.elyndra.launcher.ui.masha.lipsync.RouteKind
 import com.elyndra.launcher.ui.masha.live.LiveMic
 import com.elyndra.launcher.ui.masha.live.LiveTurns
 import com.elyndra.launcher.ui.masha.live.LiveVoice
+import com.elyndra.launcher.ui.masha.live.MicLock
 import com.elyndra.launcher.ui.theme.focusRing
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -278,21 +279,40 @@ fun MashaScreen(vm: ElyndraViewModel) {
         ).also { liveRef[0] = it }
     }
     DisposableEffect(live) { onDispose { live.release() } }
-    // La app al fondo o la pantalla apagada (ON_STOP): se suelta el micrófono (en vivo o al pulsar).
+
+    // ── siempre en vivo, con candado (MicLock) ──
+    fun granted() = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+    var hasMic by remember { mutableStateOf(granted()) }
+    val micState = MicLock.state(settings.lucyMicLocked, hasMic, settings.lucyMicAsked)
+    // Mientras se pide el permiso la primera vez: la línea que explica por qué.
+    var askingMic by remember { mutableStateOf(false) }
+    // La app al fondo o la pantalla apagada (ON_STOP): se suelta el micrófono; al volver (ON_START), sigue en vivo.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var foreground by remember { mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) }
     DisposableEffect(lifecycle, live) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) {
-                live.background()
-                ears.stop()
-                pushToTalk = false
+            when (event) {
+                Lifecycle.Event.ON_START -> {
+                    // El permiso se pudo dar (o quitar) en los ajustes del sistema.
+                    hasMic = granted()
+                    foreground = true
+                }
+                Lifecycle.Event.ON_STOP -> {
+                    foreground = false
+                    live.background()
+                    ears.stop()
+                    pushToTalk = false
+                }
+                else -> Unit
             }
         }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
     }
+    LaunchedEffect(micState, foreground, live) {
+        if (foreground && MicLock.shouldListen(micState)) live.start()
+    }
 
-    // El micrófono solo se pide la primera vez que se toca; denegado, el chat sigue por escrito.
     var pendingMic by remember { mutableStateOf<MicAction?>(null) }
     fun runMic(action: MicAction) {
         when (action) {
@@ -304,22 +324,43 @@ fun MashaScreen(vm: ElyndraViewModel) {
             }
         }
     }
-    val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+    val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
         val action = pendingMic
         pendingMic = null
-        if (granted && action != null) runMic(action) else if (!granted) vm.showToast(UiText.res(R.string.masha_mic_denied))
+        askingMic = false
+        hasMic = ok
+        // Concedido, en vivo lo arranca el efecto de arriba; denegado, la pista lo dice (sin aviso).
+        if (ok && action == MicAction.Talk) runMic(action)
+    }
+    // La primera vez que se abre su pantalla: se pide el permiso, con una línea que explica por qué. Nunca más solo.
+    LaunchedEffect(Unit) {
+        if (micState == MicLock.State.AskPermission) {
+            settings.markLucyMicAsked()
+            askingMic = true
+            micPermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
     }
     fun withMic(action: MicAction) {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+        if (granted()) {
             runMic(action)
         } else {
             pendingMic = action
             micPermission.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
-    /** Tocar: la conversación en vivo, encendida o apagada. */
-    fun tapMic() = if (live.active) live.lock() else withMic(MicAction.Live)
-    /** Mantener: en vivo interrumpe a Lucy y escucha ya; si no, una frase. */
+    /** Tocar (o Y): el candado del micrófono; sin permiso, se pide. */
+    fun tapMic() {
+        when (MicLock.tap(micState)) {
+            MicLock.Tap.Lock -> {
+                settings.updateLucyMicLocked(true)
+                live.lock()
+            }
+            // Desbloqueado, el efecto de arriba vuelve a ponerla en vivo.
+            MicLock.Tap.Unlock -> settings.updateLucyMicLocked(false)
+            MicLock.Tap.RequestPermission -> withMic(MicAction.Live)
+        }
+    }
+    /** Mantener: en vivo interrumpe a Lucy y escucha ya; bloqueado, una frase (lo pide el usuario a propósito). */
     fun holdMic() = if (live.active) live.bargeIn() else withMic(MicAction.Talk)
     /** Soltar: se cierra la frase (lo dicho se manda solo). */
     fun releaseMic() {
@@ -327,13 +368,15 @@ fun MashaScreen(vm: ElyndraViewModel) {
     }
     val mic = MicActions(
         live = live.active,
+        lock = micState,
+        asking = askingMic,
         liveState = live.state,
         systemStt = ears.processedBySystem && (live.active || presence.listening),
         onTap = ::tapMic,
         onHoldStart = ::holdMic,
         onHoldEnd = ::releaseMic,
     )
-    // Y en el mando: tocar = en vivo; mantener = hablar (ver InputController.mashaMic).
+    // Y en el mando: tocar = candado; mantener = hablar o cortarla (ver InputController.mashaMic).
     val holdOrTap = remember { HoldOrTap() }
     val tapMicNow by rememberUpdatedState(::tapMic)
     val holdMicNow by rememberUpdatedState(::holdMic)
@@ -383,8 +426,8 @@ fun MashaScreen(vm: ElyndraViewModel) {
     }
     // Una pregunta nueva corta lo que estuviera diciendo.
     LaunchedEffect(masha.busy) { if (masha.busy) voice.stop() }
-    // Habla mientras llega el texto: frase a frase. En vivo habla siempre (aunque la voz esté apagada).
-    val speakReplies = settings.mashaVoice || live.active
+    // Habla mientras llega el texto: frase a frase. En vivo habla siempre (aunque la voz esté apagada), y con el micrófono bloqueado también.
+    val speakReplies = settings.mashaVoice || live.active || micState != MicLock.State.Live
     // Con tarjetas solo dice la frase corta (ReplyShape): los detalles se ven en ellas.
     LaunchedEffect(last?.id, last?.text?.length, last?.pending, last?.attachment, speakReplies) {
         if (last == null || !last.fromMasha || last.restored || last.id == alreadyShown || !speakReplies) return@LaunchedEffect
@@ -906,6 +949,10 @@ private enum class MicAction { Live, Talk }
 private class MicActions(
     /** La conversación en vivo está encendida. */
     val live: Boolean,
+    /** El candado: en vivo, bloqueado por el usuario o sin permiso. */
+    val lock: MicLock.State,
+    /** Se está pidiendo el permiso por primera vez (se explica por qué). */
+    val asking: Boolean,
     /** De quién es el turno en vivo (para el indicador "escuchando"). */
     val liveState: LiveTurns.State,
     /** Se está oyendo con el servicio del sistema (el audio puede salir del móvil): se avisa. */
@@ -916,15 +963,17 @@ private class MicActions(
 )
 
 /**
- * Micrófono: tocar enciende o apaga la conversación en vivo; mantener es
- * pulsar para hablar (al soltar se manda). El aro sigue la voz; en vivo, un
- * segundo aro lo marca.
+ * Micrófono: es el candado. Tocar lo bloquea (se suelta el micrófono y el
+ * punto verde del sistema se va) o lo desbloquea; mantener es cortarla en vivo
+ * o, bloqueado, pulsar para hablar (al soltar se manda). En vivo, un aro lo
+ * marca y sigue la voz; bloqueado, el micrófono tachado y apagado.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MicButton(presence: MashaPresence, glow: Color, mic: MicActions) {
     val listening = presence.listening
-    val label = stringResource(if (mic.live) R.string.lucy_mic_live_stop else R.string.lucy_mic_live_start)
+    val locked = mic.lock != MicLock.State.Live
+    val label = stringResource(if (locked) R.string.lucy_mic_unlock else R.string.lucy_mic_lock)
     val holdLabel = stringResource(R.string.lucy_mic_hold)
     val interaction = remember { MutableInteractionSource() }
     var held by remember { mutableStateOf(false) }
@@ -947,8 +996,14 @@ private fun MicButton(presence: MashaPresence, glow: Color, mic: MicActions) {
             }
             .padding(4.dp)
             .clip(CircleShape)
-            .background(if (listening || mic.live) glow.copy(alpha = 0.3f) else Holo.panel.copy(alpha = 0.75f))
-            .border(1.5.dp, glow.copy(alpha = if (listening || mic.live) 1f else 0.5f), CircleShape)
+            .background(
+                when {
+                    locked -> LOCKED_RED.copy(alpha = 0.16f)
+                    listening || mic.live -> glow.copy(alpha = 0.3f)
+                    else -> Holo.panel.copy(alpha = 0.75f)
+                },
+            )
+            .border(1.5.dp, if (locked) LOCKED_RED.copy(alpha = 0.75f) else glow.copy(alpha = if (listening || mic.live) 1f else 0.5f), CircleShape)
             .drawBehind {
                 if (listening) {
                     val r = size.minDimension / 2 * (0.7f + 0.3f * presence.micLevel)
@@ -968,15 +1023,41 @@ private fun MicButton(presence: MashaPresence, glow: Color, mic: MicActions) {
             ),
         contentAlignment = Alignment.Center,
     ) {
-        MicGlyph()
+        MicGlyph(locked)
     }
 }
 
-/** Bajo el dock, en vivo: la marca "EN VIVO" y, si el audio lo procesa el sistema, el aviso. */
+/** El rojo apagado del micrófono bloqueado (se distingue del azul del holograma sin gritar). */
+private val LOCKED_RED = Color(0xFFFF6B7A)
+
+/**
+ * Bajo el dock: en vivo, la marca "EN VIVO" y, si el audio lo procesa el
+ * sistema, el aviso; bloqueado, "Micrófono bloqueado" con su pista; la primera
+ * vez, por qué se pide el permiso.
+ */
 @Composable
 private fun LiveStrip(mic: MicActions, glow: Color) {
-    AnimatedVisibility(mic.live || mic.systemStt, enter = fadeIn(), exit = fadeOut()) {
+    val locked = mic.lock == MicLock.State.Locked || mic.lock == MicLock.State.NoPermission
+    AnimatedVisibility(mic.live || mic.systemStt || locked || mic.asking, enter = fadeIn(), exit = fadeOut()) {
         Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (mic.asking) {
+                ElyText(stringResource(R.string.lucy_mic_permission_why), size = 8.5f, color = Holo.text, maxLines = 2, lineHeightRatio = 1.3f)
+                return@Row
+            }
+            if (locked && !mic.live) {
+                Box(Modifier.size(7.dp).clip(CircleShape).background(LOCKED_RED))
+                Spacer(Modifier.width(5.dp))
+                ElyText(stringResource(R.string.lucy_mic_locked), size = 8.5f, weight = FontWeight.Bold, color = LOCKED_RED, uppercase = true, letterSpacing = tracking(0.2f), maxLines = 1)
+                Spacer(Modifier.width(8.dp))
+                ElyText(
+                    stringResource(if (mic.lock == MicLock.State.NoPermission) R.string.lucy_mic_no_permission else R.string.lucy_mic_locked_hint),
+                    size = 8.5f,
+                    color = Holo.dim,
+                    maxLines = 2,
+                    lineHeightRatio = 1.3f,
+                )
+                return@Row
+            }
             if (mic.live) {
                 // El micrófono está abierto toda la sesión: el punto late siempre, y el texto dice de quién es el turno.
                 val pulse = rememberInfiniteTransition(label = "live")
@@ -1070,12 +1151,14 @@ private fun SendArrow() {
 }
 
 @Composable
-private fun MicGlyph() {
+private fun MicGlyph(locked: Boolean = false) {
     Box(
         Modifier.size(18.dp).drawBehind {
             val t = 1.8.dp.toPx()
             val w = size.width
             val h = size.height
+            // Bloqueado: tachado en diagonal.
+            if (locked) drawLine(LOCKED_RED, Offset(w * 0.08f, h * 0.08f), Offset(w * 0.92f, h * 0.92f), t * 1.2f, cap = StrokeCap.Round)
             drawRoundRect(
                 Color.White,
                 topLeft = Offset(w * 0.34f, h * 0.06f),
@@ -1223,7 +1306,7 @@ private val LANDSCAPE_BAR = 54.dp
 
 private val MASHA_HINTS = listOf(
     PadHint("A", R.string.hint_select),
-    PadHint("Y", R.string.hint_talk),
+    PadHint("Y", R.string.hint_mic_lock),
     PadHint("X", R.string.hint_chat),
     PadHint("L1", R.string.hint_bond),
     PadHint("B", R.string.hint_back),

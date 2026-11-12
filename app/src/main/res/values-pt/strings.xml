@@ -1214,10 +1214,14 @@ Feito pela comunidade, sem revisão. Confira o repositório antes de instalar.</
     <string name="lucy_off_jealous_devoted">Aff, sério?! Quem é ela? Achei que eu era a sua favorita.</string>
     <string name="lucy_live">Ao vivo</string>
     <string name="lucy_live_system_stt">Sua voz é processada pelo serviço de reconhecimento de voz do sistema.</string>
-    <string name="lucy_mic_live_start">Começar uma conversa ao vivo com a Lucy</string>
-    <string name="lucy_mic_live_stop">Encerrar a conversa ao vivo</string>
+    <string name="lucy_mic_lock">Bloquear o microfone</string>
+    <string name="lucy_mic_unlock">Desbloquear o microfone</string>
+    <string name="lucy_mic_locked">Microfone bloqueado</string>
+    <string name="lucy_mic_locked_hint">A Lucy não te ouve. Toca no microfone para desbloquear, ou escreve.</string>
+    <string name="lucy_mic_permission_why">A Lucy ouve-te enquanto estás no ecrã dela, por isso basta falar. Podes bloquear o microfone quando quiseres.</string>
+    <string name="lucy_mic_no_permission">Sem permissão de microfone. Toca no microfone para a dar, ou escreve.</string>
     <string name="lucy_mic_hold">Segure para falar</string>
-    <string name="hint_talk">Falar</string>
+    <string name="hint_mic_lock">Bloquear mic</string>
     <string name="settings_lucy_voice_interrupt">Interromper com a voz pelo alto-falante</string>
     <string name="settings_lucy_voice_interrupt_desc">Numa conversa ao vivo, se você falar por cima da Lucy, ela para e escuta. Se neste celular ela se interromper sozinha, desative e use o botão do microfone. Com fones funciona sempre.</string>
     <string name="lucy_live_listening">Ouvindo</string>

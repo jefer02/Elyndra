@@ -344,6 +344,20 @@ class SettingsController(private val vm: ElyndraViewModel) {
         store.lucyChatVisible = lucyChatVisible
     }
 
+    var lucyMicLocked by mutableStateOf(store.lucyMicLocked); private set
+
+    fun updateLucyMicLocked(locked: Boolean) {
+        lucyMicLocked = locked
+        store.lucyMicLocked = locked
+    }
+
+    var lucyMicAsked by mutableStateOf(store.lucyMicAsked); private set
+
+    fun markLucyMicAsked() {
+        lucyMicAsked = true
+        store.lucyMicAsked = true
+    }
+
     var lucySubtitles by mutableStateOf(store.lucySubtitles); private set
 
     fun toggleLucySubtitles() {

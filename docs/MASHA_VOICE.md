@@ -68,8 +68,14 @@ MashaScreen ──feed(texto, final)──▶ MashaVoice ──▶ VoiceRouter �
 
 ### Conversación en vivo (`ui/masha/live/`)
 
-- **Tocar** el micrófono (o **Y** en el mando) enciende o apaga el modo en vivo; **mantener** es pulsar
-  para hablar (al soltar se manda) o, en vivo, cortar a Lucy ya. El permiso se pide la primera vez.
+- **Siempre en vivo** (v4): entrar en la pantalla de Lucy pone la conversación en vivo sola; al volver del
+  fondo, sigue. El micrófono es un **candado** (`MicLock`): tocarlo (o **Y** en el mando) lo bloquea
+  (`AudioRecord` suelto, el punto verde del sistema se va) o lo desbloquea; se recuerda entre visitas
+  (`lucy.micLocked`, por defecto desbloqueado). Bloqueado se puede escribir y ella sigue hablando;
+  **mantener** es cortarla en vivo o, bloqueado, pulsar para hablar. El permiso se pide **una vez**, la
+  primera vez que se abre su pantalla (`lucy.micAsked`), con una línea que explica por qué; denegado, abre
+  bloqueado con una pista y no vuelve a preguntar (tocar el micrófono lo pide). En reposo solo trabaja el
+  VAD; el reconocedor solo mientras el usuario habla. Ya no hay apagado automático.
   Solo terminan la sesión: salir de la pantalla, la app al fondo o la pantalla apagada (`ON_STOP`, el
   micrófono se suelta en el momento), bloquear el micrófono y que falte el permiso
   (`LiveTurns.EndReason`). **Nada de lo que oye la termina** (v4): ni el silencio (no hay temporizador de

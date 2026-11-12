@@ -1164,10 +1164,14 @@
     <string name="lucy_off_jealous_devoted">えっ、うそでしょ！？誰それ？ 一番は私だと思ってたのに。</string>
     <string name="lucy_live">ライブ</string>
     <string name="lucy_live_system_stt">音声はシステムの音声認識サービスで処理されます。</string>
-    <string name="lucy_mic_live_start">Lucyとライブで話す</string>
-    <string name="lucy_mic_live_stop">ライブ会話を終える</string>
+    <string name="lucy_mic_lock">マイクをブロック</string>
+    <string name="lucy_mic_unlock">マイクのブロックを解除</string>
+    <string name="lucy_mic_locked">マイクはブロック中</string>
+    <string name="lucy_mic_locked_hint">Lucyには聞こえていません。マイクをタップして解除するか、文字で話しかけてね。</string>
+    <string name="lucy_mic_permission_why">Lucyの画面にいる間は話しかけるだけでOK。マイクはいつでもブロックできます。</string>
+    <string name="lucy_mic_no_permission">マイクの許可がありません。マイクをタップして許可するか、文字で話しかけてね。</string>
     <string name="lucy_mic_hold">長押しで話す</string>
-    <string name="hint_talk">話す</string>
+    <string name="hint_mic_lock">マイクロック</string>
     <string name="settings_lucy_voice_interrupt">スピーカーでも声で割り込む</string>
     <string name="settings_lucy_voice_interrupt_desc">ライブ会話中にLucyの話にかぶせて話すと、彼女は話を止めて聞きます。この端末で勝手に止まってしまう場合はオフにして、マイクボタンを使ってください。ヘッドホンでは常に使えます。</string>
     <string name="lucy_live_listening">聞いています</string>

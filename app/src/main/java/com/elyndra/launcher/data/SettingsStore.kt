@@ -406,6 +406,19 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean("lucy.chatVisible", false)
         set(v) = prefs.edit { putBoolean("lucy.chatVisible", v) }
 
+    /**
+     * El micrófono de Lucy bloqueado por el usuario. Se recuerda entre visitas:
+     * bloqueado, abrir su pantalla no graba. Por defecto, desbloqueado (en vivo).
+     */
+    var lucyMicLocked: Boolean
+        get() = prefs.getBoolean("lucy.micLocked", false)
+        set(v) = prefs.edit { putBoolean("lucy.micLocked", v) }
+
+    /** Ya se pidió el permiso del micrófono al abrir su pantalla (no se vuelve a pedir solo). */
+    var lucyMicAsked: Boolean
+        get() = prefs.getBoolean("lucy.micAsked", false)
+        set(v) = prefs.edit { putBoolean("lucy.micAsked", v) }
+
     /** Con el chat oculto, una línea con lo que dice Lucy mientras habla. */
     var lucySubtitles: Boolean
         get() = prefs.getBoolean("lucy.subtitles", true)

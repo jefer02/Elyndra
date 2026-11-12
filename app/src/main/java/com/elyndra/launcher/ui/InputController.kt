@@ -226,7 +226,7 @@ class InputController(private val vm: ElyndraViewModel) {
 
     /**
      * Un botón que se suelta. Solo cuenta Y en la pantalla de Lucy (mantener
-     * para hablar, tocar para la conversación en vivo); el resto se maneja al pulsar.
+     * para hablar, tocar para el candado del micrófono); el resto se maneja al pulsar.
      */
     fun release(pad: Pad): Boolean {
         val mic = mashaMic ?: return false
@@ -318,7 +318,7 @@ class InputController(private val vm: ElyndraViewModel) {
         }
         // Y: al botón principal de la pantalla (en Añadir, "Añadir N juegos").
         Pad.Options -> when {
-            // En la de Lucy, el micrófono: tocar = conversación en vivo; mantener = hablar.
+            // En la de Lucy, el micrófono: tocar = candado (bloquear / desbloquear); mantener = hablar o cortarla.
             vm.screen == Screen.Masha && mashaMic != null -> { mashaMic?.press(); true }
             // En la tienda, Y abre las utilidades (recargar, actualizar todo, quitar filtros).
             vm.screen == Screen.Ports && vm.ports.detail == null -> { vm.ports.openUtilities(); true }
