@@ -145,7 +145,13 @@ class MashaPromptTest {
     }
 
     @Test
-    fun theVersionIsBumpedForActingOnConfirmation() {
-        assertEquals(11, MashaPrompt.VERSION)
+    fun theBatteryIsOnlyMentionedWithAWarningBeforeSomethingHeavy() {
+        assertTrue(prompt.contains("only when the context has DEVICE_WARNING"))
+        assertTrue(prompt.contains("never talk about the battery"))
+    }
+
+    @Test
+    fun theVersionIsBumpedForDeviceWarnings() {
+        assertEquals(12, MashaPrompt.VERSION)
     }
 }

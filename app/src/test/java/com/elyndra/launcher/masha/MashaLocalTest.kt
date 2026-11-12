@@ -170,6 +170,7 @@ class MashaLocalTest {
     private fun build(
         device: DeviceState?,
         now: Long = NOW,
+        deviceWarned: Boolean = false,
         memories: List<Memory> = emptyList(),
         userFolders: List<String> = emptyList(),
         relationship: AffinityLevel? = null,
@@ -184,6 +185,7 @@ class MashaLocalTest {
                 arcs = emptyList(),
                 memories = memories,
                 device = device,
+                deviceWarned = deviceWarned,
                 zone = ZoneId.of("UTC"),
                 language = "es",
                 screen = "library",
@@ -283,9 +285,25 @@ class MashaLocalTest {
         assertEquals(2, root["library"]!!.jsonObject["games"]!!.jsonPrimitive.content.toInt())
         assertEquals("Okami", root["in_progress"]!!.jsonArray[0].jsonObject["title"]!!.jsonPrimitive.content)
         assertEquals(1, root["never_opened"]!!.jsonObject["count"]!!.jsonPrimitive.content.toInt())
-        assertEquals("50", root["device"]!!.jsonObject["battery_pct"]!!.jsonPrimitive.content)
+        // Sin problema, ni cifras de batería ni aviso: Lucy no la menciona porque sí.
+        assertFalse("battery_pct" in root["device"]!!.jsonObject)
+        assertFalse("DEVICE_WARNING" in root)
         assertEquals("Okami", root["screen"]!!.jsonObject["focused"]!!.jsonPrimitive.content)
         assertTrue(root["catalog"]!!.jsonArray.size <= MashaContextBuilder.MAX_CATALOG)
+    }
+
+    @Test
+    fun aRealDeviceProblemGoesInTheContextOncePerSession() {
+        val low = DeviceState(batteryPct = 12, charging = false)
+        val warning = DeepSeekProtocolJson.parse(build(low).json)["DEVICE_WARNING"]!!.jsonObject
+        assertEquals("low_battery", warning["kind"]!!.jsonPrimitive.content)
+        assertEquals("12", warning["battery_pct"]!!.jsonPrimitive.content)
+        assertFalse("DEVICE_WARNING" in DeepSeekProtocolJson.parse(build(low, deviceWarned = true).json))
+        // Cargando o con batería de sobra, nada.
+        assertFalse("DEVICE_WARNING" in DeepSeekProtocolJson.parse(build(DeviceState(batteryPct = 12, charging = true)).json))
+        assertFalse("DEVICE_WARNING" in DeepSeekProtocolJson.parse(build(DeviceState(batteryPct = 47)).json))
+        val hot = DeepSeekProtocolJson.parse(build(DeviceState(batteryPct = 80, thermal = DeviceState.Thermal.Severe)).json)
+        assertEquals("hot", hot["DEVICE_WARNING"]!!.jsonObject["kind"]!!.jsonPrimitive.content)
     }
 
     @Test

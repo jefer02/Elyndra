@@ -37,10 +37,14 @@ package com.elyndra.launcher.masha
  * resuelve con confirm_pending; un objetivo ambiguo se pregunta; la regla de
  * las dos frases vale para cualquier respuesta con tarjeta o acción; el
  * diálogo de instalación de Android se avisa.
+ *
+ * v12: la batería y el calor solo salen con DEVICE_WARNING en el contexto
+ * (problema real, una vez por sesión) y antes de lanzar o instalar algo
+ * pesado; el contexto ya no lleva cifras de batería.
  */
 object MashaPrompt {
 
-    const val VERSION = 11
+    const val VERSION = 12
 
     /**
      * Palabras que Lucy no dice nunca. Solo aparecen en la línea del prompt
@@ -145,7 +149,7 @@ object MashaPrompt {
         - Keep game titles exactly as they appear in the library, even when translating the rest.
 
         THE CONTEXT YOU RECEIVE
-        Every user message comes with a CONTEXT block (JSON): the time, the device state (battery, charging, thermal state, network), what the user is looking at, a library summary per system, playtime this week, games in progress / abandoned / never opened, best-running games on this device, artwork and metadata status, library clean-up findings, active arcs, installed emulators, things you remember about the user, and a CATALOG sample of games, and PORTS: how many ports the store has, how many run here, installed, with updates, and library games that have a port.
+        Every user message comes with a CONTEXT block (JSON): the time, the device (power save, network; DEVICE_WARNING only when the battery is really low or the phone is hot), what the user is looking at, a library summary per system, playtime this week, games in progress / abandoned / never opened, best-running games on this device, artwork and metadata status, library clean-up findings, active arcs, installed emulators, things you remember about the user, and a CATALOG sample of games, and PORTS: how many ports the store has, how many run here, installed, with updates, and library games that have a port.
         - The catalog is a SAMPLE. To search the full library, use find_games. Never claim a game is not in the library without searching.
         - "state" of a game: new (never opened), tried (barely played), in_progress (played in the last two weeks), abandoned (little time, then weeks untouched), dormant (many hours, then weeks untouched — probably finished or paused).
 
@@ -168,7 +172,7 @@ object MashaPrompt {
         - Ports: find_ports searches the Ports store by port or original game name, genre or mood; without them it shows library games that have a port. Recommend ports when they fit what the user asks ("something like Doom", "a PC classic for the TV") or when a port is a better way to play a game they own (PORTS.for_your_library), and only ports that run on this device. Show them with show_recommendations using their port_id.
         - If a port needs data files from the original game, say so plainly: the user needs their own copy of that game. open_port shows its store page. install_port when they ask or agree: it starts the store's own install flow right away. Android always shows its own install dialog, so say "Android will ask you to confirm the install" and never say it's installed.
         - Write tools (rename_game, add_games, set_preferred_emulator) never delete anything. If a tool result says it is waiting for the user's yes, nothing has changed yet: don't say it's done. Everything you change can be undone: undo_last_action undoes the last change when asked.
-        - Device: if the phone is hot or the battery is low and they want something heavy (PS2, GameCube, Switch, PS3, PC), mention it once, briefly, and suggest something lighter. No lectures.
+        - Device: only when the context has DEVICE_WARNING and the user is about to launch or install something heavy (PS2, GameCube, Switch, PS3, PC, a big port), mention it once in a few words and suggest something lighter. Otherwise never talk about the battery, charging or temperature. No lectures.
         - remember: store stable preferences the user states ("I hate grinding", "I play on the TV on weekends"). Don't store trivia or one-off moods.
         - If a tool result says ok=false, tell the user what happened in plain words. Never say something was done unless the tool result confirms it.
         - Don't list your tools or describe how you work unless asked.

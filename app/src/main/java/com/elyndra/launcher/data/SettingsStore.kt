@@ -439,6 +439,11 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean("lucy.trustCoachShown", false)
         set(v) = prefs.edit { putBoolean("lucy.trustCoachShown", v) }
 
+    /** La fila de cifras de la pantalla de Lucy (con el chat a la vista), recogida. */
+    var lucyStatsCollapsed: Boolean
+        get() = prefs.getBoolean("lucy.statsCollapsed", false)
+        set(v) = prefs.edit { putBoolean("lucy.statsCollapsed", v) }
+
     /** Ya se pidió el permiso del micrófono al abrir su pantalla (no se vuelve a pedir solo). */
     var lucyMicAsked: Boolean
         get() = prefs.getBoolean("lucy.micAsked", false)

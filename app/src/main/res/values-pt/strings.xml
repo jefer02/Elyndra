@@ -399,6 +399,8 @@
     <string name="masha_placeholder">Pergunte à Lucy ou diga o que fazer…</string>
     <string name="masha_greeting">Oi, eu sou a Lucy. Conheço sua biblioteca, como você joga e o que seu celular aguenta. Me diz quanto tempo você tem e eu acho algo que você vai amar.</string>
     <string name="masha_stat_week">Esta semana</string>
+    <string name="masha_stats_hide">Ocultar números</string>
+    <string name="masha_stats_show">Mostrar números</string>
     <string name="masha_stat_top">Mais jogado</string>
     <string name="masha_stat_sessions">Sessões</string>
     <string name="masha_vs_previous">%1$s vs semana passada</string>

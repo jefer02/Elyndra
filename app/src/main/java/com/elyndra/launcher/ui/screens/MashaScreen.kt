@@ -742,7 +742,7 @@ private fun ColumnScope.Conversation(
 ) {
     val masha = vm.masha
     val lang = vm.settings.lang
-    // Con el chat oculto, ni las cifras: toda la pantalla es para ella.
+    // Con el chat oculto, ni las cifras: toda la pantalla es para ella. Sin datos todavía, tampoco; y se pueden recoger.
     Box(Modifier.onGloballyPositioned { area.statsBottom = it.boundsInRoot().bottom }) { if (open) StatsRow(vm, glow) }
     // En vertical, el hueco de arriba es para verla a ella; en horizontal ella
     // está a la izquierda y la conversación ocupa toda su columna.
@@ -804,6 +804,21 @@ private fun ColumnScope.Conversation(
 @Composable
 private fun StatsRow(vm: ElyndraViewModel, glow: Color) {
     val stats = vm.masha.stats()
+    if (stats.isEmpty) return
+    val collapsed = vm.settings.lucyStatsCollapsed
+    if (collapsed) {
+        // Recogida: una pastilla pequeña para volver a abrirla.
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .holoPanel(RoundedCornerShape(10.dp), glow, alpha = 0.45f)
+                .shapeClickable(RoundedCornerShape(10.dp), onClickLabel = stringResource(R.string.masha_stats_show), onClick = vm.settings::toggleLucyStats)
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+        ) {
+            ElyText(stringResource(R.string.masha_stat_week) + " · " + fmtMinutes(stats.weekMinutes) + "  ▾", size = 9f, weight = FontWeight.SemiBold, color = Holo.dim, maxLines = 1)
+        }
+        return
+    }
     val noData = stringResource(R.string.masha_no_data)
     val cards = listOf(
         Triple(
@@ -819,7 +834,10 @@ private fun StatsRow(vm: ElyndraViewModel, glow: Color) {
             if (stats.weekSessions == 0) noData else stringResource(R.string.masha_average, fmtMinutes(stats.averageMinutes)),
         ),
     )
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+    Row(
+        Modifier.fillMaxWidth().shapeClickable(RoundedCornerShape(12.dp), onClickLabel = stringResource(R.string.masha_stats_hide), onClick = vm.settings::toggleLucyStats),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
         cards.forEachIndexed { i, (label, value, sub) ->
             Column(
                 Modifier

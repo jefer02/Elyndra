@@ -15,6 +15,7 @@ import com.elyndra.launcher.R
 import com.elyndra.launcher.data.AppLocale
 import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.data.fmtMinutes
+import com.elyndra.launcher.domain.device.DeviceAdvice
 import com.elyndra.launcher.domain.insights.Insight
 import com.elyndra.launcher.domain.lists.DynamicList
 import com.elyndra.launcher.domain.lists.ListRule
@@ -108,6 +109,9 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
         celebration = null
     }
 
+    /** Ya avisó de la batería o del calor en esta sesión de su pantalla (una vez como mucho). */
+    private var deviceWarned = false
+
     /** El último mensaje del usuario: repetirlo tal cual no suma. */
     private var lastUserText: String? = null
 
@@ -169,6 +173,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     /** Al salir de la pantalla: la conversación termina y se resume (sigue aunque la pantalla ya no esté). */
     fun onClose() {
         idleJob?.cancel()
+        deviceWarned = false
         vm.viewModelScope.launch { summarize() }
     }
 
@@ -434,7 +439,8 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     }
 
     private suspend fun online(text: String, previous: String?, history: List<MashaTurn>, language: String, cacheable: Boolean) {
-        val context = brain.context(language, vm.screenName(), vm.focusName(), portsSummary())
+        val warning = DeviceAdvice.forContext(brain.device.snapshot(), deviceWarned)
+        val context = brain.context(language, vm.screenName(), vm.focusName(), portsSummary(), deviceWarned)
         val index = messages.size
         messages += ChatMessage(fromMasha = true, text = "", pending = true)
         val buffer = StringBuilder()
@@ -475,6 +481,8 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                     render(final = false)
                 }
                 is MashaEvent.Completed -> {
+                    // El aviso de batería o calor iba en el contexto y se lanzó o instaló algo: ya está dado.
+                    if (warning != null && tools.any { it in DeviceAdvice.HEAVY_TOOLS }) deviceWarned = true
                     // Con tarjeta, confirmación o algo hecho: como mucho dos frases, la herramienta que sea (v4).
                     val shown = ReplyShape.finalText(event.text, attachment, done)
                     buffer.setLength(0)
@@ -735,7 +743,10 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
         val topMinutes: Int,
         val weekSessions: Int,
         val averageMinutes: Int,
-    )
+    ) {
+        /** Las tres cifras vacías ("sin datos todavía"): la fila no se enseña. */
+        val isEmpty: Boolean get() = weekMinutes == 0 && weekSessions == 0 && topTitle == null
+    }
 
     /** Tarjetas de la cabecera: esta semana, el más jugado y las sesiones (las de verdad, no las salidas al minuto). */
     fun stats(now: Long = System.currentTimeMillis()): Stats {

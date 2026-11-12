@@ -1,7 +1,9 @@
 package com.elyndra.launcher.masha
 
 import com.elyndra.launcher.domain.Game
+import com.elyndra.launcher.domain.device.DeviceAdvice
 import com.elyndra.launcher.domain.device.DeviceState
+import com.elyndra.launcher.domain.device.DeviceWarning
 import com.elyndra.launcher.domain.lists.SmartLists
 import com.elyndra.launcher.domain.ports.PortRecommend
 import com.elyndra.launcher.domain.profile.GameProfile
@@ -29,6 +31,8 @@ data class ContextInput(
     val arcs: List<ArcProgress>,
     val memories: List<Memory>,
     val device: DeviceState?,
+    /** Ya se avisó de la batería o del calor en esta sesión (no se repite). */
+    val deviceWarned: Boolean = false,
     val zone: ZoneId,
     val language: String,
     /** Qué está mirando el usuario: "library", "folder", "details", "masha"… */
@@ -137,13 +141,17 @@ object MashaContextBuilder {
         val volatile = buildJsonObject {
             put("now", describeNow(now, input.zone, input.language))
             input.device?.let { d ->
+                // Sin cifras de batería ni temperatura: solo hay aviso cuando es un problema (DeviceAdvice).
                 putJsonObject("device") {
-                    d.batteryPct?.let { put("battery_pct", it) }
-                    put("charging", d.charging)
-                    d.batteryTempC?.let { put("battery_temp_c", it) }
-                    put("thermal", d.thermal.name.lowercase())
                     put("power_save", d.powerSave)
                     put("network", d.network.name.lowercase())
+                }
+                DeviceAdvice.forContext(d, input.deviceWarned)?.let { w ->
+                    putJsonObject("DEVICE_WARNING") {
+                        put("kind", if (w == DeviceWarning.Hot) "hot" else "low_battery")
+                        if (w == DeviceWarning.LowBattery) d.batteryPct?.let { put("battery_pct", it) }
+                        put("note", "mention it once, briefly, only if the user is about to launch or install something heavy")
+                    }
                 }
             }
             putJsonObject("screen") {

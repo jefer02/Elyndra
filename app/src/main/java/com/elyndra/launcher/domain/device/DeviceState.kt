@@ -47,3 +47,27 @@ data class DeviceState(
 }
 
 enum class DeviceWarning { LowBattery, Hot, PowerSave }
+
+/**
+ * Cuándo Lucy puede hablar de la batería o del calor (pura): solo si de verdad
+ * es un problema (menos del [DeviceState.LOW_BATTERY_PCT] % sin cargar, o
+ * caliente) y como mucho una vez por sesión. El contexto del modelo no lleva
+ * cifras de batería si no hay nada que avisar, así no lo menciona porque sí;
+ * con aviso, solo lo dice antes de lanzar o instalar algo pesado.
+ */
+object DeviceAdvice {
+
+    fun problem(device: DeviceState?): DeviceWarning? = when {
+        device == null -> null
+        device.isHot -> DeviceWarning.Hot
+        device.isLowBattery -> DeviceWarning.LowBattery
+        else -> null
+    }
+
+    /** El aviso que va en el contexto: el problema, si aún no se avisó en esta sesión. */
+    fun forContext(device: DeviceState?, warnedThisSession: Boolean): DeviceWarning? =
+        if (warnedThisSession) null else problem(device)
+
+    /** Las herramientas que lanzan o instalan algo (cuando el aviso cuenta como dado). */
+    val HEAVY_TOOLS = setOf("launch_game", "install_port")
+}

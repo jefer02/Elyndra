@@ -368,6 +368,8 @@
     <string name="masha_placeholder">Lucy に質問、または指示…</string>
     <string name="masha_greeting">こんにちは、ルーシーだよ。あなたのライブラリも、遊び方も、スマホの余力も分かってる。どれくらい時間があるか教えて。きっと気に入るのを探すね。</string>
     <string name="masha_stat_week">今週</string>
+    <string name="masha_stats_hide">統計を隠す</string>
+    <string name="masha_stats_show">統計を表示</string>
     <string name="masha_stat_top">最も遊んだ</string>
     <string name="masha_stat_sessions">セッション</string>
     <string name="masha_vs_previous">先週比 %1$s</string>
