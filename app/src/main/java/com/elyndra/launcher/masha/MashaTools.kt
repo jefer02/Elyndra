@@ -53,6 +53,7 @@ object MashaTools {
     const val OPEN_PORT = "open_port"
     const val INSTALL_PORT = "install_port"
     const val RECOMMEND = "show_recommendations"
+    const val CONFIRM_PENDING = "confirm_pending"
 
     /** Cuántas tarjetas como mucho en una recomendación. */
     const val MAX_PICKS = 4
@@ -62,7 +63,7 @@ object MashaTools {
         LAUNCH_GAME, SET_GAME_EMULATOR, CREATE_LIST, CREATE_ARC, UPDATE_METADATA, REMEMBER, FORGET,
         FILTER_LIBRARY, SET_ART, ADD_GAME, REMOVE_GAME, SET_ACCENT, SET_DARK_MODE,
         RENAME_GAME, ADD_GAMES, OPEN_ADD_ROMS, SET_PREFERRED_EMULATOR, UNDO_LAST_ACTION,
-        OPEN_PORT, INSTALL_PORT,
+        OPEN_PORT, INSTALL_PORT, CONFIRM_PENDING,
     )
 
     val ACCENTS = listOf("indigo", "abismo", "medianoche", "mandarina", "fuego", "menta", "cobalto", "lila", "coral", "turquesa", "oro", "chicle", "grafito")
@@ -169,8 +170,8 @@ object MashaTools {
                 string("title", "Installed app name.")
                 required("title")
             },
-            tool(REMOVE_GAME, "Remove an Android game or a whole emulator folder from the library. Deletes nothing from storage. Only when asked.") {
-                string("title", "Game title or system name of the folder.")
+            tool(REMOVE_GAME, "Hide an Android game from the library. Nothing is uninstalled or deleted, and undo_last_action brings it back. Only when asked. (ROMs and whole folders are removed from their long-press menu, not by you.)") {
+                string("title", "Game title.")
                 required("title")
             },
             tool(LIST_INSTALLED_APPS, "List installed apps that could be added to the library.") {},
@@ -186,30 +187,34 @@ object MashaTools {
             tool(
                 RENAME_GAME,
                 "Set a game's name. The name is locked: metadata syncs never overwrite it, and its metadata is refreshed right away. " +
-                    "If you are proposing the name yourself, the app shows a confirm card: say in one sentence what you will set and ask. " +
+                    "If the user asked for it (or agreed), it is done right away; if the name is only your idea, the app shows a confirm card. " +
                     "Set user_dictated=true only when the user gave the exact name.",
             ) {
                 string("game", "Current title of the game in the library.")
                 string("name", "The new name.")
                 boolean("user_dictated", "true if the user dictated this exact name (then no confirmation is needed).")
+                boolean("user_requested", "true if the user asked for this directly or just agreed to your proposal: then it runs right away, with no confirm card.")
                 required("game", "name")
             },
             tool(LIST_ADDABLE_GAMES, "Games on the device that are not in the library yet: installed Android apps/games, and new ROMs/PC games inside folders Elyndra already has access to (also ones the user removed before). Only names, never paths.") {},
             tool(
                 ADD_GAMES,
-                "Add games to the library (never deletes anything). For more than one game the app shows the list in a confirm card first. " +
+                "Add games to the library (never deletes anything). If the user asked for it (or agreed), they are added right away; " +
+                    "if it is only your idea and there is more than one, the app shows them in a confirm card first. " +
                     "At most 50 per call; the rest are reported as skipped.",
             ) {
                 stringArray("titles", "Exact titles from list_addable_games.")
                 boolean("all", "true = every game list_addable_games found (instead of titles).")
+                boolean("user_requested", "true if the user asked for this directly or just agreed to your proposal: then it runs right away, with no confirm card.")
             },
             tool(OPEN_ADD_ROMS, "Open the Add screen on the ROMs tab so the user can pick a new folder with the system picker (you cannot pick folders yourself). Tell the user which folder to select.") {
                 string("system", "System the folder is for, if known.")
             },
             tool(LIST_EMULATORS, "Emulators on this device: the ones Elyndra recognizes (with the systems they run and where they are the preferred emulator), the recognized ones not set up for any system, and installed apps that look like emulators but have no known profile (Elyndra cannot launch those safely).") {},
-            tool(SET_PREFERRED_EMULATOR, "Make a recognized, installed emulator the preferred one for all of a system's folders. The app shows a confirm card first.") {
+            tool(SET_PREFERRED_EMULATOR, "Make a recognized, installed emulator the preferred one for all of a system's folders. Done right away if the user asked for it; a confirm card if it is only your idea.") {
                 string("system", "System name or id, e.g. 'PlayStation 2', 'psp'.")
                 string("emulator", "Emulator name or id.")
+                boolean("user_requested", "true if the user asked for this directly or just agreed to your proposal: then it runs right away, with no confirm card.")
                 required("system", "emulator")
             },
             tool(
@@ -226,7 +231,14 @@ object MashaTools {
                 }
                 required("items")
             },
-            tool(UNDO_LAST_ACTION, "Undo the last rename, add or emulator change made through you. Only when the user asks.") {},
+            tool(UNDO_LAST_ACTION, "Undo the last change made through you (add, rename, emulator, accent, dark mode, artwork, hiding a game…). Only when the user asks.") {},
+            tool(
+                CONFIRM_PENDING,
+                "Answer the confirm card that is waiting (the latest one): when the user says yes or no to it in any words, in any language.",
+            ) {
+                string("answer", "confirm or cancel.")
+                required("answer")
+            },
             tool(
                 FIND_PORTS,
                 "Native Android ports (decompilations/recompilations/source ports) from Elyndra's Ports store, for console and PC games. " +
@@ -246,11 +258,13 @@ object MashaTools {
             },
             tool(
                 INSTALL_PORT,
-                "Install a port from the Ports store. The app shows a confirm card first and then the store's own install flow; nothing is installed until the user confirms. " +
-                    "Only when the user asked for it or agreed to your suggestion. Say first if it needs files from the original game.",
+                "Install a port from the Ports store with the store's own install flow. If the user asked for it (or agreed) it starts right away; " +
+                    "if it is only your idea, a confirm card first. Android always shows its own install dialog: tell the user Android will ask them to confirm. " +
+                    "Say first if it needs files from the original game.",
             ) {
                 string("port_id", "The port id from find_ports.")
                 string("game", "Or the original game's name.")
+                boolean("user_requested", "true if the user asked for this directly or just agreed to your proposal: then it runs right away, with no confirm card.")
             },
         )
     }

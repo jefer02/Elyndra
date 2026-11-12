@@ -125,7 +125,8 @@ class MashaPromptTest {
         assertTrue(prompt.contains("find_ports searches the Ports store"))
         assertTrue(prompt.contains("only ports that run on this device"))
         assertTrue(prompt.contains("If a port needs data files from the original game, say so plainly"))
-        assertTrue(prompt.contains("install_port only when they ask or agree: it shows a confirm card"))
+        assertTrue(prompt.contains("install_port when they ask or agree: it starts the store's own install flow right away"))
+        assertTrue(prompt.contains("Android will ask you to confirm the install"))
         assertTrue(prompt.contains("PORTS"))
         // La regla dura de siempre sigue igual.
         assertTrue(prompt.contains("Never help obtain, download, decrypt or crack ROMs, BIOS files, firmware or keys."))
@@ -134,7 +135,17 @@ class MashaPromptTest {
     }
 
     @Test
-    fun theVersionIsBumpedForPorts() {
-        assertEquals(10, MashaPrompt.VERSION)
+    fun whatTheUserAsksOrConfirmsIsDoneWithoutTappingAButton() {
+        assertTrue(prompt.contains("WHEN THEY ASK OR SAY YES, DO IT"))
+        assertTrue(prompt.contains("Never tell them to tap a button"))
+        assertTrue(prompt.contains("call confirm_pending"))
+        assertTrue(prompt.contains("ask one short question"))
+        assertFalse(prompt.contains("wait for the user's confirmation"))
+        assertTrue(MashaTools.CONFIRM_PENDING in MashaTools.MUTATING)
+    }
+
+    @Test
+    fun theVersionIsBumpedForActingOnConfirmation() {
+        assertEquals(11, MashaPrompt.VERSION)
     }
 }

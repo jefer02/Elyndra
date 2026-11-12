@@ -1265,6 +1265,6 @@ Built by the community, not reviewed. Check the repository before installing.</s
     <string name="lucy_port_not_android">Not on Android yet</string>
     <string name="lucy_port_needs_files">Needs files from your copy of %1$s</string>
     <string name="lucy_confirm_install_port">Install %1$s from the Ports store?</string>
-    <string name="lucy_confirm_install_port_flow">The store opens and installs it as usual. Nothing is installed until you confirm.</string>
+    <string name="lucy_confirm_install_port_flow">The store opens and installs it as usual. Android will ask you to confirm the install.</string>
     <string name="lucy_off_ports_query_none">I looked through the Ports store and there’s nothing for %1$s that runs here. Sorry!</string>
 </resources>

@@ -113,7 +113,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
 
     /** Lo que Masha propone cambiar y espera confirmación, y la pila de deshacer. */
     val writes = MashaWrites()
-    private val actions = MashaActions(vm, brain, writes)
+    private val actions = MashaActions(vm, brain, writes) { id, state -> markConfirm(id, state) }
     private var job: Job? = null
     private var persistJob: Job? = null
 
@@ -288,6 +288,8 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
         persist(StoredMessage(MashaTurn.Role.User, text, null, null, System.currentTimeMillis()))
         val previous = lastUserText
         lastUserText = text
+        // Lo que dijo decide si una acción se hace ya o se propone (ActionGate).
+        actions.lastUserText = text
 
         job = vm.viewModelScope.launch {
             try {
@@ -354,16 +356,28 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     /** ¿Sigue a la espera esta tarjeta? (tras reiniciar, ya no). */
     fun isWritePending(id: String): Boolean = writes.isPending(id)
 
-    /** "Confirmar" en la tarjeta (o "sí" escrito): se hace y se cuenta en el chat. */
+    /**
+     * "Confirmar" en la tarjeta, o un sí con palabras ("sí", "dale", "confirmo",
+     * "yes", "はい"… ver ConfirmationResolver), por escrito o en vivo: se hace y
+     * se cuenta en el chat. Mientras, cuenta como ocupada (la conversación en
+     * vivo espera a que lo diga).
+     */
     fun confirmWrite(id: String) {
         if (!writes.isPending(id)) return
+        // Tocada mientras contesta otra cosa: esa respuesta ya lleva su "ocupada".
+        val own = !busy
+        if (own) busy = true
         vm.viewModelScope.launch {
-            val out = writes.confirm(id) ?: return@launch
-            markConfirm(id, if (out.ok) ConfirmState.DONE else ConfirmState.CANCELLED)
-            val ctx = localized()
-            val text = ctx.getString(if (out.ok) R.string.masha_write_done else R.string.masha_write_failed, out.label)
-            messages += ChatMessage(fromMasha = true, text = text, done = listOf(out.label))
-            persist(StoredMessage(MashaTurn.Role.Masha, text, null, MashaAttachment.Done(out.label, out.ok), System.currentTimeMillis()))
+            try {
+                val out = writes.confirm(id) ?: return@launch
+                markConfirm(id, if (out.ok) ConfirmState.DONE else ConfirmState.CANCELLED)
+                val ctx = localized()
+                val text = ctx.getString(if (out.ok) R.string.masha_write_done else R.string.masha_write_failed, out.label)
+                messages += ChatMessage(fromMasha = true, text = text, done = listOf(out.label))
+                persist(StoredMessage(MashaTurn.Role.Masha, text, null, MashaAttachment.Done(out.label, out.ok), System.currentTimeMillis()))
+            } finally {
+                if (own) busy = false
+            }
         }
     }
 

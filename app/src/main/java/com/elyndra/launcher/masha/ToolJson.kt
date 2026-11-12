@@ -62,3 +62,17 @@ fun toolFail(detail: String): ToolResult = ToolResult(
         put("detail", detail)
     },
 )
+
+/**
+ * Varios juegos encajan con [query]: no se hace nada y Lucy pregunta cuál, en
+ * una frase corta (ver ActionGate).
+ */
+fun toolAmbiguous(query: String, titles: List<String>): ToolResult = ToolResult(
+    ok = false,
+    payload = buildJsonObject {
+        put("ok", false)
+        put("needs_clarification", true)
+        put("detail", "several games match '$query'; nothing was done. Ask the user one short question: which one?")
+        put("candidates", JsonArray(titles.distinct().take(6).map { JsonPrimitive(it) }))
+    },
+)

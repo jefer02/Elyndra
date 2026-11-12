@@ -1,6 +1,10 @@
 package com.elyndra.launcher.ui
 
 import com.elyndra.launcher.masha.MashaWrites
+import com.elyndra.launcher.masha.ActionGate
+import com.elyndra.launcher.masha.ConfirmState
+import com.elyndra.launcher.masha.TargetMatch
+import com.elyndra.launcher.masha.toolAmbiguous
 import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.library.Names
 import com.elyndra.launcher.domain.ports.PortDisplay
@@ -48,10 +52,21 @@ class MashaActions(
     private val vm: ElyndraViewModel,
     private val brain: MashaBrain,
     private val writes: MashaWrites = MashaWrites(),
+    /** Una tarjeta contestada por la herramienta confirm_pending (id, estado): la marca en el chat. */
+    private val onConfirmAnswered: (String, String) -> Unit = { _, _ -> },
 ) : MashaToolbox {
 
+    /**
+     * El último mensaje del usuario (lo pone MashaController antes de cada
+     * respuesta): si pidió la acción o dijo que sí, se hace sin tarjeta (ver [ActionGate]).
+     */
+    @Volatile var lastUserText: String? = null
+
+    /** ¿El usuario pidió (o confirmó) esto? Su mensaje o el argumento `user_requested` del modelo. */
+    private fun asked(a: JsonObject): Boolean = ActionGate.userAsked(lastUserText, a.bool("user_requested") == true)
+
     /** Nombres, juegos por añadir y emuladores (ver [MashaLibraryActions]). */
-    private val library = MashaLibraryActions(vm, writes)
+    private val library = MashaLibraryActions(vm, writes, ::asked)
 
     override val specs: List<ToolSpec> get() = MashaTools.specs
 
@@ -93,6 +108,7 @@ class MashaActions(
             MashaTools.OPEN_PORT -> openPort(a)
             MashaTools.INSTALL_PORT -> installPort(a)
             MashaTools.RECOMMEND -> recommend(a)
+            MashaTools.CONFIRM_PENDING -> confirmPending(a)
             else -> toolFail("unknown tool ${call.name}")
         }
     }
@@ -100,7 +116,11 @@ class MashaActions(
     /* ── acciones ─────────────────────────────────────────────── */
 
     suspend fun launchGame(title: String?): ToolResult {
-        val target = resolve(title) ?: return notFound(title)
+        val target = when (val l = lookup(title)) {
+            is Lookup.Found -> l.target
+            is Lookup.Ambiguous -> return toolAmbiguous(title.orEmpty(), l.titles)
+            Lookup.Missing -> return notFound(title)
+        }
         if (target.what == What.Folder) return toolFail("'${target.title}' is an emulator folder, not a game")
         val opened = onMain { vm.openByKey(target.key) }
         return if (opened) {
@@ -111,7 +131,11 @@ class MashaActions(
     }
 
     private suspend fun setGameEmulator(a: JsonObject): ToolResult {
-        val target = resolve(a.str("title")) ?: return notFound(a.str("title"))
+        val target = when (val l = lookup(a.str("title"))) {
+            is Lookup.Found -> l.target
+            is Lookup.Ambiguous -> return toolAmbiguous(a.str("title").orEmpty(), l.titles)
+            Lookup.Missing -> return notFound(a.str("title"))
+        }
         val rom = vm.library.roms.firstOrNull { it.key == target.key }
             ?: return toolFail("'${target.title}' is not a ROM; Android games don't use emulators")
         val query = a.str("emulator") ?: return toolFail("which emulator?")
@@ -124,8 +148,13 @@ class MashaActions(
         if (!vm.orchestrator.isInstalled(emulatorId)) {
             return toolFail("${vm.orchestrator.name(emulatorId)} is not installed on this device")
         }
+        val before = rom.emulatorId
         onMain { vm.setRomEmulatorByKey(rom.key, emulatorId) }
         val name = vm.orchestrator.name(emulatorId)
+        writes.record("⚙ ${target.title} → $name") {
+            onMain { vm.setRomEmulatorByKey(rom.key, before) }
+            "emulator change for '${target.title}'"
+        }
         return toolOk("'${target.title}' will now launch with $name", MashaAttachment.Done("⚙ ${target.title} → $name"), mutating = true)
     }
 
@@ -135,7 +164,11 @@ class MashaActions(
         }
         return when (a.str("scope")) {
             "game" -> {
-                val target = resolve(a.str("title")) ?: return notFound(a.str("title"))
+                val target = when (val l = lookup(a.str("title"))) {
+                    is Lookup.Found -> l.target
+                    is Lookup.Ambiguous -> return toolAmbiguous(a.str("title").orEmpty(), l.titles)
+                    Lookup.Missing -> return notFound(a.str("title"))
+                }
                 onMain { vm.updateMetadata(listOf(target.key), force = true) }
                 toolOk("updating metadata for '${target.title}'", MashaAttachment.Done("↻ ${target.title}"), mutating = true)
             }
@@ -267,9 +300,11 @@ class MashaActions(
     }
 
     /**
-     * Instalar un port: siempre una tarjeta de confirmación y, al confirmar, el
-     * flujo de la tienda de siempre (PortInstallController.primary: el aviso de
-     * port sin verificar, la descarga y el instalador del sistema). Nunca otro camino.
+     * Instalar un port con el flujo de la tienda de siempre
+     * (PortInstallController.primary: el aviso de port sin verificar, la
+     * descarga y el instalador del sistema; nunca otro camino). Pedido por el
+     * usuario, empieza ya; si es idea de Lucy, primero una tarjeta. El diálogo
+     * de instalación de Android sale siempre: no se puede saltar.
      */
     private suspend fun installPort(a: JsonObject): ToolResult {
         val ports = portsReady()
@@ -278,7 +313,7 @@ class MashaActions(
         val updates = onMain { ports.updateIds() }
         if (port.id in ports.installed && port.id !in updates) return toolFail("${PortDisplay.title(port)} is already installed and up to date")
         val title = PortDisplay.title(port)
-        val w = writes.propose(ConfirmKind.INSTALL_PORT, listOf(title, PortRecommend.requiredGame(port).orEmpty())) {
+        val submitted = writes.submit(ConfirmKind.INSTALL_PORT, listOf(title, PortRecommend.requiredGame(port).orEmpty()), execute = asked(a)) {
             withContext(Dispatchers.Main) {
                 // Sin releases aún ("Free"), la tienda primero las pide; luego, su botón de siempre.
                 ports.ensureReleases(port, prefetch = false, force = true)
@@ -292,7 +327,35 @@ class MashaActions(
             }
             WriteOutcome("⬇ $title")
         }
-        return toolOk("waiting for the user's confirmation in the chat card", MashaAttachment.Confirm(w.id, w.kind, w.items), mutating = true)
+        return when (submitted) {
+            is MashaWrites.Submitted.Done -> toolOk(
+                "the install of $title started; Android will now show its own install dialog: tell the user Android will ask them to confirm the install",
+                MashaAttachment.Done(submitted.outcome.label),
+                mutating = true,
+            )
+            is MashaWrites.Submitted.Proposed -> {
+                val w = submitted.write
+                toolOk("waiting for the user's yes (in words or on the card)", MashaAttachment.Confirm(w.id, w.kind, w.items), mutating = true)
+            }
+        }
+    }
+
+    /** "Sí" o "no" a la última tarjeta, dicho con palabras y resuelto por el modelo. */
+    private suspend fun confirmPending(a: JsonObject): ToolResult {
+        val w = writes.latest() ?: return toolFail("there is no confirm card waiting")
+        return when (a.str("answer")?.lowercase()) {
+            "confirm", "yes", "ok" -> {
+                val out = writes.confirm(w.id) ?: return toolFail("that card was already answered")
+                onMain { onConfirmAnswered(w.id, if (out.ok) ConfirmState.DONE else ConfirmState.CANCELLED) }
+                if (out.ok) toolOk("done: ${out.label}", MashaAttachment.Done(out.label), mutating = true) else toolFail("it could not be done: ${out.label}")
+            }
+            "cancel", "no" -> {
+                writes.cancel(w.id)
+                onMain { onConfirmAnswered(w.id, ConfirmState.CANCELLED) }
+                toolOk("cancelled; nothing was changed", mutating = true)
+            }
+            else -> toolFail("answer must be confirm or cancel")
+        }
     }
 
     private suspend fun filterLibrary(a: JsonObject): ToolResult {
@@ -318,21 +381,32 @@ class MashaActions(
         return toolOk("'${match.label}' added to the library", MashaAttachment.Games(null, listOf(key)), mutating = true)
     }
 
+    /** Ocultar una app de la biblioteca (nada se desinstala); se deshace volviéndola a añadir. */
     private suspend fun removeGame(title: String?): ToolResult {
-        val target = resolve(title) ?: return notFound(title)
-        if (target.what == What.Rom) {
-            return toolFail("'${target.title}' is a single ROM: it can be removed from its long-press menu, or its whole folder removed")
+        val target = when (val l = lookup(title)) {
+            is Lookup.Found -> l.target
+            is Lookup.Ambiguous -> return toolAmbiguous(title.orEmpty(), l.titles)
+            Lookup.Missing -> return notFound(title)
         }
+        if (target.what != What.App) {
+            return toolFail("'${target.title}' is a ROM or a folder: it can be removed from its long-press menu, not by you")
+        }
+        val app = vm.library.apps.firstOrNull { it.key == target.key } ?: return notFound(title)
         val removed = onMain { vm.removeFromLibrary(target.key) }
-        return if (removed) {
-            toolOk("'${target.title}' removed from the library; nothing was deleted from storage", MashaAttachment.Done("✕ ${target.title}"), mutating = true)
-        } else {
-            toolFail("could not remove '${target.title}'")
+        if (!removed) return toolFail("could not remove '${target.title}'")
+        writes.record("✕ ${target.title}") {
+            onMain { vm.addInstalledApp(app.packageName, app.displayTitle) }
+            "hiding of '${target.title}'"
         }
+        return toolOk("'${target.title}' hidden from the library; nothing was uninstalled or deleted", MashaAttachment.Done("✕ ${target.title}"), mutating = true)
     }
 
     private suspend fun setArt(title: String?, kindName: String?): ToolResult {
-        val target = resolve(title) ?: return notFound(title)
+        val target = when (val l = lookup(title)) {
+            is Lookup.Found -> l.target
+            is Lookup.Ambiguous -> return toolAmbiguous(title.orEmpty(), l.titles)
+            Lookup.Missing -> return notFound(title)
+        }
         val kind = when (kindName?.lowercase()) {
             "cover" -> ArtKind.Cover
             "background" -> ArtKind.Background
@@ -341,9 +415,16 @@ class MashaActions(
             else -> return toolFail("unknown image kind: $kindName")
         }
         if (kind == ArtKind.Cover && target.what != What.Rom) return toolFail("'${target.title}' uses an icon or logo, not a cover")
+        val before = onMain { metaOf(target.key) }
         val applied = vm.applyArtAuto(target.key, kind)
         return if (applied) {
             onMain { vm.materializeArt(target.key, kind) }
+            if (before != null) {
+                writes.record("🖼 ${target.title}") {
+                    onMain { vm.app.library.updateMeta(target.key) { before } }
+                    "$kindName of '${target.title}'"
+                }
+            }
             toolOk("applied the $kindName of '${target.title}'", MashaAttachment.Done("🖼 ${target.title}"), mutating = true)
         } else {
             toolFail("no configured service returned a $kindName for '${target.title}'")
@@ -361,13 +442,25 @@ class MashaActions(
     private suspend fun setAccent(accent: String?): ToolResult {
         val id = accent?.trim()?.lowercase().orEmpty()
         if (id !in MashaTools.ACCENTS) return toolFail("unknown accent: $accent")
+        val before = vm.settings.accentId
         onMain { vm.settings.setAccent(id) }
+        writes.record("◐ $id") {
+            onMain { vm.settings.setAccent(before) }
+            "accent change"
+        }
         return toolOk("accent set to $id", mutating = true)
     }
 
     private suspend fun setDarkMode(enabled: Boolean?): ToolResult {
         val dark = enabled ?: return toolFail("dark or light?")
+        val before = vm.settings.darkMode
         onMain { if (vm.settings.darkMode != dark) vm.settings.toggleDark() }
+        if (before != dark) {
+            writes.record(if (dark) "☾" else "☀") {
+                onMain { if (vm.settings.darkMode != before) vm.settings.toggleDark() }
+                "dark mode change"
+            }
+        }
         return toolOk(if (dark) "dark mode on" else "light mode on", mutating = true) { put("dark", dark) }
     }
 
@@ -377,16 +470,33 @@ class MashaActions(
 
     private data class Target(val key: String, val title: String, val what: What)
 
-    /** Del título al elemento: juegos (ROM o app) y, si no, carpetas por nombre de sistema. */
-    private suspend fun resolve(title: String?): Target? {
+    private sealed interface Lookup {
+        data class Found(val target: Target) : Lookup
+
+        /** Varios encajan: se pregunta cuál (ver [toolAmbiguous]); no se hace nada. */
+        data class Ambiguous(val titles: List<String>) : Lookup
+        data object Missing : Lookup
+    }
+
+    /**
+     * Del título al elemento: juegos (ROM o app, [TargetMatch]: si encajan
+     * varios, es ambiguo) y, si no, carpetas por nombre de sistema.
+     */
+    private suspend fun lookup(title: String?): Lookup {
         val q = title?.trim().orEmpty()
-        if (q.isEmpty()) return null
-        brain.knowledge.snapshot().resolve(q)?.let { g -> return Target(g.key, g.title, if (g.isApp) What.App else What.Rom) }
+        if (q.isEmpty()) return Lookup.Missing
+        val games = TargetMatch.candidates(q, brain.knowledge.snapshot().games) { it.title }
+        if (games.size == 1) return games[0].let { g -> Lookup.Found(Target(g.key, g.title, if (g.isApp) What.App else What.Rom)) }
+        if (games.size > 1) return Lookup.Ambiguous(games.map { it.title })
         val folders = vm.library.folders.mapNotNull { f -> Systems.byId(f.systemId)?.let { Target(f.key, it.name, What.Folder) } }
-        return folders.firstOrNull { it.title.equals(q, ignoreCase = true) }
+        val folder = folders.firstOrNull { it.title.equals(q, ignoreCase = true) }
             ?: folders.firstOrNull { it.title.contains(q, ignoreCase = true) }
             ?: folders.maxByOrNull { Names.similarity(q, it.title) }?.takeIf { Names.similarity(q, it.title) >= 0.7 }
+        return folder?.let { Lookup.Found(it) } ?: Lookup.Missing
     }
+
+    private fun metaOf(key: String): com.elyndra.launcher.data.GameMeta? =
+        vm.library.roms.firstOrNull { it.key == key }?.meta ?: vm.library.apps.firstOrNull { it.key == key }?.meta
 
     private fun notFound(title: String?) = toolFail("'${title.orEmpty()}' is not in the user's library")
 
