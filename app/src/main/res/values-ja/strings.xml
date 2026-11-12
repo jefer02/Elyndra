@@ -1164,7 +1164,6 @@
     <string name="lucy_off_jealous_devoted">えっ、うそでしょ！？誰それ？ 一番は私だと思ってたのに。</string>
     <string name="lucy_live">ライブ</string>
     <string name="lucy_live_system_stt">音声はシステムの音声認識サービスで処理されます。</string>
-    <string name="lucy_live_ended">ライブ会話を終了しました</string>
     <string name="lucy_mic_live_start">Lucyとライブで話す</string>
     <string name="lucy_mic_live_stop">ライブ会話を終える</string>
     <string name="lucy_mic_hold">長押しで話す</string>

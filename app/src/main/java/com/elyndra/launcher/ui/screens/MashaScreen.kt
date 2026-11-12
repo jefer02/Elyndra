@@ -234,14 +234,13 @@ fun MashaScreen(vm: ElyndraViewModel) {
                 masha.send(lang)
             }
         },
-        onError = { failure ->
+        onError = { failure, code ->
             pushToTalk = false
             val live = liveRef[0]
             val inLive = live != null && live.active
-            live?.takeIf { inLive }?.onEarsFailure(failure)
-            // En vivo, una escucha en silencio no es un error que contar: ya lo cuentan los turnos.
-            val quiet = failure == MashaEars.Failure.StreamUnsupported ||
-                inLive && (failure == MashaEars.Failure.NoMatch || failure == MashaEars.Failure.Busy)
+            live?.takeIf { inLive }?.onEarsFailure(failure, code)
+            // En vivo, los fallos del reconocedor se recuperan solos y en silencio (ver LiveVoice).
+            val quiet = failure == MashaEars.Failure.StreamUnsupported || inLive
             if (!quiet) {
                 val res = when (failure) {
                     MashaEars.Failure.Unavailable -> R.string.masha_mic_unavailable
@@ -274,7 +273,8 @@ fun MashaScreen(vm: ElyndraViewModel) {
             language = { vm.settings.lang },
             // Con auriculares su voz no vuelve al micrófono: hablar encima la corta siempre.
             voiceBargeIn = { vm.settings.lucyVoiceInterrupt || voice.audioRoute.kind != RouteKind.Speaker },
-            onEnded = { reason -> if (reason == LiveTurns.EndReason.Silence) vm.showToast(UiText.res(R.string.lucy_live_ended)) },
+            hasPermission = { ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED },
+            onEnded = { reason -> if (reason == LiveTurns.EndReason.Permission) vm.showToast(UiText.res(R.string.masha_mic_denied)) },
         ).also { liveRef[0] = it }
     }
     DisposableEffect(live) { onDispose { live.release() } }
@@ -296,7 +296,7 @@ fun MashaScreen(vm: ElyndraViewModel) {
     var pendingMic by remember { mutableStateOf<MicAction?>(null) }
     fun runMic(action: MicAction) {
         when (action) {
-            MicAction.Live -> live.toggle()
+            MicAction.Live -> live.start()
             MicAction.Talk -> {
                 pushToTalk = true
                 voice.stop()
@@ -318,7 +318,7 @@ fun MashaScreen(vm: ElyndraViewModel) {
         }
     }
     /** Tocar: la conversación en vivo, encendida o apagada. */
-    fun tapMic() = if (live.active) live.stop() else withMic(MicAction.Live)
+    fun tapMic() = if (live.active) live.lock() else withMic(MicAction.Live)
     /** Mantener: en vivo interrumpe a Lucy y escucha ya; si no, una frase. */
     fun holdMic() = if (live.active) live.bargeIn() else withMic(MicAction.Talk)
     /** Soltar: se cierra la frase (lo dicho se manda solo). */

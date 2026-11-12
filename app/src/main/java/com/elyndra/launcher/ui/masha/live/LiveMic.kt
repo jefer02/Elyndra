@@ -91,6 +91,8 @@ class LiveMic(
     fun stop() {
         running = false
         closeStream()
+        // Si estaba esperando para reabrir, que no siga durmiendo (y no haya dos hilos al volver a empezar).
+        thread?.interrupt()
         thread?.join(500)
         thread = null
     }
@@ -122,17 +124,39 @@ class LiveMic(
             "AEC=${it.aec}, NS=${it.ns}, silero=${it.silero}, acoplamiento=${"%.1f".format(couplingDb)} dB"
     }
 
-    @SuppressLint("MissingPermission") // LiveVoice solo arranca con el permiso concedido
+    /**
+     * Mientras siga encendido: si el micrófono no se puede abrir o deja de dar
+     * audio (otro proceso se lo queda, error del driver), se suelta y se
+     * reabre con una espera creciente (250 ms … 4 s). La sesión no termina.
+     */
     private fun loop() {
+        var attempt = 0
+        while (running) {
+            val healthy = recordOnce()
+            if (!running) break
+            if (healthy) attempt = 0
+            val wait = (250L shl attempt.coerceAtMost(4)).coerceAtMost(4_000L)
+            attempt++
+            Log.w(TAG, "mic lost: reopening in ${wait}ms (attempt $attempt)")
+            try {
+                Thread.sleep(wait)
+            } catch (_: InterruptedException) {
+                break
+            }
+        }
+    }
+
+    /** Un arranque del micrófono; true si llegó a dar audio (para reiniciar la espera). */
+    @SuppressLint("MissingPermission") // LiveVoice solo arranca con el permiso concedido
+    private fun recordOnce(): Boolean {
         val min = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
         val record = runCatching {
             AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(min, FRAME * 2 * 8))
         }.getOrNull()
         if (record == null || record.state != AudioRecord.STATE_INITIALIZED) {
-            Log.w(TAG, "sin micrófono para la conversación en vivo")
+            Log.w(TAG, "mic unavailable (AudioRecord not initialized)")
             record?.release()
-            running = false
-            return
+            return false
         }
         val aec = runCatching { if (AcousticEchoCanceler.isAvailable()) AcousticEchoCanceler.create(record.audioSessionId)?.apply { enabled = true } else null }.getOrNull()
         val ns = runCatching { if (NoiseSuppressor.isAvailable()) NoiseSuppressor.create(record.audioSessionId)?.apply { enabled = true } else null }.getOrNull()
@@ -147,16 +171,24 @@ class LiveMic(
         var prob = 0f
         var n = 0
         var level = 0f
+        var frames = 0
         try {
             record.startRecording()
+            if (record.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                Log.w(TAG, "mic refused to start recording")
+                return false
+            }
             while (running) {
                 var got = 0
                 while (got < FRAME && running) {
                     val r = record.read(frame, got, FRAME - got)
-                    if (r <= 0) break
+                    // Negativo: ERROR_DEAD_OBJECT, ERROR_INVALID_OPERATION…; se reabre (antes giraba en vacío).
+                    if (r < 0) throw IllegalStateException("AudioRecord.read error $r")
+                    if (r == 0) break
                     got += r
                 }
                 if (got < FRAME) continue
+                frames++
                 ring.write(frame)
                 pipe?.let { p ->
                     if (p.preroll) p.send(ring.last(SAMPLE_RATE * STREAM_PREROLL_MS / 1000)) else p.send(frame.copyOf())
@@ -189,7 +221,7 @@ class LiveMic(
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "micrófono en vivo parado", e)
+            Log.w(TAG, "mic stopped with an error", e)
         } finally {
             runCatching { record.stop() }
             aec?.release()
@@ -200,6 +232,7 @@ class LiveMic(
             Log.i(TAG, "micrófono suelto: ${report()}")
             main.post { onLevel(0f) }
         }
+        return frames > 0
     }
 
     /**

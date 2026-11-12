@@ -5,7 +5,7 @@ import com.elyndra.launcher.ui.masha.live.LiveTurns.EndReason
 import com.elyndra.launcher.ui.masha.live.LiveTurns.Event
 import com.elyndra.launcher.ui.masha.live.LiveTurns.State
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Los turnos de la conversación en vivo con el micrófono siempre abierto: pausa, muletilla, corte y fin. */
@@ -23,7 +23,7 @@ class LiveTurnsTest {
     @Test
     fun aFullTurnGoesBackToWaitingWithTheMicStillOpen() {
         val t = LiveTurns()
-        assertEquals(listOf(Effect.StopVoice, Effect.OpenMic), t.on(Event.Start))
+        assertEquals(listOf(Effect.OpenMic), t.on(Event.Start))
         assertEquals(State.Waiting, t.state)
         assertEquals(listOf(Effect.OpenRecognizer), t.on(Event.SpeechStart))
         assertEquals(State.UserSpeaking, t.state)
@@ -87,45 +87,115 @@ class LiveTurnsTest {
     }
 
     @Test
-    fun threeMinutesWithoutTheUserEndTheSessionOnlyWhileWaiting() {
-        assertEquals(180_000L, LiveTurns.IDLE_TIMEOUT_MS)
-        assertEquals(emptyList<Effect>(), speaking().on(Event.IdleTimeout))
-        val t = waiting()
-        assertEquals(listOf(Effect.StopVoice, Effect.CloseMic, Effect.End(EndReason.Silence)), t.on(Event.IdleTimeout))
-        assertFalse(t.active)
+    fun startingDoesNotCutWhatSheIsSaying() {
+        assertEquals(listOf(Effect.OpenMic), LiveTurns().on(Event.Start))
     }
 
     @Test
-    fun stopOrBackgroundReleaseEverythingFromAnyState() {
-        listOf(Event.Stop, Event.Background).forEach { ev ->
-            assertEquals(listOf(Effect.StopVoice, Effect.CloseMic, Effect.End(EndReason.Stopped)), waiting().on(ev))
+    fun onlyLeavingBackgroundTheLockOrAMissingPermissionEndTheSession() {
+        val reasons = mapOf(
+            Event.Leave to EndReason.Left,
+            Event.Background to EndReason.Background,
+            Event.Lock to EndReason.Locked,
+            Event.PermissionMissing to EndReason.Permission,
+        )
+        reasons.forEach { (ev, reason) ->
+            assertEquals(listOf(Effect.StopVoice, Effect.CloseMic, Effect.End(reason)), waiting().on(ev))
             assertEquals(
-                listOf(Effect.StopReply, Effect.StopVoice, Effect.CloseMic, Effect.End(EndReason.Stopped)),
+                listOf(Effect.StopReply, Effect.StopVoice, Effect.CloseMic, Effect.End(reason)),
                 speaking().on(ev),
             )
             val held = speaking().apply { on(Event.SpeechStart) }
             assertEquals(
-                listOf(Effect.CancelRecognizer, Effect.StopReply, Effect.StopVoice, Effect.CloseMic, Effect.End(EndReason.Stopped)),
+                listOf(Effect.CancelRecognizer, Effect.StopReply, Effect.StopVoice, Effect.CloseMic, Effect.End(reason)),
                 held.on(ev),
             )
             assertEquals(State.Idle, held.state)
             val hearing = waiting().apply { on(Event.SpeechStart) }
-            assertEquals(listOf(Effect.CancelRecognizer, Effect.StopVoice, Effect.CloseMic, Effect.End(EndReason.Stopped)), hearing.on(ev))
+            assertEquals(listOf(Effect.CancelRecognizer, Effect.StopVoice, Effect.CloseMic, Effect.End(reason)), hearing.on(ev))
         }
-        assertEquals(emptyList<Effect>(), LiveTurns().on(Event.Stop))
+        assertEquals(emptyList<Effect>(), LiveTurns().on(Event.Leave))
     }
 
     @Test
-    fun aFailureEndsTheSession() {
+    fun everyRecognizerErrorCodeKeepsTheSessionAlive() {
+        (1..15).forEach { code ->
+            // Mientras el usuario habla: vuelve a esperar y se recupera el reconocedor.
+            val hearing = waiting().apply { on(Event.SpeechStart) }
+            assertEquals(listOf(Effect.CancelRecognizer, Effect.RecoverRecognizer(code)), hearing.on(Event.RecognizerError(code)))
+            assertEquals(State.Waiting, hearing.state)
+            assertTrue(hearing.active)
+            // En una pausa sobre su voz: ella sigue.
+            val held = speaking().apply { on(Event.SpeechStart) }
+            assertEquals(listOf(Effect.CancelRecognizer, Effect.ResumeVoice), held.on(Event.RecognizerError(code)))
+            assertEquals(State.Speaking, held.state)
+            // En cualquier otro estado, un error tardío no hace nada.
+            listOf(waiting(), thinking(), speaking()).forEach { t ->
+                val before = t.state
+                assertEquals(emptyList<Effect>(), t.on(Event.RecognizerError(code)))
+                assertEquals(before, t.state)
+            }
+            // Y se puede seguir hablando.
+            assertEquals(listOf(Effect.OpenRecognizer), hearing.on(Event.SpeechStart))
+        }
+    }
+
+    @Test
+    fun aPauseWithNoTextResumesHerSpeechAndKeepsTheSession() {
+        val t = speaking().apply { on(Event.SpeechStart) }
+        assertEquals(State.Held, t.state)
+        assertEquals(listOf(Effect.CancelRecognizer, Effect.ResumeVoice), t.on(Event.HeardNothing))
+        assertEquals(State.Speaking, t.state)
+        val again = speaking().apply { on(Event.SpeechStart) }
+        assertEquals(listOf(Effect.CancelRecognizer, Effect.ResumeVoice), again.on(Event.Heard("  ")))
+        assertEquals(State.Speaking, again.state)
+        assertTrue(again.active)
+    }
+
+    @Test
+    fun tenEmptyResultsInARowKeepTheSession() {
         val t = waiting()
-        assertEquals(listOf(Effect.StopVoice, Effect.CloseMic, Effect.End(EndReason.Failed)), t.on(Event.Failed))
-        assertEquals(State.Idle, t.state)
+        repeat(10) {
+            t.on(Event.SpeechStart)
+            t.on(Event.TurnEnded)
+            if (it % 2 == 0) t.on(Event.HeardNothing) else t.on(Event.Heard(""))
+            assertEquals(State.Waiting, t.state)
+        }
+        assertTrue(t.active)
+        assertEquals(listOf(Effect.OpenRecognizer), t.on(Event.SpeechStart))
+    }
+
+    @Test
+    fun herVoiceStartingWhileWaitingCountsAsSpeaking() {
+        // Respuesta a algo escrito o tocado: hablarle encima la pausa igual.
+        val t = waiting()
+        assertEquals(listOf(Effect.WatchVoice), t.on(Event.ReplyStarted))
+        assertEquals(State.Speaking, t.state)
+        assertEquals(listOf(Effect.PauseVoice, Effect.OpenRecognizer), t.on(Event.SpeechStart))
+        t.on(Event.Resume)
+        assertEquals(emptyList<Effect>(), t.on(Event.ReplyFinished))
+        assertEquals(State.Waiting, t.state)
+    }
+
+    @Test
+    fun theBackoffGrowsAndResets() {
+        val b = RecognizerBackoff()
+        assertEquals(listOf(250L, 500L, 1_000L, 2_000L, 4_000L, 4_000L), List(6) { b.next() })
+        b.reset()
+        assertEquals(250L, b.next())
+    }
+
+    @Test
+    fun transitionsAreLoggedWithoutWhatTheUserSaid() {
+        val line = LiveTurns.describe(Event.Heard("my secret"), State.UserSpeaking, State.Thinking, listOf(Effect.Send("my secret")))
+        assertEquals("event=Heard(9 chars) from=UserSpeaking to=Thinking effects=[Send]", line)
+        assertEquals("NO_MATCH", RecognizerErrors.name(7))
     }
 
     @Test
     fun eventsOutOfTurnAreIgnored() {
         val idle = LiveTurns()
-        listOf(Event.SpeechStart, Event.TurnEnded, Event.Heard("hello"), Event.ReplyFinished, Event.Resume, Event.Commit, Event.IdleTimeout)
+        listOf(Event.SpeechStart, Event.TurnEnded, Event.Heard("hello"), Event.ReplyFinished, Event.Resume, Event.Commit, Event.RecognizerError(7), Event.ReplyStarted)
             .forEach { assertEquals(emptyList<Effect>(), idle.on(it)) }
         assertEquals(State.Idle, idle.state)
         val t = thinking()

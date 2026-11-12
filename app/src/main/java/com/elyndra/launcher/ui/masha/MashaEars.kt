@@ -47,7 +47,7 @@ class MashaEars(
     private val presence: MashaPresence,
     private val onPartial: (String) -> Unit,
     private val onFinal: (String) -> Unit,
-    private val onError: (Failure) -> Unit,
+    private val onError: (Failure, Int) -> Unit,
 ) {
     enum class Failure { Unavailable, Permission, NoMatch, Network, Busy, StreamUnsupported }
 
@@ -79,7 +79,7 @@ class MashaEars(
 
     private fun listen(language: String, source: ParcelFileDescriptor?) {
         if (!available) {
-            onError(Failure.Unavailable)
+            onError(Failure.Unavailable, SpeechRecognizer.ERROR_CLIENT)
             return
         }
         stop()
@@ -157,7 +157,7 @@ class MashaEars(
             // Audio de fuera rechazado nada más empezar: este reconocedor no lo acepta.
             if (source != null && error in STREAM_ERRORS && SystemClock.elapsedRealtime() - startedAt < STREAM_PROBE_MS) {
                 stop()
-                onError(Failure.StreamUnsupported)
+                onError(Failure.StreamUnsupported, error)
                 return
             }
             // El del dispositivo no tiene este idioma (o no está descargado): se repite con el del sistema.
@@ -179,13 +179,13 @@ class MashaEars(
                 else -> Failure.NoMatch
             }
             stop()
-            onError(failure)
+            onError(failure, error)
         }
 
         override fun onResults(results: Bundle?) {
             val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
             stop()
-            if (text.isNotBlank()) onFinal(text) else onError(Failure.NoMatch)
+            if (text.isNotBlank()) onFinal(text) else onError(Failure.NoMatch, SpeechRecognizer.ERROR_NO_MATCH)
         }
 
         override fun onPartialResults(partialResults: Bundle?) {
@@ -213,14 +213,14 @@ fun rememberMashaEars(
     presence: MashaPresence,
     onPartial: (String) -> Unit,
     onFinal: (String) -> Unit,
-    onError: (MashaEars.Failure) -> Unit,
+    onError: (MashaEars.Failure, Int) -> Unit,
 ): MashaEars {
     val context = LocalContext.current
     val partial by rememberUpdatedState(onPartial)
     val final by rememberUpdatedState(onFinal)
     val error by rememberUpdatedState(onError)
     val ears = remember(presence) {
-        MashaEars(context, presence, { partial(it) }, { final(it) }, { error(it) })
+        MashaEars(context, presence, { partial(it) }, { final(it) }, { f, code -> error(f, code) })
     }
     DisposableEffect(ears) {
         onDispose { ears.stop() }

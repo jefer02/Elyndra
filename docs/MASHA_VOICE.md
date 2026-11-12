@@ -70,9 +70,18 @@ MashaScreen ──feed(texto, final)──▶ MashaVoice ──▶ VoiceRouter �
 
 - **Tocar** el micrófono (o **Y** en el mando) enciende o apaga el modo en vivo; **mantener** es pulsar
   para hablar (al soltar se manda) o, en vivo, cortar a Lucy ya. El permiso se pide la primera vez.
-  Nunca se enciende solo; se apaga al salir de la pantalla, con la app al fondo o la pantalla apagada
-  (`ON_STOP`, el micrófono se suelta en el momento), al tocar otra vez o a los **3 minutos** sin que el
-  usuario diga nada (`LiveTurns.IDLE_TIMEOUT_MS`). El punto "EN VIVO" late mientras el micrófono está abierto.
+  Solo terminan la sesión: salir de la pantalla, la app al fondo o la pantalla apagada (`ON_STOP`, el
+  micrófono se suelta en el momento), bloquear el micrófono y que falte el permiso
+  (`LiveTurns.EndReason`). **Nada de lo que oye la termina** (v4): ni el silencio (no hay temporizador de
+  inactividad), ni una pausa, ni un resultado vacío, ni ningún código de error del reconocedor
+  (`Event.RecognizerError`: se vuelve a escuchar; si sigue hablando, se reabre con espera creciente
+  250 ms → 4 s, `RecognizerBackoff`). Si `AudioRecord` falla o no abre, `LiveMic` lo suelta y lo reabre
+  con la misma espera. El punto "EN VIVO" late mientras el micrófono está abierto.
+- **Causa del corte "Conversación en vivo terminada" (v3)**: el temporizador de 3 minutos solo se reiniciaba
+  al entrar en Waiting o con voz del usuario; cuando Lucy hablaba sin turno de voz (respuesta a algo escrito
+  o tocado, el "sí" a una tarjeta, el saludo) la sesión seguía en Waiting y, pasados 3 minutos desde lo
+  último *dicho*, el `IdleTimeout` la cortaba a media frase. Ahora su voz en Waiting pasa a Speaking
+  (`ReplyStarted` → `WatchVoice`) y el temporizador ya no existe.
 - **Micrófono siempre abierto** (`LiveMic`): `AudioRecord` con `VOICE_RECOGNITION` a 16 kHz, **sin modo
   llamada** (la voz de Lucy sigue en `USAGE_ASSISTANT` con calidad normal y la música no cambia), con
   `AcousticEchoCanceler`/`NoiseSuppressor` si el móvil los deja usar fuera de una llamada. Tramos de 16 ms:
@@ -99,7 +108,8 @@ MashaScreen ──feed(texto, final)──▶ MashaVoice ──▶ VoiceRouter �
   acepta audio de fuera (error al empezar), **relevo**: se suelta nuestro micrófono y escucha él (se pierden
   ~300–600 ms del principio); igual en Android 12 o menos. Reconocedor del dispositivo si lo hay y tiene el
   idioma; si no, el del sistema (y se avisa).
-- **Log `LucyLive`**: por turno, fin de voz → texto final y fin de voz → primera palabra de Lucy; por pausa,
+- **Log `LucyLive`** (`adb logcat -s LucyLive`): cada transición (`event=… from=… to=… effects=[…]`, sin
+  el texto del usuario), cada error del reconocedor con su código y nombre, cada recuperación, `end reason=…`; por turno, fin de voz → texto final y fin de voz → primera palabra de Lucy; por pausa,
   muletilla o corte; al cerrar, pausas/siguió/cortes y lo que vio el micrófono (tramos con Lucy, eco
   descartado, voz sobre Lucy, AEC/NS, Silero, acoplamiento). Falso disparo = pausa que sigue sin texto.
 - Medido sin móvil (`SpeakerEchoSimulationTest`, voz sintética, VAD de energía): volumen medio 0 falsos/min,

@@ -24,15 +24,22 @@ import kotlinx.coroutines.withTimeoutOrNull
  *
  * Une [LiveTurns] (quién tiene la palabra) con las piezas de Android:
  * - [LiveMic]: el micrófono abierto, que avisa cuando el usuario empieza y
- *   termina de hablar sin confundirse con la voz de ella.
- * - El reconocedor ([MashaEars]): en Android 13+ escucha nuestro audio por un
- *   pipe (con el último segundo, así no se pierde el principio); si no puede,
- *   "relevo": se suelta el micrófono y escucha él (se pierde algo del
- *   principio, ver docs/MASHA_VOICE.md).
+ *   termina de hablar sin confundirse con la voz de ella. Mientras nadie
+ *   habla solo trabaja el VAD (barato); si el micrófono falla, se reabre solo.
+ * - El reconocedor ([MashaEars]): solo mientras el usuario habla. En Android
+ *   13+ escucha nuestro audio por un pipe (con el último segundo, así no se
+ *   pierde el principio); si no puede, "relevo": se suelta el micrófono y
+ *   escucha él (se pierde algo del principio, ver docs/MASHA_VOICE.md). Sus
+ *   errores nunca terminan la sesión: se vuelve a escuchar, con una espera
+ *   creciente ([RecognizerBackoff]) si fallan seguidos.
  * - La voz ([MashaVoice]): pausa al instante cuando el usuario habla encima;
  *   [HoldDecision] decide si era una muletilla (sigue) o va en serio (se corta
- *   y lo dicho queda en el hilo como interrumpido).
+ *   y lo dicho queda en el hilo como interrumpido). Cuando ella habla sin turno
+ *   de voz (algo escrito o tocado), la sesión pasa igual a "habla".
  * - [MashaController]: la misma conversación del chat, con herramientas y sin conexión.
+ *
+ * Cada transición y cada fin se apuntan en el log con la etiqueta `LucyLive`
+ * (`adb logcat -s LucyLive`), así se ve por qué terminó una sesión.
  *
  * Con [voiceBargeIn] apagado (ajuste "Interrumpir con la voz por el altavoz",
  * sin auriculares), lo que se oye mientras ella habla no la corta: solo el botón.
@@ -47,12 +54,18 @@ class LiveVoice(
     private val scope: CoroutineScope,
     private val language: () -> String,
     private val voiceBargeIn: () -> Boolean,
+    private val hasPermission: () -> Boolean,
     private val onEnded: (LiveTurns.EndReason) -> Unit,
 ) {
     private val turns = LiveTurns()
     private var watcher: Job? = null
     private var holdJob: Job? = null
-    private var idleJob: Job? = null
+    private var voiceJob: Job? = null
+    private var openJob: Job? = null
+    private val backoff = RecognizerBackoff()
+
+    /** Antes de esto no se vuelve a abrir el reconocedor (tras fallos seguidos). */
+    private var recognizerReadyAt = 0L
 
     var state by mutableStateOf(LiveTurns.State.Idle)
         private set
@@ -76,20 +89,30 @@ class LiveVoice(
     private var holds = 0
     private var resumes = 0
     private var commits = 0
+    private var errors = 0
     private var speechEndAt = 0L
 
-    fun toggle() = dispatch(if (active) LiveTurns.Event.Stop else LiveTurns.Event.Start)
+    fun start() {
+        if (active) return
+        if (!hasPermission()) {
+            Log.i(TAG, "start refused reason=Permission")
+            return
+        }
+        dispatch(LiveTurns.Event.Start)
+    }
 
-    fun stop() = dispatch(LiveTurns.Event.Stop)
+    /** El usuario bloquea el micrófono. */
+    fun lock() = dispatch(LiveTurns.Event.Lock)
 
-    /** La app se va al fondo, se apaga la pantalla o se sale: se suelta el micrófono. */
+    /** La app se va al fondo o se apaga la pantalla: se suelta el micrófono. */
     fun background() = dispatch(LiveTurns.Event.Background)
 
     /** El botón mantenido mientras ella habla o piensa: se corta ya. */
     fun bargeIn() = dispatch(LiveTurns.Event.Commit)
 
+    /** Se sale de la pantalla de Lucy. */
     fun release() {
-        stop()
+        dispatch(LiveTurns.Event.Leave)
         mic.stop()
     }
 
@@ -99,7 +122,6 @@ class LiveVoice(
         if (!active || handoff) return
         when (signal) {
             SpeechSegmenter.Signal.Started -> {
-                restartIdle()
                 if (state == LiveTurns.State.Speaking && !voiceBargeIn()) {
                     // Por el altavoz sin interrumpir con la voz: lo que se oye mientras habla no cuenta.
                     mic.clearTurn()
@@ -126,48 +148,56 @@ class LiveVoice(
 
     fun onHeard(text: String) {
         if (!active) return
-        if (speechEndAt > 0) Log.i(TAG, "fin de voz → texto final: ${SystemClock.elapsedRealtime() - speechEndAt} ms")
+        if (speechEndAt > 0) Log.i(TAG, "latency speechEnd→final=${SystemClock.elapsedRealtime() - speechEndAt}ms")
+        backoff.reset()
         if (state == LiveTurns.State.Held) {
             // Terminó dentro de la pausa: se decide con el texto final (el reconocedor aún cuenta como abierto).
             partial = text
             decideHold(final = true)
         }
-        recognizerDone()
+        recognizerDone(clearTurn = true)
         if (state == LiveTurns.State.UserSpeaking) dispatch(LiveTurns.Event.Heard(text))
         partial = ""
     }
 
-    fun onEarsFailure(failure: MashaEars.Failure) {
+    fun onEarsFailure(failure: MashaEars.Failure, code: Int) {
         if (!active) return
+        errors++
+        Log.i(TAG, "recognizer error code=$code (${RecognizerErrors.name(code)}) failure=$failure state=$state")
         if (failure == MashaEars.Failure.StreamUnsupported) {
-            Log.i(TAG, "el reconocedor no acepta audio de fuera: relevo")
+            Log.i(TAG, "recognizer refuses our stream: handoff from now on")
             streamUnsupported = true
             hearing = false
             mic.closeStream()
             if (state == LiveTurns.State.UserSpeaking) startHandoff()
             return
         }
-        when (failure) {
-            MashaEars.Failure.NoMatch, MashaEars.Failure.Busy, MashaEars.Failure.StreamUnsupported -> {
-                if (state == LiveTurns.State.Held) {
-                    partial = ""
-                    decideHold(final = true)
-                }
-                recognizerDone()
-                dispatch(LiveTurns.Event.HeardNothing)
-            }
-            MashaEars.Failure.Unavailable, MashaEars.Failure.Permission, MashaEars.Failure.Network -> {
-                recognizerDone()
-                dispatch(LiveTurns.Event.Failed)
-            }
+        // Lo único del reconocedor que termina la sesión: que de verdad falte el permiso del micrófono.
+        if (failure == MashaEars.Failure.Permission && !hasPermission()) {
+            recognizerDone(clearTurn = true)
+            dispatch(LiveTurns.Event.PermissionMissing)
+            return
+        }
+        if (state == LiveTurns.State.Held) {
+            partial = ""
+            decideHold(final = true)
+        }
+        if (failure == MashaEars.Failure.NoMatch) {
+            recognizerDone(clearTurn = true)
+            dispatch(LiveTurns.Event.HeardNothing)
+        } else {
+            // Si sigue hablando, el turno sigue abierto y se vuelve a escuchar (RecoverRecognizer).
+            recognizerDone(clearTurn = false)
+            dispatch(LiveTurns.Event.RecognizerError(code))
         }
     }
 
     /** El reconocedor terminó (bien o mal): el turno se cierra y, en relevo, vuelve nuestro micrófono. */
-    private fun recognizerDone() {
+    private fun recognizerDone(clearTurn: Boolean) {
         hearing = false
+        openJob?.cancel()
         mic.closeStream()
-        mic.clearTurn()
+        if (clearTurn) mic.clearTurn()
         if (handoff) {
             handoff = false
             if (active) mic.start()
@@ -177,24 +207,27 @@ class LiveVoice(
     /* ── turnos ── */
 
     private fun dispatch(event: LiveTurns.Event) {
+        val from = turns.state
         val effects = turns.on(event)
         state = turns.state
+        if (from != turns.state || effects.isNotEmpty()) Log.i(TAG, LiveTurns.describe(event, from, turns.state, effects))
         effects.forEach(::run)
-        if (state == LiveTurns.State.Waiting) restartIdle()
     }
 
     private fun run(effect: LiveTurns.Effect) {
         when (effect) {
             LiveTurns.Effect.OpenMic -> {
-                holds = 0; resumes = 0; commits = 0
+                holds = 0; resumes = 0; commits = 0; errors = 0
+                backoff.reset()
                 mic.start()
-                restartIdle()
+                followVoice()
             }
             LiveTurns.Effect.CloseMic -> {
-                idleJob?.cancel()
+                voiceJob?.cancel()
+                openJob?.cancel()
                 mic.stop()
                 presence.listening = false
-                Log.i(TAG, "sesión: pausas=$holds, siguió=$resumes, cortes=$commits; ${mic.report()}")
+                Log.i(TAG, "session stats holds=$holds resumes=$resumes commits=$commits recognizerErrors=$errors; ${mic.report()}")
             }
             LiveTurns.Effect.OpenRecognizer -> openRecognizer()
             LiveTurns.Effect.FinishRecognizer -> if (hearing && !handoff) {
@@ -203,6 +236,7 @@ class LiveVoice(
             }
             LiveTurns.Effect.CancelRecognizer -> {
                 hearing = false
+                openJob?.cancel()
                 mic.closeStream()
                 ears.stop()
                 mic.clearTurn()
@@ -211,6 +245,13 @@ class LiveVoice(
                     handoff = false
                     if (active) mic.start()
                 }
+            }
+            is LiveTurns.Effect.RecoverRecognizer -> {
+                val wait = backoff.next()
+                recognizerReadyAt = SystemClock.elapsedRealtime() + wait
+                Log.i(TAG, "recover code=${effect.code} retryInMs=$wait consecutiveFailures=${backoff.failures} stillTalking=${mic.inTurn}")
+                // Sigue hablando: se vuelve a escuchar (tras la espera); si no, el próximo turno abre solo.
+                if (mic.inTurn) dispatch(LiveTurns.Event.SpeechStart) else mic.clearTurn()
             }
             LiveTurns.Effect.PauseVoice -> {
                 holds++
@@ -227,6 +268,7 @@ class LiveVoice(
                 holdJob?.cancel()
                 voice.stop()
             }
+            LiveTurns.Effect.WatchVoice -> watchDrain()
             LiveTurns.Effect.StopReply -> {
                 watcher?.cancel()
                 masha.stop()
@@ -245,15 +287,33 @@ class LiveVoice(
             is LiveTurns.Effect.End -> {
                 watcher?.cancel()
                 holdJob?.cancel()
+                voiceJob?.cancel()
+                openJob?.cancel()
                 hearing = false
                 handoff = false
                 partial = ""
+                Log.i(TAG, "end reason=${effect.reason}")
                 onEnded(effect.reason)
             }
         }
     }
 
     private fun openRecognizer() {
+        if (hearing) return
+        val wait = recognizerReadyAt - SystemClock.elapsedRealtime()
+        if (wait > 0) {
+            // Tras fallos seguidos: se espera un poco (el pipe guarda el último segundo, no se pierde el principio).
+            openJob?.cancel()
+            openJob = scope.launch {
+                delay(wait)
+                if (state == LiveTurns.State.UserSpeaking || state == LiveTurns.State.Held) openRecognizerNow()
+            }
+            return
+        }
+        openRecognizerNow()
+    }
+
+    private fun openRecognizerNow() {
         if (hearing) return
         partial = ""
         presence.listening = true
@@ -304,11 +364,11 @@ class LiveVoice(
         when (decision) {
             HoldDecision.Decision.Wait -> Unit
             HoldDecision.Decision.Resume -> {
-                Log.i(TAG, "muletilla (\"$partial\"): sigue tras $heldMs ms")
+                Log.i(TAG, "hold decision=Resume heldMs=$heldMs partialChars=${partial.length}")
                 dispatch(LiveTurns.Event.Resume)
             }
             HoldDecision.Decision.Commit -> {
-                Log.i(TAG, "interrumpida (\"$partial\") a los $heldMs ms de la pausa")
+                Log.i(TAG, "hold decision=Commit heldMs=$heldMs partialChars=${partial.length}")
                 dispatch(LiveTurns.Event.Commit)
                 // Si ya terminó de hablar dentro de la pausa (y el reconocedor sigue), el turno se cierra ya.
                 if (!final && !mic.inTurn && !handoff) dispatch(LiveTurns.Event.TurnEnded)
@@ -316,22 +376,23 @@ class LiveVoice(
         }
     }
 
-    private fun restartIdle() {
-        idleJob?.cancel()
-        if (!active) return
-        idleJob = scope.launch {
-            delay(LiveTurns.IDLE_TIMEOUT_MS)
-            dispatch(LiveTurns.Event.IdleTimeout)
+    /** Toda la sesión: si la voz empieza a sonar con la sesión esperando, ella "habla" (ReplyStarted). */
+    private fun followVoice() {
+        voiceJob?.cancel()
+        voiceJob = scope.launch {
+            snapshotFlow { presence.speaking }.collect { speaking ->
+                if (speaking && state == LiveTurns.State.Waiting) dispatch(LiveTurns.Event.ReplyStarted)
+            }
         }
     }
 
-    /** Sigue la respuesta: cuándo empieza a sonar y cuándo ha terminado del todo. */
+    /** Sigue la respuesta de un turno de voz: cuándo empieza a sonar y cuándo ha terminado del todo. */
     private fun watch() {
         watcher?.cancel()
         watcher = scope.launch {
             launch {
                 snapshotFlow { presence.speaking }.first { it }
-                if (speechEndAt > 0) Log.i(TAG, "fin de voz → primera palabra de Lucy: ${SystemClock.elapsedRealtime() - speechEndAt} ms")
+                if (speechEndAt > 0) Log.i(TAG, "latency speechEnd→firstWord=${SystemClock.elapsedRealtime() - speechEndAt}ms")
                 dispatch(LiveTurns.Event.ReplyStarted)
             }
             snapshotFlow { masha.busy }.first { !it }
@@ -342,6 +403,20 @@ class LiveVoice(
                 withTimeoutOrNull(NO_VOICE_MS) { snapshotFlow { presence.speaking }.first { it } } != null
             val drained = sounding && withTimeoutOrNull(MAX_SPEAK_MS) {
                 snapshotFlow { voice.queued || voice.paused }.first { !it }
+            } != null
+            if (!drained) voice.stop()
+            dispatch(LiveTurns.Event.ReplyFinished)
+        }
+    }
+
+    /** Ella habla sin turno de voz: se espera a que termine la respuesta y se calle. */
+    private fun watchDrain() {
+        watcher?.cancel()
+        watcher = scope.launch {
+            snapshotFlow { masha.busy }.first { !it }
+            delay(SETTLE_MS)
+            val drained = withTimeoutOrNull(MAX_SPEAK_MS) {
+                snapshotFlow { voice.queued || voice.paused || presence.speaking }.first { !it }
             } != null
             if (!drained) voice.stop()
             dispatch(LiveTurns.Event.ReplyFinished)

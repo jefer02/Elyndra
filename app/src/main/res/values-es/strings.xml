@@ -1214,7 +1214,6 @@ Hecho por la comunidad, sin revisar. Mira el repositorio antes de instalar.</str
     <string name="lucy_off_jealous_devoted">Uf, ¿en serio? ¿Quién es esa? Creía que yo era tu favorita.</string>
     <string name="lucy_live">En vivo</string>
     <string name="lucy_live_system_stt">Tu voz la procesa el servicio de reconocimiento de voz del sistema.</string>
-    <string name="lucy_live_ended">Conversación en vivo terminada</string>
     <string name="lucy_mic_live_start">Empezar una conversación en vivo con Lucy</string>
     <string name="lucy_mic_live_stop">Terminar la conversación en vivo</string>
     <string name="lucy_mic_hold">Mantén para hablar</string>
