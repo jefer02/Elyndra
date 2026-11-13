@@ -527,4 +527,33 @@ class LiveVoiceTest {
         assertEquals(listOf("cuéntame un chiste"), h.chat.sent)
         assertTrue("sent ${elapsed}ms after the user stopped", elapsed <= 1_500)
     }
+
+    @Test
+    fun aRecognizerWithoutNetworkShowsTheOfflineStatusUntilItAnswersAgain() = runTest {
+        val h = Harness(this)
+        h.start()
+        repeat(2) {
+            h.mic.clearTurn()
+            h.userSpeaks()
+            h.live.onEarsFailure(MashaEars.Failure.Network, 2)
+            advanceTimeBy(RecognizerBackoff.MAX_MS)
+            h.settle()
+        }
+        assertTrue(h.live.offline)
+        assertTrue(h.live.active) // la escucha sigue
+        h.mic.clearTurn()
+        h.userSpeaks()
+        h.live.onHeard("ya hay red")
+        assertFalse(h.live.offline)
+        assertEquals(listOf("ya hay red"), h.chat.sent)
+    }
+
+    @Test
+    fun oneNetworkHiccupIsNotWorthAStatus() = runTest {
+        val h = Harness(this)
+        h.start()
+        h.userSpeaks()
+        h.live.onEarsFailure(MashaEars.Failure.Network, 2)
+        assertFalse(h.live.offline)
+    }
 }

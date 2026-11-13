@@ -182,6 +182,10 @@ class LiveVoice(
     var struggling by mutableStateOf(false)
         private set
 
+    /** El reconocedor falla seguido por la red: la interfaz dice "No te escucho: sin conexión" hasta que vuelva. */
+    var offline by mutableStateOf(false)
+        private set
+
     /** El reconocedor escucha (pipe o relevo). */
     private var hearing = false
 
@@ -296,6 +300,8 @@ class LiveVoice(
             endTurn(endVia ?: TurnEnd.Error, "", recognizerEnded = true)
             return
         }
+        if (code == HearingHealth.NO_MATCH) health.onRecognizerWorked() else health.onRecognizerError(code)
+        updateStruggling()
         if (failure == MashaEars.Failure.StreamUnsupported) {
             log("recognizer refuses our stream: handoff from now on")
             streamUnsupported = true
@@ -353,6 +359,7 @@ class LiveVoice(
 
     /** Un turno del usuario terminó con o sin texto: ¿el reconocedor oye de verdad? */
     private fun noteTurn(gotText: Boolean, speechMs: Int, wasStream: Boolean) {
+        if (gotText) health.onRecognizerWorked()
         val advice = health.onTurn(gotText, speechMs, wasStream)
         log("turn result text=$gotText speechMs=$speechMs via=${if (wasStream) "stream" else "mic"} missesInARow=${health.misses}")
         if (advice == HearingHealth.Advice.UseHandoff && !streamUnsupported) {
@@ -363,6 +370,10 @@ class LiveVoice(
     }
 
     private fun updateStruggling() {
+        if (health.offline != offline) {
+            offline = health.offline
+            log("hearing offline=$offline networkFailuresInARow=${health.networkFailures}")
+        }
         val now = health.struggling
         if (now == struggling) return
         struggling = now
@@ -551,6 +562,7 @@ class LiveVoice(
                 partial = ""
                 health.reset()
                 struggling = false
+                offline = false
                 log("end reason=${effect.reason}")
                 onEnded(effect.reason)
             }

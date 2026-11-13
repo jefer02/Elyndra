@@ -54,6 +54,7 @@ object MashaTools {
     const val INSTALL_PORT = "install_port"
     const val RECOMMEND = "show_recommendations"
     const val CONFIRM_PENDING = "confirm_pending"
+    const val GET_DEVICE_STATE = "get_device_state"
 
     /** Cuántas tarjetas como mucho en una recomendación. */
     const val MAX_PICKS = 4
@@ -144,6 +145,7 @@ object MashaTools {
             tool(CURATION_REPORT, "Library clean-up findings: duplicates, incomplete multi-disc sets, poorly named ROMs, mixed regions, and series groups.") {
                 enum("detail", "Which part to detail.", listOf("summary", "duplicates", "incomplete_sets", "poorly_named", "mixed_regions", "series"))
             },
+            tool(GET_DEVICE_STATE, "Battery %, charging, power save and temperature of this device right now. Read-only. Call it ONLY when the user asks about the device (battery, charge, heat); never on your own.") {},
             tool(GET_STATS, "Playtime statistics: totals, per system, top games, sessions and trends.") {
                 enum("period", "Time window.", listOf("week", "month", "year", "all"))
             },

@@ -43,4 +43,15 @@ class PortDisplayTest {
             assertEquals(it, PortDisplay.portName(soh.copy(name = it)))
         }
     }
+
+    @Test fun `the store line drops a raw id but keeps the developer`() {
+        assertEquals(PortDisplay.PortLine(null, "HarbourMasters"), PortDisplay.portLine(soh.copy(name = "soh_android")))
+    }
+
+    @Test fun `a variant row is titled by its maker when the port name is an id`() {
+        assertEquals("Ship of Harkinian" to "HarbourMasters", PortDisplay.variant(soh))
+        assertEquals("HarbourMasters" to null, PortDisplay.variant(soh.copy(name = "soh_android")))
+        // Sin desarrollador, el dueño del repositorio.
+        assertEquals("linkzenic" to null, PortDisplay.variant(soh.copy(name = "soh_android", developer = null)))
+    }
 }

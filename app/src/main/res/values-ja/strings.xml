@@ -565,6 +565,7 @@
     <string name="masha_mic_no_match">聞き取れませんでした。もう一度どうぞ。</string>
     <string name="masha_mic_network">音声認識には接続が必要です。</string>
     <string name="masha_sound">サウンド</string>
+    <string name="masha_sound_muted">サウンド（Lucyの声はミュート）</string>
     <string name="masha_sound_ambient">環境音</string>
     <string name="masha_sound_volume">環境音の音量</string>
     <string name="masha_sound_voice">Lucyの声</string>
@@ -1177,6 +1178,7 @@
     <string name="settings_lucy_voice_interrupt_desc">ライブ会話中にLucyの話にかぶせて話すと、彼女は話を止めて聞きます。この端末で勝手に止まってしまう場合はオフにして、マイクボタンを使ってください。ヘッドホンでは常に使えます。</string>
     <string name="lucy_live_listening">聞いています</string>
     <string name="lucy_live_struggling">うまく聞き取れないよ。近くで話すか、文字で送ってね。</string>
+    <string name="lucy_live_offline">聞き取れません：接続なし</string>
     <string name="lucy_live_talking">Lucyが話しています</string>
     <string name="lucy_live_thinking">考え中…</string>
     <string name="lucy_live_hearing">あなたが話しています</string>

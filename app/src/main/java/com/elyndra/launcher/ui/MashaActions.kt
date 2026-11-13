@@ -26,6 +26,7 @@ import com.elyndra.launcher.masha.bool
 import com.elyndra.launcher.masha.playStateName
 import com.elyndra.launcher.masha.str
 import com.elyndra.launcher.masha.toolFail
+import com.elyndra.launcher.masha.DeviceTool
 import com.elyndra.launcher.masha.toolOk
 import com.elyndra.launcher.metadata.ArtKind
 import kotlinx.coroutines.Dispatchers
@@ -87,6 +88,7 @@ class MashaActions(
             MashaTools.UPDATE_METADATA -> updateMetadata(a)
             MashaTools.CURATION_REPORT -> skills.curationReport(a)
             MashaTools.GET_STATS -> skills.stats(a)
+            MashaTools.GET_DEVICE_STATE -> DeviceTool.result(runCatching { brain.device.snapshot() }.getOrNull())
             MashaTools.REMEMBER -> skills.remember(a)
             MashaTools.FORGET -> skills.forget(a)
             MashaTools.FILTER_LIBRARY -> filterLibrary(a)

@@ -373,6 +373,7 @@ fun MashaScreen(vm: ElyndraViewModel) {
         asking = askingMic,
         liveState = live.state,
         struggling = live.active && live.struggling,
+        offline = live.active && live.offline,
         systemStt = ears.processedBySystem && (live.active || presence.listening),
         onTap = ::tapMic,
         onHoldStart = ::holdMic,
@@ -428,8 +429,9 @@ fun MashaScreen(vm: ElyndraViewModel) {
     }
     // Una pregunta nueva corta lo que estuviera diciendo.
     LaunchedEffect(masha.busy) { if (masha.busy) voice.stop() }
-    // Habla mientras llega el texto: frase a frase. En vivo habla siempre (aunque la voz esté apagada), y con el micrófono bloqueado también.
-    val speakReplies = settings.mashaVoice || live.active || micState != MicLock.State.Live
+    // Habla mientras llega el texto: frase a frase. Con la voz silenciada (el altavoz de la cabecera), solo
+    // subtítulos; la escucha en vivo sigue igual.
+    val speakReplies = settings.mashaVoice
     // Con tarjetas solo dice la frase corta (ReplyShape): los detalles se ven en ellas.
     LaunchedEffect(last?.id, last?.text?.length, last?.pending, last?.attachment, speakReplies) {
         if (last == null || !last.fromMasha || last.restored || last.id == alreadyShown || !speakReplies) return@LaunchedEffect
@@ -694,7 +696,7 @@ private fun TopBar(
             }
             HoloIcon(stringResource(if (chatOpen) R.string.masha_hide_chat else R.string.masha_show_chat), glow, onClick = onToggleChat) { ChatGlyph(chatOpen) }
             Spacer(Modifier.width(8.dp))
-            HoloIcon(stringResource(R.string.masha_sound), glow, onClick = onSound) { SpeakerGlyph(vm.settings.mashaSoundscape) }
+            HoloIcon(stringResource(if (vm.settings.mashaVoice) R.string.masha_sound else R.string.masha_sound_muted), glow, onClick = onSound) { SpeakerGlyph(vm.settings.mashaVoice) }
             Spacer(Modifier.width(8.dp))
             HoloIcon(stringResource(R.string.masha_recenter), glow, onClick = onRecenter) { RecenterGlyph() }
             Spacer(Modifier.width(8.dp))
@@ -1015,6 +1017,8 @@ private class MicActions(
     val liveState: LiveTurns.State,
     /** Varios turnos seguidos sin texto, o el micrófono mudo: "No te estoy escuchando bien". */
     val struggling: Boolean,
+    /** El reconocedor falla seguido por la red: "No te escucho: sin conexión", discreto, hasta que vuelva. */
+    val offline: Boolean,
     /** Se está oyendo con el servicio del sistema (el audio puede salir del móvil): se avisa. */
     val systemStt: Boolean,
     val onTap: () -> Unit,
@@ -1127,7 +1131,9 @@ private fun LiveStrip(mic: MicActions, glow: Color) {
                 Spacer(Modifier.width(5.dp))
                 ElyText(stringResource(R.string.lucy_live), size = 8.5f, weight = FontWeight.Bold, color = glow, uppercase = true, letterSpacing = tracking(0.2f))
                 Spacer(Modifier.width(6.dp))
-                if (mic.struggling) {
+                if (mic.offline) {
+                    ElyText(stringResource(R.string.lucy_live_offline), size = 8.5f, color = Holo.dim, maxLines = 2, lineHeightRatio = 1.3f)
+                } else if (mic.struggling) {
                     ElyText(stringResource(R.string.lucy_live_struggling), size = 8.5f, weight = FontWeight.Bold, color = LOCKED_RED, maxLines = 2, lineHeightRatio = 1.3f)
                 } else {
                     ElyText(stringResource(liveStateLabel(mic.liveState)), size = 8.5f, color = Holo.text)

@@ -15,11 +15,27 @@ object PortDisplay {
     /** El nombre que se enseña: el del juego original. */
     fun title(port: PortEntry): String = port.game.name.trim().ifEmpty { port.name.trim() }
 
-    /** El nombre del port y quién lo hace, para la línea secundaria (la UI pone "Port: …· por …"). */
-    data class PortLine(val portName: String, val developer: String?)
+    /**
+     * El nombre del port y quién lo hace, para la línea secundaria (la UI pone
+     * "Port: …· por …"). [portName] es null si el catálogo solo trae un
+     * identificador ("gow3_android"): entonces la línea va sin nombre.
+     */
+    data class PortLine(val portName: String?, val developer: String?)
 
-    fun portLine(port: PortEntry): PortLine =
-        PortLine(port.name.trim(), port.developer?.trim()?.takeIf { it.isNotEmpty() })
+    fun portLine(port: PortEntry): PortLine = PortLine(portName(port), developer(port))
+
+    /**
+     * Una fila de "Elige un port" (varios ports del mismo juego): el nombre del
+     * port y, debajo, quién lo hace. Si el nombre es un identificador, la fila
+     * se titula con quien lo hace y no lleva segunda línea.
+     */
+    fun variant(port: PortEntry): Pair<String, String?> {
+        val maker = developer(port) ?: port.releaseRepo.owner
+        val name = portName(port) ?: return maker to null
+        return name to maker
+    }
+
+    private fun developer(port: PortEntry): String? = port.developer?.trim()?.takeIf { it.isNotEmpty() }
 
     /**
      * El nombre del port para enseñarlo, o null si es un identificador (slug,

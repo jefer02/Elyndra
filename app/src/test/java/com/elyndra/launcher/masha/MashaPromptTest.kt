@@ -151,7 +151,15 @@ class MashaPromptTest {
     }
 
     @Test
-    fun theVersionIsBumpedForDeviceWarnings() {
-        assertEquals(12, MashaPrompt.VERSION)
+    fun theDeviceToolIsOnlyForQuestionsAboutTheDevice() {
+        assertTrue(prompt.contains("call get_device_state"))
+        assertTrue(prompt.contains("Never call it otherwise"))
+        assertFalse(MashaTools.GET_DEVICE_STATE in MashaTools.MUTATING)
+        assertTrue(MashaTools.specs.any { it.name == MashaTools.GET_DEVICE_STATE })
+    }
+
+    @Test
+    fun theVersionIsBumpedForTheDeviceTool() {
+        assertEquals(13, MashaPrompt.VERSION)
     }
 }

@@ -123,6 +123,11 @@ MashaScreen ──feed(texto, final)──▶ MashaVoice ──▶ VoiceRouter �
   turnos seguidos con voz (≥ 400 ms) y sin texto por el pipe → relevo hasta salir de la pantalla; **3
   seguidos** (por cualquier vía), o el micrófono dando ceros 5 s seguidos (otra app lo tiene) → bajo el
   dock "**No te estoy escuchando bien**" en vez de "Escuchando", hasta el siguiente texto.
+- **Sin conexión**: 2 errores de red seguidos del reconocedor (NETWORK_TIMEOUT, NETWORK, SERVER,
+  SERVER_DISCONNECTED: uno que solo funciona con conexión y no la tiene) → bajo el micrófono, discreto,
+  "**No te escucho: sin conexión**", hasta que el reconocedor vuelva a contestar (un texto o un NO_MATCH).
+- **Voz silenciada**: con "Voz de Lucy" apagada (panel del altavoz de la cabecera, cuyo icono sale tachado)
+  no habla nunca, tampoco en vivo ni con el micrófono bloqueado: contesta con subtítulos y la escucha sigue.
 - **Todo turno acaba en un envío** (v4.2): en vivo lo dicho va directo a la conversación (`MashaController.say`,
   el mismo camino que lo escrito: contexto, idioma y herramientas) y **nunca** pasa por el campo de texto. Antes
   los parciales se escribían en el campo y solo se mandaba si llegaba un resultado final con texto: si el

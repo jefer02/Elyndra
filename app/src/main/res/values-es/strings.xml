@@ -598,6 +598,7 @@
     <string name="masha_mic_no_match">No te he entendido. ¿Otra vez?</string>
     <string name="masha_mic_network">El reconocimiento de voz necesita conexión.</string>
     <string name="masha_sound">Sonido</string>
+    <string name="masha_sound_muted">Sonido (voz de Lucy silenciada)</string>
     <string name="masha_sound_ambient">Ambiente sonoro</string>
     <string name="masha_sound_volume">Volumen del ambiente</string>
     <string name="masha_sound_voice">Voz de Lucy</string>
@@ -1227,6 +1228,7 @@ Hecho por la comunidad, sin revisar. Mira el repositorio antes de instalar.</str
     <string name="settings_lucy_voice_interrupt_desc">En una conversación en vivo, si hablas encima de Lucy, se calla y te escucha. Si en este móvil se corta sola, apágalo y usa el botón del micrófono. Con auriculares funciona siempre.</string>
     <string name="lucy_live_listening">Escuchando</string>
     <string name="lucy_live_struggling">No te estoy escuchando bien. Acércate o escríbeme.</string>
+    <string name="lucy_live_offline">No te escucho: sin conexión</string>
     <string name="lucy_live_talking">Lucy está hablando</string>
     <string name="lucy_live_thinking">Pensando…</string>
     <string name="lucy_live_hearing">Estás hablando</string>

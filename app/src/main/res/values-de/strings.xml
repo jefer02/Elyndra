@@ -583,6 +583,7 @@
     <string name="masha_mic_no_match">Das habe ich nicht verstanden. Nochmal?</string>
     <string name="masha_mic_network">Spracherkennung braucht eine Verbindung.</string>
     <string name="masha_sound">Ton</string>
+    <string name="masha_sound_muted">Ton (Lucys Stimme stumm)</string>
     <string name="masha_sound_ambient">Klangkulisse</string>
     <string name="masha_sound_volume">Lautstärke der Kulisse</string>
     <string name="masha_sound_voice">Lucys Stimme</string>
@@ -1209,6 +1210,7 @@ Von der Community erstellt, nicht geprüft. Sieh dir vor der Installation das Re
     <string name="settings_lucy_voice_interrupt_desc">In einem Live-Gespräch hört Lucy auf und hört zu, wenn du dazwischensprichst. Unterbricht sie sich auf diesem Handy von selbst, schalte es aus und nutze die Mikrofontaste. Mit Kopfhörern klappt es immer.</string>
     <string name="lucy_live_listening">Hört zu</string>
     <string name="lucy_live_struggling">Ich höre dich nicht gut. Komm näher oder schreib mir.</string>
+    <string name="lucy_live_offline">Ich höre dich nicht: keine Verbindung</string>
     <string name="lucy_live_talking">Lucy spricht</string>
     <string name="lucy_live_thinking">Denkt nach…</string>
     <string name="lucy_live_hearing">Du sprichst</string>

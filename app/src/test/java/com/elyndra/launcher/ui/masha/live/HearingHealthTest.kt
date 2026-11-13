@@ -89,4 +89,23 @@ class HearingHealthTest {
         assertTrue(s.line("energy").contains("lucy=silent"))
         assertTrue(s.line("energy").contains("expectedEcho=none"))
     }
+
+    @Test
+    fun networkErrorsInARowMeanOfflineUntilTheRecognizerAnswers() {
+        val h = HearingHealth()
+        h.onRecognizerError(2)
+        assertFalse(h.offline)
+        h.onRecognizerError(11)
+        assertTrue(h.offline)
+        // Otros errores no dicen nada de la red.
+        h.onRecognizerWorked()
+        h.onRecognizerError(5)
+        h.onRecognizerError(3)
+        assertFalse(h.offline)
+        h.onRecognizerError(1)
+        h.onRecognizerError(4)
+        assertTrue(h.offline)
+        h.reset()
+        assertFalse(h.offline)
+    }
 }

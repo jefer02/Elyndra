@@ -307,10 +307,12 @@ private fun Variants(state: PortDetailState, actions: PortDetailActions) {
         if (state.siblings.size > 1) {
             VariantsLabel(stringResource(R.string.store_choose_port))
             state.siblings.forEach { p ->
+                // Nunca el identificador del catálogo ("gow3_android"): el nombre del port o quién lo hace.
+                val (title, maker) = PortDisplay.variant(p)
                 VariantRow(
                     selected = p.id == state.port.id,
-                    title = p.name,
-                    detail = p.developer ?: p.releaseRepo.owner,
+                    title = title,
+                    detail = maker.orEmpty(),
                     trailing = null,
                     onClick = { actions.select(p) },
                 )
@@ -321,9 +323,9 @@ private fun Variants(state: PortDetailState, actions: PortDetailActions) {
             VariantsLabel(stringResource(R.string.store_release))
             VariantRow(
                 selected = true,
-                title = latest?.asset?.name ?: tag ?: stringResource(R.string.store_latest_release),
-                detail = listOfNotNull(tag, latest?.asset?.size?.takeIf { it > 0 }?.let { formatSize(it) }).joinToString(" · ")
-                    .ifEmpty { state.port.releaseRepo.slug },
+                // La versión, no el nombre del archivo (game-arm64.apk).
+                title = tag ?: stringResource(R.string.store_latest_release),
+                detail = latest?.asset?.size?.takeIf { it > 0 }?.let { formatSize(it) } ?: state.port.releaseRepo.slug,
                 trailing = null,
                 onClick = {},
             )
@@ -358,7 +360,7 @@ private fun VariantRow(selected: Boolean, title: String, detail: String, trailin
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             ElyText(title, size = 14f, weight = FontWeight.Normal, color = Store.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            ElyText(detail, size = 10f, color = Store.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (detail.isNotBlank()) ElyText(detail, size = 10f, color = Store.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         trailing?.let {
             Spacer(Modifier.width(8.dp))

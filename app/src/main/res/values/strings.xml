@@ -589,6 +589,7 @@
     <string name="masha_mic_no_match">I didn’t catch that. Try again?</string>
     <string name="masha_mic_network">Speech recognition needs a connection.</string>
     <string name="masha_sound">Sound</string>
+    <string name="masha_sound_muted">Sound (Lucy’s voice muted)</string>
     <string name="masha_sound_ambient">Ambient soundscape</string>
     <string name="masha_sound_volume">Ambient volume</string>
     <string name="masha_sound_voice">Lucy’s voice</string>
@@ -1215,6 +1216,7 @@ Built by the community, not reviewed. Check the repository before installing.</s
     <string name="settings_lucy_voice_interrupt_desc">In a live conversation, talking over Lucy makes her stop and listen. If she keeps stopping by herself on this phone, turn it off and use the mic button. With headphones it always works.</string>
     <string name="lucy_live_listening">Listening</string>
     <string name="lucy_live_struggling">I can\'t hear you well. Come closer or type to me.</string>
+    <string name="lucy_live_offline">I can’t hear you: no connection</string>
     <string name="lucy_live_talking">Lucy is talking</string>
     <string name="lucy_live_thinking">Thinking…</string>
     <string name="lucy_live_hearing">You’re talking</string>

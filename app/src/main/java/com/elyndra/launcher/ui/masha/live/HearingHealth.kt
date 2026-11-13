@@ -16,6 +16,9 @@ import java.util.Locale
  * - [struggling] (la interfaz dice "No te estoy escuchando bien") tras
  *   [STRUGGLE_AFTER] fallos seguidos, o con el micrófono dando silencio
  *   digital (otra app lo tiene) más de [SILENCED_LIMIT_MS].
+ * - [offline] ("No te escucho: sin conexión") tras [OFFLINE_AFTER] errores
+ *   de red seguidos del reconocedor (uno que solo funciona con conexión y no
+ *   la tiene); se va en cuanto el reconocedor vuelve a contestar.
  */
 class HearingHealth {
 
@@ -30,6 +33,22 @@ class HearingHealth {
         private set
 
     val struggling: Boolean get() = misses >= STRUGGLE_AFTER || micSilencedMs >= SILENCED_LIMIT_MS
+
+    /** Errores de red seguidos del reconocedor. */
+    var networkFailures = 0
+        private set
+
+    val offline: Boolean get() = networkFailures >= OFFLINE_AFTER
+
+    /** El reconocedor falló con este código (SpeechRecognizer.ERROR_*): los de red cuentan. */
+    fun onRecognizerError(code: Int) {
+        if (code in NETWORK_ERRORS) networkFailures++
+    }
+
+    /** El reconocedor contestó (con texto, o diciendo que no entendió nada): la red va. */
+    fun onRecognizerWorked() {
+        networkFailures = 0
+    }
 
     /** Un turno del usuario terminó: [gotText] si dio texto; [speechMs], la voz que oyó el VAD; [viaStream], si el reconocedor escuchaba el pipe. */
     fun onTurn(gotText: Boolean, speechMs: Int, viaStream: Boolean): Advice {
@@ -50,6 +69,7 @@ class HearingHealth {
     fun reset() {
         misses = 0
         micSilencedMs = 0
+        networkFailures = 0
     }
 
     companion object {
@@ -57,6 +77,13 @@ class HearingHealth {
         const val HANDOFF_AFTER = 2
         const val STRUGGLE_AFTER = 3
         const val SILENCED_LIMIT_MS = 5_000
+        const val OFFLINE_AFTER = 2
+
+        /** NETWORK_TIMEOUT (1), NETWORK (2), SERVER (4) y SERVER_DISCONNECTED (11). */
+        val NETWORK_ERRORS = setOf(1, 2, 4, 11)
+
+        /** NO_MATCH (7): el reconocedor oyó y contestó, así que llega a su servicio. */
+        const val NO_MATCH = 7
     }
 }
 
