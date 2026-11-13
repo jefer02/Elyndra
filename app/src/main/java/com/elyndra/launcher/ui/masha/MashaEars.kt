@@ -10,6 +10,7 @@ import android.os.SystemClock
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -19,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import com.elyndra.launcher.ui.masha.live.RecognizerErrors
 
 /**
  * Los oídos de Lucy: reconocimiento de voz.
@@ -40,6 +42,10 @@ import androidx.compose.ui.platform.LocalContext
  * reconocedor no acepta audio de fuera, falla enseguida con
  * [Failure.StreamUnsupported] y quien llama vuelve a [start].
  *
+ * Cada escucha se apunta en el log (`LucyLive`): con qué reconocedor y qué
+ * audio, cuándo está listo, si oyó voz, el nivel máximo, los parciales y cómo
+ * terminó (sin el texto).
+ *
  * Tiene que usarse desde el hilo principal (lo exige SpeechRecognizer).
  */
 class MashaEars(
@@ -48,6 +54,8 @@ class MashaEars(
     private val onPartial: (String) -> Unit,
     private val onFinal: (String) -> Unit,
     private val onError: (Failure, Int) -> Unit,
+    /** El reconocedor cree que el usuario terminó de hablar (su resultado llega después, o no). */
+    private val onEndOfSpeech: () -> Unit = {},
 ) {
     enum class Failure { Unavailable, Permission, NoMatch, Network, Busy, StreamUnsupported }
 
@@ -113,6 +121,7 @@ class MashaEars(
             }
         }
         presence.listening = true
+        Log.i(TAG, "recognizer listen onDevice=$onDevice audio=${if (source != null) "stream" else "mic"} lang=$language")
         r.startListening(intent)
     }
 
@@ -135,13 +144,29 @@ class MashaEars(
     }
 
     private inner class Listener(private val onDevice: Boolean) : RecognitionListener {
+        private var rmsMax = Float.NEGATIVE_INFINITY
+        private var rmsCount = 0
+        private var partials = 0
+        private var ready = false
+        private var began = false
+
+        private fun at() = "+${SystemClock.elapsedRealtime() - startedAt}ms"
+        private fun summary() = "ready=$ready speechSeen=$began rmsMax=${if (rmsCount == 0) "none" else "%.1f".format(rmsMax)} rmsEvents=$rmsCount partials=$partials"
+
         override fun onReadyForSpeech(params: Bundle?) {
+            ready = true
+            Log.i(TAG, "recognizer ready ${at()}")
             presence.listening = true
         }
 
-        override fun onBeginningOfSpeech() = Unit
+        override fun onBeginningOfSpeech() {
+            began = true
+            Log.i(TAG, "recognizer beginningOfSpeech ${at()}")
+        }
 
         override fun onRmsChanged(rmsdB: Float) {
+            rmsCount++
+            if (rmsdB > rmsMax) rmsMax = rmsdB
             // −2..10 dB aprox. → 0..1, suavizado.
             val level = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
             presence.micLevel = presence.micLevel * 0.6f + level * 0.4f
@@ -150,10 +175,13 @@ class MashaEars(
         override fun onBufferReceived(buffer: ByteArray?) = Unit
 
         override fun onEndOfSpeech() {
+            Log.i(TAG, "recognizer endOfSpeech ${at()} ${summary()}")
             presence.micLevel = 0f
+            onEndOfSpeech()
         }
 
         override fun onError(error: Int) {
+            Log.i(TAG, "recognizer onError code=$error (${RecognizerErrors.name(error)}) ${at()} onDevice=$onDevice audio=${if (source != null) "stream" else "mic"} ${summary()}")
             // Audio de fuera rechazado nada más empezar: este reconocedor no lo acepta.
             if (source != null && error in STREAM_ERRORS && SystemClock.elapsedRealtime() - startedAt < STREAM_PROBE_MS) {
                 stop()
@@ -184,6 +212,7 @@ class MashaEars(
 
         override fun onResults(results: Bundle?) {
             val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+            Log.i(TAG, "recognizer results chars=${text.length} ${at()} ${summary()}")
             stop()
             if (text.isNotBlank()) onFinal(text) else onError(Failure.NoMatch, SpeechRecognizer.ERROR_NO_MATCH)
         }
@@ -191,13 +220,18 @@ class MashaEars(
         override fun onPartialResults(partialResults: Bundle?) {
             partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
                 ?.takeIf { it.isNotBlank() }
-                ?.let(onPartial)
+                ?.let {
+                    if (partials++ == 0) Log.i(TAG, "recognizer first partial ${at()}")
+                    onPartial(it)
+                }
         }
 
         override fun onEvent(eventType: Int, params: Bundle?) = Unit
     }
 
     private companion object {
+        const val TAG = "LucyLive"
+
         /** ERROR_LANGUAGE_NOT_SUPPORTED (12) y ERROR_LANGUAGE_UNAVAILABLE (13), de Android 12. */
         val LANGUAGE_ERRORS = setOf(12, 13)
 
@@ -214,13 +248,15 @@ fun rememberMashaEars(
     onPartial: (String) -> Unit,
     onFinal: (String) -> Unit,
     onError: (MashaEars.Failure, Int) -> Unit,
+    onEndOfSpeech: () -> Unit = {},
 ): MashaEars {
     val context = LocalContext.current
     val partial by rememberUpdatedState(onPartial)
     val final by rememberUpdatedState(onFinal)
     val error by rememberUpdatedState(onError)
+    val endOfSpeech by rememberUpdatedState(onEndOfSpeech)
     val ears = remember(presence) {
-        MashaEars(context, presence, { partial(it) }, { final(it) }, { f, code -> error(f, code) })
+        MashaEars(context, presence, { partial(it) }, { final(it) }, { f, code -> error(f, code) }, { endOfSpeech() })
     }
     DisposableEffect(ears) {
         onDispose { ears.stop() }

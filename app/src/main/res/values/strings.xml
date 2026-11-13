@@ -1214,6 +1214,7 @@ Built by the community, not reviewed. Check the repository before installing.</s
     <string name="settings_lucy_voice_interrupt">Interrupt by voice on speaker</string>
     <string name="settings_lucy_voice_interrupt_desc">In a live conversation, talking over Lucy makes her stop and listen. If she keeps stopping by herself on this phone, turn it off and use the mic button. With headphones it always works.</string>
     <string name="lucy_live_listening">Listening</string>
+    <string name="lucy_live_struggling">I can\'t hear you well. Come closer or type to me.</string>
     <string name="lucy_live_talking">Lucy is talking</string>
     <string name="lucy_live_thinking">Thinking…</string>
     <string name="lucy_live_hearing">You’re talking</string>

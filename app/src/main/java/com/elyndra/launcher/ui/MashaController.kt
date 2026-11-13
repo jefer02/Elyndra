@@ -271,24 +271,50 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
         send(uiLanguage, cacheable = true)
     }
 
+    /** Lo escrito en el campo de texto. */
     fun send(uiLanguage: String, cacheable: Boolean = false) {
-        val text = draft.trim()
-        if (text.isEmpty() || busy) return
+        if (submit(draft.trim(), uiLanguage, cacheable)) draft = ""
+    }
+
+    /**
+     * Lo dicho en la conversación en vivo: va directo, sin pasar por el campo
+     * de texto, por el mismo camino que lo escrito (contexto, idioma y
+     * herramientas). Con [force], si aún contesta otra cosa, esa respuesta se
+     * corta y se suelta su "ocupada". false si no se mandó.
+     */
+    fun say(text: String, uiLanguage: String, force: Boolean = false): Boolean {
+        if (busy && force) release()
+        return submit(text.trim(), uiLanguage, cacheable = false)
+    }
+
+    /** Sube con cada respuesta (o confirmación) que se queda el "ocupada": solo la última lo suelta. */
+    private var replySeq = 0
+
+    /** Corta ya la respuesta en curso y suelta "ocupada", sin esperar a que su corrutina termine. */
+    private fun release() {
+        replySeq++
+        job?.cancel()
+        job = null
+        finishPending(stopped = true)
+        busy = false
+        working = null
+    }
+
+    private fun submit(text: String, uiLanguage: String, cacheable: Boolean): Boolean {
+        if (text.isEmpty() || busy) return false
         // "Sí" / "no" con una propuesta a la espera: se contesta aquí, sin IA.
         val pendingWrite = writes.latest()
         val answer = pendingWrite?.let { MashaWriteRules.answer(text) }
         if (pendingWrite != null && answer != null) {
             messages += ChatMessage(fromMasha = false, text = text)
-            draft = ""
             persist(StoredMessage(MashaTurn.Role.User, text, null, null, System.currentTimeMillis()))
             if (answer) confirmWrite(pendingWrite.id) else cancelWrite(pendingWrite.id)
-            return
+            return true
         }
         // El hilo que ve el modelo es el de antes de este mensaje, sin el saludo de cortesía.
         val history = messages.filterNot { it.pending || it.greeting || it.text.isBlank() }
             .map { MashaTurn(if (it.fromMasha) MashaTurn.Role.Masha else MashaTurn.Role.User, it.text, it.interrupted) }
         messages += ChatMessage(fromMasha = false, text = text)
-        draft = ""
         busy = true
         persist(StoredMessage(MashaTurn.Role.User, text, null, null, System.currentTimeMillis()))
         val previous = lastUserText
@@ -296,17 +322,22 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
         // Lo que dijo decide si una acción se hace ya o se propone (ActionGate).
         actions.lastUserText = text
 
+        val seq = ++replySeq
         job = vm.viewModelScope.launch {
             try {
                 if (brain.canGoOnline()) online(text, previous, history, uiLanguage, cacheable) else offlineReply(text, previous, failure = null)
             } catch (e: CancellationException) {
-                finishPending(stopped = true)
+                // Si ya la soltó release(), lo pendiente es de la respuesta nueva.
+                if (seq == replySeq) finishPending(stopped = true)
                 throw e
             } finally {
-                busy = false
-                working = null
+                if (seq == replySeq) {
+                    busy = false
+                    working = null
+                }
             }
         }
+        return true
     }
 
     /* ── relación ─────────────────────────────────────────────── */
@@ -372,6 +403,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
         // Tocada mientras contesta otra cosa: esa respuesta ya lleva su "ocupada".
         val own = !busy
         if (own) busy = true
+        val seq = if (own) ++replySeq else replySeq
         vm.viewModelScope.launch {
             try {
                 val out = writes.confirm(id) ?: return@launch
@@ -381,7 +413,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                 messages += ChatMessage(fromMasha = true, text = text, done = listOf(out.label))
                 persist(StoredMessage(MashaTurn.Role.Masha, text, null, MashaAttachment.Done(out.label, out.ok), System.currentTimeMillis()))
             } finally {
-                if (own) busy = false
+                if (own && seq == replySeq) busy = false
             }
         }
     }

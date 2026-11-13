@@ -114,10 +114,36 @@ MashaScreen ──feed(texto, final)──▶ MashaVoice ──▶ VoiceRouter �
   acepta audio de fuera (error al empezar), **relevo**: se suelta nuestro micrófono y escucha él (se pierden
   ~300–600 ms del principio); igual en Android 12 o menos. Reconocedor del dispositivo si lo hay y tiene el
   idioma; si no, el del sistema (y se avisa).
+- **Reconocedores que aceptan el pipe y lo ignoran** (v4.1): algunos no fallan con `EXTRA_AUDIO_SOURCE`,
+  abren su propio micrófono o no leen el pipe. Antes eso daba NO_MATCH/SPEECH_TIMEOUT en bucle, en
+  silencio (la sesión vuelve a escuchar), y parecía que Lucy no oía nada. Ahora, mientras escucha por el
+  pipe, `StreamCheck` mira cada 100 ms: si **nuestro** micrófono pasa a dar ceros (Android le da el audio a
+  uno solo) es que el reconocedor tiene el micrófono → relevo en el sitio (soltamos el nuestro y le dejamos
+  terminar); si la cola del pipe crece (> 600 ms sin leer) → se cancela y relevo. Y `HearingHealth`: 2
+  turnos seguidos con voz (≥ 400 ms) y sin texto por el pipe → relevo hasta salir de la pantalla; **3
+  seguidos** (por cualquier vía), o el micrófono dando ceros 5 s seguidos (otra app lo tiene) → bajo el
+  dock "**No te estoy escuchando bien**" en vez de "Escuchando", hasta el siguiente texto.
+- **Todo turno acaba en un envío** (v4.2): en vivo lo dicho va directo a la conversación (`MashaController.say`,
+  el mismo camino que lo escrito: contexto, idioma y herramientas) y **nunca** pasa por el campo de texto. Antes
+  los parciales se escribían en el campo y solo se mandaba si llegaba un resultado final con texto: si el
+  reconocedor acababa en error/NO_MATCH tras cerrarle el pipe, o no llegaba a dar resultado (relevo, sin nuestro
+  silencio), lo dicho se quedaba escrito en el campo y Lucy no contestaba. Ahora el fin de turno llega por
+  cualquiera de: nuestro silencio (700 ms), `onEndOfSpeech` del reconocedor, su resultado, o 1,2 s sin parciales
+  nuevos con texto (si nuestro micrófono no oye voz). Tras el fin, 700 ms para el resultado final; si no llega
+  (o llega un error) va el último parcial. Sin ningún texto, a los 5 s vuelve a escuchar.
+- **Lo dicho nunca se pierde**: si llega con ella contestando otra cosa (algo escrito, el saludo, una
+  confirmación), se corta esa respuesta y se manda en cuanto queda libre; si a los 500 ms sigue "ocupada", se
+  manda igual (se suelta a la fuerza).
+- **Probado de punta a punta** (`LiveVoiceTest`): tramos por el oído de verdad → reconocedor falso → texto →
+  chat → su voz → escuchando; relevo por ceros, por pipe sin leer y por turnos vacíos; el aviso.
 - **Log `LucyLive`** (`adb logcat -s LucyLive`): cada transición (`event=… from=… to=… effects=[…]`, sin
   el texto del usuario), cada error del reconocedor con su código y nombre, cada recuperación, `end reason=…`; por turno, fin de voz → texto final y fin de voz → primera palabra de Lucy; por pausa,
   muletilla o corte; al cerrar, pausas/siguió/cortes y lo que vio el micrófono (tramos con Lucy, eco
   descartado, voz sobre Lucy, AEC/NS, Silero, acoplamiento). Falso disparo = pausa que sigue sin texto.
+  Además (debug, `D`): cada segundo `mic 1s: level … p avg/max … lucy=… expectedEcho=… voiced=…
+  silenced=…`; por escucha del reconocedor `recognizer listen onDevice=… audio=stream|mic`, `ready`,
+  `beginningOfSpeech`, `first partial`, `endOfSpeech`/`results chars=N`/`onError code=…` con nivel máximo y
+  parciales; `pipe closed: written=… backlog=…`; `turn result text=… via=… missesInARow=…`; por turno, `turn end via=silence|endOfSpeech|results|partialTimeout|error source=final|partial chars=N → sent|queued(chatBusy)|dropped(noText|chatRefused)` y, si esperó, `send dequeued waitedMs=… force=… → sent`.
 - Medido sin móvil (`SpeakerEchoSimulationTest`, voz sintética, VAD de energía): volumen medio 0 falsos/min,
   8 % de barge-ins perdidos, ~295 ms de reacción; volumen alto (eco al nivel del usuario, altavoz saturado)
   0 falsos/min y 50 % perdidos (26 % si el usuario sube la voz). A volumen alto haría falta un AEC por software.

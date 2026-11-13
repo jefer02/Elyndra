@@ -29,7 +29,9 @@ import java.util.concurrent.TimeUnit
  *   decide si el usuario empieza o termina de hablar → [onSignal], en el hilo
  *   principal;
  * - si hay un reconocedor escuchando ([openStream]), le pasa el audio por un
- *   pipe (primero el anillo).
+ *   pipe (primero el anillo);
+ * - cada segundo, un resumen al log ([MicMeter]: nivel, probabilidad de voz,
+ *   eco esperado, tramos de voz y de silencio digital).
  *
  * [stop] suelta el micrófono antes de volver (para el reconocedor de siempre o
  * al salir). El acoplamiento aprendido del eco se conserva entre arranques.
@@ -41,7 +43,7 @@ class LiveMic(
     private val onSignal: (SpeechSegmenter.Signal) -> Unit,
     /** Nivel del micrófono 0..1 (para el holograma), en el hilo principal, ~15 veces por segundo. */
     private val onLevel: (Float) -> Unit,
-) {
+) : LiveVoice.Mic {
     private val app = context.applicationContext
     private val main = Handler(Looper.getMainLooper())
 
@@ -70,15 +72,22 @@ class LiveMic(
     val active: Boolean get() = running
 
     /** Voz acumulada del usuario en el turno en curso (ms). */
-    val speechMs: Int get() = ear?.segmenter?.speechMs ?: 0
+    override val speechMs: Int get() = ear?.segmenter?.speechMs ?: 0
 
     /** Silencio dentro del turno en curso (ms). */
-    val silenceMs: Int get() = ear?.segmenter?.silence ?: 0
+    override val silenceMs: Int get() = ear?.segmenter?.silence ?: 0
 
     /** Hay un turno del usuario abierto (habló y aún no lleva el silencio de fin de turno). */
-    val inTurn: Boolean get() = ear?.segmenter?.inTurn == true
+    override val inTurn: Boolean get() = ear?.segmenter?.inTurn == true
 
-    fun start() {
+    /** Silencio digital seguido (ceros): Android le está dando el micrófono a otro. */
+    @Volatile override var silencedMs = 0
+        private set
+
+    /** Audio en la cola del pipe que el reconocedor aún no ha leído. */
+    override val backlogMs: Int get() = pipe?.backlogMs ?: 0
+
+    override fun start() {
         if (running) return
         running = true
         thread = Thread({ loop() }, "lucy-live-mic").apply {
@@ -88,7 +97,7 @@ class LiveMic(
     }
 
     /** Suelta el micrófono ya (espera al hilo). */
-    fun stop() {
+    override fun stop() {
         running = false
         closeStream()
         // Si estaba esperando para reabrir, que no siga durmiendo (y no haya dos hilos al volver a empezar).
@@ -98,7 +107,7 @@ class LiveMic(
     }
 
     /** El turno en curso se da por cerrado por otra vía (el reconocedor terminó). */
-    fun clearTurn() {
+    override fun clearTurn() {
         ear?.segmenter?.clear()
     }
 
@@ -114,12 +123,12 @@ class LiveMic(
     }
 
     /** Cierra el pipe: el reconocedor ve el final del audio y da su resultado. */
-    fun closeStream() {
+    override fun closeStream() {
         pipe?.close()
         pipe = null
     }
 
-    fun report(): String = stats.let {
+    override fun report(): String = stats.let {
         "frames con Lucy=${it.framesWithLucy}, eco descartado=${it.echoRejected}, voz sobre Lucy=${it.startsOverLucy}, " +
             "AEC=${it.aec}, NS=${it.ns}, silero=${it.silero}, acoplamiento=${"%.1f".format(couplingDb)} dB"
     }
@@ -163,6 +172,9 @@ class LiveMic(
         val silero = runCatching { app.assets.open(SileroVad.ASSET).use { it.readBytes() } }.getOrNull()?.let { SileroVad.load(it) }
         val energy = VoiceActivity()
         val ear = LiveEar(EchoGate(initialCouplingDb = couplingDb)).also { this.ear = it }
+        val meter = MicMeter(frameMs = FRAME * 1000 / SAMPLE_RATE)
+        val vad = if (silero != null) "silero" else "energy"
+        silencedMs = 0
         stats = Stats(aec = aec?.enabled == true, ns = ns?.enabled == true, silero = silero != null)
         Log.i(TAG, "micrófono abierto: AEC=${stats.aec} NS=${stats.ns} silero=${stats.silero}")
         val ring = PcmRing(SAMPLE_RATE * PREROLL_MS / 1000)
@@ -195,6 +207,7 @@ class LiveMic(
                     p.preroll = false
                 }
                 val micDb = VoiceActivity.levelDb(frame)
+                silencedMs = if (micDb <= MicMeter.SILENT_DB) silencedMs + FRAME * 1000 / SAMPLE_RATE else 0
                 // Silero mira ventanas de 32 ms: cada dos tramos, los dos últimos.
                 if (++n % 2 == 0) {
                     prob = if (silero != null) {
@@ -213,6 +226,7 @@ class LiveMic(
                     if (signal == SpeechSegmenter.Signal.Started) s.startsOverLucy++
                 }
                 couplingDb = ear.gate.couplingDb
+                meter.add(micDb, prob, refDb, ear.gate.predictedDb, ear.voiced, ear.echoRejected)?.let { Log.d(TAG, it.line(vad)) }
                 if (signal != null) main.post { if (running) onSignal(signal) }
                 level = level * 0.6f + ((micDb + 60f) / 45f).coerceIn(0f, 1f) * 0.4f
                 if (n % 4 == 0) {
@@ -229,6 +243,7 @@ class LiveMic(
             record.release()
             silero?.close()
             this.ear = null
+            silencedMs = 0
             Log.i(TAG, "micrófono suelto: ${report()}")
             main.post { onLevel(0f) }
         }
@@ -242,6 +257,11 @@ class LiveMic(
     private class PcmPipe(fd: ParcelFileDescriptor, @Volatile var preroll: Boolean) {
         private val queue = LinkedBlockingQueue<ShortArray>(QUEUE_MAX)
         @Volatile private var open = true
+        @Volatile private var sentSamples = 0L
+        @Volatile private var dropped = 0
+
+        /** Lo que espera en la cola (si el reconocedor no lee, crece: el pipe del sistema ya va lleno). */
+        val backlogMs: Int get() = queue.size * FRAME * 1000 / SAMPLE_RATE
         private val out = ParcelFileDescriptor.AutoCloseOutputStream(fd)
         private val writer = Thread({ drain(out) }, "lucy-live-pipe").apply {
             isDaemon = true
@@ -249,10 +269,12 @@ class LiveMic(
         }
 
         fun send(samples: ShortArray) {
-            if (open) queue.offer(samples)
+            if (open && !queue.offer(samples)) dropped++
         }
 
         fun close() {
+            if (!open) return
+            Log.i(TAG, "pipe closed: written=${sentSamples * 1000 / SAMPLE_RATE}ms backlog=${backlogMs}ms dropped=$dropped")
             open = false
             queue.offer(END)
         }
@@ -268,6 +290,7 @@ class LiveMic(
                         bytes[2 * i + 1] = (s[i].toInt() shr 8).toByte()
                     }
                     out.write(bytes)
+                    sentSamples += s.size
                 }
             } catch (_: Exception) {
                 // El reconocedor cerró su extremo: nada más que mandar.

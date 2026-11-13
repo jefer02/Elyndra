@@ -1226,6 +1226,7 @@ Fait par la communauté, non vérifié. Consultez le dépôt avant d\'installer.
     <string name="settings_lucy_voice_interrupt">Interrompre à la voix sur le haut-parleur</string>
     <string name="settings_lucy_voice_interrupt_desc">En conversation en direct, si vous parlez par-dessus Lucy, elle s’arrête et vous écoute. Si elle se coupe toute seule sur ce téléphone, désactivez-le et utilisez le bouton du micro. Avec un casque, ça marche toujours.</string>
     <string name="lucy_live_listening">À l’écoute</string>
+    <string name="lucy_live_struggling">Je ne t\'entends pas bien. Rapproche-toi ou écris-moi.</string>
     <string name="lucy_live_talking">Lucy parle</string>
     <string name="lucy_live_thinking">Elle réfléchit…</string>
     <string name="lucy_live_hearing">Vous parlez</string>

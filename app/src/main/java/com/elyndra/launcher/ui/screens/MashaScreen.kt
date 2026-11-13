@@ -252,6 +252,7 @@ fun MashaScreen(vm: ElyndraViewModel) {
                 vm.showToast(UiText.res(res))
             }
         },
+        onEndOfSpeech = { liveRef[0]?.takeIf { it.active }?.onEndOfSpeech() },
     )
     val scope = rememberCoroutineScope()
     // El micrófono siempre abierto de la conversación en vivo: oye al usuario sin confundirlo con la voz de ella.
@@ -264,7 +265,7 @@ fun MashaScreen(vm: ElyndraViewModel) {
         )
     }
     val live = remember(ears, voice, liveMic) {
-        LiveVoice(
+        LiveVoice.create(
             ears = ears,
             voice = voice,
             presence = presence,
@@ -371,6 +372,7 @@ fun MashaScreen(vm: ElyndraViewModel) {
         lock = micState,
         asking = askingMic,
         liveState = live.state,
+        struggling = live.active && live.struggling,
         systemStt = ears.processedBySystem && (live.active || presence.listening),
         onTap = ::tapMic,
         onHoldStart = ::holdMic,
@@ -1011,6 +1013,8 @@ private class MicActions(
     val asking: Boolean,
     /** De quién es el turno en vivo (para el indicador "escuchando"). */
     val liveState: LiveTurns.State,
+    /** Varios turnos seguidos sin texto, o el micrófono mudo: "No te estoy escuchando bien". */
+    val struggling: Boolean,
     /** Se está oyendo con el servicio del sistema (el audio puede salir del móvil): se avisa. */
     val systemStt: Boolean,
     val onTap: () -> Unit,
@@ -1088,7 +1092,8 @@ private val LOCKED_RED = Color(0xFFFF6B7A)
 
 /**
  * Bajo el dock: en vivo, la marca "EN VIVO" y, si el audio lo procesa el
- * sistema, el aviso; bloqueado, "Micrófono bloqueado" con su pista; la primera
+ * sistema, el aviso; si no le llega lo que dice el usuario, "No te estoy
+ * escuchando bien"; bloqueado, "Micrófono bloqueado" con su pista; la primera
  * vez, por qué se pide el permiso.
  */
 @Composable
@@ -1122,7 +1127,11 @@ private fun LiveStrip(mic: MicActions, glow: Color) {
                 Spacer(Modifier.width(5.dp))
                 ElyText(stringResource(R.string.lucy_live), size = 8.5f, weight = FontWeight.Bold, color = glow, uppercase = true, letterSpacing = tracking(0.2f))
                 Spacer(Modifier.width(6.dp))
-                ElyText(stringResource(liveStateLabel(mic.liveState)), size = 8.5f, color = Holo.text)
+                if (mic.struggling) {
+                    ElyText(stringResource(R.string.lucy_live_struggling), size = 8.5f, weight = FontWeight.Bold, color = LOCKED_RED, maxLines = 2, lineHeightRatio = 1.3f)
+                } else {
+                    ElyText(stringResource(liveStateLabel(mic.liveState)), size = 8.5f, color = Holo.text)
+                }
                 Spacer(Modifier.width(10.dp))
             }
             if (mic.systemStt) {

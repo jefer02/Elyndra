@@ -1226,6 +1226,7 @@ Hecho por la comunidad, sin revisar. Mira el repositorio antes de instalar.</str
     <string name="settings_lucy_voice_interrupt">Interrumpir con la voz por el altavoz</string>
     <string name="settings_lucy_voice_interrupt_desc">En una conversación en vivo, si hablas encima de Lucy, se calla y te escucha. Si en este móvil se corta sola, apágalo y usa el botón del micrófono. Con auriculares funciona siempre.</string>
     <string name="lucy_live_listening">Escuchando</string>
+    <string name="lucy_live_struggling">No te estoy escuchando bien. Acércate o escríbeme.</string>
     <string name="lucy_live_talking">Lucy está hablando</string>
     <string name="lucy_live_thinking">Pensando…</string>
     <string name="lucy_live_hearing">Estás hablando</string>
