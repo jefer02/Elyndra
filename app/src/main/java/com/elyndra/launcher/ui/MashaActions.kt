@@ -1,10 +1,20 @@
 package com.elyndra.launcher.ui
 
 import com.elyndra.launcher.masha.MashaWrites
+import com.elyndra.launcher.masha.ActionGate
+import com.elyndra.launcher.masha.ConfirmState
+import com.elyndra.launcher.masha.TargetMatch
+import com.elyndra.launcher.masha.toolAmbiguous
 import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.library.Names
 import com.elyndra.launcher.domain.ports.PortDisplay
 import com.elyndra.launcher.domain.ports.StoreRows
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.delay
+import com.elyndra.launcher.masha.WriteOutcome
+import com.elyndra.launcher.masha.ConfirmKind
+import com.elyndra.launcher.domain.ports.PortRecommend
+import com.elyndra.launcher.domain.ports.PortEntry
 import com.elyndra.launcher.masha.MashaAttachment
 import com.elyndra.launcher.masha.MashaBrain
 import com.elyndra.launcher.masha.MashaToolbox
@@ -13,12 +23,15 @@ import com.elyndra.launcher.masha.ToolCall
 import com.elyndra.launcher.masha.ToolResult
 import com.elyndra.launcher.masha.ToolSpec
 import com.elyndra.launcher.masha.bool
+import com.elyndra.launcher.masha.playStateName
 import com.elyndra.launcher.masha.str
 import com.elyndra.launcher.masha.toolFail
+import com.elyndra.launcher.masha.DeviceTool
 import com.elyndra.launcher.masha.toolOk
 import com.elyndra.launcher.metadata.ArtKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.addJsonObject
@@ -39,11 +52,22 @@ import kotlinx.serialization.json.putJsonArray
 class MashaActions(
     private val vm: ElyndraViewModel,
     private val brain: MashaBrain,
-    writes: MashaWrites = MashaWrites(),
+    private val writes: MashaWrites = MashaWrites(),
+    /** Una tarjeta contestada por la herramienta confirm_pending (id, estado): la marca en el chat. */
+    private val onConfirmAnswered: (String, String) -> Unit = { _, _ -> },
 ) : MashaToolbox {
 
+    /**
+     * El último mensaje del usuario (lo pone MashaController antes de cada
+     * respuesta): si pidió la acción o dijo que sí, se hace sin tarjeta (ver [ActionGate]).
+     */
+    @Volatile var lastUserText: String? = null
+
+    /** ¿El usuario pidió (o confirmó) esto? Su mensaje o el argumento `user_requested` del modelo. */
+    private fun asked(a: JsonObject): Boolean = ActionGate.userAsked(lastUserText, a.bool("user_requested") == true)
+
     /** Nombres, juegos por añadir y emuladores (ver [MashaLibraryActions]). */
-    private val library = MashaLibraryActions(vm, writes)
+    private val library = MashaLibraryActions(vm, writes, ::asked)
 
     override val specs: List<ToolSpec> get() = MashaTools.specs
 
@@ -64,6 +88,7 @@ class MashaActions(
             MashaTools.UPDATE_METADATA -> updateMetadata(a)
             MashaTools.CURATION_REPORT -> skills.curationReport(a)
             MashaTools.GET_STATS -> skills.stats(a)
+            MashaTools.GET_DEVICE_STATE -> DeviceTool.result(runCatching { brain.device.snapshot() }.getOrNull())
             MashaTools.REMEMBER -> skills.remember(a)
             MashaTools.FORGET -> skills.forget(a)
             MashaTools.FILTER_LIBRARY -> filterLibrary(a)
@@ -81,7 +106,11 @@ class MashaActions(
             MashaTools.LIST_EMULATORS -> library.listEmulators()
             MashaTools.SET_PREFERRED_EMULATOR -> library.setPreferred(a)
             MashaTools.UNDO_LAST_ACTION -> library.undo()
-            MashaTools.FIND_PORT -> findPort(a.str("query"), a.bool("open") == true)
+            MashaTools.FIND_PORTS -> findPorts(a)
+            MashaTools.OPEN_PORT -> openPort(a)
+            MashaTools.INSTALL_PORT -> installPort(a)
+            MashaTools.RECOMMEND -> recommend(a)
+            MashaTools.CONFIRM_PENDING -> confirmPending(a)
             else -> toolFail("unknown tool ${call.name}")
         }
     }
@@ -89,7 +118,11 @@ class MashaActions(
     /* ── acciones ─────────────────────────────────────────────── */
 
     suspend fun launchGame(title: String?): ToolResult {
-        val target = resolve(title) ?: return notFound(title)
+        val target = when (val l = lookup(title)) {
+            is Lookup.Found -> l.target
+            is Lookup.Ambiguous -> return toolAmbiguous(title.orEmpty(), l.titles)
+            Lookup.Missing -> return notFound(title)
+        }
         if (target.what == What.Folder) return toolFail("'${target.title}' is an emulator folder, not a game")
         val opened = onMain { vm.openByKey(target.key) }
         return if (opened) {
@@ -100,7 +133,11 @@ class MashaActions(
     }
 
     private suspend fun setGameEmulator(a: JsonObject): ToolResult {
-        val target = resolve(a.str("title")) ?: return notFound(a.str("title"))
+        val target = when (val l = lookup(a.str("title"))) {
+            is Lookup.Found -> l.target
+            is Lookup.Ambiguous -> return toolAmbiguous(a.str("title").orEmpty(), l.titles)
+            Lookup.Missing -> return notFound(a.str("title"))
+        }
         val rom = vm.library.roms.firstOrNull { it.key == target.key }
             ?: return toolFail("'${target.title}' is not a ROM; Android games don't use emulators")
         val query = a.str("emulator") ?: return toolFail("which emulator?")
@@ -113,8 +150,13 @@ class MashaActions(
         if (!vm.orchestrator.isInstalled(emulatorId)) {
             return toolFail("${vm.orchestrator.name(emulatorId)} is not installed on this device")
         }
+        val before = rom.emulatorId
         onMain { vm.setRomEmulatorByKey(rom.key, emulatorId) }
         val name = vm.orchestrator.name(emulatorId)
+        writes.record("⚙ ${target.title} → $name") {
+            onMain { vm.setRomEmulatorByKey(rom.key, before) }
+            "emulator change for '${target.title}'"
+        }
         return toolOk("'${target.title}' will now launch with $name", MashaAttachment.Done("⚙ ${target.title} → $name"), mutating = true)
     }
 
@@ -124,7 +166,11 @@ class MashaActions(
         }
         return when (a.str("scope")) {
             "game" -> {
-                val target = resolve(a.str("title")) ?: return notFound(a.str("title"))
+                val target = when (val l = lookup(a.str("title"))) {
+                    is Lookup.Found -> l.target
+                    is Lookup.Ambiguous -> return toolAmbiguous(a.str("title").orEmpty(), l.titles)
+                    Lookup.Missing -> return notFound(a.str("title"))
+                }
                 onMain { vm.updateMetadata(listOf(target.key), force = true) }
                 toolOk("updating metadata for '${target.title}'", MashaAttachment.Done("↻ ${target.title}"), mutating = true)
             }
@@ -146,35 +192,171 @@ class MashaActions(
      * Ports del catálogo de la tienda. Solo títulos, plataformas y repositorios:
      * nada de rutas ni de URLs de descarga, y nunca ROMs.
      */
-    private suspend fun findPort(query: String?, open: Boolean): ToolResult {
+    /**
+     * Las tarjetas de una recomendación: cada juego (por título) o port (por
+     * id) que exista, con su motivo y los datos de ahora (minutos, estado,
+     * emulador). Lo que no se encuentra se dice al modelo y no sale.
+     */
+    private suspend fun recommend(a: JsonObject): ToolResult {
+        val items = (a["items"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.take(MashaTools.MAX_PICKS)
+        if (items.isEmpty()) return toolFail("nothing to show: pass items with a title or port_id and a reason")
+        val snapshot = brain.knowledge.snapshot()
+        val picks = ArrayList<MashaAttachment.Pick>()
+        val missing = ArrayList<String>()
+        for (item in items) {
+            val reason = item.str("reason")?.trim()?.take(MAX_REASON).orEmpty()
+            val portId = item.str("port_id")?.trim()?.takeIf { it.isNotEmpty() }
+            if (portId != null) {
+                val ports = vm.ports
+                if (ports.catalog.isEmpty()) onMain { ports.onOpen() }.also { ports.awaitCatalog() }
+                val port = ports.catalog.firstOrNull { it.id == portId }
+                    ?: StoreRows.find(ports.catalog, portId, emptyList(), limit = 1).firstOrNull()?.lead
+                if (port == null) missing += portId else picks += MashaAttachment.Pick(MashaAttachment.Pick.PORT, port.id, reason)
+                continue
+            }
+            val title = item.str("title")
+            val game = title?.let { snapshot.resolve(it) }
+            if (game == null) {
+                missing += title.orEmpty()
+                continue
+            }
+            val p = snapshot.profiles[game.key]
+            picks += MashaAttachment.Pick(
+                kind = MashaAttachment.Pick.GAME,
+                id = game.key,
+                reason = reason,
+                minutes = p?.totalMinutes ?: game.stats.minutes,
+                state = playStateName(p?.state),
+                emulator = if (game.isApp) null else p?.lastEmulator?.let { vm.orchestrator.name(it) },
+            )
+        }
+        val shown = picks.distinctBy { it.kind to it.id }
+        if (shown.isEmpty()) return toolFail("none of those are in the library or the Ports store: ${missing.joinToString()}")
+        return toolOk(attachment = MashaAttachment.Picks(shown)) {
+            put("shown", shown.size)
+            if (missing.isNotEmpty()) putJsonArray("not_found") { missing.forEach { add(it) } }
+            put("note", "The cards show the details: say one or two short spoken sentences, no titles list.")
+        }
+    }
+
+    /** La tienda cargada (de la red, de la caché o la copia del APK: sin conexión también hay catálogo). */
+    private suspend fun portsReady(): PortsController {
         val ports = vm.ports
         if (ports.catalog.isEmpty()) onMain { ports.onOpen() }.also { ports.awaitCatalog() }
+        return ports
+    }
+
+    private suspend fun findPorts(a: JsonObject): ToolResult {
+        val ports = portsReady()
         val owned = onMain { ports.owned() }
-        val found = StoreRows.find(ports.catalog, query, owned)
-        if (open) found.firstOrNull()?.let { first -> onMain { ports.openPort(first.lead.id) } }
-        if (found.isEmpty()) return toolOk("no ports found", mutating = open)
-        return toolOk(attachment = MashaAttachment.Ports(query, found.map { it.lead.id }), mutating = open) {
-            put("count", found.size)
+        val installed = ports.installed.keys
+        val updates = onMain { ports.updateIds() }
+        val found = PortRecommend.search(
+            ports.catalog, a.str("query"), a.str("genre"), a.str("mood"), owned,
+            includeIncompatible = a.bool("include_incompatible") == true, installedIds = installed,
+        )
+        if (found.groups.isEmpty()) {
+            return toolOk(if (found.incompatible > 0) "${found.incompatible} found, but none can be installed on this device" else "no ports found") {
+                put("incompatible_hidden", found.incompatible)
+            }
+        }
+        return toolOk(attachment = MashaAttachment.Ports(a.str("query"), found.groups.map { PortRecommend.best(it).id })) {
+            put("count", found.groups.size)
+            if (found.incompatible > 0) put("incompatible_hidden", found.incompatible)
             putJsonArray("ports") {
-                found.forEach { g ->
-                    val p = g.lead
+                found.groups.forEach { g ->
+                    val p = PortRecommend.best(g)
                     addJsonObject {
+                        put("port_id", p.id)
                         put("game", PortDisplay.title(p))
                         put("original_platform", p.platform)
-                        put("port", p.name)
+                        // El nombre del port solo si es presentable (nunca un slug ni un archivo).
+                        PortDisplay.portName(p)?.let { put("port", it) }
                         p.developer?.let { put("developer", it) }
-                        put("ports_available", g.ports.size)
                         put("kind", p.kind)
-                        put("repo", p.releaseRepo.slug)
-                        put("installable_on_android", g.ports.any { it.installable })
-                        put("installed", g.ports.any { it.id in ports.installed })
+                        put("ports_available", g.ports.size)
+                        put("state", PortRecommend.state(p, installed, updates))
+                        put("runs_on_this_device", PortRecommend.compatible(g))
+                        PortRecommend.requiredGame(p)?.let { put("needs_data_files_from", it) }
                         put("in_library", owned.any { it.port.id in g.ids })
-                        put("needs_own_copy", p.requires.userRom)
                         put("verified", p.verified)
                         if (p.trust.prerelease) put("prerelease", true)
                     }
                 }
             }
+        }
+    }
+
+    /** El port por id o, si no, el mejor resultado para el nombre del juego. */
+    private fun portFor(ports: PortsController, a: JsonObject): PortEntry? {
+        a.str("port_id")?.trim()?.takeIf { it.isNotEmpty() }?.let { id -> ports.catalog.firstOrNull { it.id == id }?.let { return it } }
+        val game = a.str("game")?.trim()?.takeIf { it.isNotEmpty() } ?: a.str("port_id") ?: return null
+        return StoreRows.find(ports.catalog, game, emptyList(), limit = 1).firstOrNull()?.let(PortRecommend::best)
+    }
+
+    private suspend fun openPort(a: JsonObject): ToolResult {
+        val ports = portsReady()
+        val port = portFor(ports, a) ?: return toolFail("that port is not in the Ports store")
+        onMain { ports.openPort(port.id) }
+        return toolOk("opened the store page of ${PortDisplay.title(port)}", MashaAttachment.Done("◈ ${PortDisplay.title(port)}"), mutating = true)
+    }
+
+    /**
+     * Instalar un port con el flujo de la tienda de siempre
+     * (PortInstallController.primary: el aviso de port sin verificar, la
+     * descarga y el instalador del sistema; nunca otro camino). Pedido por el
+     * usuario, empieza ya; si es idea de Lucy, primero una tarjeta. El diálogo
+     * de instalación de Android sale siempre: no se puede saltar.
+     */
+    private suspend fun installPort(a: JsonObject): ToolResult {
+        val ports = portsReady()
+        val port = portFor(ports, a) ?: return toolFail("that port is not in the Ports store")
+        if (!port.installable) return toolFail("${PortDisplay.title(port)} can't be installed on this device")
+        val updates = onMain { ports.updateIds() }
+        if (port.id in ports.installed && port.id !in updates) return toolFail("${PortDisplay.title(port)} is already installed and up to date")
+        val title = PortDisplay.title(port)
+        val submitted = writes.submit(ConfirmKind.INSTALL_PORT, listOf(title, PortRecommend.requiredGame(port).orEmpty()), execute = asked(a)) {
+            withContext(Dispatchers.Main) {
+                // Sin releases aún ("Free"), la tienda primero las pide; luego, su botón de siempre.
+                ports.ensureReleases(port, prefetch = false, force = true)
+            }
+            withTimeoutOrNull(RELEASES_WAIT_MS) {
+                while (withContext(Dispatchers.Main) { ports.latest(port) } == null) delay(200)
+            }
+            withContext(Dispatchers.Main) {
+                vm.ports.openPort(port.id)
+                vm.portInstall.primary(port)
+            }
+            WriteOutcome("⬇ $title")
+        }
+        return when (submitted) {
+            is MashaWrites.Submitted.Done -> toolOk(
+                "the install of $title started; Android will now show its own install dialog: tell the user Android will ask them to confirm the install",
+                MashaAttachment.Done(submitted.outcome.label),
+                mutating = true,
+            )
+            is MashaWrites.Submitted.Proposed -> {
+                val w = submitted.write
+                toolOk("waiting for the user's yes (in words or on the card)", MashaAttachment.Confirm(w.id, w.kind, w.items), mutating = true)
+            }
+        }
+    }
+
+    /** "Sí" o "no" a la última tarjeta, dicho con palabras y resuelto por el modelo. */
+    private suspend fun confirmPending(a: JsonObject): ToolResult {
+        val w = writes.latest() ?: return toolFail("there is no confirm card waiting")
+        return when (a.str("answer")?.lowercase()) {
+            "confirm", "yes", "ok" -> {
+                val out = writes.confirm(w.id) ?: return toolFail("that card was already answered")
+                onMain { onConfirmAnswered(w.id, if (out.ok) ConfirmState.DONE else ConfirmState.CANCELLED) }
+                if (out.ok) toolOk("done: ${out.label}", MashaAttachment.Done(out.label), mutating = true) else toolFail("it could not be done: ${out.label}")
+            }
+            "cancel", "no" -> {
+                writes.cancel(w.id)
+                onMain { onConfirmAnswered(w.id, ConfirmState.CANCELLED) }
+                toolOk("cancelled; nothing was changed", mutating = true)
+            }
+            else -> toolFail("answer must be confirm or cancel")
         }
     }
 
@@ -201,21 +383,32 @@ class MashaActions(
         return toolOk("'${match.label}' added to the library", MashaAttachment.Games(null, listOf(key)), mutating = true)
     }
 
+    /** Ocultar una app de la biblioteca (nada se desinstala); se deshace volviéndola a añadir. */
     private suspend fun removeGame(title: String?): ToolResult {
-        val target = resolve(title) ?: return notFound(title)
-        if (target.what == What.Rom) {
-            return toolFail("'${target.title}' is a single ROM: it can be removed from its long-press menu, or its whole folder removed")
+        val target = when (val l = lookup(title)) {
+            is Lookup.Found -> l.target
+            is Lookup.Ambiguous -> return toolAmbiguous(title.orEmpty(), l.titles)
+            Lookup.Missing -> return notFound(title)
         }
+        if (target.what != What.App) {
+            return toolFail("'${target.title}' is a ROM or a folder: it can be removed from its long-press menu, not by you")
+        }
+        val app = vm.library.apps.firstOrNull { it.key == target.key } ?: return notFound(title)
         val removed = onMain { vm.removeFromLibrary(target.key) }
-        return if (removed) {
-            toolOk("'${target.title}' removed from the library; nothing was deleted from storage", MashaAttachment.Done("✕ ${target.title}"), mutating = true)
-        } else {
-            toolFail("could not remove '${target.title}'")
+        if (!removed) return toolFail("could not remove '${target.title}'")
+        writes.record("✕ ${target.title}") {
+            onMain { vm.addInstalledApp(app.packageName, app.displayTitle) }
+            "hiding of '${target.title}'"
         }
+        return toolOk("'${target.title}' hidden from the library; nothing was uninstalled or deleted", MashaAttachment.Done("✕ ${target.title}"), mutating = true)
     }
 
     private suspend fun setArt(title: String?, kindName: String?): ToolResult {
-        val target = resolve(title) ?: return notFound(title)
+        val target = when (val l = lookup(title)) {
+            is Lookup.Found -> l.target
+            is Lookup.Ambiguous -> return toolAmbiguous(title.orEmpty(), l.titles)
+            Lookup.Missing -> return notFound(title)
+        }
         val kind = when (kindName?.lowercase()) {
             "cover" -> ArtKind.Cover
             "background" -> ArtKind.Background
@@ -224,9 +417,16 @@ class MashaActions(
             else -> return toolFail("unknown image kind: $kindName")
         }
         if (kind == ArtKind.Cover && target.what != What.Rom) return toolFail("'${target.title}' uses an icon or logo, not a cover")
+        val before = onMain { metaOf(target.key) }
         val applied = vm.applyArtAuto(target.key, kind)
         return if (applied) {
             onMain { vm.materializeArt(target.key, kind) }
+            if (before != null) {
+                writes.record("🖼 ${target.title}") {
+                    onMain { vm.app.library.updateMeta(target.key) { before } }
+                    "$kindName of '${target.title}'"
+                }
+            }
             toolOk("applied the $kindName of '${target.title}'", MashaAttachment.Done("🖼 ${target.title}"), mutating = true)
         } else {
             toolFail("no configured service returned a $kindName for '${target.title}'")
@@ -244,13 +444,25 @@ class MashaActions(
     private suspend fun setAccent(accent: String?): ToolResult {
         val id = accent?.trim()?.lowercase().orEmpty()
         if (id !in MashaTools.ACCENTS) return toolFail("unknown accent: $accent")
+        val before = vm.settings.accentId
         onMain { vm.settings.setAccent(id) }
+        writes.record("◐ $id") {
+            onMain { vm.settings.setAccent(before) }
+            "accent change"
+        }
         return toolOk("accent set to $id", mutating = true)
     }
 
     private suspend fun setDarkMode(enabled: Boolean?): ToolResult {
         val dark = enabled ?: return toolFail("dark or light?")
+        val before = vm.settings.darkMode
         onMain { if (vm.settings.darkMode != dark) vm.settings.toggleDark() }
+        if (before != dark) {
+            writes.record(if (dark) "☾" else "☀") {
+                onMain { if (vm.settings.darkMode != before) vm.settings.toggleDark() }
+                "dark mode change"
+            }
+        }
         return toolOk(if (dark) "dark mode on" else "light mode on", mutating = true) { put("dark", dark) }
     }
 
@@ -260,18 +472,43 @@ class MashaActions(
 
     private data class Target(val key: String, val title: String, val what: What)
 
-    /** Del título al elemento: juegos (ROM o app) y, si no, carpetas por nombre de sistema. */
-    private suspend fun resolve(title: String?): Target? {
+    private sealed interface Lookup {
+        data class Found(val target: Target) : Lookup
+
+        /** Varios encajan: se pregunta cuál (ver [toolAmbiguous]); no se hace nada. */
+        data class Ambiguous(val titles: List<String>) : Lookup
+        data object Missing : Lookup
+    }
+
+    /**
+     * Del título al elemento: juegos (ROM o app, [TargetMatch]: si encajan
+     * varios, es ambiguo) y, si no, carpetas por nombre de sistema.
+     */
+    private suspend fun lookup(title: String?): Lookup {
         val q = title?.trim().orEmpty()
-        if (q.isEmpty()) return null
-        brain.knowledge.snapshot().resolve(q)?.let { g -> return Target(g.key, g.title, if (g.isApp) What.App else What.Rom) }
+        if (q.isEmpty()) return Lookup.Missing
+        val games = TargetMatch.candidates(q, brain.knowledge.snapshot().games) { it.title }
+        if (games.size == 1) return games[0].let { g -> Lookup.Found(Target(g.key, g.title, if (g.isApp) What.App else What.Rom)) }
+        if (games.size > 1) return Lookup.Ambiguous(games.map { it.title })
         val folders = vm.library.folders.mapNotNull { f -> Systems.byId(f.systemId)?.let { Target(f.key, it.name, What.Folder) } }
-        return folders.firstOrNull { it.title.equals(q, ignoreCase = true) }
+        val folder = folders.firstOrNull { it.title.equals(q, ignoreCase = true) }
             ?: folders.firstOrNull { it.title.contains(q, ignoreCase = true) }
             ?: folders.maxByOrNull { Names.similarity(q, it.title) }?.takeIf { Names.similarity(q, it.title) >= 0.7 }
+        return folder?.let { Lookup.Found(it) } ?: Lookup.Missing
     }
+
+    private fun metaOf(key: String): com.elyndra.launcher.data.GameMeta? =
+        vm.library.roms.firstOrNull { it.key == key }?.meta ?: vm.library.apps.firstOrNull { it.key == key }?.meta
 
     private fun notFound(title: String?) = toolFail("'${title.orEmpty()}' is not in the user's library")
 
     private suspend fun <T> onMain(block: () -> T): T = withContext(Dispatchers.Main) { block() }
+
+    private companion object {
+        /** El motivo de una tarjeta: una línea. */
+        const val MAX_REASON = 140
+
+        /** Lo que se espera a que la tienda sepa qué release instalar. */
+        const val RELEASES_WAIT_MS = 15_000L
+    }
 }

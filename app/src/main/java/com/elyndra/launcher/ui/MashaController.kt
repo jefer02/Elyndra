@@ -3,6 +3,7 @@ package com.elyndra.launcher.ui
 import com.elyndra.launcher.masha.ConfirmState
 import com.elyndra.launcher.masha.MashaWriteRules
 import com.elyndra.launcher.masha.MashaWrites
+import com.elyndra.launcher.masha.ReplyShape
 import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -14,12 +15,20 @@ import com.elyndra.launcher.R
 import com.elyndra.launcher.data.AppLocale
 import com.elyndra.launcher.data.Systems
 import com.elyndra.launcher.data.fmtMinutes
+import com.elyndra.launcher.domain.device.DeviceAdvice
 import com.elyndra.launcher.domain.insights.Insight
 import com.elyndra.launcher.domain.lists.DynamicList
 import com.elyndra.launcher.domain.lists.ListRule
 import com.elyndra.launcher.domain.lists.SmartLists
+import com.elyndra.launcher.domain.ports.PortRecommend
+import com.elyndra.launcher.domain.relationship.AffinityLevel
+import com.elyndra.launcher.domain.relationship.AffinityScorer
+import com.elyndra.launcher.domain.relationship.GainReason
 import com.elyndra.launcher.domain.session.SessionMood
+import com.elyndra.launcher.masha.ConversationRecall
 import com.elyndra.launcher.masha.MashaAttachment
+import com.elyndra.launcher.masha.MashaContextBuilder
+import com.elyndra.launcher.masha.MashaPrompt
 import com.elyndra.launcher.masha.MashaBrain
 import com.elyndra.launcher.masha.MashaChatRequest
 import com.elyndra.launcher.masha.MashaError
@@ -33,6 +42,7 @@ import com.elyndra.launcher.masha.offline.OfflineIntents
 import com.elyndra.launcher.ui.masha.MashaMood
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -76,10 +86,43 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
 
     private val pacing get() = brain.pacing
 
+    /** El nivel de la relación con Lucy (el corazón de su pantalla). */
+    var affinityLevel by mutableStateOf(brain.affinity.level); private set
+
+    /** Sube cada vez que la relación sube de nivel: Lucy lo celebra con un gesto (nunca hay aviso al bajar). */
+    var levelUps by mutableIntStateOf(0); private set
+
+    /** Cómo va hacia el siguiente nivel (barra del panel "Lucy y tú" y de Ajustes). */
+    var affinityProgress by mutableStateOf(brain.affinity.progress); private set
+
+    /** Las últimas subidas, la más nueva primero (las bajadas no se enseñan). */
+    var recentGains by mutableStateOf(brain.affinity.recentGains); private set
+
+    /** Cada subida de puntos: [gainSeq] cambia y [lastGain] dice cuántos (el "+N" flotante). */
+    var gainSeq by mutableIntStateOf(0); private set
+    var lastGain by mutableIntStateOf(0); private set
+
+    /** Un nivel alcanzado por primera vez, para la tarjeta de celebración (null = ninguna). */
+    var celebration by mutableStateOf<AffinityLevel?>(null); private set
+
+    fun dismissCelebration() {
+        celebration = null
+    }
+
+    /** Ya avisó de la batería o del calor en esta sesión de su pantalla (una vez como mucho). */
+    private var deviceWarned = false
+
+    /** El último mensaje del usuario: repetirlo tal cual no suma. */
+    private var lastUserText: String? = null
+
     /** Lo que Masha propone cambiar y espera confirmación, y la pila de deshacer. */
     val writes = MashaWrites()
-    private val actions = MashaActions(vm, brain, writes)
+    private val actions = MashaActions(vm, brain, writes) { id, state -> markConfirm(id, state) }
     private var job: Job? = null
+    private var persistJob: Job? = null
+
+    /** La respuesta de la IA que ya se guardó entera (para marcarla si luego la cortan hablando). */
+    private var savedReplyId: Long? = null
     private var historyLoaded = false
 
     val hasKey: Boolean get() = brain.config.hasKey
@@ -89,9 +132,16 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     }
 
     /** Al abrir el chat: recupera el hilo guardado (una vez) y saluda si está vacío. */
-    fun onOpen(greeting: String) {
+    /**
+     * Al abrir el chat: recupera el hilo guardado (una vez). Si pasó más de
+     * media hora desde el último mensaje y hay un tema guardado, Lucy saluda
+     * retomándolo; si no, el hilo sigue tal cual (y con el hilo vacío, el saludo de siempre).
+     */
+    fun onOpen(greeting: String, uiLanguage: String) {
+        val welcome = ConversationRecall.shouldWelcomeBack(System.currentTimeMillis(), recall)
         if (historyLoaded) {
-            if (messages.isEmpty()) messages += ChatMessage(fromMasha = true, text = greeting, greeting = true)
+            if (welcome) welcomeBack(uiLanguage)
+            else if (messages.isEmpty()) messages += ChatMessage(fromMasha = true, text = greeting, greeting = true)
             return
         }
         historyLoaded = true
@@ -105,11 +155,102 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                         game = m.gameKey?.let { gameRef(it) },
                         attachment = m.attachment,
                         restored = true,
+                        interrupted = m.interrupted,
                     )
                 }
-                if (messages.isEmpty()) messages += ChatMessage(fromMasha = true, text = greeting, greeting = true)
             }
+            if (welcome) welcomeBack(uiLanguage)
+            else if (messages.isEmpty()) messages += ChatMessage(fromMasha = true, text = greeting, greeting = true)
         }
+    }
+
+    /* ── la última conversación ───────────────────────────────── */
+
+    private val recall get() = brain.conversation
+    private var idleJob: Job? = null
+    private var welcomeJob: Job? = null
+
+    /** Al salir de la pantalla: la conversación termina y se resume (sigue aunque la pantalla ya no esté). */
+    fun onClose() {
+        idleJob?.cancel()
+        deviceWarned = false
+        vm.viewModelScope.launch { summarize() }
+    }
+
+    /** Hubo un mensaje: se apunta y, tras [ConversationRecall.IDLE_END_MS] de silencio, se da por terminada. */
+    private fun noteActivity(at: Long) {
+        recall.lastActivityAt = at
+        idleJob?.cancel()
+        idleJob = vm.viewModelScope.launch {
+            delay(ConversationRecall.IDLE_END_MS)
+            summarize()
+        }
+    }
+
+    /**
+     * Guarda una frase con el tema de la conversación: con IA, una llamada
+     * barata; sin ella (o si falla), los juegos y las intenciones que salieron.
+     */
+    private suspend fun summarize() {
+        if (!ConversationRecall.needsSummary(recall)) return
+        val turns = messages.filterNot { it.pending || it.greeting || it.text.isBlank() }
+            .map { MashaTurn(if (it.fromMasha) MashaTurn.Role.Masha else MashaTurn.Role.User, it.text, it.interrupted) }
+        if (turns.isEmpty()) return
+        val upTo = recall.lastActivityAt
+        val titles = vm.library.roms.map { it.displayTitle } + vm.library.apps.map { it.displayTitle }
+        val local = ConversationRecall.fallback(turns, titles)
+        val online = if (brain.canGoOnline()) {
+            brain.ai.complete(ConversationRecall.SUMMARY_SYSTEM, ConversationRecall.transcript(turns), maxTokens = 60, temperature = 0.3)
+                .getOrNull()
+                ?.let(ConversationRecall::sanitize)
+        } else {
+            null
+        }
+        val summary = online ?: local?.summary ?: return
+        recall.summary = summary
+        recall.topicGame = local?.game
+        recall.summarizedUpTo = upTo
+    }
+
+    /**
+     * El saludo al volver, retomando el tema: con IA, en su voz y a su nivel
+     * (una llamada con su prompt y el contexto); sin ella, una frase fija con
+     * el juego del que se habló, si lo hubo.
+     */
+    private fun welcomeBack(language: String) {
+        val summary = recall.summary ?: return
+        if (busy || welcomeJob?.isActive == true) return
+        val away = System.currentTimeMillis() - recall.lastActivityAt
+        val index = messages.size
+        messages += ChatMessage(fromMasha = true, text = "", pending = true)
+        welcomeJob = vm.viewModelScope.launch {
+            val online = if (brain.canGoOnline()) {
+                val context = brain.context(language, vm.screenName(), vm.focusName())
+                val prompt = "CONTEXT (JSON):\n${context.json}\nUI_LANGUAGE: $language\n\n" +
+                    ConversationRecall.welcomeInstruction(summary, MashaContextBuilder.ago(away).removeSuffix(" ago"))
+                brain.ai.complete(MashaPrompt.SYSTEM, prompt, maxTokens = 160).getOrNull()?.takeIf { it.isNotBlank() }
+            } else {
+                null
+            }
+            val ctx = localized()
+            val text = online ?: recall.topicGame?.let { ctx.getString(R.string.lucy_welcome_back_game, it) }
+                ?: ctx.getString(R.string.lucy_welcome_back)
+            if (index in messages.indices && messages[index].pending) {
+                messages[index] = messages[index].copy(text = text, pending = false, offline = online == null)
+            } else {
+                messages += ChatMessage(fromMasha = true, text = text, offline = online == null)
+            }
+            mood = MashaMood.Warm
+            persist(StoredMessage(MashaTurn.Role.Masha, text, null, null, System.currentTimeMillis()))
+        }
+    }
+
+    /** "Olvidar conversaciones": el hilo y el último tema (los recuerdos y la relación se quedan). */
+    fun forgetConversations() {
+        welcomeJob?.cancel()
+        idleJob?.cancel()
+        recall.clear()
+        clearConversation(null)
     }
 
     /**
@@ -119,6 +260,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     fun clearConversation(greeting: String?) {
         stop()
         messages.clear()
+        lastUserText = null
         if (greeting != null) messages += ChatMessage(fromMasha = true, text = greeting, greeting = true)
         vm.viewModelScope.launch { brain.memory.clearHistory() }
     }
@@ -129,38 +271,120 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
         send(uiLanguage, cacheable = true)
     }
 
+    /** Lo escrito en el campo de texto. */
     fun send(uiLanguage: String, cacheable: Boolean = false) {
-        val text = draft.trim()
-        if (text.isEmpty() || busy) return
+        if (submit(draft.trim(), uiLanguage, cacheable)) draft = ""
+    }
+
+    /**
+     * Lo dicho en la conversación en vivo: va directo, sin pasar por el campo
+     * de texto, por el mismo camino que lo escrito (contexto, idioma y
+     * herramientas). Con [force], si aún contesta otra cosa, esa respuesta se
+     * corta y se suelta su "ocupada". false si no se mandó.
+     */
+    fun say(text: String, uiLanguage: String, force: Boolean = false): Boolean {
+        if (busy && force) release()
+        return submit(text.trim(), uiLanguage, cacheable = false)
+    }
+
+    /** Sube con cada respuesta (o confirmación) que se queda el "ocupada": solo la última lo suelta. */
+    private var replySeq = 0
+
+    /** Corta ya la respuesta en curso y suelta "ocupada", sin esperar a que su corrutina termine. */
+    private fun release() {
+        replySeq++
+        job?.cancel()
+        job = null
+        finishPending(stopped = true)
+        busy = false
+        working = null
+    }
+
+    private fun submit(text: String, uiLanguage: String, cacheable: Boolean): Boolean {
+        if (text.isEmpty() || busy) return false
         // "Sí" / "no" con una propuesta a la espera: se contesta aquí, sin IA.
         val pendingWrite = writes.latest()
         val answer = pendingWrite?.let { MashaWriteRules.answer(text) }
         if (pendingWrite != null && answer != null) {
             messages += ChatMessage(fromMasha = false, text = text)
-            draft = ""
             persist(StoredMessage(MashaTurn.Role.User, text, null, null, System.currentTimeMillis()))
             if (answer) confirmWrite(pendingWrite.id) else cancelWrite(pendingWrite.id)
-            return
+            return true
         }
         // El hilo que ve el modelo es el de antes de este mensaje, sin el saludo de cortesía.
         val history = messages.filterNot { it.pending || it.greeting || it.text.isBlank() }
-            .map { MashaTurn(if (it.fromMasha) MashaTurn.Role.Masha else MashaTurn.Role.User, it.text) }
+            .map { MashaTurn(if (it.fromMasha) MashaTurn.Role.Masha else MashaTurn.Role.User, it.text, it.interrupted) }
         messages += ChatMessage(fromMasha = false, text = text)
-        draft = ""
         busy = true
         persist(StoredMessage(MashaTurn.Role.User, text, null, null, System.currentTimeMillis()))
+        val previous = lastUserText
+        lastUserText = text
+        // Lo que dijo decide si una acción se hace ya o se propone (ActionGate).
+        actions.lastUserText = text
 
+        val seq = ++replySeq
         job = vm.viewModelScope.launch {
             try {
-                if (brain.canGoOnline()) online(text, history, uiLanguage, cacheable) else offlineReply(text, failure = null)
+                if (brain.canGoOnline()) online(text, previous, history, uiLanguage, cacheable) else offlineReply(text, previous, failure = null)
             } catch (e: CancellationException) {
-                finishPending(stopped = true)
+                // Si ya la soltó release(), lo pendiente es de la respuesta nueva.
+                if (seq == replySeq) finishPending(stopped = true)
                 throw e
             } finally {
-                busy = false
-                working = null
+                if (seq == replySeq) {
+                    busy = false
+                    working = null
+                }
             }
         }
+        return true
+    }
+
+    /* ── relación ─────────────────────────────────────────────── */
+
+    /**
+     * Puntúa el mensaje del usuario para la relación: lo que dijo la IA (con la
+     * red de seguridad local) o, sin ella, las reglas locales. Pedir una acción
+     * no cuenta. Si sube de nivel, Lucy se pone cálida y lo celebra.
+     */
+    private fun score(message: String, previous: String?, modelDelta: Int?) {
+        val level = brain.affinity.level
+        val delta = modelDelta?.let { AffinityScorer.guard(message, it) } ?: run {
+            val intent = OfflineIntents.detect(message)
+            val isAction = intent !is OfflineIntent.Hello && intent !is OfflineIntent.Unknown
+            AffinityScorer.score(message, level, isAction, previous)
+        }
+        // La IA no dice por qué: su puntuación va como "charla"; la local sí sabe el motivo.
+        val reason = if (modelDelta != null) GainReason.Chat else AffinityScorer.reason(message, level)
+        val change = brain.affinity.apply(delta, reason)
+        refreshAffinity()
+        if (change.gained > 0) {
+            lastGain = change.gained
+            gainSeq++
+        }
+        if (change.levelUp) {
+            levelUps++
+            mood = MashaMood.Warm
+        }
+        if (change.celebrate) celebration = change.newLevel
+    }
+
+    /** Los celos sin conexión: nada hasta [AffinityLevel.Friendly]; de ahí, más intensos cuanto más cerca. */
+    private fun jealousLine(message: String): Int? {
+        if (!AffinityScorer.isJealousyTrigger(message)) return null
+        return when (brain.affinity.level) {
+            AffinityLevel.Distant, AffinityLevel.Curious -> null
+            AffinityLevel.Friendly -> R.string.lucy_off_jealous_friendly
+            AffinityLevel.Close -> R.string.lucy_off_jealous_close
+            AffinityLevel.Devoted -> R.string.lucy_off_jealous_devoted
+        }
+    }
+
+    /** "Olvidar todo": la relación vuelve al principio (y el corazón con ella). */
+    fun refreshAffinity() {
+        affinityLevel = brain.affinity.level
+        affinityProgress = brain.affinity.progress
+        recentGains = brain.affinity.recentGains
     }
 
     /* ── confirmaciones ───────────────────────────────────────── */
@@ -168,16 +392,29 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     /** ¿Sigue a la espera esta tarjeta? (tras reiniciar, ya no). */
     fun isWritePending(id: String): Boolean = writes.isPending(id)
 
-    /** "Confirmar" en la tarjeta (o "sí" escrito): se hace y se cuenta en el chat. */
+    /**
+     * "Confirmar" en la tarjeta, o un sí con palabras ("sí", "dale", "confirmo",
+     * "yes", "はい"… ver ConfirmationResolver), por escrito o en vivo: se hace y
+     * se cuenta en el chat. Mientras, cuenta como ocupada (la conversación en
+     * vivo espera a que lo diga).
+     */
     fun confirmWrite(id: String) {
         if (!writes.isPending(id)) return
+        // Tocada mientras contesta otra cosa: esa respuesta ya lleva su "ocupada".
+        val own = !busy
+        if (own) busy = true
+        val seq = if (own) ++replySeq else replySeq
         vm.viewModelScope.launch {
-            val out = writes.confirm(id) ?: return@launch
-            markConfirm(id, if (out.ok) ConfirmState.DONE else ConfirmState.CANCELLED)
-            val ctx = localized()
-            val text = ctx.getString(if (out.ok) R.string.masha_write_done else R.string.masha_write_failed, out.label)
-            messages += ChatMessage(fromMasha = true, text = text, done = listOf(out.label))
-            persist(StoredMessage(MashaTurn.Role.Masha, text, null, MashaAttachment.Done(out.label, out.ok), System.currentTimeMillis()))
+            try {
+                val out = writes.confirm(id) ?: return@launch
+                markConfirm(id, if (out.ok) ConfirmState.DONE else ConfirmState.CANCELLED)
+                val ctx = localized()
+                val text = ctx.getString(if (out.ok) R.string.masha_write_done else R.string.masha_write_failed, out.label)
+                messages += ChatMessage(fromMasha = true, text = text, done = listOf(out.label))
+                persist(StoredMessage(MashaTurn.Role.Masha, text, null, MashaAttachment.Done(out.label, out.ok), System.currentTimeMillis()))
+            } finally {
+                if (own && seq == replySeq) busy = false
+            }
         }
     }
 
@@ -203,8 +440,39 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
         job = null
     }
 
-    private suspend fun online(text: String, history: List<MashaTurn>, language: String, cacheable: Boolean) {
-        val context = brain.context(language, vm.screenName(), vm.focusName())
+    /**
+     * El usuario le cortó hablando (conversación en vivo): se para la
+     * respuesta y en el hilo queda solo lo que llegó a decir ([spoken], las
+     * frases que sonaron), marcado como interrumpido, para que la próxima vez
+     * no lo repita. Sin nada dicho y sin tarjeta, la burbuja se quita.
+     */
+    fun interrupt(spoken: String) {
+        val lastUser = messages.indexOfLast { !it.fromMasha }
+        val i = messages.indexOfLast { it.fromMasha && !it.greeting }
+        stop()
+        if (i < 0 || i < lastUser) return
+        val m = messages[i]
+        val text = spoken.trim().takeIf { it.isNotEmpty() }?.let { it.trimEnd('.', '…', ' ') + "…" } ?: "…"
+        val saved = savedReplyId == m.id
+        if (!saved && spoken.isBlank() && m.attachment == null) {
+            messages.removeAt(i)
+            return
+        }
+        messages[i] = m.copy(text = text, pending = false, interrupted = true)
+        if (saved) {
+            val previous = persistJob
+            persistJob = vm.viewModelScope.launch {
+                previous?.join()
+                brain.memory.markLastInterrupted(text)
+            }
+        } else {
+            persist(StoredMessage(MashaTurn.Role.Masha, text, m.game?.key, m.attachment, System.currentTimeMillis(), interrupted = true))
+        }
+    }
+
+    private suspend fun online(text: String, previous: String?, history: List<MashaTurn>, language: String, cacheable: Boolean) {
+        val warning = DeviceAdvice.forContext(brain.device.snapshot(), deviceWarned)
+        val context = brain.context(language, vm.screenName(), vm.focusName(), portsSummary(), deviceWarned)
         val index = messages.size
         messages += ChatMessage(fromMasha = true, text = "", pending = true)
         val buffer = StringBuilder()
@@ -245,28 +513,49 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                     render(final = false)
                 }
                 is MashaEvent.Completed -> {
+                    // El aviso de batería o calor iba en el contexto y se lanzó o instaló algo: ya está dado.
+                    if (warning != null && tools.any { it in DeviceAdvice.HEAVY_TOOLS }) deviceWarned = true
+                    // Con tarjeta, confirmación o algo hecho: como mucho dos frases, la herramienta que sea (v4).
+                    val shown = ReplyShape.finalText(event.text, attachment, done)
                     buffer.setLength(0)
-                    buffer.append(event.text)
+                    buffer.append(shown)
                     render(final = true)
                     mood = MashaMood.read(event.text, tools, failed = false)
+                    // De caché no hay puntuación de la IA (era la de otro mensaje): la pone la regla local.
+                    score(text, previous, if (event.fromCache) null else event.affinityDelta)
                     val game = if (attachment == null) findMentionedGame(event.text) else null
                     if (game != null && index in messages.indices) messages[index] = messages[index].copy(game = game)
-                    persist(StoredMessage(MashaTurn.Role.Masha, event.text, game?.key, attachment, System.currentTimeMillis()))
+                    persist(StoredMessage(MashaTurn.Role.Masha, shown, game?.key, attachment, System.currentTimeMillis()))
+                    if (index in messages.indices) savedReplyId = messages[index].id
                 }
                 is MashaEvent.Failed -> {
                     if (event.partial.isBlank()) {
                         // Nada que enseñar: se quita la burbuja vacía y contesta Masha sin conexión.
                         if (index in messages.indices) messages.removeAt(index)
-                        offlineReply(text, failure = event.error)
+                        offlineReply(text, previous, failure = event.error)
                     } else {
                         render(final = true)
                         mood = MashaMood.Concerned
+                        score(text, previous, modelDelta = null)
                         persist(StoredMessage(MashaTurn.Role.Masha, event.partial, null, attachment, System.currentTimeMillis()))
                         vm.showToast(errorText(event.error))
                     }
                 }
             }
         }
+    }
+
+    /**
+     * La tienda resumida para el contexto (PORTS). Sin catálogo aún, se pide
+     * en segundo plano (red, caché o la copia del APK) y esta vez no va.
+     */
+    private fun portsSummary(): PortRecommend.Summary? {
+        val ports = vm.ports
+        if (ports.catalog.isEmpty()) {
+            ports.onOpen()
+            return null
+        }
+        return PortRecommend.summary(ports.catalog, ports.installed.keys, ports.updateIds(), ports.owned())
     }
 
     /** Si se cortó a medias, lo que quedó escrito se da por bueno (sin la marca de "escribiendo"). */
@@ -284,7 +573,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
      * con las mismas capacidades que usa la IA. Si llega aquí por un fallo, lo
      * dice una vez, en una línea, y contesta igual.
      */
-    private suspend fun offlineReply(text: String, failure: MashaError?) {
+    private suspend fun offlineReply(text: String, previous: String?, failure: MashaError?) {
         val ctx = localized()
         val skills = brain.skills
         var attachment: MashaAttachment? = null
@@ -356,12 +645,15 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
                     if (result.ok) ctx.getString(R.string.masha_off_renamed, focused, intent.name) else ctx.getString(R.string.masha_off_rename_bad, intent.name)
                 }
             }
-            OfflineIntent.FindPort -> {
-                val result = actions.execute(ToolCall("local", MashaTools.FIND_PORT, buildJsonObject {}))
+            is OfflineIntent.FindPort -> {
+                // Del catálogo cargado o, sin red, del guardado (o la copia del APK).
+                val result = actions.execute(ToolCall("local", MashaTools.FIND_PORTS, buildJsonObject { intent.query?.let { put("query", it) } }))
                 val found = result.attachment as? MashaAttachment.Ports
                 if (found != null) {
                     attachment = found
                     ctx.getString(R.string.masha_off_ports)
+                } else if (intent.query != null) {
+                    ctx.getString(R.string.lucy_off_ports_query_none, intent.query)
                 } else {
                     // Nada de la biblioteca tiene port: la tienda, para mirar.
                     vm.openPorts()
@@ -372,9 +664,13 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
             OfflineIntent.Unknown -> ctx.getString(if (brain.config.hasKey) R.string.masha_off_unknown else R.string.masha_off_unknown_nokey)
         }
         val prefix = failure?.let { ctx.getString(failureLine(it)) + "\n\n" }.orEmpty()
-        val full = prefix + reply
+        // Si nombra a otra chica, otro asistente u otro launcher, un puchero según el nivel; lo pedido se hace igual.
+        val jealous = jealousLine(text)?.let { ctx.getString(it) + " " }.orEmpty()
+        // Con tarjeta, solo la frase corta (las tarjetas cuentan el resto).
+        val full = ReplyShape.finalText(prefix + jealous + reply, attachment)
         // Sin IA no hay herramientas que mirar: una tarjeta de datos cuenta como análisis.
         mood = MashaMood.read(reply, if (attachment != null) listOf(MashaTools.GET_STATS) else emptyList(), failed = failure != null)
+        score(text, previous, modelDelta = null)
         messages += ChatMessage(fromMasha = true, text = full, game = game, attachment = attachment, offline = true)
         persist(StoredMessage(MashaTurn.Role.Masha, full, game?.key, attachment, System.currentTimeMillis()))
     }
@@ -479,7 +775,10 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
         val topMinutes: Int,
         val weekSessions: Int,
         val averageMinutes: Int,
-    )
+    ) {
+        /** Las tres cifras vacías ("sin datos todavía"): la fila no se enseña. */
+        val isEmpty: Boolean get() = weekMinutes == 0 && weekSessions == 0 && topTitle == null
+    }
 
     /** Tarjetas de la cabecera: esta semana, el más jugado y las sesiones (las de verdad, no las salidas al minuto). */
     fun stats(now: Long = System.currentTimeMillis()): Stats {
@@ -531,7 +830,7 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     private fun workingLabel(call: ToolCall): UiText = UiText.res(
         when (call.name) {
             MashaTools.FIND_GAMES, MashaTools.OPEN_LIST -> R.string.masha_working_search
-            MashaTools.FIND_PORT -> R.string.masha_working_ports
+            MashaTools.FIND_PORTS, MashaTools.OPEN_PORT, MashaTools.INSTALL_PORT -> R.string.masha_working_ports
             MashaTools.GET_GAME_PROFILE, MashaTools.SUGGEST_EMULATOR -> R.string.masha_working_profile
             MashaTools.PLAN_SESSION -> R.string.masha_working_plan
             MashaTools.CREATE_ARC, MashaTools.GET_ARCS -> R.string.masha_working_arc
@@ -556,7 +855,13 @@ class MashaController(private val vm: ElyndraViewModel, private val brain: Masha
     }
 
     private fun persist(message: StoredMessage) {
-        vm.viewModelScope.launch { brain.memory.saveMessage(message) }
+        noteActivity(message.createdAt)
+        // En orden: marcar una respuesta como interrumpida tiene que llegar después de guardarla.
+        val previous = persistJob
+        persistJob = vm.viewModelScope.launch {
+            previous?.join()
+            brain.memory.saveMessage(message)
+        }
     }
 
     /** Contexto con el idioma de la app, para componer respuestas fuera de Compose. */

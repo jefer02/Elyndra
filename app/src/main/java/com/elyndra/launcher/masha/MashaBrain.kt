@@ -2,7 +2,9 @@ package com.elyndra.launcher.masha
 
 import com.elyndra.launcher.domain.library.UserFolderLogic
 import com.elyndra.launcher.core.device.DeviceStateMonitor
+import com.elyndra.launcher.data.AffinityPrefs
 import com.elyndra.launcher.data.ArcRepository
+import com.elyndra.launcher.data.ConversationPrefs
 import com.elyndra.launcher.data.InsightPacingPrefs
 import com.elyndra.launcher.data.SettingsStore
 import com.elyndra.launcher.data.Systems
@@ -10,6 +12,8 @@ import com.elyndra.launcher.domain.insights.Insight
 import com.elyndra.launcher.domain.insights.InsightInput
 import com.elyndra.launcher.domain.insights.InsightPacing
 import com.elyndra.launcher.domain.insights.MashaInsights
+import com.elyndra.launcher.domain.ports.PortRecommend
+import com.elyndra.launcher.domain.relationship.Affinity
 import com.elyndra.launcher.domain.session.ArcStep
 import com.elyndra.launcher.launch.EmulatorInventory
 import com.elyndra.launcher.launch.LaunchOrchestrator
@@ -44,7 +48,15 @@ class MashaBrain @Inject constructor(
     private val engine: MetadataEngine,
     private val settings: SettingsStore,
     private val pacingStore: InsightPacingPrefs,
+    affinityStore: AffinityPrefs,
+    conversationStore: ConversationPrefs,
 ) {
+
+    /** De qué iba la última conversación y cuándo fue (ver [ConversationRecall]). */
+    val conversation: ConversationStore = conversationStore
+
+    /** La relación con Lucy: cuánto de cálida suena (nunca lo que puede hacer). */
+    val affinity = Affinity(affinityStore)
 
     /**
      * Qué ha dicho ya el bocadillo y cuándo. Guardado: sobrevive a que Android
@@ -55,7 +67,7 @@ class MashaBrain @Inject constructor(
     /** Masha puede usar la IA ahora mismo (clave, permiso del usuario y red). */
     fun canGoOnline(): Boolean = ai.isAvailable && device.snapshot().isOnline
 
-    suspend fun context(language: String, screen: String?, focus: String?): BuiltContext {
+    suspend fun context(language: String, screen: String?, focus: String?, ports: PortRecommend.Summary? = null, deviceWarned: Boolean = false): BuiltContext {
         val snapshot = knowledge.snapshot()
         val folderEmulators = snapshot.library.folders
             .mapNotNull { f -> f.emulatorId?.let { e -> f.systemId to (orchestrator.name(e) to orchestrator.isInstalled(e)) } }
@@ -66,6 +78,7 @@ class MashaBrain @Inject constructor(
                 arcs = skills.arcProgress(),
                 memories = memory.all(20),
                 device = device.snapshot(),
+                deviceWarned = deviceWarned,
                 zone = ZoneId.systemDefault(),
                 language = language,
                 screen = screen,
@@ -76,6 +89,9 @@ class MashaBrain @Inject constructor(
                 folderEmulators = folderEmulators,
                 savedLists = skills.savedListNames(),
                 userFolders = UserFolderLogic.sorted(snapshot.library.userFolders).map { it.name },
+                relationship = affinity.level,
+                lastConversation = conversation.summary?.let { it to conversation.lastActivityAt },
+                ports = ports,
             ),
         )
     }
@@ -125,8 +141,10 @@ class MashaBrain @Inject constructor(
             .map { (arc, step) -> arc.title to step }
     }
 
-    /** Borra todo lo que Masha guarda: recuerdos, hilo y respuestas en caché. */
+    /** Borra todo lo que Masha guarda: recuerdos, hilo, el último tema, respuestas en caché y la relación. */
     suspend fun forgetEverything() {
+        affinity.reset()
+        conversation.clear()
         memory.clearMemories()
         memory.clearHistory()
         cache.clear()

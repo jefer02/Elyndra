@@ -119,6 +119,20 @@ class UpdateLogicTest {
         assertEquals("Elyndra-v0.4.0-beta-x86_64.apk", UpdateLogic.chooseAsset(split, listOf("x86_64", "x86"))?.name)
     }
 
+    @Test fun `x86 does not match an APK named x86-64`() {
+        assertFalse(UpdateLogic.namesAbi("port-x86-64.apk", "x86"))
+        assertFalse(UpdateLogic.namesAbi("port-x86_64.apk", "x86"))
+        assertTrue(UpdateLogic.namesAbi("port-x86.apk", "x86"))
+        assertTrue(UpdateLogic.namesAbi("port-x86-release.apk", "x86"))
+        // El de 64 bits sí se reconoce con guion, y sigue contando como "dice una ABI".
+        assertTrue(UpdateLogic.namesAbi("port-x86-64.apk", "x86_64"))
+        assertTrue(UpdateLogic.mentionsAnyAbi("port-x86-64.apk"))
+        val both = listOf(apk("port-x86-64.apk"), apk("port-x86.apk"))
+        assertEquals("port-x86.apk", UpdateLogic.chooseAsset(both, listOf("x86"))?.name)
+        assertEquals("port-x86-64.apk", UpdateLogic.chooseAsset(both, listOf("x86_64", "x86"))?.name)
+        assertNull(UpdateLogic.chooseAsset(listOf(apk("port-x86-64.apk")), listOf("x86")))
+    }
+
     @Test fun `x86 does not match the x86_64 APK`() {
         assertEquals("Elyndra-v0.4.0-beta-universal.apk", UpdateLogic.chooseAsset(split, listOf("x86"))?.name)
     }

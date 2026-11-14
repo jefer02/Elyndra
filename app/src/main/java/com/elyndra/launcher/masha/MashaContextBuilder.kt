@@ -1,10 +1,14 @@
 package com.elyndra.launcher.masha
 
 import com.elyndra.launcher.domain.Game
+import com.elyndra.launcher.domain.device.DeviceAdvice
 import com.elyndra.launcher.domain.device.DeviceState
+import com.elyndra.launcher.domain.device.DeviceWarning
 import com.elyndra.launcher.domain.lists.SmartLists
+import com.elyndra.launcher.domain.ports.PortRecommend
 import com.elyndra.launcher.domain.profile.GameProfile
 import com.elyndra.launcher.domain.profile.PlayState
+import com.elyndra.launcher.domain.relationship.AffinityLevel
 import com.elyndra.launcher.domain.session.ArcProgress
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
@@ -27,6 +31,8 @@ data class ContextInput(
     val arcs: List<ArcProgress>,
     val memories: List<Memory>,
     val device: DeviceState?,
+    /** Ya se avisó de la batería o del calor en esta sesión (no se repite). */
+    val deviceWarned: Boolean = false,
     val zone: ZoneId,
     val language: String,
     /** Qué está mirando el usuario: "library", "folder", "details", "masha"… */
@@ -43,6 +49,12 @@ data class ContextInput(
     val savedLists: List<String>,
     /** Las carpetas creadas por el usuario, solo por su nombre. */
     val userFolders: List<String> = emptyList(),
+    /** El nivel de la relación con Lucy (elige el tono); null = no se manda. */
+    val relationship: AffinityLevel? = null,
+    /** El tema de la última conversación y cuándo fue su último mensaje (epoch ms); null = nada. */
+    val lastConversation: Pair<String, Long>? = null,
+    /** La tienda de ports en números y nombres de juegos (nunca enlaces ni rutas); null = sin catálogo aún. */
+    val ports: PortRecommend.Summary? = null,
 )
 
 data class BuiltContext(val json: String, val fingerprint: String)
@@ -73,6 +85,8 @@ object MashaContextBuilder {
         val profiles = s.profiles
 
         val stable = buildJsonObject {
+            // En la parte estable: si cambia de nivel, cambia el tono y las respuestas guardadas ya no valen.
+            input.relationship?.let { put("RELATIONSHIP_LEVEL", it.id) }
             putJsonObject("library") { library(this, input) }
             putJsonObject("playtime") { playtime(this, input) }
             list("in_progress", games.filter { profiles[it.key]?.state == PlayState.InProgress }.sortedByDescending { profiles[it.key]?.lastPlayed ?: 0 }.take(8), input)
@@ -127,18 +141,41 @@ object MashaContextBuilder {
         val volatile = buildJsonObject {
             put("now", describeNow(now, input.zone, input.language))
             input.device?.let { d ->
+                // Sin cifras de batería ni temperatura: solo hay aviso cuando es un problema (DeviceAdvice).
                 putJsonObject("device") {
-                    d.batteryPct?.let { put("battery_pct", it) }
-                    put("charging", d.charging)
-                    d.batteryTempC?.let { put("battery_temp_c", it) }
-                    put("thermal", d.thermal.name.lowercase())
                     put("power_save", d.powerSave)
                     put("network", d.network.name.lowercase())
+                }
+                DeviceAdvice.forContext(d, input.deviceWarned)?.let { w ->
+                    putJsonObject("DEVICE_WARNING") {
+                        put("kind", if (w == DeviceWarning.Hot) "hot" else "low_battery")
+                        if (w == DeviceWarning.LowBattery) d.batteryPct?.let { put("battery_pct", it) }
+                        put("note", "mention it once, briefly, only if the user is about to launch or install something heavy")
+                    }
                 }
             }
             putJsonObject("screen") {
                 put("view", input.screen ?: "library")
                 input.focus?.let { put("focused", it) }
+            }
+            // Volátil: el "hace cuánto" cambia solo. Se vuelve a limpiar aquí por si acaso.
+            input.lastConversation?.let { (summary, at) ->
+                ConversationRecall.sanitize(summary)?.let { clean ->
+                    putJsonObject("LAST_CONVERSATION") {
+                        put("summary", clean)
+                        if (at > 0) put("ago", ago(now - at))
+                    }
+                }
+            }
+            // Volátil: instalar o actualizar un port no debe invalidar respuestas guardadas.
+            input.ports?.let { p ->
+                putJsonObject("PORTS") {
+                    put("total", p.total)
+                    put("runs_on_this_device", p.compatible)
+                    put("installed", p.installed)
+                    put("updates", p.updates)
+                    if (p.forYourLibrary.isNotEmpty()) putJsonArray("for_your_library") { p.forYourLibrary.forEach { add(it) } }
+                }
             }
         }
 

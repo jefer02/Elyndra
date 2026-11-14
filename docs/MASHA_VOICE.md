@@ -66,6 +66,104 @@ MashaScreen ──feed(texto, final)──▶ MashaVoice ──▶ VoiceRouter �
 - El modelo se carga y se "calienta" al elegir idioma (al entrar en la pantalla de Lucy); si ya espera una
   frase de verdad, el calentamiento se salta (ella misma lo hace).
 
+### Conversación en vivo (`ui/masha/live/`)
+
+- **Siempre en vivo** (v4): entrar en la pantalla de Lucy pone la conversación en vivo sola; al volver del
+  fondo, sigue. El micrófono es un **candado** (`MicLock`): tocarlo (o **Y** en el mando) lo bloquea
+  (`AudioRecord` suelto, el punto verde del sistema se va) o lo desbloquea; se recuerda entre visitas
+  (`lucy.micLocked`, por defecto desbloqueado). Bloqueado se puede escribir y ella sigue hablando;
+  **mantener** es cortarla en vivo o, bloqueado, pulsar para hablar. El permiso se pide **una vez**, la
+  primera vez que se abre su pantalla (`lucy.micAsked`), con una línea que explica por qué; denegado, abre
+  bloqueado con una pista y no vuelve a preguntar (tocar el micrófono lo pide). En reposo solo trabaja el
+  VAD; el reconocedor solo mientras el usuario habla. Ya no hay apagado automático.
+  Solo terminan la sesión: salir de la pantalla, la app al fondo o la pantalla apagada (`ON_STOP`, el
+  micrófono se suelta en el momento), bloquear el micrófono y que falte el permiso
+  (`LiveTurns.EndReason`). **Nada de lo que oye la termina** (v4): ni el silencio (no hay temporizador de
+  inactividad), ni una pausa, ni un resultado vacío, ni ningún código de error del reconocedor
+  (`Event.RecognizerError`: se vuelve a escuchar; si sigue hablando, se reabre con espera creciente
+  250 ms → 4 s, `RecognizerBackoff`). Si `AudioRecord` falla o no abre, `LiveMic` lo suelta y lo reabre
+  con la misma espera. El punto "EN VIVO" late mientras el micrófono está abierto.
+- **Causa del corte "Conversación en vivo terminada" (v3)**: el temporizador de 3 minutos solo se reiniciaba
+  al entrar en Waiting o con voz del usuario; cuando Lucy hablaba sin turno de voz (respuesta a algo escrito
+  o tocado, el "sí" a una tarjeta, el saludo) la sesión seguía en Waiting y, pasados 3 minutos desde lo
+  último *dicho*, el `IdleTimeout` la cortaba a media frase. Ahora su voz en Waiting pasa a Speaking
+  (`ReplyStarted` → `WatchVoice`) y el temporizador ya no existe.
+- **Micrófono siempre abierto** (`LiveMic`): `AudioRecord` con `VOICE_RECOGNITION` a 16 kHz, **sin modo
+  llamada** (la voz de Lucy sigue en `USAGE_ASSISTANT` con calidad normal y la música no cambia), con
+  `AcousticEchoCanceler`/`NoiseSuppressor` si el móvil los deja usar fuera de una llamada. Tramos de 16 ms:
+  anillo de 1,2 s (`PcmRing`), VAD (Silero v5 en ONNX Runtime, `SileroVad`; por energía en 32 bits,
+  `VoiceActivity`), puerta de eco y segmentador (`LiveEar`).
+- **Su propia voz como referencia** (`EchoGate`): `SpeechOutput` anota el nivel de lo que escribe en la pista
+  (`PlaybackEnvelope`) y el micrófono lo lee en la trama que suena (reloj de la pista). La puerta estima el
+  retardo altavoz→micro cruzando envolventes (0–384 ms), aprende el acoplamiento solo con tramos que siguen
+  a su voz y deja pasar la voz que supera el eco esperado en 5 dB (con 4 dB más de margen si el micro sigue
+  su envolvente: distorsión a volumen alto). Con ella callada, decide el VAD.
+- **Turnos** (`LiveTurns`, puro): Waiting → UserSpeaking (≥ 250 ms de voz) → fin de turno con **700 ms** de
+  silencio (`SpeechSegmenter`) → Thinking → Speaking → Waiting. Si habla mientras piensa, se cancela la
+  petición y se espera a que termine.
+- **Interrumpir**: con ella hablando, a los 250 ms de voz del usuario se **pausa** (`MashaVoice.pause`, la
+  pista se para sin perder la cola) y el reconocedor ya escucha. `HoldDecision`: una muletilla corta ("mm",
+  "ajá", "うん"… `Backchannel`, 6 idiomas) → sigue donde iba; cualquier otra palabra, más de 900 ms de voz o
+  un "sí" a su pregunta final → se corta: en el hilo queda solo lo que llegó a decir, marcado como
+  interrumpido (columna `interrupted`, migración 9→10), y DeepSeek lo recibe con la nota
+  `(The user interrupted you here.)` (prompt v8, INTERRUPTIONS). Una pausa nunca dura más de 2,5 s.
+- **Ajuste "Interrumpir con la voz por el altavoz"** (Ajustes → Lucy, encendido por defecto): apagado y por
+  el altavoz, lo que se oye mientras ella habla no la corta (solo el botón); con auriculares siempre.
+- **Reconocer sin perder el principio**: en Android 13+ `MashaEars.startStream` escucha nuestro audio por un
+  pipe (`EXTRA_AUDIO_SOURCE`, PCM 16 kHz) empezando por el último segundo del anillo. Si el reconocedor no
+  acepta audio de fuera (error al empezar), **relevo**: se suelta nuestro micrófono y escucha él (se pierden
+  ~300–600 ms del principio); igual en Android 12 o menos. Reconocedor del dispositivo si lo hay y tiene el
+  idioma; si no, el del sistema (y se avisa).
+- **Reconocedores que aceptan el pipe y lo ignoran** (v4.1): algunos no fallan con `EXTRA_AUDIO_SOURCE`,
+  abren su propio micrófono o no leen el pipe. Antes eso daba NO_MATCH/SPEECH_TIMEOUT en bucle, en
+  silencio (la sesión vuelve a escuchar), y parecía que Lucy no oía nada. Ahora, mientras escucha por el
+  pipe, `StreamCheck` mira cada 100 ms: si **nuestro** micrófono pasa a dar ceros (Android le da el audio a
+  uno solo) es que el reconocedor tiene el micrófono → relevo en el sitio (soltamos el nuestro y le dejamos
+  terminar); si la cola del pipe crece (> 600 ms sin leer) → se cancela y relevo. Y `HearingHealth`: 2
+  turnos seguidos con voz (≥ 400 ms) y sin texto por el pipe → relevo hasta salir de la pantalla; **3
+  seguidos** (por cualquier vía), o el micrófono dando ceros 5 s seguidos (otra app lo tiene) → bajo el
+  dock "**No te estoy escuchando bien**" en vez de "Escuchando", hasta el siguiente texto.
+- **Sin conexión**: 2 errores de red seguidos del reconocedor (NETWORK_TIMEOUT, NETWORK, SERVER,
+  SERVER_DISCONNECTED: uno que solo funciona con conexión y no la tiene) → bajo el micrófono, discreto,
+  "**No te escucho: sin conexión**", hasta que el reconocedor vuelva a contestar (un texto o un NO_MATCH).
+- **Voz silenciada**: con "Voz de Lucy" apagada (panel del altavoz de la cabecera, cuyo icono sale tachado)
+  no habla nunca, tampoco en vivo ni con el micrófono bloqueado: contesta con subtítulos y la escucha sigue.
+- **Todo turno acaba en un envío** (v4.2): en vivo lo dicho va directo a la conversación (`MashaController.say`,
+  el mismo camino que lo escrito: contexto, idioma y herramientas) y **nunca** pasa por el campo de texto. Antes
+  los parciales se escribían en el campo y solo se mandaba si llegaba un resultado final con texto: si el
+  reconocedor acababa en error/NO_MATCH tras cerrarle el pipe, o no llegaba a dar resultado (relevo, sin nuestro
+  silencio), lo dicho se quedaba escrito en el campo y Lucy no contestaba. Ahora el fin de turno llega por
+  cualquiera de: nuestro silencio (700 ms), `onEndOfSpeech` del reconocedor, su resultado, o 1,2 s sin parciales
+  nuevos con texto (si nuestro micrófono no oye voz). Tras el fin, 700 ms para el resultado final; si no llega
+  (o llega un error) va el último parcial. Sin ningún texto, a los 5 s vuelve a escuchar.
+- **Que no se interrumpa sola ni se pare** (v4.3, medido en la tablet): con el AEC del móvil el arranque de cada
+  sílaba suya llega al micro antes que el retraso estimado y casi tan fuerte como el usuario. La puerta de eco
+  mira siempre desde el último tramo (no solo alrededor del retraso), conserva lo aprendido al reabrir el
+  micrófono (`EchoGate.reopened`), pide 7 dB sobre su eco (antes 5) y, con ella sonando, 300 ms de voz. Si en una
+  respuesta la pausa dos veces sin texto, la voz ya no la pausa hasta la siguiente (el botón sí). Cortada por el
+  usuario, su mensaje recortado no se vuelve a leer (`SpokenReply`). Y el silencio que el TTS del sistema pone
+  en los extremos de cada frase (~340 ms al final) se recorta (`SilenceTrimmer`): entre frases quedaba ~0,7 s
+  callada. Las trazas reales están en `app/src/test/resources/live/` (`TabletEchoTraceTest`); en debug,
+  `LiveMic` escribe una nueva en `files/live-trace.csv` (`adb exec-out run-as com.elyndra.launcher cat
+  files/live-trace.csv`). En el log, cada pausa y vuelta: `pause voice reason=… levels=[…]` /
+  `resume voice reason=… heldMs=…`, y `speech start mic=… ref=… expectedEcho=…`.
+- **Lo dicho nunca se pierde**: si llega con ella contestando otra cosa (algo escrito, el saludo, una
+  confirmación), se corta esa respuesta y se manda en cuanto queda libre; si a los 500 ms sigue "ocupada", se
+  manda igual (se suelta a la fuerza).
+- **Probado de punta a punta** (`LiveVoiceTest`): tramos por el oído de verdad → reconocedor falso → texto →
+  chat → su voz → escuchando; relevo por ceros, por pipe sin leer y por turnos vacíos; el aviso.
+- **Log `LucyLive`** (`adb logcat -s LucyLive`): cada transición (`event=… from=… to=… effects=[…]`, sin
+  el texto del usuario), cada error del reconocedor con su código y nombre, cada recuperación, `end reason=…`; por turno, fin de voz → texto final y fin de voz → primera palabra de Lucy; por pausa,
+  muletilla o corte; al cerrar, pausas/siguió/cortes y lo que vio el micrófono (tramos con Lucy, eco
+  descartado, voz sobre Lucy, AEC/NS, Silero, acoplamiento). Falso disparo = pausa que sigue sin texto.
+  Además (debug, `D`): cada segundo `mic 1s: level … p avg/max … lucy=… expectedEcho=… voiced=…
+  silenced=…`; por escucha del reconocedor `recognizer listen onDevice=… audio=stream|mic`, `ready`,
+  `beginningOfSpeech`, `first partial`, `endOfSpeech`/`results chars=N`/`onError code=…` con nivel máximo y
+  parciales; `pipe closed: written=… backlog=…`; `turn result text=… via=… missesInARow=…`; por turno, `turn end via=silence|endOfSpeech|results|partialTimeout|error source=final|partial chars=N → sent|queued(chatBusy)|dropped(noText|chatRefused)` y, si esperó, `send dequeued waitedMs=… force=… → sent`.
+- Medido sin móvil (`SpeakerEchoSimulationTest`, voz sintética, VAD de energía): volumen medio 0 falsos/min,
+  8 % de barge-ins perdidos, ~295 ms de reacción; volumen alto (eco al nivel del usuario, altavoz saturado)
+  0 falsos/min y 50 % perdidos (26 % si el usuario sube la voz). A volumen alto haría falta un AEC por software.
+
 ### Ánimo y prosodia
 
 Supertonic no tiene control de tono ni estilo. Se usa lo que sí tiene:
@@ -194,6 +292,9 @@ Google TTS perdía PCM cuando se le encolaban varias frases ya en caché (ahora 
 - Voces femeninas de Google en pt/fr/de/ja (`SystemTtsEngine.FEMALE`).
 - Sincronía de labios a ojo con la voz natural, altavoz y Bluetooth (los ajustes por salida no cambian).
 - Descarga del modelo con datos móviles / Wi-Fi lenta y reanudación.
+- Conversación en vivo: latencia de turno, falsos disparos y barge-ins perdidos por el altavoz a volumen
+  medio y alto (log `LucyLive`), qué reconocedores aceptan `EXTRA_AUDIO_SOURCE` y qué móviles tienen
+  reconocedor en el dispositivo para cada idioma.
 
 ## Herramientas de QA (solo debug)
 

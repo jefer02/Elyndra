@@ -7,12 +7,13 @@ import java.util.UUID
    Lo que Masha cambia en la biblioteca: añadir juegos, ponerles
    nombre y elegir emulador. Nunca borra juegos ni archivos.
 
-   Cada escritura pasa por una confirmación: Masha deja en el chat
-   una tarjeta con lo que va a hacer ("Añadir 12 juegos", "Cambiar
-   el nombre de X a Y") y botones de Confirmar / Cancelar; también
-   vale contestar "sí" o "no". Lo hecho se puede deshacer ("deshaz
-   lo último"). La única excepción es el nombre que el usuario
-   dicta él mismo: ahí no hay nada que confirmar.
+   Si el usuario lo pidió directamente o acaba de decir que sí, se
+   hace ya ([submit] con execute, ver ActionGate). Si la idea es de
+   Masha, deja en el chat una tarjeta con lo que va a hacer ("Añadir
+   12 juegos", "Cambiar el nombre de X a Y") y botones de Confirmar /
+   Cancelar; también vale contestar "sí" o "no" con palabras, en
+   cualquier idioma de la app ([answer], ConfirmationResolver). Todo
+   lo hecho se puede deshacer ("deshaz lo último").
 
    Kotlin puro: se prueba en la JVM.
    ───────────────────────────────────────────────────────────── */
@@ -22,6 +23,9 @@ object ConfirmKind {
     const val ADD_GAMES = "add_games"
     const val RENAME = "rename"
     const val SET_EMULATOR = "set_emulator"
+
+    /** Instalar un port de la tienda (items: nombre del juego, juego original del que hacen falta archivos o vacío). */
+    const val INSTALL_PORT = "install_port"
 }
 
 /** Estado de una tarjeta de confirmación. */
@@ -79,6 +83,44 @@ class MashaWrites(private val newId: () -> String = { UUID.randomUUID().toString
 
     fun cancel(id: String): Boolean = pending.remove(id) != null
 
+    /** Lo que pasó con una escritura: hecha ya o a la espera de la tarjeta. */
+    sealed interface Submitted {
+        data class Done(val outcome: WriteOutcome) : Submitted
+        data class Proposed(val write: PendingWrite) : Submitted
+    }
+
+    /**
+     * Con [execute] (el usuario la pidió o la confirmó, ver ActionGate) se
+     * hace ya y queda para deshacer; si no, se propone con tarjeta.
+     */
+    suspend fun submit(kind: String, items: List<String>, execute: Boolean, run: suspend () -> WriteOutcome): Submitted {
+        if (!execute) return Submitted.Proposed(propose(kind, items, run))
+        val out = run()
+        out.undo?.let { record(out.label, it) }
+        return Submitted.Done(out)
+    }
+
+    /** La respuesta con palabras a la última propuesta. */
+    sealed interface Answered {
+        val write: PendingWrite
+        data class Confirmed(override val write: PendingWrite, val outcome: WriteOutcome) : Answered
+        data class Cancelled(override val write: PendingWrite) : Answered
+    }
+
+    /**
+     * "Sí" / "dale" / "confirmo" / "yes" / "はい"… con una propuesta a la
+     * espera: se hace; "no" / "cancela": se descarta. Otra cosa (o nada
+     * pendiente): null, y lo contesta el modelo.
+     */
+    suspend fun answer(text: String): Answered? {
+        val w = latest() ?: return null
+        return when (ConfirmationResolver.resolve(text)) {
+            ConfirmationResolver.Answer.Affirmative -> confirm(w.id)?.let { Answered.Confirmed(w, it) }
+            ConfirmationResolver.Answer.Negative -> if (cancel(w.id)) Answered.Cancelled(w) else null
+            ConfirmationResolver.Answer.Unrelated -> null
+        }
+    }
+
     /** Algo hecho sin confirmación (el nombre dictado): también se puede deshacer. */
     fun record(label: String, undoAction: suspend () -> String) {
         undo.addLast(label to undoAction)
@@ -117,23 +159,10 @@ object MashaWriteRules {
     fun <T> cap(items: List<T>, max: Int = BATCH_CAP): Pair<List<T>, List<T>> =
         items.take(max) to items.drop(max)
 
-    /** ¿Es un "sí" / "no" contestando a una confirmación? (en los idiomas de la app) */
-    fun answer(text: String): Boolean? {
-        val t = text.trim().lowercase().trimEnd('.', '!', '¡', '?', '¿').trim()
-        return when (t) {
-            in YES -> true
-            in NO -> false
-            else -> null
-        }
+    /** ¿Es un "sí" / "no" contestando a una confirmación? (en los idiomas de la app, ver [ConfirmationResolver]) */
+    fun answer(text: String): Boolean? = when (ConfirmationResolver.resolve(text)) {
+        ConfirmationResolver.Answer.Affirmative -> true
+        ConfirmationResolver.Answer.Negative -> false
+        ConfirmationResolver.Answer.Unrelated -> null
     }
-
-    private val YES = setOf(
-        "sí", "si", "vale", "ok", "okay", "dale", "confirmo", "confirmar", "hazlo", "adelante", "de acuerdo",
-        "yes", "yep", "sure", "confirm", "do it", "go ahead", "sim", "pode", "confirmar", "oui", "d'accord", "ja", "jawohl", "bestätigen",
-        "はい", "うん", "お願い",
-    )
-    private val NO = setOf(
-        "no", "nope", "cancela", "cancelar", "mejor no", "déjalo", "dejalo", "cancel", "don't", "dont", "não", "nao", "non", "annuler",
-        "nein", "abbrechen", "いいえ", "やめて",
-    )
 }

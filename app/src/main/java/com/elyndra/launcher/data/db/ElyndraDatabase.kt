@@ -39,7 +39,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         UserFolderEntity::class,
         UserFolderItemEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class ElyndraDatabase : RoomDatabase() {
@@ -178,6 +178,13 @@ abstract class ElyndraDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+        /** Conversación en vivo: una respuesta de Lucy cortada por el usuario se marca (una columna nueva). */
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `masha_messages` ADD COLUMN `interrupted` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
     }
 }

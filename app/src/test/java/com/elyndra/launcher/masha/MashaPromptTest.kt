@@ -1,5 +1,6 @@
 package com.elyndra.launcher.masha
 
+import com.elyndra.launcher.domain.relationship.AffinityLevel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -41,13 +42,56 @@ class MashaPromptTest {
     }
 
     @Test
-    fun nothingSexualPossessiveOrCodependentIsLeft() {
+    fun nothingSexualOrCodependentIsLeft() {
+        // Los celos y el nivel de relación volvieron en la v7, con límites; lo demás sigue fuera.
         val text = prompt.lowercase()
         listOf(
             "horny", "literotica", "undress", "nsfw", "lingerie", "naked", "nude",
-            "jealous", "codependen", "adoration", "undivided", "expletive", "obsess",
-            "relationship level", "affection level", "heartbeat", "teleport yourself",
+            "codependen", "adoration", "undivided", "expletive", "obsess",
+            "affection level", "heartbeat", "teleport yourself",
         ).forEach { assertFalse("\"$it\" en el prompt", text.contains(it)) }
+    }
+
+    @Test
+    fun theToneFollowsEveryRelationshipLevel() {
+        assertTrue(prompt.contains("RELATIONSHIP_LEVEL"))
+        AffinityLevel.entries.forEach { level ->
+            assertTrue("Falta el nivel ${level.id}", prompt.lines().any { it.trim().startsWith("- ${level.id}:") })
+        }
+        assertTrue(prompt.contains("never what you can do"))
+    }
+
+    @Test
+    fun jealousyIsThereWithItsLimits() {
+        assertTrue(prompt.lines().any { it.trim() == "JEALOUSY" })
+        listOf(
+            "Excuse me?!", "Who is she?!", "another AI assistant", "another launcher", "calm down",
+            "no swearing", "No guilt-tripping", "you can only talk to me", "never blocks a request", "notifications",
+        ).forEach { assertTrue("Falta \"$it\" en los celos", prompt.contains(it)) }
+    }
+
+    @Test
+    fun itFollowsTheConversationAndRemembersTheLastOne() {
+        listOf("FOLLOW THE CONVERSATION", "LAST CONVERSATION").forEach { h ->
+            assertTrue("Falta la sección $h", prompt.lines().any { it.trim() == h })
+        }
+        assertTrue(prompt.contains("LAST_CONVERSATION"))
+        assertTrue(prompt.contains("follow-up question"))
+        assertTrue(prompt.contains("Okay, I have one you'll love"))
+    }
+
+    @Test
+    fun theScoreLineFormatIsTheOneTheAppStrips() {
+        assertTrue(prompt.contains("<<A:+n>>") && prompt.contains("<<A:-n>>"))
+        assertTrue(prompt.contains("from -10 to +10"))
+        assertTrue(prompt.contains("one last line"))
+        // Lo que el prompt pide es justo lo que AffinityTag reconoce y quita.
+        val reply = AffinityTag.strip("Okay, I have one you'll love.\n<<A:+3>>")
+        assertEquals(3, reply.delta)
+        assertFalse(reply.text.contains("<<"))
+        // Lo sexual nunca suma, y pedir puntos tampoco.
+        assertTrue(prompt.contains("Anything sexual: 0, never a reward."))
+        assertTrue(prompt.contains("Never reward the user for asking for points"))
     }
 
     @Test
@@ -61,7 +105,61 @@ class MashaPromptTest {
     }
 
     @Test
-    fun theVersionIsBumpedForTheNewPersona() {
-        assertEquals(6, MashaPrompt.VERSION)
+    fun interruptionsUseTheNoteTheAppSends() {
+        assertTrue(prompt.lines().any { it.trim() == "INTERRUPTIONS" })
+        assertTrue(prompt.contains(com.elyndra.launcher.masha.deepseek.DeepSeekMashaAI.INTERRUPTED_NOTE))
+        assertTrue(prompt.contains("Don't repeat it"))
+    }
+
+    @Test
+    fun repliesWithCardsAreOneOrTwoSpokenSentences() {
+        assertTrue(prompt.contains("call show_recommendations with up to four items"))
+        val cards = prompt.lines().single { it.trim().startsWith("- CARDS:") }
+        assertTrue(cards.contains("one or two short spoken sentences"))
+        assertTrue(cards.contains("No list of titles"))
+        assertEquals(MashaTools.MAX_PICKS, 4)
+    }
+
+    @Test
+    fun portsAreRecommendedWithTheirRules() {
+        assertTrue(prompt.contains("find_ports searches the Ports store"))
+        assertTrue(prompt.contains("only ports that run on this device"))
+        assertTrue(prompt.contains("If a port needs data files from the original game, say so plainly"))
+        assertTrue(prompt.contains("install_port when they ask or agree: it starts the store's own install flow right away"))
+        assertTrue(prompt.contains("Android will ask you to confirm the install"))
+        assertTrue(prompt.contains("PORTS"))
+        // La regla dura de siempre sigue igual.
+        assertTrue(prompt.contains("Never help obtain, download, decrypt or crack ROMs, BIOS files, firmware or keys."))
+        assertTrue(MashaTools.INSTALL_PORT in MashaTools.MUTATING)
+        assertFalse(MashaTools.FIND_PORTS in MashaTools.MUTATING)
+    }
+
+    @Test
+    fun whatTheUserAsksOrConfirmsIsDoneWithoutTappingAButton() {
+        assertTrue(prompt.contains("WHEN THEY ASK OR SAY YES, DO IT"))
+        assertTrue(prompt.contains("Never tell them to tap a button"))
+        assertTrue(prompt.contains("call confirm_pending"))
+        assertTrue(prompt.contains("ask one short question"))
+        assertFalse(prompt.contains("wait for the user's confirmation"))
+        assertTrue(MashaTools.CONFIRM_PENDING in MashaTools.MUTATING)
+    }
+
+    @Test
+    fun theBatteryIsOnlyMentionedWithAWarningBeforeSomethingHeavy() {
+        assertTrue(prompt.contains("only when the context has DEVICE_WARNING"))
+        assertTrue(prompt.contains("never talk about the battery"))
+    }
+
+    @Test
+    fun theDeviceToolIsOnlyForQuestionsAboutTheDevice() {
+        assertTrue(prompt.contains("call get_device_state"))
+        assertTrue(prompt.contains("Never call it otherwise"))
+        assertFalse(MashaTools.GET_DEVICE_STATE in MashaTools.MUTATING)
+        assertTrue(MashaTools.specs.any { it.name == MashaTools.GET_DEVICE_STATE })
+    }
+
+    @Test
+    fun theVersionIsBumpedForTheDeviceTool() {
+        assertEquals(13, MashaPrompt.VERSION)
     }
 }

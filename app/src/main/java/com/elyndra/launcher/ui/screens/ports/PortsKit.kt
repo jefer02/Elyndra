@@ -201,14 +201,15 @@ private fun DrawScope.drawStoreIcon(icon: StoreIcon, color: Color) {
 /** El nombre corto de la plataforma original ("N64", "XBOX 360"). */
 fun platformLabel(platform: String): String = PortDisplay.platformBadge(platform)
 
-/** La línea secundaria de un port: "Port: Ship of Harkinian · por HarbourMasters". */
+/** La línea secundaria de un port: "Port: Ship of Harkinian · por HarbourMasters" (nunca un identificador). */
 @Composable
 fun portLineText(port: PortEntry): String {
     val line = PortDisplay.portLine(port)
-    return if (line.developer != null) {
-        stringResource(R.string.ports_port_line, line.portName, line.developer)
-    } else {
-        stringResource(R.string.ports_port_line_short, line.portName)
+    return when {
+        line.portName != null && line.developer != null -> stringResource(R.string.ports_port_line, line.portName, line.developer)
+        line.portName != null -> stringResource(R.string.ports_port_line_short, line.portName)
+        line.developer != null -> stringResource(R.string.ports_port_badge_named, line.developer)
+        else -> stringResource(R.string.ports_port_badge)
     }
 }
 

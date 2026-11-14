@@ -9,6 +9,8 @@ import com.elyndra.launcher.masha.ConfirmKind
 import com.elyndra.launcher.masha.MashaAttachment
 import com.elyndra.launcher.masha.MashaWriteRules
 import com.elyndra.launcher.masha.MashaWrites
+import com.elyndra.launcher.masha.TargetMatch
+import com.elyndra.launcher.masha.toolAmbiguous
 import com.elyndra.launcher.masha.ToolResult
 import com.elyndra.launcher.masha.WriteOutcome
 import com.elyndra.launcher.masha.bool
@@ -28,13 +30,19 @@ import kotlinx.serialization.json.putJsonArray
 /**
  * Las herramientas de Masha que ponen nombre a juegos, añaden lo que hay en
  * el dispositivo y eligen emulador. Solo añaden o renombran: ninguna borra
- * juegos ni archivos. Lo que escribe pide confirmación (ver [MashaWrites]) y
- * se puede deshacer.
+ * juegos ni archivos. Si el usuario lo pidió (o dijo que sí) se hace ya; si
+ * es idea de Lucy, pide confirmación (ver [MashaWrites]). Todo se puede
+ * deshacer, y un objetivo ambiguo se pregunta antes de tocar nada.
  *
  * Al modelo solo le llegan nombres de juegos, de paquetes y de sistemas:
  * nunca rutas, URIs ni credenciales.
  */
-class MashaLibraryActions(private val vm: ElyndraViewModel, private val writes: MashaWrites) {
+class MashaLibraryActions(
+    private val vm: ElyndraViewModel,
+    private val writes: MashaWrites,
+    /** ¿El usuario pidió (o confirmó) esta acción? Entonces se hace sin tarjeta (ver ActionGate). */
+    private val asked: (JsonObject) -> Boolean = { false },
+) {
 
     /* ── sin nombre ───────────────────────────────────────────── */
 
@@ -51,7 +59,9 @@ class MashaLibraryActions(private val vm: ElyndraViewModel, private val writes: 
     suspend fun rename(a: JsonObject): ToolResult {
         val game = a.str("game")?.trim().orEmpty()
         val name = MashaWriteRules.cleanName(a.str("name")) ?: return toolFail("'${a.str("name").orEmpty()}' is not a usable game name")
-        val target = findGame(game) ?: return toolFail("'$game' is not in the user's library")
+        val found = findGames(game)
+        if (found.size > 1) return toolAmbiguous(game, found.map { it.title })
+        val target = found.firstOrNull() ?: return toolFail("'$game' is not in the user's library")
         val dictated = a.bool("user_dictated") == true
         val doIt: suspend () -> WriteOutcome = {
             val before = withContext(Dispatchers.Main) { metaOf(target.key) }
@@ -70,12 +80,15 @@ class MashaLibraryActions(private val vm: ElyndraViewModel, private val writes: 
             out.undo?.let { writes.record(out.label, it) }
             return toolOk("'${target.title}' is now called '$name' (locked; metadata refreshing)", MashaAttachment.Done(out.label), mutating = true)
         }
-        val w = writes.propose(ConfirmKind.RENAME, listOf(target.title, name), doIt)
-        return toolOk(
-            "waiting for the user's confirmation in the chat card; tell them in one sentence what you will set",
-            MashaAttachment.Confirm(w.id, w.kind, w.items),
-            mutating = true,
-        )
+        return when (val s = writes.submit(ConfirmKind.RENAME, listOf(target.title, name), execute = asked(a), run = doIt)) {
+            is MashaWrites.Submitted.Done ->
+                toolOk("'${target.title}' is now called '$name' (locked; metadata refreshing)", MashaAttachment.Done(s.outcome.label), mutating = true)
+            is MashaWrites.Submitted.Proposed -> toolOk(
+                "your idea, so it waits for the user's yes (in words or on the card); tell them in one sentence what you will set",
+                MashaAttachment.Confirm(s.write.id, s.write.kind, s.write.items),
+                mutating = true,
+            )
+        }
     }
 
     /* ── lo que se puede añadir ───────────────────────────────── */
@@ -123,18 +136,21 @@ class MashaLibraryActions(private val vm: ElyndraViewModel, private val writes: 
             }
         }
         val names = batch.map { it.title }
-        // Un solo juego pedido por su nombre: se añade sin más (se puede deshacer).
-        if (batch.size == 1 && !all) {
-            val out = doIt()
-            out.undo?.let { writes.record(out.label, it) }
-            return toolOk("added '${names.first()}' to the library", MashaAttachment.Done("＋ ${names.first()}"), mutating = true)
+        val note = (if (skipped.isNotEmpty()) "; ${skipped.size} over the limit of ${MashaWriteRules.BATCH_CAP} skipped" else "") +
+            (if (notFound.isNotEmpty()) "; not found: ${notFound.joinToString()}" else "")
+        // Pedido por el usuario (o un solo juego por su nombre): se añade ya (se puede deshacer).
+        if (asked(a) || (batch.size == 1 && !all)) {
+            val out = (writes.submit(ConfirmKind.ADD_GAMES, names, execute = true, run = doIt) as MashaWrites.Submitted.Done).outcome
+            if (!out.ok) return toolFail("could not add those games")
+            val label = if (batch.size == 1) "＋ ${names.first()}" else out.label
+            return toolOk("added ${names.size} games to the library$note", MashaAttachment.Done(label), mutating = true)
         }
         val w = writes.propose(ConfirmKind.ADD_GAMES, names, doIt)
         return toolOk(
-            "waiting for the user's confirmation in the chat card (${batch.size} games" +
+            "your idea, so it waits for the user's yes, in words or on the card (${batch.size} games" +
                 (if (skipped.isNotEmpty()) ", ${skipped.size} over the limit of ${MashaWriteRules.BATCH_CAP} skipped" else "") +
                 (if (notFound.isNotEmpty()) "; not found: ${notFound.joinToString()}" else "") + ")",
-            MashaAttachment.Confirm(w.id, w.kind, names, skipped = skipped.size),
+            MashaAttachment.Confirm(w.id, w.kind, names, skipped = skipped.size, packages = batch.map { (it as? AddItem.App)?.pkg.orEmpty() }),
             mutating = true,
         )
     }
@@ -173,7 +189,7 @@ class MashaLibraryActions(private val vm: ElyndraViewModel, private val writes: 
         }
     }
 
-    fun setPreferred(a: JsonObject): ToolResult {
+    suspend fun setPreferred(a: JsonObject): ToolResult {
         val systemQuery = a.str("system")?.trim().orEmpty()
         val system = Systems.byId(systemQuery) ?: Systems.ALL.firstOrNull { it.name.equals(systemQuery, true) || it.short.equals(systemQuery, true) }
             ?: Systems.ALL.maxByOrNull { Names.similarity(systemQuery, it.name) }?.takeIf { Names.similarity(systemQuery, it.name) >= 0.7 }
@@ -187,14 +203,21 @@ class MashaLibraryActions(private val vm: ElyndraViewModel, private val writes: 
             return toolFail("there is no ${system.name} folder in the library yet; add one first ($OPEN_ADD)")
         }
         val name = vm.orchestrator.name(emuId)
-        val w = writes.propose(ConfirmKind.SET_EMULATOR, listOf(name, system.name)) {
+        val submitted = writes.submit(ConfirmKind.SET_EMULATOR, listOf(name, system.name), execute = asked(a)) {
             val before = withContext(Dispatchers.Main) { vm.setSystemEmulator(system.id, emuId) }
             WriteOutcome("⚙ ${system.name} → $name") {
                 withContext(Dispatchers.Main) { vm.restoreFolderEmulators(before) }
                 "emulator change for ${system.name}"
             }
         }
-        return toolOk("waiting for the user's confirmation in the chat card", MashaAttachment.Confirm(w.id, w.kind, w.items), mutating = true)
+        return when (submitted) {
+            is MashaWrites.Submitted.Done -> toolOk("$name is now the preferred emulator for ${system.name}", MashaAttachment.Done(submitted.outcome.label), mutating = true)
+            is MashaWrites.Submitted.Proposed -> toolOk(
+                "your idea, so it waits for the user's yes (in words or on the card)",
+                MashaAttachment.Confirm(submitted.write.id, submitted.write.kind, submitted.write.items),
+                mutating = true,
+            )
+        }
     }
 
     suspend fun undo(): ToolResult {
@@ -206,11 +229,10 @@ class MashaLibraryActions(private val vm: ElyndraViewModel, private val writes: 
 
     private data class Found(val key: String, val title: String)
 
-    private fun findGame(q: String): Found? {
-        if (q.isEmpty()) return null
+    /** Los juegos que encajan con [q] ([TargetMatch]); más de uno = ambiguo. */
+    private fun findGames(q: String): List<Found> {
         val all = vm.library.roms.map { Found(it.key, it.displayTitle) } + vm.library.apps.map { Found(it.key, it.displayTitle) }
-        return all.firstOrNull { it.title.equals(q, ignoreCase = true) }
-            ?: all.maxByOrNull { Names.similarity(q, it.title) }?.takeIf { Names.similarity(q, it.title) >= 0.75 }
+        return TargetMatch.candidates(q, all) { it.title }
     }
 
     private fun metaOf(key: String): GameMeta? =

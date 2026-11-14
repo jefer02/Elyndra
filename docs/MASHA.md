@@ -93,9 +93,32 @@ listas, limpieza, metadatos, emuladores, memoria…) y el modo sin conexión.
 
 Cambios de comportamiento:
 
-- `MashaPrompt` (VERSION 6): la personalidad de Lucy (alt, cariñosa, algo nerd; sin contenido
-  sexual ni celos) y "tus respuestas se leen en voz alta". Subir la versión invalida la caché
-  de respuestas antigua.
+- `MashaPrompt` (VERSION 10; v8 interrupciones en vivo, v9 tarjetas, v10 ports): la personalidad de Lucy (alt, cariñosa, algo nerd; cálida
+  también al recomendar), sigue la conversación, ajusta el tono a `RELATIONSHIP_LEVEL`,
+  retoma `LAST_CONVERSATION` y tiene celos teatrales con límites (sin insultos, sin
+  culpabilizar, nunca bloquean una petición, nunca en avisos). Nada sexual. "Tus respuestas
+  se leen en voz alta". Subir la versión invalida la caché de respuestas antigua.
+- Relación (`domain/relationship/Affinity`): 0–100, cinco niveles; la IA puntúa cada mensaje
+  con una última línea oculta `<<A:±n>>` que `AffinityTag` quita del streaming antes de
+  pantalla, caché y voz (partida entre trozos tampoco asoma; solo cuenta en la última
+  línea). Sin IA, `AffinityScorer`. Recorte ±10 por mensaje, +15 al día, nada baja por
+  ausencia.
+- Última conversación (`ConversationRecall`): al salir o tras 10 min sin mensajes se guarda
+  una frase con el tema; tras más de 30 min, Lucy saluda retomándolo.
+- Recomendaciones en tarjetas (`show_recommendations` → `MashaAttachment.Picks`): carátula,
+  sistema, tiempo jugado, estado, emulador y su motivo, con Jugar/Abrir (o la ficha del port).
+  Con tarjetas, el texto es una o dos frases que se dicen; `ReplyShape` recorta lo que sobre
+  en la burbuja, la voz y el subtítulo (el hilo guarda el texto entero).
+- Ports de la tienda (`domain/ports/PortRecommend`): `find_ports` busca por nombre, género o
+  ánimo (también sin conexión, con el catálogo guardado o el del APK) y solo devuelve lo que se
+  instala aquí; `open_port` abre su ficha; `install_port` deja una tarjeta de confirmación y,
+  al confirmar, usa el flujo de la tienda (`PortInstallController.primary`). `PORTS` en el
+  contexto: números y nombres de juegos, sin repositorios ni enlaces.
+- Pantalla: Lucy a tamaño completo con el chat oculto por defecto (X o el botón lo enseñan, y
+  se recuerda), subtítulo de lo que dice (Ajustes → Lucy → Subtítulos), tarjetas a la vista y
+  un botón de teclado (Select). El corazón de la cabecera (o L1) abre "Lucy y tú": nivel,
+  barra al siguiente, qué cambia en cada nivel y las últimas subidas; cada subida enseña un
+  "+N" y la primera vez en un nivel, su tarjeta.
 - `MashaController.mood`: el ánimo se deduce en local de la respuesta y de las herramientas usadas.
 
 ## El modelo: cara y manos

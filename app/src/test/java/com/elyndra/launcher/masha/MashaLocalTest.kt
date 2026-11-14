@@ -22,6 +22,14 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import com.elyndra.launcher.domain.ports.GameArt
+import com.elyndra.launcher.domain.ports.GhRepo
+import com.elyndra.launcher.domain.ports.PortBuild
+import com.elyndra.launcher.domain.ports.PortEntry
+import com.elyndra.launcher.domain.ports.PortGame
+import com.elyndra.launcher.domain.ports.PortRecommend
+import com.elyndra.launcher.domain.ports.Requirement
+import com.elyndra.launcher.domain.relationship.AffinityLevel
 import org.junit.Test
 import java.time.ZoneId
 
@@ -31,22 +39,39 @@ class MashaLocalTest {
     /* ── intenciones sin conexión ─────────────────────────────── */
 
     @Test
-    fun herNameIsIgnoredWhetherItIsLucyOrMasha() {
+    fun herNameIsIgnoredWhenItIsLucy() {
         assertEquals(OfflineIntent.Launch("Zelda"), OfflineIntents.detect("Lucy, juega Zelda"))
-        assertEquals(OfflineIntent.Launch("Zelda"), OfflineIntents.detect("Masha, play Zelda"))
         assertEquals(OfflineIntent.Launch("Zelda"), OfflineIntents.detect("hey Lucy play Zelda"))
         assertEquals(OfflineIntent.Launch("Zelda"), OfflineIntents.detect("play Zelda, Lucy"))
-        assertEquals(OfflineIntent.Plan(25, 35, SessionMood.Any), OfflineIntents.detect("Oye Masha, tengo media hora"))
+        assertEquals(OfflineIntent.Plan(25, 35, SessionMood.Any), OfflineIntents.detect("Oye Lucy, tengo media hora"))
         assertEquals(OfflineIntent.Plan(30, 40, SessionMood.Any), OfflineIntents.detect("Salut Lucy : j'ai 30-40 minutes"))
         assertEquals(OfflineIntent.Plan(25, 35, SessionMood.Any), OfflineIntents.detect("Hallo Lucy, halbe Stunde"))
         assertEquals(OfflineIntent.Recommend, OfflineIntents.detect("Olá Lucy, o que jogar?"))
         assertEquals("ゼルダを起動して", OfflineIntents.withoutName("ねえルーシー、ゼルダを起動して"))
-        assertEquals("ゼルダを起動して", OfflineIntents.withoutName("マーシャ、ゼルダを起動して"))
+        assertEquals("ゼルダを起動して", OfflineIntents.withoutName("ルーシー、ゼルダを起動して"))
+    }
+
+    @Test
+    fun commonMisspellingsOfLucyCount() {
+        listOf("Lucie", "lucey", "Luci", "Lusy", "LUCYY").forEach {
+            assertEquals(it, OfflineIntent.Launch("Zelda"), OfflineIntents.detect("$it, play Zelda"))
+        }
+        assertEquals("ゼルダを起動して", OfflineIntents.withoutName("ルシー、ゼルダを起動して"))
+        // Dentro de otra palabra no es su nombre.
+        assertEquals("Lucifer, play", OfflineIntents.withoutName("Lucifer, play"))
+    }
+
+    @Test
+    fun mashaIsNoLongerAFormOfAddress() {
+        assertEquals("Masha, play Zelda", OfflineIntents.withoutName("Masha, play Zelda"))
+        assertEquals("マーシャ、ゼルダを起動して", OfflineIntents.withoutName("マーシャ、ゼルダを起動して"))
+        assertEquals(OfflineIntent.Unknown, OfflineIntents.detect("Masha?"))
+        assertEquals(OfflineIntent.Unknown, OfflineIntents.detect("Hi, Masha!"))
     }
 
     @Test
     fun aGreetingOrJustHerNameIsAHello() {
-        listOf("Lucy", "Masha?", "hola Lucy", "Hi, Masha!", "Bonjour Lucy.", "ねえ、ルーシー", "hey").forEach {
+        listOf("Lucy", "Lucy?", "hola Lucy", "Hi, Lucy!", "Bonjour Lucy.", "ねえ、ルーシー", "hey").forEach {
             assertEquals(it, OfflineIntent.Hello, OfflineIntents.detect(it))
         }
         // Solo tras una coma cuenta como nombre al final: "play Lucy" podría ser un juego.
@@ -104,7 +129,16 @@ class MashaLocalTest {
             "gibt es eine native Portierung?",
             "busca recompilaciones de Xbox 360",
             "show me decompilations",
-        ).forEach { assertEquals(it, OfflineIntent.FindPort, OfflineIntents.detect(it)) }
+        ).forEach { assertTrue(it, OfflineIntents.detect(it) is OfflineIntent.FindPort) }
+    }
+
+    @Test
+    fun aPortRequestCanNameTheGame() {
+        assertEquals(OfflineIntent.FindPort("Zelda"), OfflineIntents.detect("is there a native port of Zelda?"))
+        assertEquals(OfflineIntent.FindPort("Doom"), OfflineIntents.detect("Lucy, ¿hay algún port de Doom para el móvil?"))
+        assertEquals(OfflineIntent.FindPort("Xbox 360"), OfflineIntents.detect("busca recompilaciones de Xbox 360"))
+        assertEquals(OfflineIntent.FindPort("Quake"), OfflineIntents.detect("any port like Quake"))
+        assertEquals(OfflineIntent.FindPort(null), OfflineIntents.detect("¿hay algún port nativo?"))
     }
 
     @Test
@@ -133,7 +167,16 @@ class MashaLocalTest {
         sessions = listOf(session("r:okami", 3.0, 50, "nethersx2"), session("r:okami", 2.0, 40, "nethersx2")),
     )
 
-    private fun build(device: DeviceState?, now: Long = NOW, memories: List<Memory> = emptyList(), userFolders: List<String> = emptyList()): BuiltContext {
+    private fun build(
+        device: DeviceState?,
+        now: Long = NOW,
+        deviceWarned: Boolean = false,
+        memories: List<Memory> = emptyList(),
+        userFolders: List<String> = emptyList(),
+        relationship: AffinityLevel? = null,
+        lastConversation: Pair<String, Long>? = null,
+        ports: PortRecommend.Summary? = null,
+    ): BuiltContext {
         val games = library.games()
         val snapshot = KnowledgeSnapshot(library, games, GameProfiles.buildAll(games, library.sessions, now = now), LibraryCurator.analyze(games), emptyList(), now)
         return MashaContextBuilder.build(
@@ -142,6 +185,7 @@ class MashaLocalTest {
                 arcs = emptyList(),
                 memories = memories,
                 device = device,
+                deviceWarned = deviceWarned,
                 zone = ZoneId.of("UTC"),
                 language = "es",
                 screen = "library",
@@ -152,8 +196,52 @@ class MashaLocalTest {
                 folderEmulators = mapOf("ps2" to ("NetherSX2" to true)),
                 savedLists = listOf("RPG pendientes"),
                 userFolders = userFolders,
+                relationship = relationship,
+                lastConversation = lastConversation,
+                ports = ports,
             ),
         )
+    }
+
+    /** Un catálogo con repositorios, enlaces de arte y builds: nada de eso puede llegar al contexto. */
+    private fun portsSummary(): PortRecommend.Summary {
+        val catalog = listOf(
+            PortEntry(
+                id = "soh",
+                name = "Ship of Harkinian",
+                repo = GhRepo("HarbourMasters", "Shipwright"),
+                game = PortGame("The Legend of Zelda: Ocarina of Time", "n64", art = GameArt(cover = "https://cdn.example.com/zelda.png")),
+                builds = listOf(PortBuild("android")),
+                requires = Requirement(userRom = true),
+                screenshots = listOf("https://example.com/shot.png"),
+            ),
+            PortEntry(id = "starship", name = "Starship", repo = GhRepo("HarbourMasters", "Starship"), game = PortGame("Star Fox 64", "n64")),
+        )
+        return PortRecommend.summary(catalog, installedIds = setOf("starship"), updateIds = emptySet(), owned = emptyList()).copy(
+            forYourLibrary = listOf("The Legend of Zelda: Ocarina of Time"),
+        )
+    }
+
+    @Test
+    fun portsGoInTheContextAsCountsAndNames() {
+        val root = DeepSeekProtocolJson.parse(build(DeviceState(), ports = portsSummary()).json)
+        val ports = root["PORTS"]!!.jsonObject
+        assertEquals(2, ports["total"]!!.jsonPrimitive.content.toInt())
+        assertEquals(1, ports["runs_on_this_device"]!!.jsonPrimitive.content.toInt())
+        assertEquals(1, ports["installed"]!!.jsonPrimitive.content.toInt())
+        assertEquals("The Legend of Zelda: Ocarina of Time", ports["for_your_library"]!!.jsonArray[0].jsonPrimitive.content)
+        // Volátil: instalar un port no invalida las respuestas guardadas.
+        assertEquals(build(DeviceState()).fingerprint, build(DeviceState(), ports = portsSummary()).fingerprint)
+        assertFalse("PORTS" in DeepSeekProtocolJson.parse(build(DeviceState()).json))
+    }
+
+    @Test
+    fun theRelationshipLevelGoesInTheContextAndChangesTheFingerprint() {
+        val curious = build(DeviceState(), relationship = AffinityLevel.Curious)
+        val close = build(DeviceState(), relationship = AffinityLevel.Close)
+        assertEquals("close", DeepSeekProtocolJson.parse(close.json)["RELATIONSHIP_LEVEL"]!!.jsonPrimitive.content)
+        assertNotEquals(curious.fingerprint, close.fingerprint)
+        assertFalse("RELATIONSHIP_LEVEL" in DeepSeekProtocolJson.parse(build(DeviceState()).json))
     }
 
     @Test
@@ -166,11 +254,29 @@ class MashaLocalTest {
 
     @Test
     fun theContextNeverCarriesPathsOrUris() {
-        val json = build(DeviceState(batteryPct = 50)).json
-        assertFalse("content://" in json)
-        assertFalse("primary:" in json)
-        assertFalse(".iso" in json)
-        assertFalse("media/" in json)
+        val summary = "We talked about content://com.android.externalstorage.documents/tree/primary:ROMs/okami.iso and /storage/emulated/0/media/x"
+        listOf(
+            build(DeviceState(batteryPct = 50)),
+            build(DeviceState(batteryPct = 50), lastConversation = summary to NOW - 3_600_000),
+            build(DeviceState(batteryPct = 50), ports = portsSummary()),
+        ).forEach {
+            val json = it.json
+            assertFalse("content://" in json)
+            assertFalse("primary:" in json)
+            assertFalse(".iso" in json)
+            assertFalse("media/" in json)
+            assertFalse("://" in json)
+            assertFalse("HarbourMasters" in json)
+        }
+    }
+
+    @Test
+    fun theLastConversationGoesInTheContextWithHowLongAgo() {
+        val root = DeepSeekProtocolJson.parse(build(DeviceState(), lastConversation = "We talked about Okami." to NOW - 3 * 3_600_000L).json)
+        val last = root["LAST_CONVERSATION"]!!.jsonObject
+        assertEquals("We talked about Okami.", last["summary"]!!.jsonPrimitive.content)
+        assertEquals("3h ago", last["ago"]!!.jsonPrimitive.content)
+        assertFalse("LAST_CONVERSATION" in DeepSeekProtocolJson.parse(build(DeviceState()).json))
     }
 
     @Test
@@ -179,9 +285,25 @@ class MashaLocalTest {
         assertEquals(2, root["library"]!!.jsonObject["games"]!!.jsonPrimitive.content.toInt())
         assertEquals("Okami", root["in_progress"]!!.jsonArray[0].jsonObject["title"]!!.jsonPrimitive.content)
         assertEquals(1, root["never_opened"]!!.jsonObject["count"]!!.jsonPrimitive.content.toInt())
-        assertEquals("50", root["device"]!!.jsonObject["battery_pct"]!!.jsonPrimitive.content)
+        // Sin problema, ni cifras de batería ni aviso: Lucy no la menciona porque sí.
+        assertFalse("battery_pct" in root["device"]!!.jsonObject)
+        assertFalse("DEVICE_WARNING" in root)
         assertEquals("Okami", root["screen"]!!.jsonObject["focused"]!!.jsonPrimitive.content)
         assertTrue(root["catalog"]!!.jsonArray.size <= MashaContextBuilder.MAX_CATALOG)
+    }
+
+    @Test
+    fun aRealDeviceProblemGoesInTheContextOncePerSession() {
+        val low = DeviceState(batteryPct = 12, charging = false)
+        val warning = DeepSeekProtocolJson.parse(build(low).json)["DEVICE_WARNING"]!!.jsonObject
+        assertEquals("low_battery", warning["kind"]!!.jsonPrimitive.content)
+        assertEquals("12", warning["battery_pct"]!!.jsonPrimitive.content)
+        assertFalse("DEVICE_WARNING" in DeepSeekProtocolJson.parse(build(low, deviceWarned = true).json))
+        // Cargando o con batería de sobra, nada.
+        assertFalse("DEVICE_WARNING" in DeepSeekProtocolJson.parse(build(DeviceState(batteryPct = 12, charging = true)).json))
+        assertFalse("DEVICE_WARNING" in DeepSeekProtocolJson.parse(build(DeviceState(batteryPct = 47)).json))
+        val hot = DeepSeekProtocolJson.parse(build(DeviceState(batteryPct = 80, thermal = DeviceState.Thermal.Severe)).json)
+        assertEquals("hot", hot["DEVICE_WARNING"]!!.jsonObject["kind"]!!.jsonPrimitive.content)
     }
 
     @Test

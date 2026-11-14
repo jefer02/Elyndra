@@ -76,7 +76,7 @@ fun MashaMemoryBlock(vm: ElyndraViewModel, key: String, meta: GameMeta, modifier
             .padding(start = 15.dp, end = 12.dp, top = 11.dp, bottom = 11.dp),
     ) {
         Image(
-            painterResource(R.drawable.masha),
+            painterResource(R.drawable.masha_small),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier

@@ -112,28 +112,61 @@ class SessionTracker @Inject constructor(
         val usm = context.getSystemService(UsageStatsManager::class.java) ?: return null
         val events = usm.queryEvents(from, to)
         val e = UsageEvents.Event()
-        var total = 0L
-        var resumedAt: Long? = null
-        var seen = false
+        val own = ArrayList<ForegroundTime.Event>()
         while (events.hasNextEvent()) {
             events.getNextEvent(e)
             if (e.packageName != pkg) continue
-            seen = true
-            when (e.eventType) {
-                // 1 = ACTIVITY_RESUMED (antes MOVE_TO_FOREGROUND), mismo valor en todas las versiones.
-                RESUMED -> if (resumedAt == null) resumedAt = e.timeStamp
-                // 2 = ACTIVITY_PAUSED (antes MOVE_TO_BACKGROUND); 23 = ACTIVITY_STOPPED.
-                PAUSED, STOPPED -> resumedAt?.let { total += (e.timeStamp - it).coerceAtLeast(0); resumedAt = null }
-            }
+            own += ForegroundTime.Event(e.eventType, e.className, e.timeStamp)
         }
-        resumedAt?.let { total += (to - it).coerceAtLeast(0) }
-        if (seen) total else null
+        ForegroundTime.total(own, to)
     }.getOrNull()
 
     private companion object {
         const val MAX_SESSION_MINUTES = 12 * 60
-        const val RESUMED = 1
-        const val PAUSED = 2
-        const val STOPPED = 23
+    }
+}
+
+/**
+ * La suma de los tramos en primer plano de un paquete, sin Android (se prueba
+ * en la JVM, ForegroundTimeTest).
+ *
+ * Se lleva la cuenta por actividad: al pasar de una actividad a otra del mismo
+ * emulador, Android avisa "pausada A → reanudada B → detenida A", y ese último
+ * aviso de A no puede cerrar el tramo de B, que sigue en pantalla.
+ */
+internal object ForegroundTime {
+
+    /** 1 = ACTIVITY_RESUMED (antes MOVE_TO_FOREGROUND), mismo valor en todas las versiones. */
+    const val RESUMED = 1
+
+    /** 2 = ACTIVITY_PAUSED (antes MOVE_TO_BACKGROUND). */
+    const val PAUSED = 2
+
+    /** 23 = ACTIVITY_STOPPED. */
+    const val STOPPED = 23
+
+    data class Event(val type: Int, val className: String?, val at: Long)
+
+    /**
+     * Milisegundos con alguna actividad reanudada, hasta [to] si la última
+     * sigue abierta. Null si no hay ningún evento del paquete.
+     */
+    fun total(events: List<Event>, to: Long): Long? {
+        if (events.isEmpty()) return null
+        var total = 0L
+        var since = 0L
+        val resumed = HashSet<String>()
+        for (e in events) {
+            val activity = e.className.orEmpty()
+            when (e.type) {
+                RESUMED -> {
+                    if (resumed.isEmpty()) since = e.at
+                    resumed += activity
+                }
+                PAUSED, STOPPED -> if (resumed.remove(activity) && resumed.isEmpty()) total += (e.at - since).coerceAtLeast(0)
+            }
+        }
+        if (resumed.isNotEmpty()) total += (to - since).coerceAtLeast(0)
+        return total
     }
 }

@@ -179,6 +179,24 @@ class MigrationTest {
     }
 
     @Test
+    fun migration9to10AddsOnlyTheInterruptedFlagToLucysMessages() {
+        val v9 = schema(9)
+        val v10 = schema(10)
+        val sql = sqlOf(ElyndraDatabase.MIGRATION_9_10)
+        assertEquals(1, sql.size)
+        assertEquals(setOf("interrupted"), addedColumns(sql, "masha_messages"))
+        assertEquals(v9.keys, v10.keys)
+        assertEquals(columns(v9.getValue("masha_messages")) + "interrupted", columns(v10.getValue("masha_messages")))
+        for (name in v9.keys - "masha_messages") assertEquals(name, columns(v9.getValue(name)), columns(v10.getValue(name)))
+        // Como lo declara la entidad: entero, no nulo, 0 por defecto (los mensajes viejos no estaban cortados).
+        val field = v10.getValue("masha_messages")["fields"]!!.jsonArray.map { it.jsonObject }.single { it["columnName"]!!.jsonPrimitive.content == "interrupted" }
+        assertEquals("INTEGER", field["affinity"]!!.jsonPrimitive.content)
+        assertEquals("0", field["defaultValue"]!!.jsonPrimitive.content)
+        assertTrue(sql.single().contains("NOT NULL DEFAULT 0"))
+        assertEquals(10, ElyndraDatabase.MIGRATIONS.last().endVersion)
+    }
+
+    @Test
     fun portPlacementRoundTripsThroughTheMapper() {
         val folder = com.elyndra.launcher.data.RomFolder("v-switch", "switch", "", "", "", isVirtual = true)
         assertTrue(LibraryMapper.folder(folder).isVirtual)

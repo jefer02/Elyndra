@@ -49,13 +49,22 @@ object MashaTools {
     const val LIST_EMULATORS = "list_emulators"
     const val SET_PREFERRED_EMULATOR = "set_preferred_emulator"
     const val UNDO_LAST_ACTION = "undo_last_action"
-    const val FIND_PORT = "find_port"
+    const val FIND_PORTS = "find_ports"
+    const val OPEN_PORT = "open_port"
+    const val INSTALL_PORT = "install_port"
+    const val RECOMMEND = "show_recommendations"
+    const val CONFIRM_PENDING = "confirm_pending"
+    const val GET_DEVICE_STATE = "get_device_state"
+
+    /** Cuántas tarjetas como mucho en una recomendación. */
+    const val MAX_PICKS = 4
 
     /** Las que cambian algo: una respuesta que las usó nunca sale de caché. */
     val MUTATING = setOf(
         LAUNCH_GAME, SET_GAME_EMULATOR, CREATE_LIST, CREATE_ARC, UPDATE_METADATA, REMEMBER, FORGET,
         FILTER_LIBRARY, SET_ART, ADD_GAME, REMOVE_GAME, SET_ACCENT, SET_DARK_MODE,
         RENAME_GAME, ADD_GAMES, OPEN_ADD_ROMS, SET_PREFERRED_EMULATOR, UNDO_LAST_ACTION,
+        OPEN_PORT, INSTALL_PORT, CONFIRM_PENDING,
     )
 
     val ACCENTS = listOf("indigo", "abismo", "medianoche", "mandarina", "fuego", "menta", "cobalto", "lila", "coral", "turquesa", "oro", "chicle", "grafito")
@@ -136,6 +145,7 @@ object MashaTools {
             tool(CURATION_REPORT, "Library clean-up findings: duplicates, incomplete multi-disc sets, poorly named ROMs, mixed regions, and series groups.") {
                 enum("detail", "Which part to detail.", listOf("summary", "duplicates", "incomplete_sets", "poorly_named", "mixed_regions", "series"))
             },
+            tool(GET_DEVICE_STATE, "Battery %, charging, power save and temperature of this device right now. Read-only. Call it ONLY when the user asks about the device (battery, charge, heat); never on your own.") {},
             tool(GET_STATS, "Playtime statistics: totals, per system, top games, sessions and trends.") {
                 enum("period", "Time window.", listOf("week", "month", "year", "all"))
             },
@@ -162,8 +172,8 @@ object MashaTools {
                 string("title", "Installed app name.")
                 required("title")
             },
-            tool(REMOVE_GAME, "Remove an Android game or a whole emulator folder from the library. Deletes nothing from storage. Only when asked.") {
-                string("title", "Game title or system name of the folder.")
+            tool(REMOVE_GAME, "Hide an Android game from the library. Nothing is uninstalled or deleted, and undo_last_action brings it back. Only when asked. (ROMs and whole folders are removed from their long-press menu, not by you.)") {
+                string("title", "Game title.")
                 required("title")
             },
             tool(LIST_INSTALLED_APPS, "List installed apps that could be added to the library.") {},
@@ -179,43 +189,84 @@ object MashaTools {
             tool(
                 RENAME_GAME,
                 "Set a game's name. The name is locked: metadata syncs never overwrite it, and its metadata is refreshed right away. " +
-                    "If you are proposing the name yourself, the app shows a confirm card: say in one sentence what you will set and ask. " +
+                    "If the user asked for it (or agreed), it is done right away; if the name is only your idea, the app shows a confirm card. " +
                     "Set user_dictated=true only when the user gave the exact name.",
             ) {
                 string("game", "Current title of the game in the library.")
                 string("name", "The new name.")
                 boolean("user_dictated", "true if the user dictated this exact name (then no confirmation is needed).")
+                boolean("user_requested", "true if the user asked for this directly or just agreed to your proposal: then it runs right away, with no confirm card.")
                 required("game", "name")
             },
             tool(LIST_ADDABLE_GAMES, "Games on the device that are not in the library yet: installed Android apps/games, and new ROMs/PC games inside folders Elyndra already has access to (also ones the user removed before). Only names, never paths.") {},
             tool(
                 ADD_GAMES,
-                "Add games to the library (never deletes anything). For more than one game the app shows the list in a confirm card first. " +
+                "Add games to the library (never deletes anything). If the user asked for it (or agreed), they are added right away; " +
+                    "if it is only your idea and there is more than one, the app shows them in a confirm card first. " +
                     "At most 50 per call; the rest are reported as skipped.",
             ) {
                 stringArray("titles", "Exact titles from list_addable_games.")
                 boolean("all", "true = every game list_addable_games found (instead of titles).")
+                boolean("user_requested", "true if the user asked for this directly or just agreed to your proposal: then it runs right away, with no confirm card.")
             },
             tool(OPEN_ADD_ROMS, "Open the Add screen on the ROMs tab so the user can pick a new folder with the system picker (you cannot pick folders yourself). Tell the user which folder to select.") {
                 string("system", "System the folder is for, if known.")
             },
             tool(LIST_EMULATORS, "Emulators on this device: the ones Elyndra recognizes (with the systems they run and where they are the preferred emulator), the recognized ones not set up for any system, and installed apps that look like emulators but have no known profile (Elyndra cannot launch those safely).") {},
-            tool(SET_PREFERRED_EMULATOR, "Make a recognized, installed emulator the preferred one for all of a system's folders. The app shows a confirm card first.") {
+            tool(SET_PREFERRED_EMULATOR, "Make a recognized, installed emulator the preferred one for all of a system's folders. Done right away if the user asked for it; a confirm card if it is only your idea.") {
                 string("system", "System name or id, e.g. 'PlayStation 2', 'psp'.")
                 string("emulator", "Emulator name or id.")
+                boolean("user_requested", "true if the user asked for this directly or just agreed to your proposal: then it runs right away, with no confirm card.")
                 required("system", "emulator")
             },
-            tool(UNDO_LAST_ACTION, "Undo the last rename, add or emulator change made through you. Only when the user asks.") {},
             tool(
-                FIND_PORT,
-                "Native Android ports (decompilations/recompilations/source ports) from Elyndra's Ports store, for console and PC games. " +
-                    "Search by the original game's name. One result per game: 'game' is its name, 'port' the best port of it, 'ports_available' how many exist. " +
-                    "Without a query: games already in the library that have a port. " +
-                    "Each result says if it is installable on Android, installed, and which original game the user must own (never offer or link ROMs). " +
-                    "open=true opens the store page of the first result.",
+                RECOMMEND,
+                "Show what you recommend as cards: cover, system, playtime, state, emulator and Play/Open buttons. Use it EVERY time you recommend games " +
+                    "or ports, instead of describing them in text. Up to $MAX_PICKS items, best first, each with a one-line reason in the user's language. " +
+                    "Library games by title; ports by their id from the ports search.",
             ) {
-                string("query", "Game or port name, e.g. 'Ocarina of Time', 'Mario', 'Xbox 360'.")
-                boolean("open", "Open the store on the first result.")
+                objectArray("items", "The recommendations, best first.") {
+                    string("title", "Library game title, exactly as in the data.")
+                    string("port_id", "For a port: its id from the ports search (leave title empty).")
+                    string("reason", "One short line: why this one, for them, now.")
+                    required("reason")
+                }
+                required("items")
+            },
+            tool(UNDO_LAST_ACTION, "Undo the last change made through you (add, rename, emulator, accent, dark mode, artwork, hiding a game…). Only when the user asks.") {},
+            tool(
+                CONFIRM_PENDING,
+                "Answer the confirm card that is waiting (the latest one): when the user says yes or no to it in any words, in any language.",
+            ) {
+                string("answer", "confirm or cancel.")
+                required("answer")
+            },
+            tool(
+                FIND_PORTS,
+                "Native Android ports (decompilations/recompilations/source ports) from Elyndra's Ports store, for console and PC games. " +
+                    "Search by port or original game name (just the name: 'Doom', not 'something like Doom'), by genre, or by mood. " +
+                    "Without query, genre or mood: library games that have a port. One result per game, compatible with this device first; " +
+                    "incompatible ones are only counted unless include_incompatible. Each result says its state (installed, update_available, " +
+                    "available, not_on_android), whether it runs here, and which original game's data files it needs (the user must own it; never offer or link ROMs).",
+            ) {
+                string("query", "Port or original game name, e.g. 'Ocarina of Time', 'Doom', 'Mario 64'.")
+                string("genre", "Optional genre: platformer, racing, rpg, shooter or strategy.")
+                string("mood", "Optional mood in the user's words, e.g. 'scary', 'chill', 'with friends', 'fast', 'story', 'puzzle'.")
+                boolean("include_incompatible", "Also return ports that can't be installed on this device.")
+            },
+            tool(OPEN_PORT, "Open a port's page in the Ports store. Only when the user wants to see it.") {
+                string("port_id", "The port id from find_ports.")
+                string("game", "Or the original game's name.")
+            },
+            tool(
+                INSTALL_PORT,
+                "Install a port from the Ports store with the store's own install flow. If the user asked for it (or agreed) it starts right away; " +
+                    "if it is only your idea, a confirm card first. Android always shows its own install dialog: tell the user Android will ask them to confirm. " +
+                    "Say first if it needs files from the original game.",
+            ) {
+                string("port_id", "The port id from find_ports.")
+                string("game", "Or the original game's name.")
+                boolean("user_requested", "true if the user asked for this directly or just agreed to your proposal: then it runs right away, with no confirm card.")
             },
         )
     }
@@ -248,6 +299,19 @@ object MashaTools {
 
         fun required(vararg names: String) {
             required += names
+        }
+
+        fun objectArray(name: String, description: String, item: Params.() -> Unit) {
+            val p = Params().apply(item)
+            properties[name] = buildJsonObject {
+                put("type", "array")
+                put("description", description)
+                putJsonObject("items") {
+                    put("type", "object")
+                    putJsonObject("properties") { p.properties.forEach { (k, v) -> put(k, v) } }
+                    if (p.required.isNotEmpty()) putJsonArray("required") { p.required.forEach { add(it) } }
+                }
+            }
         }
 
         private fun prop(name: String, type: String, description: String) {

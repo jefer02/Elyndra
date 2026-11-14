@@ -86,7 +86,10 @@ object Http {
 
 suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->
     enqueue(object : Callback {
-        override fun onResponse(call: Call, response: Response) = cont.resume(response)
+        override fun onResponse(call: Call, response: Response) {
+            // Si ya se canceló nadie va a leerla: se cierra aquí para no dejar la conexión abierta.
+            if (cont.isActive) cont.resume(response) else response.close()
+        }
         override fun onFailure(call: Call, e: IOException) {
             if (!cont.isCancelled) cont.resumeWithException(e)
         }

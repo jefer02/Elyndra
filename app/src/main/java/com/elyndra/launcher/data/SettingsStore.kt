@@ -14,6 +14,21 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
 
     init {
         migrateGlass()
+        migrateLucyChat()
+    }
+
+    /**
+     * Una vez por instalación (v4): el chat de Lucy vuelve a oculto. En
+     * versiones anteriores quedó guardado a la vista (al tocar su botón o X
+     * en el mando) y la pantalla dejaba de ser de ella; desde aquí, lo que el
+     * usuario elija se respeta.
+     */
+    internal fun migrateLucyChat() {
+        if (prefs.getBoolean(LUCY_CHAT_RESET_KEY, false)) return
+        prefs.edit {
+            remove("lucy.chatVisible")
+            putBoolean(LUCY_CHAT_RESET_KEY, true)
+        }
     }
 
     /**
@@ -392,6 +407,53 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean("masha.highRefresh", false)
         set(v) = prefs.edit { putBoolean("masha.highRefresh", v) }
 
+    /**
+     * Conversación en vivo por el altavoz: hablar encima de Lucy la corta (si
+     * en un móvil se corta sola con su propia voz, se apaga y queda el botón).
+     * Con auriculares siempre se puede.
+     */
+    var lucyVoiceInterrupt: Boolean
+        get() = prefs.getBoolean("lucy.voiceInterrupt", true)
+        set(v) = prefs.edit { putBoolean("lucy.voiceInterrupt", v) }
+
+    /** La conversación con Lucy a la vista. Por defecto no: se la ve a ella, con subtítulos. */
+    var lucyChatVisible: Boolean
+        get() = prefs.getBoolean("lucy.chatVisible", false)
+        set(v) = prefs.edit { putBoolean("lucy.chatVisible", v) }
+
+    /**
+     * El micrófono de Lucy bloqueado por el usuario. Se recuerda entre visitas:
+     * bloqueado, abrir su pantalla no graba. Por defecto, desbloqueado (en vivo).
+     */
+    var lucyMicLocked: Boolean
+        get() = prefs.getBoolean("lucy.micLocked", false)
+        set(v) = prefs.edit { putBoolean("lucy.micLocked", v) }
+
+    /** Las sugerencias rápidas bajo Lucy ("Tengo 30-40 minutos"…). Por defecto no: la pantalla es para ella. */
+    var lucySuggestions: Boolean
+        get() = prefs.getBoolean("lucy.suggestions", false)
+        set(v) = prefs.edit { putBoolean("lucy.suggestions", v) }
+
+    /** Ya se enseñó (una vez, en v4) la marca que señala la insignia de confianza. */
+    var lucyTrustCoachShown: Boolean
+        get() = prefs.getBoolean("lucy.trustCoachShown", false)
+        set(v) = prefs.edit { putBoolean("lucy.trustCoachShown", v) }
+
+    /** La fila de cifras de la pantalla de Lucy (con el chat a la vista), recogida. */
+    var lucyStatsCollapsed: Boolean
+        get() = prefs.getBoolean("lucy.statsCollapsed", false)
+        set(v) = prefs.edit { putBoolean("lucy.statsCollapsed", v) }
+
+    /** Ya se pidió el permiso del micrófono al abrir su pantalla (no se vuelve a pedir solo). */
+    var lucyMicAsked: Boolean
+        get() = prefs.getBoolean("lucy.micAsked", false)
+        set(v) = prefs.edit { putBoolean("lucy.micAsked", v) }
+
+    /** Con el chat oculto, una línea con lo que dice Lucy mientras habla. */
+    var lucySubtitles: Boolean
+        get() = prefs.getBoolean("lucy.subtitles", true)
+        set(v) = prefs.edit { putBoolean("lucy.subtitles", v) }
+
     /** El ambiente sonoro del holotanque (zumbido, pads, datos) en la pantalla de Masha. */
     var mashaSoundscape: Boolean
         get() = prefs.getBoolean("masha.soundscape", true)
@@ -490,6 +552,9 @@ class SettingsStore internal constructor(private val prefs: SharedPreferences) {
 
     companion object {
         private const val VOICE_OFFSET = "voice.offset."
+
+        /** El chat de Lucy ya se devolvió a oculto una vez (ver [migrateLucyChat]). */
+        const val LUCY_CHAT_RESET_KEY = "lucy.v4.chatReset"
 
         /** La versión de los ajustes del cristal de Meridian (ver [migrateGlass]). */
         const val GLASS_VERSION_KEY = "glass.version"

@@ -15,7 +15,12 @@ import kotlinx.serialization.json.JsonObject
    ───────────────────────────────────────────────────────────── */
 
 /** Un turno de la conversación ya terminado. */
-data class MashaTurn(val role: Role, val text: String) {
+data class MashaTurn(
+    val role: Role,
+    val text: String,
+    /** El usuario le cortó a media respuesta (conversación en vivo): [text] es solo lo que llegó a decir. */
+    val interrupted: Boolean = false,
+) {
     enum class Role { User, Masha }
 }
 
@@ -55,8 +60,17 @@ sealed interface MashaEvent {
 
     data class ToolFinished(val call: ToolCall, val result: ToolResult) : MashaEvent
 
-    /** Respuesta completa. */
-    data class Completed(val text: String, val usage: TokenUsage?, val fromCache: Boolean = false) : MashaEvent
+    /**
+     * Respuesta completa, ya sin la marca de puntuación. [affinityDelta]: lo que
+     * la IA puntuó el mensaje del usuario (ver AffinityTag); null si no lo hizo
+     * o si la respuesta sale de caché.
+     */
+    data class Completed(
+        val text: String,
+        val usage: TokenUsage?,
+        val fromCache: Boolean = false,
+        val affinityDelta: Int? = null,
+    ) : MashaEvent
 
     /** No se pudo terminar. [partial] es lo que llegó a escribirse. */
     data class Failed(val error: MashaError, val partial: String) : MashaEvent
@@ -170,6 +184,33 @@ sealed interface MashaAttachment {
     @SerialName("ports")
     data class Ports(val title: String? = null, val ids: List<String>) : MashaAttachment
 
+    /**
+     * Lo que Lucy recomienda (herramienta `show_recommendations`): una tarjeta por juego
+     * o port, con su motivo en una línea; los datos (minutos, estado,
+     * emulador) se guardan como estaban al recomendarlo.
+     */
+    @Serializable
+    @SerialName("picks")
+    data class Picks(val items: List<Pick>) : MashaAttachment
+
+    @Serializable
+    data class Pick(
+        /** game | port */
+        val kind: String,
+        /** Clave del juego en la biblioteca, o id del port en el catálogo. */
+        val id: String,
+        val reason: String,
+        val minutes: Int? = null,
+        /** new | tried | in_progress | abandoned | dormant (juegos). */
+        val state: String? = null,
+        val emulator: String? = null,
+    ) {
+        companion object {
+            const val GAME = "game"
+            const val PORT = "port"
+        }
+    }
+
     /** Algo que Masha hizo (lanzar, cambiar el tema…): una ficha pequeña de "hecho". */
     @Serializable
     @SerialName("done")
@@ -187,6 +228,8 @@ sealed interface MashaAttachment {
         val items: List<String>,
         /** Lo que no entró en el lote (se cuenta, no se lista). */
         val skipped: Int = 0,
+        /** El paquete de cada item que es una app instalada ("" si es una ROM): su icono en la cuadrícula. */
+        val packages: List<String> = emptyList(),
         val state: String = ConfirmState.PENDING,
     ) : MashaAttachment
 }

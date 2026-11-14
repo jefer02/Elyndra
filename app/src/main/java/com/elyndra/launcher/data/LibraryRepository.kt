@@ -110,8 +110,19 @@ class LibraryRepository(private val store: LibraryStore, private val scope: Coro
 
     data class ScanDiff(val added: List<String>, val removed: Int, val total: Int)
 
-    /** Fusiona un reescaneo: conserva metadatos y tiempo de las ROMs que siguen ahí. */
-    fun mergeScan(folderId: String, found: List<RomScanner.Found>, now: Long = System.currentTimeMillis()): ScanDiff {
+    /**
+     * Fusiona un reescaneo: conserva metadatos y tiempo de las ROMs que siguen ahí.
+     *
+     * [unreadable]: las carpetas (ruta relativa, "" = la raíz) que el análisis
+     * no pudo listar. Lo que ya había dentro se queda tal cual: un error al
+     * leer no dice que el juego se haya ido.
+     */
+    fun mergeScan(
+        folderId: String,
+        found: List<RomScanner.Found>,
+        now: Long = System.currentTimeMillis(),
+        unreadable: Collection<String> = emptyList(),
+    ): ScanDiff {
         var diff = ScanDiff(emptyList(), 0, 0)
         update { lib ->
             val folder = lib.folders.firstOrNull { it.id == folderId } ?: return@update lib
@@ -150,10 +161,14 @@ class LibraryRepository(private val store: LibraryStore, private val scope: Coro
                     hashes = prev.hashes?.takeIf { it.size == f.size && it.modified == f.modified },
                 ) } ?: newRom(folder, f).also { added += it.key }
             }
-            val removed = existing.size - (merged.size - added.size)
-            diff = ScanDiff(added, removed.coerceAtLeast(0), merged.size)
+            val mergedIds = merged.mapTo(HashSet()) { it.id }
+            val kept = if (unreadable.isEmpty()) emptyList() else existing.values.filter { r ->
+                r.id !in mergedIds && unreadable.any { dir -> dir.isEmpty() || r.relPath == dir || r.relPath.startsWith("$dir/") }
+            }
+            val removed = existing.size - (merged.size - added.size) - kept.size
+            diff = ScanDiff(added, removed.coerceAtLeast(0), merged.size + kept.size)
             lib.copy(
-                roms = lib.roms.filterNot { it.folderId == folderId } + merged,
+                roms = lib.roms.filterNot { it.folderId == folderId } + merged + kept,
                 folders = lib.folders.map { if (it.id == folderId) it.copy(lastScan = now) else it },
             )
         }

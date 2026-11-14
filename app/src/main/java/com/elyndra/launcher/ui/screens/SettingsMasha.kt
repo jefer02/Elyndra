@@ -50,6 +50,11 @@ import com.elyndra.launcher.domain.notify.LucyNotice
 import com.elyndra.launcher.notify.LucyNoticeDebug
 import com.elyndra.launcher.notify.LucyNotifier
 import com.elyndra.launcher.data.P
+import com.elyndra.launcher.domain.relationship.AffinityLevel
+import com.elyndra.launcher.ui.masha.AffinityBar
+import com.elyndra.launcher.ui.masha.HeartGlyph
+import com.elyndra.launcher.ui.masha.labelRes
+import com.elyndra.launcher.ui.masha.progressLine
 import com.elyndra.launcher.metadata.Service
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.SettingsController
@@ -153,10 +158,30 @@ internal fun MashaColumn(vm: ElyndraViewModel) {
             }
         }
 
+        // El vínculo con Lucy: nivel, corazón y lo que falta para el siguiente.
+        SettingsGroup {
+            val progress = vm.masha.affinityProgress
+            val accent = LocalSkin.current.a2
+            ElyText(stringResource(R.string.settings_lucy_bond), size = 12.5f, weight = FontWeight.SemiBold, color = P.ink)
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HeartGlyph(fill = (progress.level.ordinal + 1) / AffinityLevel.entries.size.toFloat(), glow = accent, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    ElyText(stringResource(progress.level.labelRes()), size = 12f, weight = FontWeight.Bold, color = P.ink)
+                    ElyText(progressLine(progress), size = 10f, color = P.ink2)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            AffinityBar(progress, accent, P.ink2.copy(alpha = 0.2f), Modifier.fillMaxWidth())
+        }
+
         // Privacidad y borrado.
         SettingsGroup {
             ElyText(stringResource(R.string.settings_masha_privacy), size = 10f, color = P.ink2, lineHeightRatio = 1.45f)
             Spacer(Modifier.height(10.dp))
+            GhostButton(stringResource(R.string.settings_lucy_forget_conversations), s::forgetLucyConversations)
+            Spacer(Modifier.height(8.dp))
             GhostButton(stringResource(R.string.settings_masha_forget), s::forgetMasha)
         }
     }
@@ -256,6 +281,27 @@ private fun VoiceGroup(vm: ElyndraViewModel) {
             }
             Spacer(Modifier.height(8.dp))
             ElyText(stringResource(R.string.settings_masha_voice_notice), size = 9f, color = P.ink2, lineHeightRatio = 1.45f)
+            Spacer(Modifier.height(10.dp))
+            ToggleRow(
+                title = stringResource(R.string.settings_lucy_voice_interrupt),
+                desc = stringResource(R.string.settings_lucy_voice_interrupt_desc),
+                checked = s.lucyVoiceInterrupt,
+                onToggle = s::toggleLucyVoiceInterrupt,
+            )
+            Spacer(Modifier.height(10.dp))
+            ToggleRow(
+                title = stringResource(R.string.settings_lucy_subtitles),
+                desc = stringResource(R.string.settings_lucy_subtitles_desc),
+                checked = s.lucySubtitles,
+                onToggle = s::toggleLucySubtitles,
+            )
+            Spacer(Modifier.height(10.dp))
+            ToggleRow(
+                title = stringResource(R.string.settings_lucy_suggestions),
+                desc = stringResource(R.string.settings_lucy_suggestions_desc),
+                checked = s.lucySuggestions,
+                onToggle = s::toggleLucySuggestions,
+            )
         }
     }
 }

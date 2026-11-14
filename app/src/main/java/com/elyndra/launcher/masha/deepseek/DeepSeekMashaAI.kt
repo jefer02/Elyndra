@@ -1,6 +1,7 @@
 package com.elyndra.launcher.masha.deepseek
 
 import com.elyndra.launcher.di.MashaHttp
+import com.elyndra.launcher.masha.AffinityTag
 import com.elyndra.launcher.masha.MashaAI
 import com.elyndra.launcher.masha.MashaCache
 import com.elyndra.launcher.masha.MashaChatRequest
@@ -46,6 +47,10 @@ import javax.inject.Singleton
  * y, si pide herramientas, se ejecutan, se le devuelven los resultados y
  * sigue, hasta que responde con texto (como mucho [MAX_ROUNDS] vueltas). El
  * texto de todas las vueltas se va emitiendo según llega.
+ *
+ * La marca con la que la IA puntúa la relación ([AffinityTag]) se filtra aquí,
+ * antes de emitir nada: ni la pantalla, ni la caché, ni la voz la ven. Los
+ * mensajes del usuario y el hilo se limpian de marcas antes de mandarse.
  */
 @Singleton
 class DeepSeekMashaAI @Inject constructor(
@@ -82,17 +87,21 @@ class DeepSeekMashaAI @Inject constructor(
         val messages = ArrayList<Message>()
         messages += Message.System(MashaPrompt.SYSTEM)
         request.history.takeLast(MAX_HISTORY).forEach { turn ->
-            val text = turn.text.take(MAX_TURN_CHARS)
+            val clean = AffinityTag.strip(turn.text).text.take(MAX_TURN_CHARS)
+            // Cortada por el usuario: el modelo lo sabe y no la repite (ver MashaPrompt, INTERRUPTIONS).
+            val text = if (turn.interrupted && turn.role == MashaTurn.Role.Masha) "$clean\n$INTERRUPTED_NOTE" else clean
             messages += if (turn.role == MashaTurn.Role.User) Message.User(text) else Message.Assistant(text)
         }
         // El contexto va en el último mensaje, no en el de sistema: así el
         // prefijo (sistema + herramientas + hilo) se repite igual entre
         // preguntas y DeepSeek lo sirve de su caché, más rápido y más barato.
         messages += Message.User(
-            "CONTEXT (JSON):\n${request.context}\nUI_LANGUAGE: ${request.language}\n\nUSER MESSAGE:\n${request.message}",
+            "CONTEXT (JSON):\n${request.context}\nUI_LANGUAGE: ${request.language}\n\nUSER MESSAGE:\n${AffinityTag.strip(request.message).text}",
         )
 
         val full = StringBuilder()
+        // Uno para toda la respuesta: una marca puede quedar partida entre trozos (y entre vueltas).
+        val tag = AffinityTag.Stripper()
         var usage: TokenUsage? = null
         var mutated = false
         var needsBreak = false
@@ -101,14 +110,12 @@ class DeepSeekMashaAI @Inject constructor(
             val acc = DeepSeekProtocol.StreamAccumulator()
             try {
                 stream(messages, toolbox) { payload ->
-                    val piece = acc.accept(payload)
+                    val raw = acc.accept(payload)
+                    // Entre el texto de una vuelta y el de la siguiente, un salto de párrafo
+                    // (también por el filtro: así sabe que empieza otra línea).
+                    val lead = if (raw.isNotEmpty() && needsBreak) tag.push("\n\n").also { needsBreak = false } else ""
+                    val piece = lead + tag.push(raw)
                     if (piece.isNotEmpty()) {
-                        // Entre el texto de una vuelta y el de la siguiente, un salto de párrafo.
-                        if (needsBreak) {
-                            needsBreak = false
-                            full.append("\n\n")
-                            emit(MashaEvent.Delta("\n\n"))
-                        }
                         full.append(piece)
                         emit(MashaEvent.Delta(piece))
                     }
@@ -126,17 +133,22 @@ class DeepSeekMashaAI @Inject constructor(
 
             val calls = acc.toolCalls()
             if (calls.isEmpty() || toolbox == null) {
+                val rest = tag.finish()
+                if (rest.isNotEmpty()) {
+                    full.append(rest)
+                    emit(MashaEvent.Delta(rest))
+                }
                 val text = full.toString().trim()
                 if (text.isEmpty()) {
                     emit(MashaEvent.Failed(MashaError.Protocol("respuesta vacía (${acc.finishReason})"), ""))
                     return@flow
                 }
                 if (cacheKey != null && !mutated) cache.put(cacheKey, text, CACHE_TTL_MS)
-                emit(MashaEvent.Completed(text, usage))
+                emit(MashaEvent.Completed(text, usage, affinityDelta = tag.delta))
                 return@flow
             }
 
-            messages += Message.Assistant(acc.content, calls)
+            messages += Message.Assistant(AffinityTag.strip(acc.content).text, calls)
             for (call in calls) {
                 emit(MashaEvent.ToolStarted(call))
                 val result = try {
@@ -146,7 +158,8 @@ class DeepSeekMashaAI @Inject constructor(
                 } catch (e: Exception) {
                     ToolResult(false, buildJsonObject {
                         put("ok", false)
-                        put("error", e.message ?: e.javaClass.simpleName)
+                        // Solo el tipo: el mensaje de una excepción puede llevar una URI o una ruta, y esto viaja al modelo.
+                        put("error", e.javaClass.simpleName)
                     })
                 }
                 if (result.mutating || call.name in MashaTools.MUTATING) mutated = true
@@ -173,7 +186,7 @@ class DeepSeekMashaAI @Inject constructor(
                 val text = execute(post("/chat/completions", body)) { response ->
                     DeepSeekProtocol.parseCompletion(response.body?.string().orEmpty())
                 }
-                if (text == null) Result.failure(MashaError.Protocol("respuesta vacía")) else Result.success(text.trim())
+                if (text == null) Result.failure(MashaError.Protocol("respuesta vacía")) else Result.success(AffinityTag.strip(text).text.trim())
             } catch (e: CancellationException) {
                 throw e
             } catch (e: MashaError) {
@@ -280,18 +293,21 @@ class DeepSeekMashaAI @Inject constructor(
         cachedPromptTokens + o.cachedPromptTokens,
     )
 
-    private companion object {
-        val JSON = "application/json".toMediaType()
+    companion object {
+        private val JSON = "application/json".toMediaType()
 
-        const val MAX_ROUNDS = 5
-        const val MAX_HISTORY = 12
-        const val MAX_TURN_CHARS = 1_500
+        /** Lo que ve el modelo tras una respuesta suya cortada por el usuario. */
+        const val INTERRUPTED_NOTE = "(The user interrupted you here.)"
+
+        private const val MAX_ROUNDS = 5
+        private const val MAX_HISTORY = 12
+        private const val MAX_TURN_CHARS = 1_500
 
         /** DeepSeek recomienda 1.0–1.3 para conversación; 1.0 mantiene los datos a raya. */
-        const val CHAT_TEMPERATURE = 1.0
-        const val CHAT_MAX_TOKENS = 900
+        private const val CHAT_TEMPERATURE = 1.0
+        private const val CHAT_MAX_TOKENS = 900
 
         /** Una respuesta de consulta vale media hora si nada ha cambiado. */
-        const val CACHE_TTL_MS = 30L * 60 * 1000
+        private const val CACHE_TTL_MS = 30L * 60 * 1000
     }
 }

@@ -335,6 +335,62 @@ class SettingsController(private val vm: ElyndraViewModel) {
         preview.play(text, lang, mashaVoiceSpeaker, mashaVoiceRate)
     }
 
+    var lucyVoiceInterrupt by mutableStateOf(store.lucyVoiceInterrupt); private set
+
+    var lucyChatVisible by mutableStateOf(store.lucyChatVisible); private set
+
+    fun toggleLucyChat() {
+        lucyChatVisible = !lucyChatVisible
+        store.lucyChatVisible = lucyChatVisible
+    }
+
+    var lucySuggestions by mutableStateOf(store.lucySuggestions); private set
+
+    fun toggleLucySuggestions() {
+        lucySuggestions = !lucySuggestions
+        store.lucySuggestions = lucySuggestions
+    }
+
+    var lucyTrustCoachShown by mutableStateOf(store.lucyTrustCoachShown); private set
+
+    fun markLucyTrustCoachShown() {
+        lucyTrustCoachShown = true
+        store.lucyTrustCoachShown = true
+    }
+
+    var lucyStatsCollapsed by mutableStateOf(store.lucyStatsCollapsed); private set
+
+    fun toggleLucyStats() {
+        lucyStatsCollapsed = !lucyStatsCollapsed
+        store.lucyStatsCollapsed = lucyStatsCollapsed
+    }
+
+    var lucyMicLocked by mutableStateOf(store.lucyMicLocked); private set
+
+    fun updateLucyMicLocked(locked: Boolean) {
+        lucyMicLocked = locked
+        store.lucyMicLocked = locked
+    }
+
+    var lucyMicAsked by mutableStateOf(store.lucyMicAsked); private set
+
+    fun markLucyMicAsked() {
+        lucyMicAsked = true
+        store.lucyMicAsked = true
+    }
+
+    var lucySubtitles by mutableStateOf(store.lucySubtitles); private set
+
+    fun toggleLucySubtitles() {
+        lucySubtitles = !lucySubtitles
+        store.lucySubtitles = lucySubtitles
+    }
+
+    fun toggleLucyVoiceInterrupt() {
+        lucyVoiceInterrupt = !lucyVoiceInterrupt
+        store.lucyVoiceInterrupt = lucyVoiceInterrupt
+    }
+
     var mashaSoundscape by mutableStateOf(store.mashaSoundscape); private set
 
     fun toggleMashaSoundscape() {
@@ -501,8 +557,25 @@ class SettingsController(private val vm: ElyndraViewModel) {
                     vm.viewModelScope.launch {
                         vm.brain.forgetEverything()
                         vm.masha.clearConversation(null)
+                        vm.masha.refreshAffinity()
                         vm.showToast(UiText.res(R.string.toast_masha_forgot))
                     }
+                },
+                dismiss = DialogButton(UiText.res(R.string.close)) {},
+            ),
+        )
+    }
+
+    /** "Olvidar conversaciones": el chat y el último tema; los recuerdos y la relación se quedan. */
+    fun forgetLucyConversations() {
+        vm.showDialog(
+            DialogSpec(
+                title = UiText.res(R.string.settings_lucy_forget_conversations),
+                message = UiText.res(R.string.settings_lucy_forget_conversations_msg),
+                destructive = true,
+                confirm = DialogButton(UiText.res(R.string.remove)) {
+                    vm.masha.forgetConversations()
+                    vm.showToast(UiText.res(R.string.toast_lucy_forgot_conversations))
                 },
                 dismiss = DialogButton(UiText.res(R.string.close)) {},
             ),

@@ -295,7 +295,7 @@ private fun ParticlePreview(color: Color) {
         contentAlignment = Alignment.Center,
     ) {
         Image(
-            painterResource(R.drawable.masha),
+            painterResource(R.drawable.masha_small),
             contentDescription = stringResource(R.string.masha_particles_preview),
             contentScale = ContentScale.Crop,
             modifier = Modifier.size(26.dp).clip(CircleShape).border(1.5.dp, color, CircleShape),

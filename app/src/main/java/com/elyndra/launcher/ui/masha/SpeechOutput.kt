@@ -7,6 +7,7 @@ import android.media.AudioTrack
 import android.os.SystemClock
 import android.util.Log
 import com.elyndra.launcher.ui.masha.lipsync.LipSyncConfig
+import com.elyndra.launcher.ui.masha.live.PlaybackEnvelope
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import kotlin.math.max
@@ -27,6 +28,11 @@ import kotlin.math.max
  *   `audioOffsetMs`.
  *
  * El PCM se convierte siempre a 16 bits (8 bits y float incluidos).
+ *
+ * Para la conversación en vivo: [hold]/[resume] pausan la voz a media frase
+ * (el usuario empezó a hablar) sin perder lo que queda, y [soundingLevelDb] es
+ * el nivel de lo que sale por el altavoz ahora mismo ([envelope]), la
+ * referencia para no confundir su propia voz con la del usuario.
  */
 internal class SpeechOutput(private val config: LipSyncConfig) : LipSync.Clock {
 
@@ -47,7 +53,15 @@ internal class SpeechOutput(private val config: LipSyncConfig) : LipSync.Clock {
     private var idleSince = -1L
 
     /** La pista está sonando (no en pausa ni llenando el margen inicial). */
-    val isPlaying: Boolean get() = playing && track != null
+    val isPlaying: Boolean get() = playing && track != null && !held
+
+    /** Lo que se ha ido escribiendo en la pista, en niveles por bloque (hilo de salida → micrófono). */
+    val envelope = PlaybackEnvelope()
+
+    /** En pausa a petición (el usuario habla): ni suena ni arranca hasta [resume]. */
+    @Volatile var held = false
+        private set
+    @Volatile private var heldPos = Double.NaN
 
     /** Se llama (hilo de salida) cuando la pista arranca de verdad (para medir el tiempo hasta el primer sonido). */
     @Volatile var onPlay: ((LipSync.Item) -> Unit)? = null
@@ -72,6 +86,48 @@ internal class SpeechOutput(private val config: LipSyncConfig) : LipSync.Clock {
         gen++
         queue.clear()
         queue.offer(Msg(FLUSH, gen, null, null, 0, 0, 0))
+    }
+
+    /** Pausa ya, a media frase (la cola y lo escrito se guardan). */
+    fun hold() {
+        if (held) return
+        heldPos = computePosition(System.nanoTime())
+        held = true
+        track?.let { t -> if (playing) runCatching { t.pause() } }
+    }
+
+    /** Sigue donde se pausó. */
+    fun resume() {
+        if (!held) return
+        held = false
+        tsValid = false
+        track?.let { t -> if (playing) runCatching { t.play() } }
+    }
+
+    private val micTs = AudioTimestamp()
+
+    /**
+     * Nivel (dBFS) de lo que suena ahora mismo por la salida, o silencio. Lo
+     * llama el hilo del micrófono: la trama presentada sale de su propia marca
+     * de tiempo (sin el ajuste manual de los labios, que es para el ojo).
+     */
+    fun soundingLevelDb(now: Long = System.nanoTime()): Float {
+        val t = track ?: return PlaybackEnvelope.SILENT
+        val sr = rate
+        if (!playing || held || sr <= 0) return PlaybackEnvelope.SILENT
+        val frame = synchronized(micTs) {
+            val ok = try {
+                t.getTimestamp(micTs)
+            } catch (_: IllegalStateException) {
+                false
+            }
+            if (ok && micTs.nanoTime > 0) {
+                micTs.framePosition + (now - micTs.nanoTime) * sr / 1_000_000_000L
+            } else {
+                head(t) - (config.fallbackLatencyMs * sr / 1000).toLong()
+            }
+        }
+        return envelope.levelAt(frame)
     }
 
     fun release() {
@@ -99,6 +155,7 @@ internal class SpeechOutput(private val config: LipSyncConfig) : LipSync.Clock {
             }
             if (m.kind == FLUSH) {
                 releaseTrack()
+                held = false
                 continue
             }
             if (m.gen != gen) continue
@@ -118,7 +175,9 @@ internal class SpeechOutput(private val config: LipSyncConfig) : LipSync.Clock {
                             item.outputId = trackId
                             item.startFrame = written
                         }
-                        write(t, toPcm16(m.data!!), m.gen)
+                        val pcm = toPcm16(m.data!!)
+                        envelope.push(pcm, chans)
+                        write(t, pcm, m.gen)
                         maybePlay(t, item, force = false)
                     }
                     END -> {
@@ -170,6 +229,7 @@ internal class SpeechOutput(private val config: LipSyncConfig) : LipSync.Clock {
             .build()
         rate = sampleRate
         chans = channels
+        envelope.reset(sampleRate)
         written = 0L
         pausedAt = 0L
         playing = false
@@ -222,8 +282,8 @@ internal class SpeechOutput(private val config: LipSyncConfig) : LipSync.Clock {
             off += n
             written += n / frameBytes
             if (n == 0) {
-                // Búfer lleno: si aún no suena (margen mayor que el búfer), que empiece.
-                if (!playing) start(t)
+                // Búfer lleno: si aún no suena (margen mayor que el búfer), que empiece (salvo en pausa).
+                if (!playing && !held) start(t)
                 Thread.sleep(5)
             }
         }
@@ -233,6 +293,11 @@ internal class SpeechOutput(private val config: LipSyncConfig) : LipSync.Clock {
         idleSince = -1L
         if (playing) return
         val buffered = written - pausedAt
+        if (held) {
+            // En pausa: arranca "sonando" para que resume() la ponga en marcha.
+            playing = true
+            return
+        }
         if (force || buffered >= config.lookaheadMs / 1000f * rate) {
             start(t)
             onPlay?.invoke(item)
@@ -249,7 +314,7 @@ internal class SpeechOutput(private val config: LipSyncConfig) : LipSync.Clock {
     /** Sin nada que escribir: tras 1,5 s con todo ya sonado, la pista se pausa (no deja el audio despierto). */
     private fun idle() {
         val t = track ?: return
-        if (!playing) return
+        if (!playing || held) return
         if (head(t) < written) { idleSince = -1L; return }
         val now = SystemClock.elapsedRealtime()
         if (idleSince < 0) { idleSince = now; return }
@@ -292,6 +357,7 @@ internal class SpeechOutput(private val config: LipSyncConfig) : LipSync.Clock {
         val sr = rate
         if (sr <= 0) return Double.NaN
         val w = written
+        if (held) return if (heldPos.isNaN()) pausedAt.toDouble() - offsetFrames(sr) else heldPos
         if (!playing) return pausedAt.toDouble() - offsetFrames(sr)
         if (now - lastPoll > POLL_NS || !tsValid) {
             lastPoll = now

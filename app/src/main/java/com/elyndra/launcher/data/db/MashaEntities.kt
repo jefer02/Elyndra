@@ -87,6 +87,8 @@ data class MashaMessageEntity(
     /** Adjunto del mensaje (lista de juegos, plan de sesión…) en JSON. */
     val attachment: String?,
     @ColumnInfo(name = "created_at") val createdAt: Long,
+    /** El usuario la cortó a media respuesta (conversación en vivo); [text] es lo que llegó a decir. */
+    @ColumnInfo(defaultValue = "0") val interrupted: Boolean = false,
 )
 
 /**

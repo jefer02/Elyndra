@@ -124,13 +124,13 @@ object UpdateLogic {
     private val ABI_ALIASES = mapOf(
         "arm64-v8a" to listOf("arm64-v8a", "arm64", "aarch64"),
         "armeabi-v7a" to listOf("armeabi-v7a", "armeabi", "armv7"),
-        "x86_64" to listOf("x86_64", "x64"),
+        "x86_64" to listOf("x86_64", "x86-64", "x64"),
         "x86" to listOf("x86"),
     )
 
-    /** Un token suelto en el nombre: "x86" no casa dentro de "x86_64". */
+    /** Un token suelto en el nombre: "x86" no casa dentro de "x86_64" ni de "x86-64". */
     private fun hasToken(name: String, token: String): Boolean =
-        Regex("(?<![a-z0-9_])" + Regex.escape(token) + "(?![a-z0-9_])").containsMatchIn(name)
+        Regex("(?<![a-z0-9_])" + Regex.escape(token) + "(?![a-z0-9_]|-64)").containsMatchIn(name)
 
     /** ¿El nombre dice alguna ABI? (sin ninguna, el APK vale para todas). También lo usa el selector de ports. */
     fun mentionsAnyAbi(name: String): Boolean = ABI_ALIASES.values.flatten().any { hasToken(name.lowercase(), it) }

@@ -34,4 +34,24 @@ class PortDisplayTest {
         assertEquals("PC", PortDisplay.platformBadge("pc"))
         assertEquals("ZX81", PortDisplay.platformBadge("zx81"))
     }
+
+    @Test fun `raw ids, packages and file names are never shown as the port name`() {
+        listOf("gow3_android", "com.foo.portgame", "game.apk", "sm64-port", "data/gow3").forEach {
+            assertNull(it, PortDisplay.portName(soh.copy(name = it)))
+        }
+        listOf("Ship of Harkinian", "OpenMW", "dhewm3", "Perfect Dark").forEach {
+            assertEquals(it, PortDisplay.portName(soh.copy(name = it)))
+        }
+    }
+
+    @Test fun `the store line drops a raw id but keeps the developer`() {
+        assertEquals(PortDisplay.PortLine(null, "HarbourMasters"), PortDisplay.portLine(soh.copy(name = "soh_android")))
+    }
+
+    @Test fun `a variant row is titled by its maker when the port name is an id`() {
+        assertEquals("Ship of Harkinian" to "HarbourMasters", PortDisplay.variant(soh))
+        assertEquals("HarbourMasters" to null, PortDisplay.variant(soh.copy(name = "soh_android")))
+        // Sin desarrollador, el dueño del repositorio.
+        assertEquals("linkzenic" to null, PortDisplay.variant(soh.copy(name = "soh_android", developer = null)))
+    }
 }

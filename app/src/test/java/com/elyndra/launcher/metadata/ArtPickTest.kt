@@ -104,6 +104,15 @@ class MediaCacheTest {
     }
 
     @Test
+    fun aBodyWithoutLengthIsStillCappedInMemory() = runBlocking {
+        val media = MediaCache(dir, FakeCodec())
+        // Por trozos no hay Content-Length: el tope tiene que saltar igual.
+        val huge = Buffer().write(ByteArray(MediaCache.MAX_BYTES.toInt() + 1))
+        server.enqueue(MockResponse().setChunkedBody(huge, 64 * 1024))
+        assertEquals(MediaResult.Failed(MediaFailure.TooBig), media.fetch(server.url("/huge.png").toString(), "a:x", "cover"))
+    }
+
+    @Test
     fun noConnectionIsANetworkFailure() = runBlocking {
         val media = MediaCache(dir, FakeCodec())
         server.shutdown()

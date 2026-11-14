@@ -39,7 +39,12 @@ import androidx.compose.ui.unit.dp
 import com.elyndra.launcher.R
 import com.elyndra.launcher.masha.MashaAttachment
 import com.elyndra.launcher.ui.ChatMessage
+import com.elyndra.launcher.domain.ports.PortAction
 import com.elyndra.launcher.domain.ports.PortDisplay
+import com.elyndra.launcher.domain.ports.PortEntry
+import com.elyndra.launcher.domain.ports.PortLink
+import com.elyndra.launcher.masha.ReplyShape
+import com.elyndra.launcher.ui.screens.ports.StoreImage
 import com.elyndra.launcher.ui.ElyndraViewModel
 import com.elyndra.launcher.ui.MashaGameRef
 import com.elyndra.launcher.ui.components.ArtFallback
@@ -88,8 +93,10 @@ internal fun HoloMessage(vm: ElyndraViewModel, msg: ChatMessage, glow: Color, la
                     .padding(horizontal = 13.dp, vertical = 11.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    if (msg.text.isNotEmpty()) {
-                        ElyText(msg.text + if (msg.pending) " ▍" else "", size = 12f, color = Holo.text, lineHeightRatio = 1.55f)
+                    // Con tarjetas, solo la frase corta que dice: los detalles van en ellas.
+                    val text = ReplyShape.display(msg.text, msg.attachment, msg.done)
+                    if (text.isNotEmpty()) {
+                        ElyText(text + if (msg.pending) " ▍" else "", size = 12f, color = Holo.text, lineHeightRatio = 1.55f)
                     }
                     if (msg.done.isNotEmpty()) DoneChips(msg.done, glow)
                     when (val a = msg.attachment) {
@@ -98,6 +105,7 @@ internal fun HoloMessage(vm: ElyndraViewModel, msg: ChatMessage, glow: Color, la
                         is MashaAttachment.ArcCard -> ArcStrip(vm, a)
                         is MashaAttachment.Confirm -> ConfirmCard(vm, a, glow)
                         is MashaAttachment.Ports -> PortsStrip(vm, a)
+                        is MashaAttachment.Picks -> PicksCard(vm, a, glow)
                         is MashaAttachment.Done, null -> msg.game?.let { GameMention(it) { vm.showDetails(it.key) } }
                     }
                     if (msg.offline) {
@@ -187,7 +195,9 @@ private fun PortsStrip(vm: ElyndraViewModel, a: MashaAttachment.Ports) {
                     .padding(horizontal = 10.dp, vertical = 8.dp),
             ) {
                 ElyText(PortDisplay.title(port), size = 10.5f, weight = FontWeight.SemiBold, color = Holo.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                ElyText(PortDisplay.platformBadge(port.platform) + " · " + port.name, size = 9f, color = Holo.dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // Nunca un id, un paquete o un archivo: sin nombre presentable, solo la plataforma.
+                val line = listOfNotNull(PortDisplay.platformBadge(port.platform), PortDisplay.portName(port)).joinToString(" · ")
+                ElyText(line, size = 9f, color = Holo.dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -235,6 +245,126 @@ private fun GameThumb(ref: MashaGameRef, onClick: () -> Unit) {
     }
 }
 
+/**
+ * Lo que Lucy recomienda: una fila por juego o port con su carátula, el
+ * sistema, el tiempo jugado y el estado (o, en un port, si está instalado y
+ * si necesita archivos del juego original), el emulador si lo hay, su motivo
+ * y el botón para jugar o abrirlo.
+ */
+@Composable
+private fun PicksCard(vm: ElyndraViewModel, picks: MashaAttachment.Picks, glow: Color) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        picks.items.forEach { pick ->
+            when (pick.kind) {
+                MashaAttachment.Pick.PORT -> vm.ports.catalog.firstOrNull { it.id == pick.id }?.let { PortPickRow(vm, it, pick, glow) }
+                else -> vm.masha.gameRef(pick.id)?.let { GamePickRow(vm, it, pick, glow) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GamePickRow(vm: ElyndraViewModel, ref: MashaGameRef, pick: MashaAttachment.Pick, glow: Color) {
+    val facts = listOfNotNull(
+        ref.subtitle,
+        pick.minutes?.takeIf { it > 0 }?.let { playtime(it) },
+        pick.state?.let { stateLabel(it) },
+        pick.emulator,
+    ).joinToString(" · ")
+    PickRow(
+        cover = { Thumb(ref) },
+        title = ref.title,
+        facts = facts,
+        reason = pick.reason,
+        onOpen = { vm.showDetails(ref.key) },
+    ) {
+        HoloButton(stringResource(R.string.widget_play), glow) { vm.openByKey(ref.key) }
+    }
+}
+
+@Composable
+private fun PortPickRow(vm: ElyndraViewModel, port: PortEntry, pick: MashaAttachment.Pick, glow: Color) {
+    val action = vm.ports.action(port)
+    val needs = port.requires.userRom
+    val facts = listOfNotNull(
+        PortDisplay.platformBadge(port.platform),
+        stringResource(
+            when (action) {
+                PortAction.Installed -> R.string.lucy_port_installed
+                PortAction.Update -> R.string.lucy_port_update
+                PortAction.NotOnAndroid, PortAction.VrOnly, PortAction.Unavailable -> R.string.lucy_port_not_android
+                else -> R.string.lucy_port_available
+            },
+        ),
+    ).joinToString(" · ")
+    PickRow(
+        cover = {
+            StoreImage(vm.ports.coverArt(port), PortDisplay.title(port), Modifier.fillMaxSize())
+        },
+        title = PortDisplay.title(port),
+        facts = facts,
+        reason = pick.reason,
+        note = if (needs) stringResource(R.string.lucy_port_needs_files, port.game.name) else null,
+        onOpen = { vm.ports.openPort(port.id) },
+    ) {
+        val installedKey = vm.ports.installed[port.id]?.packageName?.let { PortLink.key(it) }
+        if (action == PortAction.Installed && installedKey != null) {
+            HoloButton(stringResource(R.string.widget_play), glow) { vm.openByKey(installedKey) }
+        } else {
+            HoloButton(stringResource(R.string.open), glow) { vm.ports.openPort(port.id) }
+        }
+    }
+}
+
+@Composable
+private fun PickRow(
+    cover: @Composable () -> Unit,
+    title: String,
+    facts: String,
+    reason: String,
+    onOpen: () -> Unit,
+    note: String? = null,
+    action: @Composable () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().shapeClickable(RoundedCornerShape(10.dp), onClick = onOpen),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(Modifier.size(46.dp, 62.dp).clip(RoundedCornerShape(8.dp)).background(Color.White.copy(alpha = 0.08f))) { cover() }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            ElyText(title, size = 12f, weight = FontWeight.Bold, color = Holo.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            ElyText(facts, size = 9.5f, color = Holo.dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (reason.isNotEmpty()) ElyText(reason, size = 10.5f, color = Holo.text, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeightRatio = 1.3f)
+            if (note != null) ElyText(note, size = 9f, weight = FontWeight.SemiBold, color = Holo.dim, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        action()
+    }
+}
+
+@Composable
+private fun Thumb(ref: MashaGameRef) {
+    if (ref.packageName != null) {
+        GameIcon(ref.artPath, ref.packageName, Modifier.fillMaxSize(), ContentScale.Crop)
+    } else {
+        ArtImage(ref.artPath, ArtFallback(ref.key, ref.title), Modifier.fillMaxSize(), showTitle = false)
+    }
+}
+
+@Composable
+private fun playtime(minutes: Int): String =
+    if (minutes >= 60) stringResource(R.string.lucy_pick_hours, minutes / 60) else stringResource(R.string.lucy_pick_minutes, minutes)
+
+@Composable
+private fun stateLabel(state: String): String? = when (state) {
+    "new" -> stringResource(R.string.lucy_state_new)
+    "tried" -> stringResource(R.string.lucy_state_tried)
+    "in_progress" -> stringResource(R.string.lucy_state_in_progress)
+    "abandoned" -> stringResource(R.string.lucy_state_abandoned)
+    "dormant" -> stringResource(R.string.lucy_state_dormant)
+    else -> null
+}
+
 /** Plan de sesión: cada juego con sus minutos y el botón para empezar por el primero. */
 /**
  * Lo que Masha va a cambiar, a la espera del visto bueno: qué es, la lista
@@ -247,6 +377,7 @@ private fun ConfirmCard(vm: ElyndraViewModel, c: MashaAttachment.Confirm, glow: 
         com.elyndra.launcher.masha.ConfirmKind.ADD_GAMES -> pluralStringResource(R.plurals.masha_confirm_add, c.items.size, c.items.size)
         com.elyndra.launcher.masha.ConfirmKind.RENAME -> stringResource(R.string.masha_confirm_rename, c.items.getOrElse(0) { "?" }, c.items.getOrElse(1) { "?" })
         com.elyndra.launcher.masha.ConfirmKind.SET_EMULATOR -> stringResource(R.string.masha_confirm_emulator, c.items.getOrElse(0) { "?" }, c.items.getOrElse(1) { "?" })
+        com.elyndra.launcher.masha.ConfirmKind.INSTALL_PORT -> stringResource(R.string.lucy_confirm_install_port, c.items.getOrElse(0) { "?" })
         else -> c.kind
     }
     Column(
@@ -258,6 +389,10 @@ private fun ConfirmCard(vm: ElyndraViewModel, c: MashaAttachment.Confirm, glow: 
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         ElyText(title, size = 11.5f, weight = FontWeight.Bold, color = Holo.text)
+        if (c.kind == com.elyndra.launcher.masha.ConfirmKind.INSTALL_PORT) {
+            c.items.getOrNull(1)?.takeIf { it.isNotEmpty() }?.let { ElyText(stringResource(R.string.lucy_port_needs_files, it), size = 10f, color = Holo.dim) }
+            ElyText(stringResource(R.string.lucy_confirm_install_port_flow), size = 9.5f, color = Holo.dim)
+        }
         if (c.kind == com.elyndra.launcher.masha.ConfirmKind.ADD_GAMES) {
             c.items.take(12).forEach { ElyText("• $it", size = 10f, color = Holo.dim, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             if (c.items.size > 12) ElyText(stringResource(R.string.masha_confirm_more, c.items.size - 12), size = 10f, color = Holo.dim)

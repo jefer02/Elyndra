@@ -209,6 +209,32 @@ class InputController(private val vm: ElyndraViewModel) {
     /** Abre el teclado en el campo del diálogo abierto (lo pone el propio campo). */
     var dialogKeyboard: (() -> Unit)? = null
 
+    /** El micrófono de Lucy: Y pulsado y soltado en su pantalla (lo pone MashaScreen). */
+    interface MicHook {
+        fun press()
+        fun release()
+    }
+
+    var mashaMic: MicHook? = null
+
+    /**
+     * Los atajos de la pantalla de Lucy (X: chat, Select: teclado, L1: "Lucy y
+     * tú", B/A en sus paneles). Lo pone MashaScreen; solo llega aquí si no hay
+     * diálogo ni hoja encima (van antes en [handle]). Devuelve si lo usó.
+     */
+    var mashaPad: ((Pad) -> Boolean)? = null
+
+    /**
+     * Un botón que se suelta. Solo cuenta Y en la pantalla de Lucy (mantener
+     * para hablar, tocar para el candado del micrófono); el resto se maneja al pulsar.
+     */
+    fun release(pad: Pad): Boolean {
+        val mic = mashaMic ?: return false
+        if (pad != Pad.Options || vm.screen != Screen.Masha) return false
+        mic.release()
+        return true
+    }
+
     fun handle(pad: Pad): Boolean {
         active = true
         // B con el teclado abierto lo cierra a él primero; la capa, a la siguiente.
@@ -272,7 +298,12 @@ class InputController(private val vm: ElyndraViewModel) {
      * Pantallas de formulario (Ajustes, Añadir, Masha): las direcciones y A
      * las mueve el foco de Compose; aquí solo volver y Start.
      */
-    private fun form(pad: Pad): Boolean = when (pad) {
+    private fun form(pad: Pad): Boolean = when {
+        vm.screen == Screen.Masha && mashaPad?.invoke(pad) == true -> true
+        else -> formDefault(pad)
+    }
+
+    private fun formDefault(pad: Pad): Boolean = when (pad) {
         Pad.Back -> { vm.back(); true }
         // L1/R1: en Ajustes, categoría (o mover la fuente cogida); en Añadir, pestaña.
         Pad.PagePrev, Pad.PageNext -> {
@@ -287,6 +318,8 @@ class InputController(private val vm: ElyndraViewModel) {
         }
         // Y: al botón principal de la pantalla (en Añadir, "Añadir N juegos").
         Pad.Options -> when {
+            // En la de Lucy, el micrófono: tocar = candado (bloquear / desbloquear); mantener = hablar o cortarla.
+            vm.screen == Screen.Masha && mashaMic != null -> { mashaMic?.press(); true }
             // En la tienda, Y abre las utilidades (recargar, actualizar todo, quitar filtros).
             vm.screen == Screen.Ports && vm.ports.detail == null -> { vm.ports.openUtilities(); true }
             else -> primaryAction?.let { runCatching { it.requestFocus() }; true } ?: false

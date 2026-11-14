@@ -11,6 +11,9 @@ import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import com.elyndra.launcher.data.SettingsStore
@@ -23,6 +26,7 @@ import com.elyndra.launcher.ui.masha.lipsync.VowelProfile
 import com.elyndra.launcher.ui.masha.voice.HalfbandDecimator
 import com.elyndra.launcher.ui.masha.voice.NeuralVoiceEngine
 import com.elyndra.launcher.ui.masha.voice.SpeechNormalizer
+import com.elyndra.launcher.ui.masha.voice.StreamChunker
 import com.elyndra.launcher.ui.masha.voice.SynthesisCallback
 import com.elyndra.launcher.ui.masha.voice.SynthesisRequest
 import com.elyndra.launcher.ui.masha.voice.SystemTtsEngine
@@ -90,19 +94,47 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
     private var seq = 0
     @Volatile private var gen = 0
 
-    /** Mensaje que se está leyendo y hasta dónde se ha puesto en cola. */
-    private var feedingId: Long = -1
-    private var queuedUpTo = 0
+    /** Parte el mensaje que se está leyendo en frases según llega. */
+    private val chunker = StreamChunker()
+
+    /**
+     * Le queda algo por decir (frases en cola, sonando o esperando motor). Es
+     * estado observable: la conversación en vivo espera a que se apague para
+     * volver a escuchar (hilo principal).
+     */
+    var queued by mutableStateOf(false)
+        private set
+
+    private fun refreshQueued() {
+        val q = order.isNotEmpty() || waiting.isNotEmpty()
+        if (q != queued) queued = q
+    }
+
+    /**
+     * La frase que suena ahora (tal como la escribió ella, sin normalizar), o
+     * null: el subtítulo (hilo principal).
+     */
+    var nowSaying by mutableStateOf<String?>(null)
+        private set
+
+    /** Las frases que llegaron a sonar desde que empezó a hablar (para "lo que dijo" al interrumpirla). */
+    private val spokenRun = ArrayList<String>()
+
+    /** En pausa porque el usuario empezó a hablar (ver [pause]). */
+    var paused by mutableStateOf(false)
+        private set
 
     /** Frases que llegaron antes de que hubiera motor: se dicen en cuanto lo hay. */
     private val waiting = ArrayList<String>()
 
     /** Una frase en curso: su modelo (hilo de análisis) y su item de render. */
-    private inner class Job(val id: String, val text: String, val gen: Int, val sayNanos: Long, val voice: VoiceInfo) {
+    private inner class Job(val id: String, val text: String, val raw: String, val gen: Int, val sayNanos: Long, val voice: VoiceInfo) {
         val item = LipSync.Item(id)
         var utt: Utterance? = null // hilo de análisis
         /** Copia a media frecuencia para el análisis (voz a 44,1 kHz), o null. */
         @Volatile var decimator: HalfbandDecimator? = null
+        /** Quita el silencio del motor al principio y al final de la frase (hilo del motor), o null. */
+        @Volatile var trimmer: SilenceTrimmer? = null
         @Volatile var rate = 0
         @Volatile var chunks = 0
         @Volatile var firstChunkNanos = -1L
@@ -152,6 +184,8 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
             j.rate = sampleRate
             val half = sampleRate >= 32_000 && encoding == AudioFormat.ENCODING_PCM_16BIT && channels == 1
             j.decimator = if (half) HalfbandDecimator() else null
+            // Lo mismo a la salida y al análisis de los labios: la boca sigue cuadrando con lo que suena.
+            j.trimmer = if (!j.speakMode && encoding == AudioFormat.ENCODING_PCM_16BIT) SilenceTrimmer(sampleRate, channels) else null
             val analysisRate = if (half) sampleRate / 2 else sampleRate
             work.post { j.utt?.begin(analysisRate, encoding, channels) }
         }
@@ -160,26 +194,38 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
             val j = jobs[id] ?: return
             if (j.gen != gen) return
             if (j.chunks++ == 0) j.firstChunkNanos = System.nanoTime()
-            if (!j.speakMode) out.data(j.item, pcm)
-            work.post {
-                // Fuera del hilo del motor (binder): escribir aquí retrasaba sus avisos.
-                if (BuildConfig.DEBUG) dump(j, pcm)
-                val d = j.decimator
-                j.utt?.audio(if (d != null) d.process(pcm) else pcm)
-                scheduleBuild(j, urgent = false)
-            }
+            val trimmed = j.trimmer?.process(pcm) ?: pcm
+            if (trimmed.isNotEmpty()) sound(j, trimmed)
         }
 
         override fun onRange(id: String, start: Int, end: Int, frame: Int) {
             val j = jobs[id] ?: return
-            val f = if (j.decimator != null) frame / 2 else frame
+            // Las marcas del motor cuentan desde su audio sin recortar.
+            val trimmed = (frame - (j.trimmer?.droppedLeadFrames ?: 0)).coerceAtLeast(0)
+            val f = if (j.decimator != null) trimmed / 2 else trimmed
             work.post {
                 j.utt?.range(start, end, f)
                 scheduleBuild(j, urgent = false)
             }
         }
 
-        override fun onEnd(id: String, ok: Boolean) = synthesisEnded(id)
+        override fun onEnd(id: String, ok: Boolean) {
+            // Lo que queda del silencio final (como mucho una pausa natural) antes de cerrar la frase.
+            jobs[id]?.let { j -> j.trimmer?.finish()?.takeIf { it.isNotEmpty() && j.gen == gen }?.let { sound(j, it) } }
+            synthesisEnded(id)
+        }
+    }
+
+    /** PCM de la frase (ya recortado) a la salida y al análisis de los labios. */
+    private fun sound(j: Job, pcm: ByteArray) {
+        if (!j.speakMode) out.data(j.item, pcm)
+        work.post {
+            // Fuera del hilo del motor (binder): escribir aquí retrasaba sus avisos.
+            if (BuildConfig.DEBUG) dump(j, pcm)
+            val d = j.decimator
+            j.utt?.audio(if (d != null) d.process(pcm) else pcm)
+            scheduleBuild(j, urgent = false)
+        }
     }
 
     init {
@@ -227,18 +273,7 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
      * el resto, también frase a frase (la primera suena antes).
      */
     fun feed(id: Long, text: String, final: Boolean) {
-        if (id != feedingId) {
-            feedingId = id
-            queuedUpTo = 0
-        }
-        if (queuedUpTo >= text.length) return
-        val end = if (final) text.length else lastSentenceEnd(text, queuedUpTo)
-        if (end <= queuedUpTo) return
-        for (s in sentences(text, queuedUpTo, end)) {
-            val chunk = speakable(s)
-            if (chunk.isNotBlank()) say(chunk)
-        }
-        queuedUpTo = end
+        chunker.feed(id, text, final).forEach(::say)
     }
 
     private fun say(raw: String) {
@@ -247,6 +282,7 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
         if (voice == null) {
             // Aún sin motor (arrancando): se dice en cuanto lo haya, no se pierde.
             if (waiting.size < MAX_WAITING) waiting += raw
+            refreshQueued()
             return
         }
         val text = if (voice.wantsNormalizedText) {
@@ -259,10 +295,11 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
         if (order.isEmpty()) {
             runStartNanos = now
             runHeard = false
+            spokenRun.clear()
         }
         val id = "masha-${seq++}"
         if (BuildConfig.DEBUG) Log.d(TAG, "say $id [${voice.engineId}]: \"$text\"")
-        val j = Job(id, text, gen, now, voice)
+        val j = Job(id, text, raw, gen, now, voice)
         jobs[id] = j
         order += j
         lip.add(j.item)
@@ -404,6 +441,7 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
             val t = out.seconds(j.item, now)
             if (!j.heard && (j.speakMode || out.isPlaying) && !t.isNaN() && t > 0.0) {
                 j.heard = true
+                spokenRun += j.raw
                 if (!runHeard) {
                     runHeard = true
                     // Cuándo empezó a oírse de verdad: ahora menos lo que ya lleva sonando.
@@ -424,12 +462,43 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
         }
         val speaking = order.isNotEmpty() && (any || runHeard)
         if (speaking != presence.speaking) presence.speaking = speaking
+        val saying = order.firstOrNull { it.heard }?.raw
+        if (saying != nowSaying) nowSaying = saying
+        refreshQueued()
         if (order.isNotEmpty()) main.postDelayed(ticker, TICK_MS)
     }
+
+    /**
+     * Pausa a media frase (el usuario empezó a hablar en la conversación en
+     * vivo): la boca se queda quieta y lo que falta sigue en cola hasta
+     * [resume] o [stop].
+     */
+    fun pause() {
+        if (released || paused) return
+        paused = true
+        out.hold()
+    }
+
+    fun resume() {
+        if (released || !paused) return
+        paused = false
+        out.resume()
+    }
+
+    /** Lo que llegó a decir desde que empezó a hablar (frases que sonaron, aunque fuera un poco). */
+    fun spokenSoFar(): String = spokenRun.joinToString(" ").trim()
+
+    /** Lo que suena es lo último que tiene en cola (para saber si su pregunta final es esta). */
+    val sayingLast: Boolean get() = waiting.isEmpty() && order.count { !it.heard } == 0 && order.size <= 1
+
+    /** Nivel (dBFS) de lo que sale ahora por la voz; lo pide el micrófono de la conversación en vivo. */
+    fun soundingLevelDb(): Float = out.soundingLevelDb()
 
     /** Calla ya (y olvida lo que quedaba en cola). */
     fun stop() {
         if (released) return
+        paused = false
+        nowSaying = null
         gen++
         engine.stop(jobs.keys.toList())
         out.stop()
@@ -437,15 +506,13 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
         jobs.clear()
         waiting.clear()
         lip.clear()
-        feedingId = -1
+        chunker.reset()
         speakingOff()
+        refreshQueued()
     }
 
     /** El mensaje ya leído no se vuelve a leer (p. ej. al volver a la pantalla). */
-    fun skip(id: Long, length: Int) {
-        feedingId = id
-        queuedUpTo = length
-    }
+    fun skip(id: Long, length: Int) = chunker.skip(id, length)
 
     fun release() {
         stop()
@@ -471,57 +538,14 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
         private const val SEC_PER_WEIGHT = 0.075f
         private const val MAX_WAITING = 12
 
-        // Los signos CJK (。！？) no llevan espacio detrás: cierran la frase por sí solos.
-        private val SENTENCE_END = Regex("[.!?…]+[\"'»”)]*(\\s|$)|[。！？]+[」』）”]*|\\n+")
-        private val URL = Regex("https?://\\S+")
-        private val MARKUP = Regex("[*_#`>|~▍•]+")
-        private val EMOJI = Regex("[\\p{So}\\p{Sk}\\x{FE0F}\\x{200D}\\x{20E3}]")
-        private val SPACES = Regex("\\s+")
+        /** Ver [StreamChunker.lastSentenceEnd]. */
+        fun lastSentenceEnd(text: String, from: Int): Int = StreamChunker.lastSentenceEnd(text, from)
 
-        /** Hasta dónde hay frases terminadas a partir de [from] (0 = ninguna). */
-        fun lastSentenceEnd(text: String, from: Int): Int {
-            var end = from
-            for (m in SENTENCE_END.findAll(text, from)) {
-                // Frases muy cortas ("Vale.") se juntan con la siguiente: suena más natural.
-                if (spokenLength(text, from, m.range.last + 1) >= MIN_CHUNK || end > from) end = m.range.last + 1
-            }
-            return end
-        }
+        /** Ver [StreamChunker.sentences]. */
+        fun sentences(text: String, from: Int, to: Int): List<String> = StreamChunker.sentences(text, from, to)
 
-        /**
-         * [from, to) partido en frases (las muy cortas, con la siguiente). Lo que
-         * queda sin punto al final va como última frase.
-         */
-        fun sentences(text: String, from: Int, to: Int): List<String> {
-            val out = ArrayList<String>()
-            var start = from
-            for (m in SENTENCE_END.findAll(text.substring(0, to), from)) {
-                val end = m.range.last + 1
-                if (spokenLength(text, start, end) >= MIN_CHUNK) {
-                    out += text.substring(start, end)
-                    start = end
-                }
-            }
-            if (start < to) {
-                val tail = text.substring(start, to)
-                // Un final corto ("¡Suerte!") se une a la frase anterior.
-                if (out.isNotEmpty() && spokenLength(text, start, to) < MIN_CHUNK) out[out.lastIndex] += tail else out += tail
-            }
-            return out
-        }
-
-        /** Largo "hablado": un carácter CJK (kana, kanji, hangul) vale ~una sílaba, como tres letras. */
-        private fun spokenLength(text: String, from: Int, to: Int): Int {
-            var n = 0
-            for (i in from until to) n += if (text[i].code >= 0x2E80) 3 else 1
-            return n
-        }
-
-        /** Lo que se lee: sin enlaces, marcas de formato ni emojis. */
-        fun speakable(s: String): String =
-            s.replace(URL, " ").replace(MARKUP, " ").replace(EMOJI, "").replace(SPACES, " ").trim()
-
-        private const val MIN_CHUNK = 18
+        /** Ver [StreamChunker.speakable]. */
+        fun speakable(s: String): String = StreamChunker.speakable(s)
     }
 }
 

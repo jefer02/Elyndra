@@ -151,7 +151,12 @@ class FolderAddController(private val vm: ElyndraViewModel) {
                     vm.showToast(UiText.res(R.string.folder_add_copy_failed))
                     return@launch
                 }
-                val existing = withContext(Dispatchers.IO) { app.scanner.children(tree, folder.rootDocId).map { it.name } }
+                // Si la carpeta no responde (SD fuera, permiso perdido) no hay dónde copiar.
+                val existing = withContext(Dispatchers.IO) { runCatching { app.scanner.children(tree, folder.rootDocId).map { it.name } }.getOrNull() }
+                if (existing == null) {
+                    vm.showToast(UiText.res(R.string.folder_add_copy_failed))
+                    return@launch
+                }
                 if (FolderAdd.exists(name, existing)) {
                     vm.showToast(UiText.res(R.string.folder_add_exists, name))
                     return@launch

@@ -229,7 +229,7 @@ object StoreRows {
     }
 
     /**
-     * Lo que encuentra Masha (`find_port`), un juego por resultado: con
+     * Lo que encuentra Lucy por nombre (`find_ports`, ver PortRecommend), un juego por resultado: con
      * [query], lo que la busca por el nombre del juego o del port (también los
      * que aún no tienen APK, que Masha sabe explicar), los instalables
      * primero; sin ella, los juegos de lo que hay en la biblioteca

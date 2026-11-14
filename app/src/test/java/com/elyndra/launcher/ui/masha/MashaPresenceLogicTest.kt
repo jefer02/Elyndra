@@ -61,6 +61,12 @@ class MashaPresenceLogicTest {
         assertEquals("Okami está en listo", spoken)
     }
 
+    @Test
+    fun `la marca de la relacion nunca se lee en voz alta`() {
+        assertEquals("Te va a encantar.", MashaVoice.speakable("Te va a encantar.\n<<A:+3>>"))
+        assertEquals("Hm.", MashaVoice.speakable("Hm. <<A:-2>>"))
+    }
+
     /* ── labios ── */
 
     @Test

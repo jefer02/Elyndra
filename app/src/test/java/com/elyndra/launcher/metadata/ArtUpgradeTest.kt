@@ -97,4 +97,30 @@ class ArtUpgradeTest {
         }
         assertTrue(body.contains("ScrapeApply.applyArt"))
     }
+
+    @Test fun `the pass ends even when more than a batch of games has nothing better`() {
+        // 50 juegos a los que ninguna fuente mejora, delante de 30 que sí mejoran.
+        val stuck = (1..50).map { "r:stuck$it" }
+        var pending = stuck + (1..30).map { "r:ok$it" }
+        var skip = 0
+        var rounds = 0
+        val tried = HashSet<String>()
+        while (true) {
+            val batch = ArtUpgrade.batch(pending, skip, 40)
+            if (batch.isEmpty()) break
+            assertTrue("the same game is asked twice", batch.none { it in tried })
+            tried += batch
+            pending = pending.filter { it !in batch || it in stuck }
+            skip = ArtUpgrade.nextSkip(skip, batch, pending)
+            assertTrue("the pass never ends", ++rounds < 10)
+        }
+        assertEquals(80, tried.size)
+        assertEquals(stuck, pending)
+    }
+
+    @Test fun `upgraded games do not move the skip`() {
+        val batch = listOf("r:a", "r:b", "r:c")
+        assertEquals(1, ArtUpgrade.nextSkip(0, batch, listOf("r:b", "r:z")))
+        assertEquals(listOf("r:z"), ArtUpgrade.batch(listOf("r:b", "r:z"), 1, 40))
+    }
 }
