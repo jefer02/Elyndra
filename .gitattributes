@@ -1,0 +1,3 @@
+# Los assets se empaquetan tal cual: git no debe convertir sus saltos de línea
+# (cmudict.txt se busca por bisección y con CRLF deja de funcionar).
+app/src/main/assets/** -text
