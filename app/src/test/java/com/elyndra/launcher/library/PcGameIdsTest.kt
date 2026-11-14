@@ -54,6 +54,18 @@ class PcGameIdsTest {
         runBlocking { PcGameIds(files).resolve(f, rom) }
 
     @Test
+    fun aGameFolderThatCannotBeListedHasNoIdInsteadOfCrashing() {
+        // Lo que hace SAF cuando la carpeta del juego ya no existe o se perdió el permiso.
+        val files = object : PcGameIds.Files {
+            override suspend fun read(treeUri: String, docId: String): String? = null
+            override suspend fun list(treeUri: String, docId: String): List<PcGameIds.Entry> =
+                throw SecurityException("Permission Denial: reading content://tree/primary%3AJuegos")
+        }
+        val resolved = runBlocking { PcGameIds(files).resolve(folder, rom("Hollow Knight", isDirectory = true)) }
+        assertEquals(PcGameIds.Resolved.None, resolved)
+    }
+
+    @Test
     fun anIsoWhoseContentIsTheIdLaunchesWithThatId() {
         val files = FakeFiles(contents = mapOf("doc" to "268910\n"))
         val resolved = resolve(files, rom("Hollow Knight.iso"))

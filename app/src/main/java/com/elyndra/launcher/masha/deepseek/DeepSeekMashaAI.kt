@@ -158,7 +158,8 @@ class DeepSeekMashaAI @Inject constructor(
                 } catch (e: Exception) {
                     ToolResult(false, buildJsonObject {
                         put("ok", false)
-                        put("error", e.message ?: e.javaClass.simpleName)
+                        // Solo el tipo: el mensaje de una excepción puede llevar una URI o una ruta, y esto viaja al modelo.
+                        put("error", e.javaClass.simpleName)
                     })
                 }
                 if (result.mutating || call.name in MashaTools.MUTATING) mutated = true

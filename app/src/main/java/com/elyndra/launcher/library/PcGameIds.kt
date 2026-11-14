@@ -4,6 +4,7 @@ import android.net.Uri
 import com.elyndra.launcher.data.BannerHub
 import com.elyndra.launcher.data.RomEntry
 import com.elyndra.launcher.data.RomFolder
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -73,7 +74,16 @@ class PcGameIds(private val files: Files) {
      */
     private suspend fun fromSidecarFile(tree: String, rom: RomEntry): Resolved? {
         if (!rom.isDirectory) return null
-        val id = files.list(tree, rom.docId)
+        // Listar puede fallar (la carpeta ya no está, se perdió el permiso): es
+        // "sin archivo-id", no un cierre de la app al lanzar.
+        val entries = try {
+            files.list(tree, rom.docId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            emptyList()
+        }
+        val id = entries
             .filter { PcGames.isIdFile(it.name, it.size) }
             .sortedBy { it.name.lowercase() }
             .firstNotNullOfOrNull { BannerHub.parseId(files.read(tree, it.docId)) }

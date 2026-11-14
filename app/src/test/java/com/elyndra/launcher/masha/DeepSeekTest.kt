@@ -189,6 +189,29 @@ class DeepSeekTest {
     }
 
     @Test
+    fun aToolThatThrowsNeverSendsItsMessageToTheModel() = runBlocking {
+        server.enqueue(
+            sse(
+                """{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_8","type":"function","function":{"name":"find_games","arguments":"{}"}}]}}]}""",
+                """{"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}""",
+            ),
+        )
+        server.enqueue(sse(text("Something went wrong."), stop))
+        val uri = "content://com.android.externalstorage.documents/tree/primary%3AROMS"
+        val toolbox = object : MashaToolbox {
+            override val specs: List<ToolSpec> = MashaTools.specs
+            override suspend fun execute(call: ToolCall): ToolResult =
+                throw SecurityException("Permission Denial: reading $uri from /storage/emulated/0/ROMS")
+        }
+        ai.chat(request("find it"), toolbox).toList()
+
+        server.takeRequest()
+        val second = server.takeRequest().body.readUtf8()
+        assertFalse(second, "content://" in second || "/storage/" in second || "ROMS" in second)
+        assertTrue(second, "SecurityException" in second)
+    }
+
+    @Test
     fun aRejectedKeyFailsCleanly() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(401).setBody("""{"error":{"message":"Authentication Fails"}}"""))
         val event = ai.chat(request("hi"), null).toList().single()

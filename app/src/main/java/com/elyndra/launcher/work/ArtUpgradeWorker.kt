@@ -6,6 +6,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.elyndra.launcher.data.LibraryRepository
 import com.elyndra.launcher.data.SettingsStore
+import com.elyndra.launcher.metadata.ArtUpgrade
 import com.elyndra.launcher.metadata.MetadataEngine
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -36,15 +37,20 @@ class ArtUpgradeWorker @AssistedInject constructor(
         if (settings.artUpgradeDone) return Result.success()
         if (engine.isRunning) return Result.retry()
         library.awaitLoaded()
+        // Las que ya se intentaron y siguen igual (ninguna fuente tenía nada mejor) no se repiten.
+        val skip = inputData.getInt(KEY_SKIP, 0)
         val keys = engine.artUpgradeKeys()
-        if (keys.isEmpty()) {
+        val batch = ArtUpgrade.batch(keys, skip, BATCH)
+        if (batch.isEmpty()) {
             settings.artUpgradeDone = true
             return Result.success()
         }
         return try {
-            engine.runAndWait(keys.take(BATCH), artOnly = true)
+            engine.runAndWait(batch, artOnly = true)
             // Lo que quede, en otra tanda (un worker tiene diez minutos de vida).
-            if (keys.size > BATCH) work.scheduleArtUpgrade(next = true) else settings.artUpgradeDone = true
+            val remaining = engine.artUpgradeKeys()
+            val nextSkip = ArtUpgrade.nextSkip(skip, batch, remaining)
+            if (remaining.size > nextSkip) work.scheduleArtUpgrade(next = true, skip = nextSkip) else settings.artUpgradeDone = true
             Result.success()
         } catch (e: CancellationException) {
             engine.cancel()
@@ -54,5 +60,8 @@ class ArtUpgradeWorker @AssistedInject constructor(
 
     companion object {
         const val BATCH = 40
+
+        /** Dato de entrada: cuántas claves pendientes saltarse (ver [ArtUpgrade.nextSkip]). */
+        const val KEY_SKIP = "skip"
     }
 }
