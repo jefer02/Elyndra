@@ -29,6 +29,7 @@ import com.elyndra.launcher.ports.PortCatalogRepository
 import com.elyndra.launcher.ports.PortInstaller
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.CancellationException
 
 /**
  * La comprobación diaria de los ports instalados (ver ElyndraWork: una vez
@@ -60,7 +61,7 @@ class PortUpdateWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val all = runCatching { catalog.load().catalog.ports }.getOrDefault(emptyList())
+        val all = cancellable { catalog.load().catalog.ports }.getOrDefault(emptyList())
         checkAvailability(all)
         val installed = installer.installed().filter { installer.isPackageInstalled(it.packageName) }
         if (installed.isEmpty()) return Result.success()
@@ -70,7 +71,7 @@ class PortUpdateWorker @AssistedInject constructor(
         for (p in installed) {
             val port = ports[p.portId] ?: continue
             val build = port.android ?: continue
-            val pick = runCatching { PortAssetPicker.latest(github.releases(port.releaseRepo), build, abis, allowDebug = port.trust.debugBuild) }.getOrNull() ?: continue
+            val pick = cancellable { PortAssetPicker.latest(github.releases(port.releaseRepo), build, abis, allowDebug = port.trust.debugBuild) }.getOrNull() ?: continue
             latest[p.portId] = pick.release
             installer.recordLatest(p.portId, pick.release.tag, pick.release.publishedAt)
         }
@@ -86,9 +87,9 @@ class PortUpdateWorker @AssistedInject constructor(
                 left += u
                 continue
             }
-            val target = runCatching { PortAssetPicker.latest(github.releases(port.releaseRepo), port.android!!, abis, allowDebug = port.trust.debugBuild) }.getOrNull()
+            val target = cancellable { PortAssetPicker.latest(github.releases(port.releaseRepo), port.android!!, abis, allowDebug = port.trust.debugBuild) }.getOrNull()
             val outcome = target?.let {
-                runCatching { installer.install(port, it, expectedPackage = u.packageName, onProgress = {}, onInstalling = {}, silent = true) }.getOrNull()
+                cancellable { installer.install(port, it, expectedPackage = u.packageName, onProgress = {}, onInstalling = {}, silent = true) }.getOrNull()
             }
             if (outcome !is PortInstaller.Outcome.Installed && outcome !is PortInstaller.Outcome.SignatureMismatch) left += u
         }
@@ -110,13 +111,17 @@ class PortUpdateWorker @AssistedInject constructor(
         val byId = viewOnly.associateBy { it.id }
         for (id in batch) {
             val port = byId[id] ?: continue
-            val releases = runCatching { github.releases(port.repo) }.getOrNull() ?: continue
+            val releases = cancellable { github.releases(port.repo) }.getOrNull() ?: continue
             val release = releases.filter { !it.draft }.maxByOrNull { it.publishedAt } ?: continue
             val apk = PortAvailability.apkIn(release.assets.map { it.name }) ?: continue
             installer.markAvailable(id, release.tag, apk)
         }
     }
 }
+
+/** Como `runCatching`, pero sin tragarse la cancelación: si WorkManager para el worker, se para de verdad. */
+private inline fun <T> cancellable(block: () -> T): kotlin.Result<T> =
+    runCatching(block).onFailure { if (it is CancellationException) throw it }
 
 /** El canal y el aviso de las actualizaciones de ports (como el de Masha: silencioso, IMPORTANCE_LOW). */
 object PortUpdateNotifier {
