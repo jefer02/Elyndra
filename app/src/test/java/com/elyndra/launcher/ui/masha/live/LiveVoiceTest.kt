@@ -69,6 +69,7 @@ class LiveVoiceTest {
         override fun closeStream() = Unit
         override fun clearTurn() = ear.segmenter.clear()
         override fun report() = "fake mic"
+        override fun levels() = "mic=-30.0dB"
     }
 
     private class FakeVoice : LiveVoice.Voice {
@@ -555,5 +556,100 @@ class LiveVoiceTest {
         h.userSpeaks()
         h.live.onEarsFailure(MashaEars.Failure.Network, 2)
         assertFalse(h.live.offline)
+    }
+
+    /* ── ella hablando: no se interrumpe sola ── */
+
+    /** Ella empieza a contestar algo (sin turno de voz): la sesión pasa a "habla". */
+    private fun Harness.lucyStartsTalking() {
+        presence.speaking = true
+        voice.queued = true
+        settle()
+    }
+
+    /** Un ruido que abre turno sobre su voz y se calla: pausa, sin texto, y ella sigue. */
+    private fun Harness.noiseOverHer() {
+        frames(30, voiced = true)
+        assertEquals(State.Held, live.state)
+        assertTrue(voice.paused)
+        frames(20, voiced = false)
+        test.advanceTimeBy(LiveVoice.HOLD_TICK_MS * 3)
+        settle()
+        assertEquals(State.Speaking, live.state)
+        assertFalse(voice.paused)
+    }
+
+    @Test
+    fun twoPausesWithoutTextTurnVoiceBargeInOffForTheRestOfHerReply() = runTest {
+        val h = Harness(this)
+        h.start()
+        h.lucyStartsTalking()
+        assertEquals(State.Speaking, h.live.state)
+        h.noiseOverHer()
+        h.noiseOverHer()
+        assertTrue(h.logs.any { it.startsWith("voice barge-in off for this reply") })
+        // La tercera vez ya no la pausa.
+        h.frames(30, voiced = true)
+        assertEquals(State.Speaking, h.live.state)
+        assertFalse(h.voice.paused)
+        // El botón sigue cortándola.
+        h.live.bargeIn()
+        assertEquals(State.UserSpeaking, h.live.state)
+    }
+
+    @Test
+    fun voiceBargeInComesBackOnHerNextReply() = runTest {
+        val h = Harness(this)
+        h.start()
+        h.lucyStartsTalking()
+        h.noiseOverHer()
+        h.noiseOverHer()
+        // Termina esa respuesta y empieza otra.
+        h.presence.speaking = false
+        h.voice.queued = false
+        h.settle()
+        advanceTimeBy(LiveVoice.SETTLE_MS + 50)
+        h.settle()
+        assertEquals(State.Waiting, h.live.state)
+        h.lucyStartsTalking()
+        h.frames(30, voiced = true)
+        assertEquals(State.Held, h.live.state)
+    }
+
+    @Test
+    fun everyPauseAndResumeIsLoggedWithItsReason() = runTest {
+        val h = Harness(this)
+        h.start()
+        h.lucyStartsTalking()
+        h.noiseOverHer()
+        assertTrue(h.logs.toString(), h.logs.any { it.startsWith("pause voice reason=userSpeech") && "levels=" in it })
+        assertTrue(h.logs.toString(), h.logs.any { it.startsWith("resume voice reason=noText") && "heldMs=" in it })
+    }
+
+    @Test
+    fun interruptingHerInHandoffAndSendingWhileHerReplyStillRunsDoesNotBreak() = runTest {
+        val h = Harness(this)
+        h.ears.streamWorks = false // relevo: el reconocedor se queda el micrófono
+        h.start()
+        h.chat.busy = true // su respuesta aún llega
+        h.lucyStartsTalking()
+        // Le habla encima, en serio (más de 0,9 s): se corta y escucha el reconocedor.
+        h.frames(70, voiced = true)
+        advanceTimeBy(LiveVoice.HOLD_TICK_MS * 2)
+        h.settle()
+        assertEquals(State.UserSpeaking, h.live.state)
+        assertEquals("mic", h.ears.calls.last())
+        assertFalse(h.mic.running)
+        // Cortada: su voz se calla (como MashaVoice.stop).
+        h.presence.speaking = false
+        h.settle()
+        h.live.onPartial("para y dime la hora")
+        h.live.onEndOfSpeech()
+        h.live.onHeard("para y dime la hora")
+        advanceTimeBy(LiveVoice.GATE_MS + 50)
+        h.settle()
+        assertEquals(listOf("para y dime la hora"), h.chat.sent)
+        assertTrue(h.mic.running) // nuestro micrófono vuelve
+        assertEquals(State.Thinking, h.live.state)
     }
 }

@@ -35,6 +35,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.layout.heightIn
 import com.elyndra.launcher.ui.masha.HoloTiles
+import com.elyndra.launcher.ui.masha.SpokenReply
 import com.elyndra.launcher.ui.masha.SubtitleLine
 import com.elyndra.launcher.ui.masha.captionMs
 import com.elyndra.launcher.ui.masha.AffinityPanel
@@ -434,9 +435,8 @@ fun MashaScreen(vm: ElyndraViewModel) {
     val speakReplies = settings.mashaVoice
     // Con tarjetas solo dice la frase corta (ReplyShape): los detalles se ven en ellas.
     LaunchedEffect(last?.id, last?.text?.length, last?.pending, last?.attachment, speakReplies) {
-        if (last == null || !last.fromMasha || last.restored || last.id == alreadyShown || !speakReplies) return@LaunchedEffect
-        val spoken = if (ReplyShape.isCardReply(last.attachment, last.done)) ReplyShape.spokenLine(last.text, ellipsis = false) else last.text
-        voice.feed(last.id, spoken, final = !last.pending)
+        val spoken = SpokenReply.of(last, alreadyShown, speakReplies) ?: return@LaunchedEffect
+        voice.feed(last!!.id, spoken, final = !last.pending)
     }
     // Lo que se lee con el chat oculto: la frase que suena (subtítulo) o, sin voz, la respuesta un rato.
     var caption by remember { mutableStateOf<String?>(null) }

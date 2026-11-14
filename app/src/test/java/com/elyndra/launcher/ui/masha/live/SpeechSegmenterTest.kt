@@ -22,6 +22,16 @@ class SpeechSegmenterTest {
     }
 
     @Test
+    fun overHerVoiceATurnNeedsLongerSpeech() {
+        val s = SpeechSegmenter(frameMs = 16)
+        // 288 ms bastan con ella callada, pero no con ella hablando.
+        assertEquals(emptyList<Signal>(), (0 until 18).mapNotNull { s.accept(true, overLucy = true) })
+        assertFalse(s.inTurn)
+        assertEquals(listOf(Signal.Started), (0 until 2).mapNotNull { s.accept(true, overLucy = true) })
+        assertTrue(s.speechMs >= SpeechSegmenter.MIN_SPEECH_OVER_LUCY_MS)
+    }
+
+    @Test
     fun aShortNoiseNeverOpensATurn() {
         val s = SpeechSegmenter(frameMs = 16)
         repeat(20) {

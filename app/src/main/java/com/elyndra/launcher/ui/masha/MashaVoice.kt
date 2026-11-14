@@ -133,6 +133,8 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
         var utt: Utterance? = null // hilo de análisis
         /** Copia a media frecuencia para el análisis (voz a 44,1 kHz), o null. */
         @Volatile var decimator: HalfbandDecimator? = null
+        /** Quita el silencio del motor al principio y al final de la frase (hilo del motor), o null. */
+        @Volatile var trimmer: SilenceTrimmer? = null
         @Volatile var rate = 0
         @Volatile var chunks = 0
         @Volatile var firstChunkNanos = -1L
@@ -182,6 +184,8 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
             j.rate = sampleRate
             val half = sampleRate >= 32_000 && encoding == AudioFormat.ENCODING_PCM_16BIT && channels == 1
             j.decimator = if (half) HalfbandDecimator() else null
+            // Lo mismo a la salida y al análisis de los labios: la boca sigue cuadrando con lo que suena.
+            j.trimmer = if (!j.speakMode && encoding == AudioFormat.ENCODING_PCM_16BIT) SilenceTrimmer(sampleRate, channels) else null
             val analysisRate = if (half) sampleRate / 2 else sampleRate
             work.post { j.utt?.begin(analysisRate, encoding, channels) }
         }
@@ -190,26 +194,38 @@ class MashaVoice(context: Context, private val presence: MashaPresence) {
             val j = jobs[id] ?: return
             if (j.gen != gen) return
             if (j.chunks++ == 0) j.firstChunkNanos = System.nanoTime()
-            if (!j.speakMode) out.data(j.item, pcm)
-            work.post {
-                // Fuera del hilo del motor (binder): escribir aquí retrasaba sus avisos.
-                if (BuildConfig.DEBUG) dump(j, pcm)
-                val d = j.decimator
-                j.utt?.audio(if (d != null) d.process(pcm) else pcm)
-                scheduleBuild(j, urgent = false)
-            }
+            val trimmed = j.trimmer?.process(pcm) ?: pcm
+            if (trimmed.isNotEmpty()) sound(j, trimmed)
         }
 
         override fun onRange(id: String, start: Int, end: Int, frame: Int) {
             val j = jobs[id] ?: return
-            val f = if (j.decimator != null) frame / 2 else frame
+            // Las marcas del motor cuentan desde su audio sin recortar.
+            val trimmed = (frame - (j.trimmer?.droppedLeadFrames ?: 0)).coerceAtLeast(0)
+            val f = if (j.decimator != null) trimmed / 2 else trimmed
             work.post {
                 j.utt?.range(start, end, f)
                 scheduleBuild(j, urgent = false)
             }
         }
 
-        override fun onEnd(id: String, ok: Boolean) = synthesisEnded(id)
+        override fun onEnd(id: String, ok: Boolean) {
+            // Lo que queda del silencio final (como mucho una pausa natural) antes de cerrar la frase.
+            jobs[id]?.let { j -> j.trimmer?.finish()?.takeIf { it.isNotEmpty() && j.gen == gen }?.let { sound(j, it) } }
+            synthesisEnded(id)
+        }
+    }
+
+    /** PCM de la frase (ya recortado) a la salida y al análisis de los labios. */
+    private fun sound(j: Job, pcm: ByteArray) {
+        if (!j.speakMode) out.data(j.item, pcm)
+        work.post {
+            // Fuera del hilo del motor (binder): escribir aquí retrasaba sus avisos.
+            if (BuildConfig.DEBUG) dump(j, pcm)
+            val d = j.decimator
+            j.utt?.audio(if (d != null) d.process(pcm) else pcm)
+            scheduleBuild(j, urgent = false)
+        }
     }
 
     init {

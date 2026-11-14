@@ -14,6 +14,14 @@ import kotlin.math.sqrt
  *   de entrada + el aire). Se estima cruzando las envolventes (dB por tramo) de
  *   lo que suena y lo que se oye, en ventanas de [HISTORY] tramos mientras ella
  *   habla con variación suficiente; el mejor desfase de 0 a [MAX_LAG] tramos.
+ *   El eco esperado mira siempre desde el último tramo hasta el desfase más la
+ *   cola: con el AEC del móvil el principio de cada sílaba llega antes de lo
+ *   que dice el desfase (estimado con la cola, que es lo que más pesa), y
+ *   mirando solo alrededor de él se colaba como voz del usuario (medido en la
+ *   tablet: TabletEchoTraceTest).
+ * - **Al reabrir el micrófono** (en relevo, cada turno) se sigue con lo
+ *   aprendido de este altavoz ([reopened]): acoplamiento y retraso. Antes el
+ *   retraso volvía al supuesto y su voz se colaba hasta volver a estimarlo.
  * - **Eco esperado:** lo que sonó hace `lag` tramos (con una cola de
  *   reverberación que cae [TAIL_DECAY_DB] por tramo) más el acoplamiento
  *   altavoz→micrófono aprendido ([couplingDb], dB de micro por dB de salida).
@@ -34,18 +42,23 @@ class EchoGate(
     val marginDb: Float = MARGIN_DB,
     val slackDb: Float = SLACK_DB,
     val warmupMs: Int = WARMUP_MS,
+    initialLag: Int = DEFAULT_LAG,
+    initialLagConfidence: Float = 0f,
 ) {
     private val ref = FloatArray(HISTORY) { SILENT }
     private val mic = FloatArray(HISTORY) { SILENT }
     private var t = 0L
 
     /** Desfase estimado del eco, en tramos. */
-    var lag = DEFAULT_LAG
+    var lag = initialLag.coerceIn(0, MAX_LAG)
         private set
 
     /** Confianza del último desfase (correlación de 0 a 1). */
-    var lagConfidence = 0f
+    var lagConfidence = initialLagConfidence
         private set
+
+    /** El desfase está confirmado (correlación suficiente); para el log. */
+    val lagKnown: Boolean get() = lagConfidence >= MIN_LAG_CORR
 
     /** Acoplamiento aprendido: dB del eco en el micro respecto a lo que suena. */
     var couplingDb = initialCouplingDb.coerceIn(MIN_COUPLING_DB, MAX_COUPLING_DB)
@@ -87,11 +100,14 @@ class EchoGate(
         return !warming && !echo
     }
 
+    /** Una puerta para el micrófono reabierto, con lo aprendido de este altavoz (acoplamiento y retraso). */
+    fun reopened(): EchoGate = EchoGate(frameMs, couplingDb, marginDb, slackDb, warmupMs, lag, lagConfidence)
+
     /** Lo que sonó hace [lag] tramos, con la cola de reverberación (dBFS de salida). */
     private fun echoSource(): Float {
         var best = SILENT
-        // Un tramo antes también: el desfase estimado puede quedarse corto por uno.
-        for (k in -1..TAIL) {
+        // Desde el último tramo: el arranque de una sílaba llega antes que el desfase estimado (ver arriba).
+        for (k in -lag..TAIL) {
             if (lag + k < 0) continue
             val v = at(lag + k) - k.coerceAtLeast(0) * TAIL_DECAY_DB
             if (v > best) best = v
@@ -176,7 +192,13 @@ class EchoGate(
         const val DEFAULT_COUPLING_DB = -10f
         const val MIN_COUPLING_DB = -60f
         const val MAX_COUPLING_DB = 6f
-        const val MARGIN_DB = 5f
+        /**
+         * Lo que el micro tiene que superar al eco esperado para ser el usuario. Medido en la tablet, con
+         * su AEC y el altavoz a volumen normal (TabletEchoTraceTest, tres sesiones): con 6,5 dB o menos el
+         * arranque de sus sílabas aún la pausaba; con 7,5 o más se pierden interrupciones del usuario a
+         * volumen normal. Es un margen estrecho: su eco llega casi tan fuerte como el usuario.
+         */
+        const val MARGIN_DB = 7f
         const val SLACK_DB = 4f
         const val WARMUP_MS = 1_000
         private const val UP_RATE = 0.06f

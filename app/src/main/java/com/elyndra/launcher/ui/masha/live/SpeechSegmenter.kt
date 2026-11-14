@@ -7,7 +7,8 @@ package com.elyndra.launcher.ui.masha.live
  * puerta de eco) y avisa:
  * - [Signal.Started] tras [minSpeechMs] de voz (con huecos de menos de
  *   [gapMs] dentro: entre sílabas también hay silencio). Un ruido más corto no
- *   abre turno.
+ *   abre turno. Con ella hablando (`overLucy`) hacen falta [minSpeechOverLucyMs]:
+ *   lo que se cuele de su voz por el altavoz no la corta.
  * - [Signal.Paused] una vez, a los [pauseMs] de silencio dentro del turno: para
  *   decidir pronto si fue una muletilla ("mm", "ajá").
  * - [Signal.Ended] a los [endSilenceMs] de silencio seguido: fin del turno.
@@ -18,6 +19,7 @@ package com.elyndra.launcher.ui.masha.live
 class SpeechSegmenter(
     val frameMs: Int = 16,
     val minSpeechMs: Int = MIN_SPEECH_MS,
+    val minSpeechOverLucyMs: Int = MIN_SPEECH_OVER_LUCY_MS,
     val endSilenceMs: Int = END_SILENCE_MS,
     val pauseMs: Int = PAUSE_MS,
     val gapMs: Int = GAP_MS,
@@ -38,7 +40,7 @@ class SpeechSegmenter(
     private var turnMs = 0
     private var pausedSent = false
 
-    fun accept(voiced: Boolean): Signal? {
+    fun accept(voiced: Boolean, overLucy: Boolean = false): Signal? {
         if (!inTurn) {
             if (voiced) {
                 onsetMs += frameMs + gapRun
@@ -47,7 +49,7 @@ class SpeechSegmenter(
                 gapRun += frameMs
                 if (gapRun > gapMs) reset()
             }
-            if (onsetMs >= minSpeechMs) {
+            if (onsetMs >= if (overLucy) minSpeechOverLucyMs else minSpeechMs) {
                 inTurn = true
                 speechMs = onsetMs
                 turnMs = onsetMs
@@ -105,6 +107,8 @@ class SpeechSegmenter(
 
     companion object {
         const val MIN_SPEECH_MS = 250
+        /** Con ella sonando (medido en la tablet: con 280 ms el arranque de sus sílabas aún la pausaba). */
+        const val MIN_SPEECH_OVER_LUCY_MS = 300
         const val END_SILENCE_MS = 700
         const val PAUSE_MS = 250
         const val GAP_MS = 160

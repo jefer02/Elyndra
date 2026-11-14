@@ -11,7 +11,13 @@ import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import android.os.SystemClock
+import com.elyndra.launcher.BuildConfig
+import java.io.BufferedWriter
+import java.io.File
 import java.io.FileOutputStream
+import java.io.FileWriter
+import java.util.Locale
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
@@ -50,6 +56,9 @@ class LiveMic(
     @Volatile private var running = false
     private var thread: Thread? = null
     @Volatile private var couplingDb = EchoGate.DEFAULT_COUPLING_DB
+
+    /** La puerta de eco de la última apertura: al reabrir se sigue con lo aprendido ([EchoGate.reopened]). */
+    @Volatile private var learned: EchoGate? = null
 
     /** El oído del arranque en curso (el hilo del micrófono lo usa; [speechMs] lo lee el principal). */
     @Volatile private var ear: LiveEar? = null
@@ -128,6 +137,10 @@ class LiveMic(
         pipe = null
     }
 
+    @Volatile private var lastLevels = ""
+
+    override fun levels(): String = lastLevels
+
     override fun report(): String = stats.let {
         "frames con Lucy=${it.framesWithLucy}, eco descartado=${it.echoRejected}, voz sobre Lucy=${it.startsOverLucy}, " +
             "AEC=${it.aec}, NS=${it.ns}, silero=${it.silero}, acoplamiento=${"%.1f".format(couplingDb)} dB"
@@ -171,13 +184,17 @@ class LiveMic(
         val ns = runCatching { if (NoiseSuppressor.isAvailable()) NoiseSuppressor.create(record.audioSessionId)?.apply { enabled = true } else null }.getOrNull()
         val silero = runCatching { app.assets.open(SileroVad.ASSET).use { it.readBytes() } }.getOrNull()?.let { SileroVad.load(it) }
         val energy = VoiceActivity()
-        val ear = LiveEar(EchoGate(initialCouplingDb = couplingDb)).also { this.ear = it }
+        // Lo aprendido del altavoz (acoplamiento y retraso) sigue al reabrir: en relevo se reabre cada turno.
+        val gate = learned?.reopened() ?: EchoGate(initialCouplingDb = couplingDb)
+        val ear = LiveEar(gate).also { this.ear = it }
         val meter = MicMeter(frameMs = FRAME * 1000 / SAMPLE_RATE)
         val vad = if (silero != null) "silero" else "energy"
         silencedMs = 0
         stats = Stats(aec = aec?.enabled == true, ns = ns?.enabled == true, silero = silero != null)
         Log.i(TAG, "micrófono abierto: AEC=${stats.aec} NS=${stats.ns} silero=${stats.silero}")
         val ring = PcmRing(SAMPLE_RATE * PREROLL_MS / 1000)
+        // Solo en debug: cada tramo (micro, lo que suena, Silero) a un fichero, para reproducir el eco real en pruebas.
+        val trace = if (BuildConfig.DEBUG) runCatching { FrameTrace(File(app.filesDir, FrameTrace.FILE)) }.getOrNull() else null
         val frame = ShortArray(FRAME)
         val window = ShortArray(SileroVad.WINDOW)
         var prob = 0f
@@ -219,13 +236,25 @@ class LiveMic(
                 }
                 val refDb = runCatching { reference() }.getOrDefault(EchoGate.SILENT)
                 val signal = ear.accept(micDb, refDb, prob)
+                trace?.add(micDb, refDb, prob, ear.voiced, signal)
                 val s = stats
                 if (refDb > EchoGate.REF_FLOOR) {
                     s.framesWithLucy++
                     if (ear.echoRejected) s.echoRejected++
                     if (signal == SpeechSegmenter.Signal.Started) s.startsOverLucy++
                 }
+                // Por qué arrancó un turno (sobre todo con ella hablando): los niveles que vio la puerta de eco.
+                if (signal == SpeechSegmenter.Signal.Started) {
+                    val g = ear.gate
+                    Log.i(TAG, "speech start mic=${"%.1f".format(micDb)}dB ref=${"%.1f".format(refDb)}dB expectedEcho=${"%.1f".format(g.predictedDb)}dB " +
+                        "coupling=${"%.1f".format(g.couplingDb)} lag=${g.lag} lagConf=${"%.2f".format(g.lagConfidence)} p=${"%.2f".format(prob)}")
+                }
                 couplingDb = ear.gate.couplingDb
+                if (refDb > EchoGate.REF_FLOOR || signal != null) {
+                    lastLevels = "mic=${"%.1f".format(micDb)}dB ref=${"%.1f".format(refDb)}dB expectedEcho=${"%.1f".format(ear.gate.predictedDb)}dB " +
+                        "lag=${ear.gate.lag}${if (ear.gate.lagKnown) "" else "?"} p=${"%.2f".format(prob)}"
+                }
+                learned = ear.gate
                 meter.add(micDb, prob, refDb, ear.gate.predictedDb, ear.voiced, ear.echoRejected)?.let { Log.d(TAG, it.line(vad)) }
                 if (signal != null) main.post { if (running) onSignal(signal) }
                 level = level * 0.6f + ((micDb + 60f) / 45f).coerceIn(0f, 1f) * 0.4f
@@ -238,6 +267,7 @@ class LiveMic(
             Log.w(TAG, "mic stopped with an error", e)
         } finally {
             runCatching { record.stop() }
+            trace?.close()
             aec?.release()
             ns?.release()
             record.release()
@@ -311,5 +341,37 @@ class LiveMic(
         const val FRAME = 256
         const val PREROLL_MS = 1_200
         const val STREAM_PREROLL_MS = 1_000
+    }
+}
+
+/**
+ * Solo en debug: la traza tramo a tramo del micrófono en vivo (`files/live-trace.csv`),
+ * para reproducir en las pruebas el eco real de un altavoz. Una línea por tramo:
+ * `ms,micDb,refDb,prob,voiced,signal`; cada apertura del micrófono empieza con `# open`.
+ * Si pasa de [MAX_BYTES] se empieza de nuevo.
+ */
+private class FrameTrace(file: File) {
+    private val out = run {
+        if (file.length() > MAX_BYTES) file.delete()
+        BufferedWriter(FileWriter(file, true), 64 * 1024).apply { write("# open ${System.currentTimeMillis()}\n") }
+    }
+    private val start = SystemClock.elapsedRealtime()
+
+    fun add(micDb: Float, refDb: Float, prob: Float, voiced: Boolean, signal: SpeechSegmenter.Signal?) {
+        runCatching {
+            out.write(
+                "${SystemClock.elapsedRealtime() - start},${"%.1f".format(Locale.ROOT, micDb)},${"%.1f".format(Locale.ROOT, refDb)}," +
+                    "${"%.2f".format(Locale.ROOT, prob)},${if (voiced) 1 else 0},${signal ?: ""}\n",
+            )
+        }
+    }
+
+    fun close() {
+        runCatching { out.close() }
+    }
+
+    companion object {
+        const val FILE = "live-trace.csv"
+        const val MAX_BYTES = 8L * 1024 * 1024
     }
 }

@@ -55,7 +55,7 @@ class MashaEars(
     private val onFinal: (String) -> Unit,
     private val onError: (Failure, Int) -> Unit,
     /** El reconocedor cree que el usuario terminó de hablar (su resultado llega después, o no). */
-    private val onEndOfSpeech: () -> Unit = {},
+    private val onSpeechEnd: () -> Unit = {},
 ) {
     enum class Failure { Unavailable, Permission, NoMatch, Network, Busy, StreamUnsupported }
 
@@ -143,7 +143,7 @@ class MashaEars(
         presence.micLevel = 0f
     }
 
-    private inner class Listener(private val onDevice: Boolean) : RecognitionListener {
+    internal inner class Listener(private val onDevice: Boolean) : RecognitionListener {
         private var rmsMax = Float.NEGATIVE_INFINITY
         private var rmsCount = 0
         private var partials = 0
@@ -177,7 +177,8 @@ class MashaEars(
         override fun onEndOfSpeech() {
             Log.i(TAG, "recognizer endOfSpeech ${at()} ${summary()}")
             presence.micLevel = 0f
-            onEndOfSpeech()
+            // El callback de MashaEars (onSpeechEnd), no este método: con el mismo nombre se llamaba a sí mismo.
+            onSpeechEnd()
         }
 
         override fun onError(error: Int) {

@@ -136,6 +136,17 @@ MashaScreen ──feed(texto, final)──▶ MashaVoice ──▶ VoiceRouter �
   cualquiera de: nuestro silencio (700 ms), `onEndOfSpeech` del reconocedor, su resultado, o 1,2 s sin parciales
   nuevos con texto (si nuestro micrófono no oye voz). Tras el fin, 700 ms para el resultado final; si no llega
   (o llega un error) va el último parcial. Sin ningún texto, a los 5 s vuelve a escuchar.
+- **Que no se interrumpa sola ni se pare** (v4.3, medido en la tablet): con el AEC del móvil el arranque de cada
+  sílaba suya llega al micro antes que el retraso estimado y casi tan fuerte como el usuario. La puerta de eco
+  mira siempre desde el último tramo (no solo alrededor del retraso), conserva lo aprendido al reabrir el
+  micrófono (`EchoGate.reopened`), pide 7 dB sobre su eco (antes 5) y, con ella sonando, 300 ms de voz. Si en una
+  respuesta la pausa dos veces sin texto, la voz ya no la pausa hasta la siguiente (el botón sí). Cortada por el
+  usuario, su mensaje recortado no se vuelve a leer (`SpokenReply`). Y el silencio que el TTS del sistema pone
+  en los extremos de cada frase (~340 ms al final) se recorta (`SilenceTrimmer`): entre frases quedaba ~0,7 s
+  callada. Las trazas reales están en `app/src/test/resources/live/` (`TabletEchoTraceTest`); en debug,
+  `LiveMic` escribe una nueva en `files/live-trace.csv` (`adb exec-out run-as com.elyndra.launcher cat
+  files/live-trace.csv`). En el log, cada pausa y vuelta: `pause voice reason=… levels=[…]` /
+  `resume voice reason=… heldMs=…`, y `speech start mic=… ref=… expectedEcho=…`.
 - **Lo dicho nunca se pierde**: si llega con ella contestando otra cosa (algo escrito, el saludo, una
   confirmación), se corta esa respuesta y se manda en cuanto queda libre; si a los 500 ms sigue "ocupada", se
   manda igual (se suelta a la fuerza).

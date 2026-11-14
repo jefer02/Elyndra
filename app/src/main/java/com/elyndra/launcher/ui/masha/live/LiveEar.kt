@@ -31,7 +31,8 @@ class LiveEar(
         val notHers = gate.accept(micDb, refDb)
         voiced = voice && notHers
         echoRejected = voice && !notHers
-        return segmenter.accept(voiced)
+        // Con su voz sonando hace falta más voz para abrir turno.
+        return segmenter.accept(voiced, overLucy = gate.predictedDb > EchoGate.SILENT)
     }
 
     companion object {

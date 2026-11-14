@@ -60,6 +60,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  *
  * Con [voiceBargeIn] apagado (ajuste "Interrumpir con la voz por el altavoz",
  * sin auriculares), lo que se oye mientras ella habla no la corta: solo el botón.
+ * Igual, solo durante esa respuesta, si ya la pausó [NO_TEXT_RESUMES_LIMIT]
+ * veces sin texto (era su propia voz o ruido: si no, se trabaría a cada rato).
+ * Cada pausa y cada vuelta se apuntan con su motivo y los niveles del micrófono.
  * Todo en el hilo principal.
  */
 class LiveVoice(
@@ -111,6 +114,9 @@ class LiveVoice(
         /** Audio para el reconocedor que aún no ha leído (ms). */
         val backlogMs: Int
         fun report(): String
+
+        /** Los niveles del último tramo (micro, lo que suena, eco esperado), para el log. */
+        fun levels(): String
     }
 
     /** Su voz ([MashaVoice]). */
@@ -205,6 +211,16 @@ class LiveVoice(
     private var silencedAtOpen = 0
 
     private var holdStarted = 0L
+
+    /** En esta respuesta suya: pausas que acabaron sin texto, y si ya no se la pausa con la voz. */
+    private var noTextResumes = 0
+    private var bargeInMuted = false
+
+    /** En la pausa en curso el reconocedor entendió algo. */
+    private var heardInHold = false
+
+    /** Por qué sigue ella tras la pausa (para el log). */
+    private var resumeReason = "recognizerNothing"
     private var holds = 0
     private var resumes = 0
     private var commits = 0
@@ -241,8 +257,9 @@ class LiveVoice(
         if (!active || handoff) return
         when (signal) {
             SpeechSegmenter.Signal.Started -> {
-                if (state == LiveTurns.State.Speaking && !voiceBargeIn()) {
-                    // Por el altavoz sin interrumpir con la voz: lo que se oye mientras habla no cuenta.
+                if (state == LiveTurns.State.Speaking && (!voiceBargeIn() || bargeInMuted)) {
+                    // Por el altavoz sin interrumpir con la voz (o ya se trabó en esta respuesta): no cuenta.
+                    if (bargeInMuted) log("speech over Lucy ignored: voice barge-in off for this reply (${mic.levels()})")
                     mic.clearTurn()
                     return
                 }
@@ -263,6 +280,7 @@ class LiveVoice(
     fun onPartial(text: String) {
         if (!active) return
         partial = text
+        if (state == LiveTurns.State.Held && text.isNotBlank()) heardInHold = true
         if (state == LiveTurns.State.UserSpeaking && endVia == null && text.isNotBlank()) watchPartials()
     }
 
@@ -470,6 +488,11 @@ class LiveVoice(
         val from = turns.state
         val effects = turns.on(event)
         state = turns.state
+        // Fuera de una respuesta suya (o empieza otra), la voz vuelve a poder pausarla.
+        if (state != LiveTurns.State.Speaking && state != LiveTurns.State.Held) {
+            noTextResumes = 0
+            bargeInMuted = false
+        }
         if (from != turns.state || effects.isNotEmpty()) log(LiveTurns.describe(event, from, turns.state, effects))
         effects.forEach(::run)
     }
@@ -523,12 +546,22 @@ class LiveVoice(
             LiveTurns.Effect.PauseVoice -> {
                 holds++
                 holdStarted = clock()
+                heardInHold = false
+                resumeReason = "recognizerNothing"
+                log("pause voice reason=userSpeech speechMs=${mic.speechMs} levels=[${mic.levels()}] pausesThisReply=${noTextResumes + 1}")
                 voice.pause()
                 watchHold()
             }
             LiveTurns.Effect.ResumeVoice -> {
                 resumes++
                 holdJob?.cancel()
+                val noText = !heardInHold
+                if (noText) noTextResumes++
+                log("resume voice reason=${if (noText) "noText" else resumeReason} heldMs=${clock() - holdStarted} noTextResumes=$noTextResumes")
+                if (noText && noTextResumes >= NO_TEXT_RESUMES_LIMIT && !bargeInMuted) {
+                    bargeInMuted = true
+                    log("voice barge-in off for this reply: $noTextResumes pauses without text (the button still interrupts)")
+                }
                 voice.resume()
             }
             LiveTurns.Effect.StopVoice -> {
@@ -744,6 +777,7 @@ class LiveVoice(
         when (decision) {
             HoldDecision.Decision.Wait -> Unit
             HoldDecision.Decision.Resume -> {
+                resumeReason = "backchannel"
                 log("hold decision=Resume heldMs=$heldMs partialChars=${partial.length}")
                 dispatch(LiveTurns.Event.Resume)
             }
@@ -822,6 +856,9 @@ class LiveVoice(
 
         /** Tras el fin de turno sin ningún texto, se deja de esperar y se vuelve a escuchar. */
         const val NO_TEXT_MS = 5_000L
+
+        /** Pausas sin texto en una misma respuesta suya tras las que la voz ya no la pausa (solo el botón). */
+        const val NO_TEXT_RESUMES_LIMIT = 2
 
         /** Una pausa no dura más: si a los 2,5 s no se sabe, va en serio. */
         const val MAX_HOLD_MS = 2_500L

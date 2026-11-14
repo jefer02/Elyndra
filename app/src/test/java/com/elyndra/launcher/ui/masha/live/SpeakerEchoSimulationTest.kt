@@ -113,6 +113,50 @@ class SpeakerEchoSimulationTest {
         return Result(falseStarts / minutes, onsets.size - reactions.size, onsets.size, reactions.average())
     }
 
+    /**
+     * Solo la voz de ella (respuestas de 6 s) volviendo al micrófono con un
+     * retraso corto (~48 ms, como en la tablet: lag=3), y el micrófono
+     * reabierto antes de cada respuesta (en relevo se suelta cada turno), con
+     * lo que LiveMic guarda entre aperturas. Ningún tramo de su voz puede abrir turno.
+     */
+    private fun selfStarts(gainDb: Double, drive: Double, seed: Int): Int {
+        val rnd = Random(seed)
+        var carried: EchoGate? = null
+        var starts = 0
+        repeat(10) {
+            val ref = voice(6.0, 215.0, -20.0, rnd)
+            val echo = speaker(ref, delayMs = 48, gainDb = gainDb, drive = drive)
+            val ear = LiveEar(carriedGate(carried))
+            val vad = VoiceActivity()
+            val buf = ShortArray(frame)
+            val rbuf = ShortArray(frame)
+            var t = 0
+            while (t + frame <= ref.size) {
+                for (k in 0 until frame) {
+                    buf[k] = ((echo[t + k] + (rnd.nextDouble() * 2 - 1).toFloat() * 0.0006f).coerceIn(-1f, 1f) * 32767).toInt().toShort()
+                    rbuf[k] = (ref[t + k].coerceIn(-1f, 1f) * 32767).toInt().toShort()
+                }
+                val micDb = VoiceActivity.levelDb(buf)
+                if (ear.accept(micDb, VoiceActivity.levelDb(rbuf), vad.prob(micDb)) == SpeechSegmenter.Signal.Started) starts++
+                t += frame
+            }
+            carried = ear.gate
+        }
+        return starts
+    }
+
+    /** Lo que LiveMic pasa de una apertura del micrófono a la siguiente. */
+    private fun carriedGate(previous: EchoGate?): EchoGate = previous?.reopened() ?: EchoGate()
+
+    @Test
+    fun herOwnVoiceNeverStartsATurnEvenRightAfterTheMicReopens() {
+        val medium = (1..3).sumOf { selfStarts(gainDb = -22.0, drive = 0.0, seed = it) }
+        val high = (1..3).sumOf { selfStarts(gainDb = -8.0, drive = 3.0, seed = it) }
+        println("Su propia voz, micrófono reabierto en cada respuesta: medio=$medium, alto=$high turnos falsos (3 × 10 respuestas)")
+        assertTrue("medium volume: $medium false starts", medium == 0)
+        assertTrue("high volume: $high false starts", high == 0)
+    }
+
     @Test
     fun bargeInOnTheSpeakerAtMediumAndHighVolume() {
         // Medio: el eco llega ~22 dB por debajo de lo que suena. Alto: ~8 dB y el altavoz satura.
@@ -131,7 +175,10 @@ class SpeakerEchoSimulationTest {
         println(row("alto+v", loud))
         val missedMedium = medium.sumOf { it.missed }.toDouble() / medium.sumOf { it.events }
         assertTrue(row("medio", medium), medium.map { it.falsePerMin }.average() <= 0.5)
-        assertTrue(row("medio", medium), missedMedium <= 0.1)
+        // 20 %: el margen (7 dB) y la voz mínima con ella sonando (300 ms) se ajustaron con el eco real de la
+        // tablet (TabletEchoTraceTest), que manda sobre esta voz sintética: con ellos aquí se pierde ~1 de cada
+        // 6 frases a volumen medio (con 5 dB y 250 ms, 1 de cada 10), y en la tablet ninguna.
+        assertTrue(row("medio", medium), missedMedium <= 0.2)
         assertTrue(row("alto", high), high.map { it.falsePerMin }.average() <= 2.0)
     }
 }
