@@ -46,6 +46,19 @@ object ArtUpgrade {
         }
     }
 
+    /** La tanda que toca: [size] claves de [keys] tras saltarse las [skip] primeras, que ya se intentaron sin suerte. */
+    fun batch(keys: List<String>, skip: Int, size: Int): List<String> = keys.drop(skip.coerceAtLeast(0)).take(size)
+
+    /**
+     * Cuántas saltarse en la tanda siguiente: las de antes más las de [batch]
+     * que siguen en [remaining] (nadie tenía nada mejor). Sin esto la misma
+     * tanda se repetiría sin fin en cuanto no mejorase ninguna.
+     */
+    fun nextSkip(skip: Int, batch: List<String>, remaining: Collection<String>): Int {
+        val left = remaining.toHashSet()
+        return skip.coerceAtLeast(0) + batch.count { it in left }
+    }
+
     /** De lo que trajo la pasada, lo que de verdad mejora [field]: de una fuente con más prioridad que la de antes. */
     fun improves(meta: GameMeta, field: MetaField, service: Service, priority: MetadataPriority): Boolean {
         val kind = field.artKind ?: return false

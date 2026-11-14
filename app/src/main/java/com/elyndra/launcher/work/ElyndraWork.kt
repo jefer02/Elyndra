@@ -8,6 +8,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.workDataOf
 import com.elyndra.launcher.notify.MashaNudgeWorker
 import com.elyndra.launcher.widget.WidgetRefreshWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -84,8 +85,9 @@ class ElyndraWork @Inject constructor(@ApplicationContext private val context: C
      * La pasada única que mejora el arte (ArtUpgradeWorker): con red sin
      * límite y batería no baja. [next]: la tanda siguiente, que sustituye a la
      * que la encola; si no, la primera, que no se repite si ya está puesta.
+     * [skip]: las claves pendientes que la tanda siguiente no vuelve a intentar.
      */
-    fun scheduleArtUpgrade(next: Boolean = false) {
+    fun scheduleArtUpgrade(next: Boolean = false, skip: Int = 0) {
         work.enqueueUniqueWork(
             ART_UPGRADE,
             if (next) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.KEEP,
@@ -98,6 +100,7 @@ class ElyndraWork @Inject constructor(@ApplicationContext private val context: C
                         .build(),
                 )
                 .setInitialDelay(if (next) 15L else 30L, TimeUnit.MINUTES)
+                .setInputData(workDataOf(ArtUpgradeWorker.KEY_SKIP to skip))
                 .build(),
         )
     }
