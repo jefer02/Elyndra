@@ -44,7 +44,10 @@ class MediaCache(private val filesDir: File, private val codec: ImageCodec = And
                 if (!response.isSuccessful) return@withContext MediaResult.Failed(MediaFailure.Http)
                 val body = response.body ?: return@withContext MediaResult.Failed(MediaFailure.Http)
                 if (body.contentLength() > MAX_BYTES) return@withContext MediaResult.Failed(MediaFailure.TooBig)
-                body.bytes()
+                // Sin Content-Length (respuesta por trozos) el tope se comprueba al leer: nunca más de MAX_BYTES en memoria.
+                val source = body.source()
+                if (source.request(MAX_BYTES + 1)) return@withContext MediaResult.Failed(MediaFailure.TooBig)
+                source.readByteArray()
             }
         } catch (e: CancellationException) {
             throw e
