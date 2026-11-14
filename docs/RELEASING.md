@@ -93,7 +93,9 @@ apksigner verify --print-certs Elyndra-v1.1.0-arm64-v8a.apk
 
 GitHub already publishes a SHA-256 `digest` for every uploaded asset, and the
 updater verifies the download against it. A `.sha256` next to each APK is
-only a fallback (and handy for people who download by hand). Name it after the
+only a fallback (and handy for people who download by hand). The updater reads
+it from the release assets, never from the repository: the `.sha256` files are
+git-ignored (`release-apk/*.sha256`), so don't commit them. Name it after the
 APK plus `.sha256`:
 
 ```bash
@@ -113,9 +115,10 @@ On Windows PowerShell:
 2. Go to **Releases → Draft a new release**.
 3. **Choose a tag**: type `v1.1.0` (or `v1.1.0-beta` for a beta) and create it on the commit you just
    pushed.
-4. **Title**: for example `Elyndra v1.1.0`. **Notes**: Markdown. The app
-   shows roughly the first 12 lines / 600 characters, so put the highlights
-   first.
+4. **Title**: for example `Elyndra v1.1.0`. **Notes**: Markdown, written in
+   `docs/releases/NOTAS-v1.1.0.md` (committed with the version bump) and
+   pasted here. The app shows roughly the first 12 lines / 600 characters, so
+   put the highlights first.
 5. Attach `Elyndra-v1.1.0-arm64-v8a.apk`, `Elyndra-v1.1.0-universal.apk`
    and, if you made them, the `.sha256` files.
 6. Leave **Set as a pre-release** unticked for a stable version. Tick it only

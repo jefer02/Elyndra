@@ -50,6 +50,8 @@ signing.properties
 output-metadata.json
 app/release/
 app/debug/
+# Los .sha256 se generan con cada release y se suben como assets de GitHub: no van al repo.
+release-apk/*.sha256
 
 # ─── Kotlin / Java generados ──────────────────────────────
 *.class
