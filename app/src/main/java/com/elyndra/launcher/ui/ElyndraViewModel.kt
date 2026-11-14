@@ -1197,19 +1197,21 @@ class ElyndraViewModel @Inject constructor(
         if (!app.files.hasPermission(folder.treeUri)) return null
         val system = Systems.byId(folder.systemId) ?: return null
         val tree = SafGuard.tree(folder, "rescan") ?: return null
+        // Las carpetas que no se dejaron listar: lo que tenían no se da por borrado.
+        val unreadable = java.util.concurrent.CopyOnWriteArrayList<String>()
         val found = if (system.id == Ps4.SYSTEM_ID) {
-            val ps4 = runCatching { app.scanner.scanPs4(tree, folder.rootDocId) }.getOrNull() ?: return null
+            val ps4 = runCatching { app.scanner.scanPs4(tree, folder.rootDocId, onUnreadable = { unreadable += it }) }.getOrNull() ?: return null
             ps4NotInstalled = ps4NotInstalled + (folder.id to ps4.notInstalled.size)
             ps4.found
         } else {
-            runCatching { app.scanner.scan(tree, folder.rootDocId, system) }.getOrNull() ?: return null
+            runCatching { app.scanner.scan(tree, folder.rootDocId, system, onUnreadable = { unreadable += it }) }.getOrNull() ?: return null
         }
         val before = library.roms.count { it.folderId == folder.id }
         if (found.isEmpty() && before > 0) {
             if (!silent) showToast(UiText.res(R.string.toast_folder_unreachable, folder.displayPath))
             return null
         }
-        val diff = repo.mergeScan(folder.id, found)
+        val diff = repo.mergeScan(folder.id, found, unreadable = unreadable)
         if (system.id == Ps4.SYSTEM_ID) importPs4Art(folder)
         if (diff.added.isNotEmpty() && app.settings.autoMeta) engine.start(diff.added, force = false)
         if (!silent) showToast(UiText.res(R.string.toast_rescan, diff.added.size, diff.removed))

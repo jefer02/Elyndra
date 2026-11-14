@@ -56,6 +56,34 @@ class LibraryRemovalTest {
         assertEquals(setOf(tekken.docId), repo.current.folders.first().excluded)
     }
 
+    private fun inside(dir: String, name: String) = found(name).copy(docId = "primary:ROMs/psp/$dir/$name", relPath = "$dir/$name")
+
+    @Test
+    fun aSubfolderThatCouldNotBeListedKeepsItsGames() {
+        repo.addRoms(folder.id, listOf(inside("jp", "Patapon.iso"), inside("jp2", "LocoRoco.iso")))
+        val patapon = repo.current.roms.first { it.fileName == "Patapon.iso" }
+        repo.updateRom(patapon.id) { it.copy(meta = it.meta.copy(name = "Patapon"), stats = it.stats.copy(minutes = 90)) }
+
+        // "jp" no se pudo listar: sus juegos no salen en el análisis, pero tampoco se han ido.
+        val diff = repo.mergeScan(folder.id, scan, unreadable = listOf("jp"))
+
+        val kept = repo.current.roms.first { it.id == patapon.id }
+        assertEquals("Patapon", kept.meta.name)
+        assertEquals(90, kept.stats.minutes)
+        // "jp2" sí se listó y está vacía de verdad: su juego sale de la biblioteca.
+        assertEquals(listOf("Patapon.iso", "Tekken.iso", "Wipeout.iso"), repo.current.roms.map { it.fileName }.sorted())
+        assertEquals(1, diff.removed)
+        assertEquals(3, diff.total)
+    }
+
+    @Test
+    fun withoutListingErrorsAMissingGameIsRemoved() {
+        repo.addRoms(folder.id, listOf(inside("jp", "Patapon.iso")))
+        val diff = repo.mergeScan(folder.id, scan)
+        assertEquals(listOf("Tekken.iso", "Wipeout.iso"), repo.current.roms.map { it.fileName }.sorted())
+        assertEquals(1, diff.removed)
+    }
+
     @Test
     fun aRescanDoesNotBringItBack() {
         val tekken = repo.current.roms.first { it.fileName == "Tekken.iso" }

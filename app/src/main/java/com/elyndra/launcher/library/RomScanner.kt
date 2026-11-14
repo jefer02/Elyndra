@@ -54,9 +54,22 @@ class RomScanner(private val resolver: ContentResolver) {
     /** Hijos directos de un documento del árbol. */
     fun children(treeUri: Uri, docId: String): List<Child> {
         if (!SafGuard.allows(treeUri, "children")) return emptyList()
+        return query(treeUri, docId).orEmpty()
+    }
+
+    /**
+     * Como [children], pero null si no se pudo listar (error del proveedor o
+     * sin respuesta): no es lo mismo que una carpeta vacía, y un reanálisis no
+     * puede dar por borrado lo que hay dentro.
+     */
+    private fun listing(treeUri: Uri, docId: String): List<Child>? =
+        if (SafGuard.allows(treeUri, "listing")) runCatching { query(treeUri, docId) }.getOrNull() else null
+
+    /** La consulta en sí: null si el proveedor no devuelve cursor. */
+    private fun query(treeUri: Uri, docId: String): List<Child>? {
         val uri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, docId)
-        val out = ArrayList<Child>()
-        resolver.query(uri, PROJECTION, null, null, null)?.use { c ->
+        return resolver.query(uri, PROJECTION, null, null, null)?.use { c ->
+            val out = ArrayList<Child>()
             while (c.moveToNext()) {
                 val id = c.getString(0) ?: continue
                 out += Child(
@@ -67,8 +80,8 @@ class RomScanner(private val resolver: ContentResolver) {
                     modified = if (c.isNull(4)) 0L else c.getLong(4),
                 )
             }
+            out
         }
-        return out
     }
 
     /** Subcarpetas visibles de una carpeta (para detectar varios sistemas a la vez). */
@@ -97,18 +110,24 @@ class RomScanner(private val resolver: ContentResolver) {
      * Recorre la carpeta (y sus subcarpetas) y devuelve los juegos del sistema.
      * Oculta las pistas referenciadas por hojas .cue/.gdi/.m3u y trata como un
      * solo juego las carpetas de PS3 (formato JB, con PS3_GAME dentro).
+     *
+     * [onUnreadable] recibe la ruta relativa ("" = la raíz, sin barra final) de
+     * cada carpeta que no se pudo listar: lo que hubiera dentro no sale en el
+     * resultado, pero tampoco se sabe que ya no esté (ver
+     * `LibraryRepository.mergeScan`).
      */
     suspend fun scan(
         treeUri: Uri,
         rootDocId: String,
         system: GameSystem,
+        onUnreadable: (String) -> Unit = {},
         onProgress: (Progress) -> Unit = {},
     ): List<Found> = withContext(Dispatchers.IO) {
         if (!SafGuard.allows(treeUri, "scan")) return@withContext emptyList()
         // El PC no se analiza por extensión: una carpeta por juego (ver abajo).
-        if (system.folderGames) return@withContext scanFolderGames(treeUri, rootDocId, system, onProgress)
+        if (system.folderGames) return@withContext scanFolderGames(treeUri, rootDocId, system, onUnreadable, onProgress)
         // PS4: juegos extraídos por Bachata, reconocidos por su contenido.
-        if (system.id == Ps4.SYSTEM_ID) return@withContext scanPs4(treeUri, rootDocId, onProgress).found
+        if (system.id == Ps4.SYSTEM_ID) return@withContext scanPs4(treeUri, rootDocId, onUnreadable, onProgress).found
 
         val results = ArrayList<Found>()
         val queue = ArrayDeque<Triple<String, String, Int>>()
@@ -118,7 +137,7 @@ class RomScanner(private val resolver: ContentResolver) {
         while (queue.isNotEmpty() && results.size < MAX_RESULTS) {
             coroutineContext.ensureActive()
             val (dirId, rel, depth) = queue.removeFirst()
-            val kids = runCatching { children(treeUri, dirId) }.getOrDefault(emptyList())
+            val kids = listing(treeUri, dirId) ?: emptyList<Child>().also { onUnreadable(rel.trimEnd('/')) }
             scanned += kids.size
 
             val files = kids.filter { !it.isDir && !it.name.startsWith(".") }
@@ -176,10 +195,11 @@ class RomScanner(private val resolver: ContentResolver) {
         treeUri: Uri,
         rootDocId: String,
         system: GameSystem,
+        onUnreadable: (String) -> Unit,
         onProgress: (Progress) -> Unit,
     ): List<Found> {
         val results = ArrayList<Found>()
-        val kids = runCatching { children(treeUri, rootDocId) }.getOrDefault(emptyList())
+        val kids = listing(treeUri, rootDocId) ?: emptyList<Child>().also { onUnreadable("") }
         var scanned = kids.size
 
         // Sueltos en la raíz: portables (.exe) y archivos-id (.iso, .txt…).
@@ -199,7 +219,7 @@ class RomScanner(private val resolver: ContentResolver) {
             onProgress(Progress(scanned, results.size, dir.name))
 
             val executables = ArrayList<PcGames.Executable>()
-            scanned += collectExecutables(treeUri, dir.docId, "", 0, executables)
+            scanned += collectExecutables(treeUri, dir.docId, "", 0, executables) { onUnreadable(dir.name) }
             if (!PcGames.looksLikeGame(executables)) {
                 // Sin ejecutable la carpeta aún puede llevar juegos dentro: los
                 // archivos-id de quien tiene así su biblioteca de BannerHub.
@@ -251,15 +271,16 @@ class RomScanner(private val resolver: ContentResolver) {
         rel: String,
         depth: Int,
         out: MutableList<PcGames.Executable>,
+        onUnreadable: () -> Unit,
     ): Int {
         if (depth > PcGames.MAX_DEPTH || out.size >= MAX_EXECUTABLES) return 0
-        val kids = runCatching { children(treeUri, docId) }.getOrDefault(emptyList())
+        val kids = listing(treeUri, docId) ?: emptyList<Child>().also { onUnreadable() }
         var scanned = kids.size
         for (child in kids) {
             if (child.name.startsWith(".")) continue
             if (child.isDir) {
                 if (child.name.lowercase() in SKIP_DIRS) continue
-                scanned += collectExecutables(treeUri, child.docId, "$rel${child.name}/", depth + 1, out)
+                scanned += collectExecutables(treeUri, child.docId, "$rel${child.name}/", depth + 1, out, onUnreadable)
             } else if (child.extension in PcGames.EXECUTABLE_EXTENSIONS) {
                 if (out.size >= MAX_EXECUTABLES) break
                 out += PcGames.Executable(child.docId, rel + child.name, child.size)
@@ -280,6 +301,7 @@ class RomScanner(private val resolver: ContentResolver) {
     suspend fun scanPs4(
         treeUri: Uri,
         rootDocId: String,
+        onUnreadable: (String) -> Unit = {},
         onProgress: (Progress) -> Unit = {},
     ): Ps4Scan = withContext(Dispatchers.IO) {
         if (!SafGuard.allows(treeUri, "scanPs4")) return@withContext Ps4Scan(emptyList(), emptyList())
@@ -293,7 +315,7 @@ class RomScanner(private val resolver: ContentResolver) {
         while (queue.isNotEmpty() && dirs.size < MAX_RESULTS) {
             coroutineContext.ensureActive()
             val (dirId, rel, depth) = queue.removeFirst()
-            val kids = runCatching { children(treeUri, dirId) }.getOrDefault(emptyList())
+            val kids = listing(treeUri, dirId) ?: emptyList<Child>().also { onUnreadable(rel.trimEnd('/')) }
             scanned += kids.size
             for (f in kids) {
                 if (f.isDir || f.name.startsWith(".") || f.extension != "pkg") continue
